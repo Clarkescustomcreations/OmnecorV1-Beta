@@ -42,3 +42,14 @@ Omnecor leverages a service-oriented tRPC/Express backend providing:
 ## Documentation Status
 
 All project documentation has been rebranded and modernized to reflect the production-ready Omnecor HMCI infrastructure.
+
+---
+
+## ACTIVE ANALYSIS (2026-05-28)
+
+### Architectural Audit
+- **Dual-Stream WebSocket**: System uses both tRPC subscriptions and a custom event bus for real-time synchronization.
+- **Incomplete OMMESH**: Discovery and security are implemented, but federated execution routing in `AiProviderService` remains stubbed.
+- **Specialized Module Gap**: LLM Builder, 3D Modeler, and PCB Designer UIs are currently mock-heavy and lack direct integration with their respective backend Python bridges.
+- **Dangling Components**: Identified several unreachable or redundant UI components (`Home.tsx`, `ComponentShowcase.tsx`, `AIChatBox.tsx`, `DashboardLayout.tsx`) that increase bundle size and maintenance overhead.
+- **Memory Integration**: The 3-layer memory system is structurally sound, but high-level agent frameworks (LiteAgent/CrewAI) are currently references rather than active participants in the service layer.

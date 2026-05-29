@@ -64,3 +64,13 @@
 - [ ] ComfyUI bridge
 - [ ] crewAI / n8n connectors
 - [ ] Unsloth LoRA fine-tuning UI
+
+## Analysis Findings & Cleanup
+- [ ] Implement real OMMESH federated routing in `AiProviderService.ts`.
+- [ ] Connect LLM Builder frontend to backend Python bridges.
+- [ ] Connect 3D Modeler frontend to Blender bridge.
+- [ ] Connect PCB Designer frontend to KiCad bridge.
+- [ ] Remove unreachable components: `Home.tsx`, `ComponentShowcase.tsx`.
+- [ ] Remove redundant components: `AIChatBox.tsx`, `DashboardLayout.tsx`.
+- [ ] Integrate LiteAgent/CrewAI references into production services.
+- [ ] Implement YARA-based scanning in `SecurityService.ts`.

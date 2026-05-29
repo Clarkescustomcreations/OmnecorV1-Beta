@@ -136,3 +136,20 @@ safe handling of untrusted data and protection of sensitive credentials.
 - **ComfyUI Integration:** Node-based image generation pipeline bridge.
 - **crewAI / n8n Integration:** External orchestration connectors.
 - **Unsloth Integration:** Local LoRA fine-tuning pipeline UI.
+
+---
+
+## Inferred Planned Feature: Real OMMESH Routing
+Currently, OMMESH discovery and security are functional, but the `AiProviderService` does not yet leverage the mesh for distributed inference.
+- **Goal**: Enable transparent offloading of LLM requests to peer nodes based on VRAM availability.
+- **Requirement**: Update `AiProviderService.ts` to query `MeshNodeOrchestrator` for optimal execution targets.
+
+## Inferred Planned Feature: Specialized Module Hardening
+Bridge the gap between the aesthetic mock UIs for specialized tools and their functional backend bridges.
+- **LLM Builder**: Wire to Unsloth/Fine-tuning service.
+- **3D Modeler**: Wire to Blender headless rendering.
+- **PCB Designer**: Wire to KiCad DRC/ERC service.
+
+## Inferred Planned Feature: Agentic Memory Integration
+Move beyond static vector storage to active agent-driven memory management.
+- **Goal**: Integrate `LiteAgent` and `CrewAI` references to allow agents to autonomously manage working and episodic memory layers.
