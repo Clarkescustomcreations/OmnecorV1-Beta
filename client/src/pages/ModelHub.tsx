@@ -48,8 +48,6 @@ export default function ModelHub() {
       JSON.stringify({
         providerId: model.source,
         modelId: model.id,
-        apiKey: (model as any).apiKey, // Assuming this might be in the model object
-        baseUrl: (model as any).endpoint,
       })
     );
   };

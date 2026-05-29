@@ -75,8 +75,20 @@ DEVICE: str = os.getenv("RVC_DEVICE", "cuda" if torch.cuda.is_available() else "
 # Maximum upload size in bytes (default 200 MB).
 MAX_UPLOAD_BYTES: int = int(os.getenv("MAX_UPLOAD_BYTES", str(200 * 1024 * 1024)))
 
+# Root directory for RVC models to prevent path traversal.
+# Default to 'assets/models/rvc' relative to the project root.
+RVC_MODELS_DIR: Path = Path(os.getenv("RVC_MODELS_DIR", "assets/models/rvc")).resolve()
+
 # Pitch extraction method — "pm" (fast, less accurate) or "harvest" (accurate, slow).
 F0_METHOD: str = os.getenv("RVC_F0_METHOD", "harvest")
+
+def is_safe_path(path: Path, base: Path) -> bool:
+    """Check if a path is contained within a base directory."""
+    try:
+        # resolve() handles symlinks and '..'
+        return base in path.resolve().parents or path.resolve() == base
+    except (OSError, RuntimeError):
+        return False
 
 # ─────────────────────────────────────────────────────────────────────────────
 # RVC model cache — keep loaded checkpoints in memory between requests
@@ -156,10 +168,12 @@ class RVCModel:
         log.info("Loading RVC checkpoint: %s on %s", self.model_path.name, self.device)
 
         # ── Load the state dict from the checkpoint file ──────────────────
+        # SECURITY: weights_only=True prevents arbitrary code execution from untrusted .pth files.
+        # If loading fails due to custom RVC classes, add them to torch.serialization.add_safe_globals.
         checkpoint = torch.load(
             str(self.model_path),
             map_location=self.device,
-            weights_only=False,   # RVC checkpoints may contain non-tensor objects
+            weights_only=True,
         )
 
         try:
@@ -464,6 +478,13 @@ async def convert_voice(
 
     # ── Validate model path exists and is a .pth file ─────────────────────
     model_file = Path(model_path).resolve()
+    if not is_safe_path(model_file, RVC_MODELS_DIR):
+        log.warning("Path traversal attempt blocked: %s", model_path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access to the specified model path is restricted.",
+        )
+
     if not model_file.exists():
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

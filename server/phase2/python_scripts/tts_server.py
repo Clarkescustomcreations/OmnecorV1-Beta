@@ -181,6 +181,17 @@ class SynthesisPathResponse(BaseModel):
     message: str = "Audio saved successfully."
 
 
+# Root directory for speaker reference files to prevent path traversal.
+SPEAKER_WAV_ROOT: Path = Path(os.getenv("SPEAKER_WAV_ROOT", "assets/speakers")).resolve()
+
+def is_safe_path(path: Path, base: Path) -> bool:
+    """Check if a path is contained within a base directory."""
+    try:
+        # resolve() handles symlinks and '..'
+        return base in path.resolve().parents or path.resolve() == base
+    except (OSError, RuntimeError):
+        return False
+
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -201,6 +212,13 @@ def _resolve_speaker_wav(raw_path: str) -> Path:
             status_code=status.HTTP_404_NOT_FOUND,
             detail=f"Speaker reference file not found: {raw_path}",
         ) from exc
+
+    if not is_safe_path(resolved, SPEAKER_WAV_ROOT):
+        log.warning("Path traversal attempt blocked: %s", raw_path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access to the specified speaker reference path is restricted.",
+        )
 
     if resolved.suffix.lower() not in {".wav", ".wave"}:
         raise HTTPException(
