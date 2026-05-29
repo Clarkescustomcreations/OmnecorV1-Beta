@@ -99,6 +99,28 @@ Transform Omnecor from a standalone workstation into a distributed LAN-native AI
 
 ---
 
+## Phase 12 — Security Hardening (COMPLETE)
+
+### Goal
+Harden the Omnecor HMCI infrastructure against critical vulnerabilities, ensuring
+safe handling of untrusted data and protection of sensitive credentials.
+
+### Success Criteria
+- [x] **Eliminate Deserialization Risks**: Secure all `torch.load` calls in Python microservices.
+- [x] **Path Traversal Mitigation**: Validate all file access paths against strict root boundaries.
+- [x] **Credential Hygiene**: Prevent sensitive API keys from persisting in browser `localStorage`.
+- [x] **Dependency Integrity**: Update core database and testing libraries to patched versions.
+- [x] **Zero Regressions**: Maintain 100% test pass rate (177/177).
+
+### Completed Tasks
+- **Critical Deserialization Fix**: Secured `rvc_server.py` by setting `weights_only=True` in `torch.load` to prevent arbitrary code execution via malicious model files.
+- **Path Traversal Protection**: Implemented secure root directory validation and `is_safe_path` checks in `rvc_server.py` and `tts_server.py`.
+- **Sensitive Data Protection**: Removed `apiKey` and `baseUrl` from `localStorage` in `ModelHub.tsx`, moving toward more secure state management.
+- **Security Dependency Updates**: Updated `drizzle-orm` (0.45.2), `vitest` (4.1.7), and `drizzle-kit` (0.31.10) to resolve known vulnerabilities.
+- **Verification**: Confirmed all 177 tests pass.
+
+---
+
 ## Future — Media & Creative Engines
 
 - **Character Engine:** Consistent character generation across sessions (Flux Pro).

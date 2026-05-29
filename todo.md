@@ -50,6 +50,13 @@
 - [ ] Post-install script
 - [ ] Packaging docs
 
+## Phase 12 — Security Hardening ✅
+- [x] **Critical Deserialization Fix**: Secured `rvc_server.py` by setting `weights_only=True` in `torch.load`.
+- [x] **Path Traversal Protection**: Implemented secure root directory validation and `is_safe_path` checks in `rvc_server.py` and `tts_server.py`.
+- [x] **Sensitive Data Protection**: Removed `apiKey` and `baseUrl` from `localStorage` in `ModelHub.tsx`.
+- [x] **Security Dependency Updates**: Updated `drizzle-orm` (0.45.2), `vitest` (4.1.7), and `drizzle-kit` (0.31.10).
+- [x] **Verification**: Confirmed all 177 tests pass.
+
 ## Future
 - [ ] Character Engine (Flux Pro)
 - [ ] Video Clone Engine
