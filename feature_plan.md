@@ -49,7 +49,7 @@ Elevate Omnecor to Aviation-grade reliability with a distinct creative environme
 
 ---
 
-## Phase 8 — OMMESH: Distributed Mesh Intelligence (IN PROGRESS)
+## Phase 8 — OMMESH: Distributed Mesh Intelligence (COMPLETE)
 
 ### Goal
 Transform Omnecor from a standalone workstation into a distributed LAN-native AI cloud.
@@ -58,7 +58,7 @@ Transform Omnecor from a standalone workstation into a distributed LAN-native AI
 - [x] **Zero-Config Discovery**: Nodes find each other on a LAN via mDNS (`bonjour`).
 - [x] **Secure Federation**: mTLS with automated certificate rotation and signed messages.
 - [x] **Intelligent Offloading**: VRAM-weighted job routing via `RoutingEngine`.
-- [ ] **Transparent Scaling**: A "Mesh Compute" resource pool is visible in the UI.
+- [x] **Transparent Scaling**: A "Mesh Compute" resource pool is visible in the UI.
 
 ### Architecture Implementation
 - **mDNS Discovery**: Uses `bonjour` to advertise node identity and capabilities on the LAN.
@@ -74,7 +74,7 @@ Transform Omnecor from a standalone workstation into a distributed LAN-native AI
 - [x] Create `RoutingEngine` (VRAM-weighted).
 - [x] Integrate `ommeshRouter` into unified `appRouter`.
 - [x] Implement peer notification broadcast after cert rotation.
-- [ ] Create Mesh Compute UI panel using existing Neural Graph components.
+- [x] Create Mesh Compute UI panel using existing Neural Graph components.
 
 ---
 
@@ -113,7 +113,9 @@ safe handling of untrusted data and protection of sensitive credentials.
 - **Path Traversal Protection**: Implemented secure root directory validation and `is_safe_path` checks in `rvc_server.py` and `tts_server.py`.
 - **Sensitive Data Protection**: Removed `apiKey` and `baseUrl` from `localStorage` in `ModelHub.tsx`, moving toward more secure state management.
 - **Security Dependency Updates**: Updated `drizzle-orm` (0.45.2), `vitest` (4.1.7), and `drizzle-kit` (0.31.10) to resolve known vulnerabilities.
-- **Verification**: Confirmed all 177 tests pass.
+- **Symlink Traversal Mitigation**: Hardened `validatePath` service with `fs.realpath` to prevent directory boundary escapes via malicious symbolic links.
+- **Python Sandbox Hardening**: Sealed the Blender Python bridge sandbox by clearing `__builtins__`, preventing introspection-based RCE escapes.
+- **Verification**: Confirmed all 177 tests pass (Final Baseline Verification Complete).
 
 ---
 

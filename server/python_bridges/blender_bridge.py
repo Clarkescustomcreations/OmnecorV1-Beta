@@ -1,4 +1,4 @@
-﻿# ============================================================
+# ============================================================
 # File: blender_bridge.py
 # Purpose:
 #   Blender background-mode bridge for Omnecor.
@@ -108,15 +108,25 @@ def run_external_script(script_path):
     Execute an external Python script
     inside Blender's Python environment.
     """
-    if not os.path.exists(script_path):
+    base_dir = os.path.abspath(os.getenv("ALLOWED_SCRIPTS_DIR", "scripts/blender"))
+    abs_path = os.path.abspath(script_path)
+
+    if not abs_path.startswith(base_dir):
+        raise PermissionError("Script path outside allowed directory")
+
+    if not abs_path.endswith(".py"):
+        raise ValueError("Only .py scripts allowed")
+
+    if not os.path.exists(abs_path):
         raise FileNotFoundError(
-            f"Script not found: {script_path}"
+            f"Script not found: {abs_path}"
         )
 
-    with open(script_path, "r", encoding="utf-8") as f:
+    with open(abs_path, "r", encoding="utf-8") as f:
         script_code = f.read()
 
-    exec(script_code, {"bpy": bpy})
+    restricted_globals = {"bpy": bpy, "__name__": "__main__", "__builtins__": {}}
+    exec(script_code, restricted_globals)
 
 
 def export_gltf(filepath):

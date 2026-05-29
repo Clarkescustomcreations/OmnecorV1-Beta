@@ -16,28 +16,32 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 
 // ---------------------------------------------------------------------------
 // Input Schemas
 // ---------------------------------------------------------------------------
 
+const safePathSchema = z.string().min(1).refine(path => {
+  return !path.includes('..') && !path.startsWith('/');
+}, "Path traversal not allowed. Use relative paths only.");
+
 const scanFileSchema = z.object({
-  filePath: z.string().min(1),
+  filePath: safePathSchema,
 });
 
 const scanDirectorySchema = z.object({
-  dirPath: z.string().min(1),
+  dirPath: safePathSchema,
 });
 
 const encryptFileSchema = z.object({
-  filePath: z.string().min(1),
+  filePath: safePathSchema,
   passphrase: z.string().min(8, "Passphrase must be at least 8 characters"),
 });
 
 const decryptFileSchema = z.object({
-  encryptedPath: z.string().min(1),
+  encryptedPath: safePathSchema,
   passphrase: z.string().min(1),
 });
 
@@ -48,13 +52,13 @@ const generateKeySchema = z.object({
 
 const createBackupSchema = z.object({
   projectId: z.string().min(1),
-  sourceDir: z.string().min(1),
+  sourceDir: safePathSchema,
   passphrase: z.string().optional(),
 });
 
 const restoreBackupSchema = z.object({
-  archivePath: z.string().min(1),
-  targetDir: z.string().min(1),
+  archivePath: safePathSchema,
+  targetDir: safePathSchema,
   passphrase: z.string().optional(),
 });
 
@@ -68,7 +72,7 @@ export const securityRouter = router({
   // =========================================================================
 
   /** Scan a single file for security threats */
-  scanFile: publicProcedure
+  scanFile: protectedProcedure
     .input(scanFileSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -82,7 +86,7 @@ export const securityRouter = router({
     }),
 
   /** Scan an entire directory recursively */
-  scanDirectory: publicProcedure
+  scanDirectory: protectedProcedure
     .input(scanDirectorySchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -109,7 +113,7 @@ export const securityRouter = router({
   // =========================================================================
 
   /** Encrypt a file with a passphrase */
-  encryptFile: publicProcedure
+  encryptFile: protectedProcedure
     .input(encryptFileSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -127,7 +131,7 @@ export const securityRouter = router({
     }),
 
   /** Decrypt a file with a passphrase */
-  decryptFile: publicProcedure
+  decryptFile: protectedProcedure
     .input(decryptFileSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -145,7 +149,7 @@ export const securityRouter = router({
     }),
 
   /** Generate and store an encryption key for a project */
-  generateProjectKey: publicProcedure
+  generateProjectKey: protectedProcedure
     .input(generateKeySchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -172,7 +176,7 @@ export const securityRouter = router({
   // =========================================================================
 
   /** Create a backup of a project directory */
-  createBackup: publicProcedure
+  createBackup: protectedProcedure
     .input(createBackupSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -190,7 +194,7 @@ export const securityRouter = router({
     }),
 
   /** Restore a project from a backup archive */
-  restoreBackup: publicProcedure
+  restoreBackup: protectedProcedure
     .input(restoreBackupSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -208,7 +212,7 @@ export const securityRouter = router({
     }),
 
   /** List all backups for a project */
-  listBackups: publicProcedure
+  listBackups: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       return ctx.services.security.listBackups(input.projectId);

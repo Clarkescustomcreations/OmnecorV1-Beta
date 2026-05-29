@@ -38,12 +38,12 @@
 - [x] **Visual Identity**: Enhanced with backdrop filters, `oklch` colors, and matte surfaces.
 - [x] **Verification**: Confirmed 177 tests pass and TypeScript check is clean.
 
-## Phase 8 — OMMESH Distributed Mesh (IN PROGRESS) 🔄
+## Phase 8 — OMMESH Distributed Mesh (COMPLETE) ✅
 - [x] LAN beacon / mDNS discovery service
 - [x] Secure node federation (mTLS)
 - [x] Intelligent VRAM-weighted job routing
 - [x] Peer notification broadcast after rotation
-- [ ] Mesh Compute UI panel
+- [x] Mesh Compute UI panel
 
 ## Phase 9 — Packaging & Distribution ✅
 - [x] .deb package
@@ -58,7 +58,11 @@
 - [x] **Path Traversal Protection**: Implemented secure root directory validation and `is_safe_path` checks in `rvc_server.py` and `tts_server.py`.
 - [x] **Sensitive Data Protection**: Removed `apiKey` and `baseUrl` from `localStorage` in `ModelHub.tsx`.
 - [x] **Security Dependency Updates**: Updated `drizzle-orm` (0.45.2), `vitest` (4.1.7), and `drizzle-kit` (0.31.10).
-- [x] **Verification**: Confirmed all 177 tests pass.
+- [x] **Unified Security Router Hardening**: Auth enforced on all security endpoints.
+- [x] **Advanced Path Validation**: Strict boundary checks in `validatePath` (including `fs.realpath`).
+- [x] **DoS Mitigation**: Global rate limiting via `express-rate-limit`.
+- [x] **Python Bridge Sandbox**: Secured `blender_bridge.py` against injection and introspection.
+- [x] **Verification**: Confirmed all 177 tests pass (Final Baseline Verification).
 
 ## Future
 - [ ] Character Engine (Flux Pro)
