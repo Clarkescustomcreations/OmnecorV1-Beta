@@ -36,10 +36,11 @@
 - [ ] HITL challenge-and-response checklists
 - [ ] Time-boxed decision lanes
 
-## Phase 8 — OMMESH Distributed Mesh ⏳
-- [ ] LAN beacon / mDNS discovery service
-- [ ] Secure node federation (mTLS)
-- [ ] Intelligent VRAM-weighted job routing
+## Phase 8 — OMMESH Distributed Mesh (IN PROGRESS) 🔄
+- [x] LAN beacon / mDNS discovery service
+- [x] Secure node federation (mTLS)
+- [x] Intelligent VRAM-weighted job routing
+- [x] Peer notification broadcast after rotation
 - [ ] Mesh Compute UI panel
 
 ## Phase 9 — Packaging & Distribution ⏳

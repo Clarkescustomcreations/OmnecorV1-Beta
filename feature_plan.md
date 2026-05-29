@@ -61,24 +61,32 @@ Elevate Omnecor to Aviation-grade reliability with a distinct creative environme
 
 ---
 
-## Phase 8 — OMMESH: Distributed Mesh Intelligence
+## Phase 8 — OMMESH: Distributed Mesh Intelligence (IN PROGRESS)
 
 ### Goal
 Transform Omnecor from a standalone workstation into a distributed LAN-native AI cloud.
 
 ### Success Criteria
-- **Zero-Config Discovery:** Nodes find each other on a LAN within 5 seconds via mDNS/UDP broadcast.
-- **Secure Federation:** mTLS or signed token exchange. Only trusted nodes share compute.
-- **Intelligent Offloading:** Inference requests route to the node with the most available
-  VRAM and lowest latency. The orchestrator tracks this in real-time.
-- **Transparent Scaling:** A "Mesh Compute" resource pool is visible in the UI, showing
-  all online nodes, their VRAM availability, and current job loads.
+- [x] **Zero-Config Discovery**: Nodes find each other on a LAN via mDNS (`bonjour`).
+- [x] **Secure Federation**: mTLS with automated certificate rotation and signed messages.
+- [x] **Intelligent Offloading**: VRAM-weighted job routing via `RoutingEngine`.
+- [ ] **Transparent Scaling**: A "Mesh Compute" resource pool is visible in the UI.
 
-### Architecture Notes
-- Each Omnecor instance runs a LAN beacon service on a fixed UDP port.
-- The primary node maintains a mesh registry (node ID, IP, port, VRAM, status).
-- Job routing uses a simple weighted score: `(available_vram * 0.7) + (1/latency_ms * 0.3)`.
-- Mesh state is broadcast via WebSocket to the frontend for live display.
+### Architecture Implementation
+- **mDNS Discovery**: Uses `bonjour` to advertise node identity and capabilities on the LAN.
+- **Security Manager**: Handles ed25519/RSA identity, mTLS TLS options for server/client, and certificate lifecycle (generation/rotation).
+- **Routing Engine**: Decides whether to execute inference locally or route to a peer based on VRAM score.
+- **MeshNode Orchestrator**: Singleton service coordinating discovery, security, and routing.
+- **tRPC Integration**: `ommeshRouter` provides mesh control and discovery APIs to the frontend.
+
+### Task List
+- [x] Implement core types and interfaces.
+- [x] Create `SecurityManager` with mTLS and cert rotation.
+- [x] Create `DiscoveryService` using `bonjour`.
+- [x] Create `RoutingEngine` (VRAM-weighted).
+- [x] Integrate `ommeshRouter` into unified `appRouter`.
+- [x] Implement peer notification broadcast after cert rotation.
+- [ ] Create Mesh Compute UI panel using existing Neural Graph components.
 
 ---
 

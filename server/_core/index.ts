@@ -33,6 +33,7 @@ import { OmnecorWebSocketServer } from "../phase2/websocket/WebSocketServer";
 import { ProcessManagerService } from "../phase2/services/ProcessManagerService";
 import { SecurityService } from "../phase2/services/SecurityService";
 import { VectorDBService } from "../phase2/services/VectorDBService";
+import { meshNode } from "../ommesh/core/MeshNode.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Port Discovery
@@ -87,6 +88,14 @@ async function startServer() {
       "[Omnecor] VectorDBService init warning:",
       (error as Error).message
     );
+  }
+
+  // ─── Initialize OMMESH Node ─────────────────────────────────────────────
+  try {
+    await meshNode.start();
+    console.log("[Omnecor] OMMESH Node started and broadcasting");
+  } catch (error) {
+    console.warn("[Omnecor] OMMESH init warning:", (error as Error).message);
   }
 
   // ─── Create Express App ─────────────────────────────────────────────────

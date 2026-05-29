@@ -45,7 +45,7 @@ import { voiceRouter } from "./routers/voiceRouter.js";
 import { trainingRouter } from "./routers/trainingRouter.js";
 import { projectRouter } from "./routers/projectRouter.js";
 import { securityRouter } from "./routers/securityRouter.js";
-import { meshRouter } from "./routers/meshRouter.js";
+import { ommeshRouter } from "./routers/ommesh.router.js";
 import { falRouter } from "./routers/falRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -86,7 +86,7 @@ export const appRouter = router({
   project: projectRouter,
 
   // ─── Mesh Intelligence (OMMESH Node Discovery) ───────────────────────────
-  mesh: meshRouter,
+  mesh: ommeshRouter,
 
   // ─── OpenArt AI (Video Clone / Character Gen) ─────────────────────────────
   fal: falRouter,
