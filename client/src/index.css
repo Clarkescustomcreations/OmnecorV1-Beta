@@ -77,7 +77,6 @@
   --sidebar-border: oklch(0.92 0.004 286.32);
   --sidebar-ring: oklch(0.623 0.214 259.815);
 }
-
 .dark {
   --primary: var(--color-blue-700);
   --primary-foreground: var(--color-blue-50);
@@ -101,7 +100,18 @@
   --border: oklch(0.22 0.01 240);
   --input: oklch(0.22 0.01 240);
   --ring: oklch(0.65 0.15 260);
+
+  /* OMMESH BRAND COLORS (Blueprint) */
+  --bg-primary: oklch(0.12 0.015 260);
+  --bg-secondary: oklch(0.16 0.018 260);
+  --bg-elevated: oklch(0.20 0.02 260);
+  --accent-cyan: oklch(0.72 0.18 210);
+  --accent-purple: oklch(0.65 0.21 300);
+  --accent-danger: oklch(0.63 0.24 25);
+  --accent-success: oklch(0.75 0.16 160);
+
   --chart-1: var(--color-blue-300);
+...
   --chart-2: var(--color-blue-500);
   --chart-3: var(--color-blue-600);
   --chart-4: var(--color-blue-700);

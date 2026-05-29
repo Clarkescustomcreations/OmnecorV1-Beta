@@ -7,12 +7,14 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Grid3x3, List, Settings, Shield } from "lucide-react";
+import { Brain, Grid3x3, List, Settings, Shield, Maximize2, Anchor, ExternalLink } from "lucide-react";
 import { useState, useMemo, useEffect } from "react";
-import NeuralGraphView from "@/components/neural/NeuralGraphView";
+import NeuralGraphView, { BrainMapViewport } from "@/components/neural/NeuralGraphView";
 import NeuralTreeView from "@/components/neural/NeuralTreeView";
 import MapManager from "@/components/neural/MapManager";
 import FictionModePanel from "@/components/neural/FictionModePanel";
+import { FloatingWindow } from "@/components/window-system/FloatingWindow";
+import { useBrainMapStore } from "@/lib/stores/brainMapStore";
 import { trpc } from "@/lib/trpc";
 import { fileTreeToNetwork } from "@/lib/fileTreeToNetwork";
 import { NeuralMapProvider, useNeuralMap } from "@/contexts/NeuralMapContext";
@@ -84,9 +86,52 @@ function BrainMapContent() {
     (n: any) => n.id === selectedNodeId
   );
 
+  const { windowMode, setWindowMode, windowPosition, windowSize } = useBrainMapStore();
+
+  // Handle External Window Launching
+  useEffect(() => {
+    if (windowMode === "external") {
+      const win = window.open(
+        "/brain-map-external",
+        "OmnecorNeuralMap",
+        `width=${windowSize.width},height=${windowSize.height},left=${windowPosition.x},top=${windowPosition.y},menubar=no,toolbar=no,location=no,status=no`
+      );
+
+      if (!win) {
+        alert("Pop-up blocked! Please allow pop-ups to use the external window mode.");
+        setWindowMode("embedded");
+      }
+      
+      const bc = new BroadcastChannel('omnecor_neural_sync');
+      bc.onmessage = (event) => {
+        if (event.data === 'redock_request') {
+          setWindowMode("embedded");
+        }
+      };
+      
+      return () => {
+        bc.postMessage('redock');
+        bc.close();
+      };
+    }
+  }, [windowMode, setWindowMode, windowPosition, windowSize]);
+
   return (
     <OmnecorDashboardLayout>
-      <div className="h-full flex flex-col bg-background overflow-hidden">
+      <div className="h-full flex flex-col bg-background overflow-hidden relative">
+        {/* Floating Window Overlay */}
+        <FloatingWindow
+          title={`${activeMap?.name || "Neural Map"} (Floating)`}
+          isOpen={windowMode === "floating"}
+          onClose={() => setWindowMode("embedded")}
+          onDock={() => setWindowMode("embedded")}
+          onExternal={() => setWindowMode("external")}
+          initialPosition={windowPosition}
+          initialSize={windowSize}
+        >
+          <BrainMapViewport onNodeClick={setSelectedNodeId} />
+        </FloatingWindow>
+
         <ResizablePanelGroup direction="horizontal" className="flex-1">
           {/* Left Sidebar: Map Manager */}
           <ResizablePanel defaultSize={20} minSize={15} maxSize={30} className="border-r border-border">
@@ -119,22 +164,45 @@ function BrainMapContent() {
                   </div>
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex items-center gap-2">
+                  {/* View Switchers */}
+                  <div className="flex bg-muted rounded-md p-1 mr-4">
+                    <Button
+                      size="sm"
+                      variant={viewMode === "graph" ? "default" : "ghost"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setViewMode("graph")}
+                    >
+                      <Grid3x3 className="w-3.5 h-3.5 mr-1.5" /> Graph
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant={viewMode === "tree" ? "default" : "ghost"}
+                      className="h-7 px-2 text-xs"
+                      onClick={() => setViewMode("tree")}
+                    >
+                      <List className="w-3.5 h-3.5 mr-1.5" /> Tree
+                    </Button>
+                  </div>
+
+                  {/* Window Controls */}
                   <Button
                     size="icon"
-                    variant={viewMode === "graph" ? "default" : "outline"}
-                    onClick={() => setViewMode("graph")}
-                    title="Graph view"
+                    variant={windowMode === "floating" ? "default" : "outline"}
+                    className="h-8 w-8"
+                    onClick={() => setWindowMode(windowMode === "floating" ? "embedded" : "floating")}
+                    title="Floating window"
                   >
-                    <Grid3x3 className="w-4 h-4" />
+                    <Maximize2 className="w-4 h-4" />
                   </Button>
                   <Button
                     size="icon"
-                    variant={viewMode === "tree" ? "default" : "outline"}
-                    onClick={() => setViewMode("tree")}
-                    title="Tree view"
+                    variant={windowMode === "external" ? "default" : "outline"}
+                    className="h-8 w-8"
+                    onClick={() => setWindowMode("external")}
+                    title="External window"
                   >
-                    <List className="w-4 h-4" />
+                    <ExternalLink className="w-4 h-4" />
                   </Button>
                 </div>
               </div>
@@ -142,23 +210,47 @@ function BrainMapContent() {
               {/* View Content */}
               <div className="flex-1 p-6 overflow-hidden">
                 <Card className="h-full flex flex-col overflow-hidden">
-                  <CardContent className="flex-1 p-0 flex overflow-hidden">
+                  <CardContent className="flex-1 p-0 flex overflow-hidden relative">
                     {activeMap ? (
                       isLoading ? (
                         <div className="flex-1 flex items-center justify-center text-muted-foreground animate-pulse">
                           Indexing Neural Network...
                         </div>
-                      ) : viewMode === "graph" ? (
-                        <NeuralGraphView
-                          network={neuralNetwork}
-                          projectId={activeMap.id}
-                          onNodeClick={setSelectedNodeId}
-                        />
                       ) : (
-                        <NeuralTreeView
-                          network={neuralNetwork}
-                          onNodeClick={setSelectedNodeId}
-                        />
+                        <>
+                          {windowMode === "embedded" ? (
+                            viewMode === "graph" ? (
+                              <NeuralGraphView
+                                network={neuralNetwork}
+                                projectId={activeMap.id}
+                                onNodeClick={setSelectedNodeId}
+                              />
+                            ) : (
+                              <NeuralTreeView
+                                network={neuralNetwork}
+                                onNodeClick={setSelectedNodeId}
+                              />
+                            )
+                          ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-muted/20">
+                              <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center mb-4">
+                                <Anchor className="h-6 w-6 text-accent animate-pulse" />
+                              </div>
+                              <h3 className="text-lg font-semibold mb-2">Neural Map Detached</h3>
+                              <p className="text-sm text-muted-foreground max-w-md">
+                                The brain map is currently active in a {windowMode} window. 
+                                Click the dock icon or the button below to bring it back.
+                              </p>
+                              <Button 
+                                variant="outline" 
+                                className="mt-6 border-accent/30 hover:bg-accent/10"
+                                onClick={() => setWindowMode("embedded")}
+                              >
+                                Re-dock to Workspace
+                              </Button>
+                            </div>
+                          )}
+                        </>
                       )
                     ) : (
                       <div className="flex-1 flex items-center justify-center text-muted-foreground">

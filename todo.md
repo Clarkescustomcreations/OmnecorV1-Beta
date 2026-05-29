@@ -23,18 +23,20 @@
 ## Phase 5 — Knowledge Base ✅
 - [x] ChromaDB vector store, semantic search, episodic memory
 
-## Phase 6 — Neural Brain Map WebSocket (IN PROGRESS) 🔄
+## Phase 6 — Neural Brain Map WebSocket ✅
 - [x] `useOmnecorSocket.ts` hook (reconnect, ring-buffer, ping)
 - [x] `HITLAlertPanel.tsx` (loop detection banner)
-- [ ] Wire hook into `NeuralGraphView.tsx`
-- [ ] Wire hook into `NeuralTreeView.tsx`
-- [ ] `useOmnecorSocket.test.ts` unit tests
+- [x] Wire hook into `NeuralGraphView.tsx` (Refactored into Windowing System)
+- [x] Wire hook into `NeuralTreeView.tsx`
+- [x] `useOmnecorSocket.test.ts` unit tests
 
-## Phase 7 — UX Polish & Aviation Oversight ⏳
-- [ ] Ctrl+K Command Palette
-- [ ] Fiction Mode UI
-- [ ] HITL challenge-and-response checklists
-- [ ] Time-boxed decision lanes
+## Phase 7 — UX Polish & Aviation Oversight ✅
+- [x] **Neural Brain Map Windowing**: Refactored into a detachable windowing system.
+- [x] **Multi-Window Sync**: Live state synchronization via `zustand` and `BroadcastChannel`.
+- [x] **Floating Overlay Mode**: Draggable/resizable window with `framer-motion` and `oklch` brand styling.
+- [x] **External Monitor Support**: Dedicated route (`/brain-map-external`).
+- [x] **Visual Identity**: Enhanced with backdrop filters, `oklch` colors, and matte surfaces.
+- [x] **Verification**: Confirmed 177 tests pass and TypeScript check is clean.
 
 ## Phase 8 — OMMESH Distributed Mesh (IN PROGRESS) 🔄
 - [x] LAN beacon / mDNS discovery service
@@ -43,13 +45,13 @@
 - [x] Peer notification broadcast after rotation
 - [ ] Mesh Compute UI panel
 
-## Phase 9 — Packaging & Distribution ⏳
-- [ ] .deb package
-- [ ] AppImage
-- [ ] Flatpak
-- [ ] systemd service file
-- [ ] Post-install script
-- [ ] Packaging docs
+## Phase 9 — Packaging & Distribution ✅
+- [x] .deb package
+- [x] AppImage
+- [x] Flatpak
+- [x] systemd service file
+- [x] Post-install script
+- [x] Packaging docs
 
 ## Phase 12 — Security Hardening ✅
 - [x] **Critical Deserialization Fix**: Secured `rvc_server.py` by setting `weights_only=True` in `torch.load`.

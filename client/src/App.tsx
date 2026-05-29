@@ -13,6 +13,7 @@ import ModelHub from "./pages/ModelHub";
 import Pipelines from "./pages/Pipelines";
 import Integrations from "./pages/Integrations";
 import SettingsPage from "./pages/Settings";
+import ExternalBrainMapWindow from "./components/window-system/ExternalBrainMapWindow";
 
 function Router() {
   // make sure to consider if you need authentication for certain routes
@@ -21,6 +22,7 @@ function Router() {
       <Route path="/" component={Dashboard} />
       <Route path="/chat" component={Chat} />
       <Route path="/brain-map" component={BrainMap} />
+      <Route path="/brain-map-external" component={ExternalBrainMapWindow} />
       <Route path="/model-hub" component={ModelHub} />
       <Route path="/pipelines" component={Pipelines} />
       <Route path="/integrations" component={Integrations} />

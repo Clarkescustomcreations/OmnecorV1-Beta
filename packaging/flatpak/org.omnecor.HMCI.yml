@@ -1,0 +1,63 @@
+app-id: org.omnecor.HMCI
+runtime: org.freedesktop.Platform
+runtime-version: '23.08'
+sdk: org.freedesktop.Sdk
+command: omnecor
+
+# Sandboxing permissions
+finish-args:
+  # Network access for AI models and API integrations
+  - --share=network
+  # IPC for GUI performance
+  - --share=ipc
+  # X11 and Wayland display support
+  - --socket=x11
+  - --socket=wayland
+  # Audio support for TTS and Whisper
+  - --socket=pulseaudio
+  # GPU acceleration (DRI)
+  - --device=dri
+  # Access to hardware (e.g., for ESPTool serial flashing)
+  - --device=all
+  # Filesystem access for project management
+  - --filesystem=home
+  # Desktop notifications
+  - --talk-name=org.freedesktop.Notifications
+
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.node20
+  - org.freedesktop.Sdk.Extension.python311
+
+build-options:
+  append-path: /usr/lib/sdk/node20/bin:/usr/lib/sdk/python311/bin
+
+modules:
+  - name: omnecor
+    buildsystem: simple
+    build-commands:
+      # Build the application
+      - npm install --include=dev
+      - npm run build
+      
+      # Prepare application directory
+      - mkdir -p /app/lib/omnecor
+      - cp -r dist/* /app/lib/omnecor/
+      - cp package.json /app/lib/omnecor/
+      
+      # Install production dependencies only in the final app dir
+      - cd /app/lib/omnecor && npm install --production
+      
+      # Install launcher and metadata
+      - install -Dm755 omnecor-launcher.sh /app/bin/omnecor
+      - install -Dm644 org.omnecor.HMCI.desktop /app/share/applications/org.omnecor.HMCI.desktop
+      - install -Dm644 omnecor.svg /app/share/icons/hicolor/scalable/apps/org.omnecor.HMCI.svg
+      
+    sources:
+      - type: dir
+        path: ../../
+      - type: file
+        path: omnecor-launcher.sh
+      - type: file
+        path: org.omnecor.HMCI.desktop
+      - type: file
+        path: omnecor.svg

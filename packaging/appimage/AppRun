@@ -1,0 +1,40 @@
+#!/usr/bin/env bash
+# ==============================================================================
+# Omnecor AppImage Entry Point
+# ==============================================================================
+# This script sets up the environment and launches the Omnecor HMCI application
+# inside the AppImage container.
+
+# Exit on error
+set -e
+
+# Get the directory of the AppRun script
+SELF_DIR="$(dirname "$(readlink -f "$0")")"
+
+# Set up paths for bundled Node.js and application
+export PATH="$SELF_DIR/usr/lib/omnecor/node/bin:$PATH"
+export OMNECOR_HOME="$SELF_DIR/usr/lib/omnecor"
+export OMNECOR_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/omnecor"
+export OMNECOR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/omnecor"
+
+# Create user data directories if they don't exist
+mkdir -p "$OMNECOR_DATA"/{vectordb,backups,models,projects}
+mkdir -p "$OMNECOR_CONFIG"
+
+# Set environment to production
+export NODE_ENV=production
+
+echo "═══════════════════════════════════════════════════════════════"
+echo "  Omnecor HMCI — AppImage Runtime"
+echo "  Version: $(cat "$SELF_DIR/usr/lib/omnecor/backend/version.txt" 2>/dev/null || echo "Unknown")"
+echo "  Data:    $OMNECOR_DATA"
+echo "  Config:  $OMNECOR_CONFIG"
+echo "═══════════════════════════════════════════════════════════════"
+
+# Start the application
+# We expect the bundled application to be in usr/lib/omnecor/backend
+cd "$SELF_DIR/usr/lib/omnecor/backend"
+
+# Launch using the bundled Node.js
+# index.js is the entry point (built from server/_core/index.ts)
+exec node index.js "$@"

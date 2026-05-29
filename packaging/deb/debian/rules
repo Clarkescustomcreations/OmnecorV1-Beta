@@ -1,0 +1,19 @@
+#!/usr/bin/make -f
+
+# Standard debian rules file for dh-based builds
+%:
+	dh $@
+
+override_dh_auto_build:
+	# Build the project (pnpm build)
+	pnpm build
+
+override_dh_auto_install:
+	# Install files to the package directory
+	mkdir -p debian/omnecor-hmci/opt/omnecor
+	cp -r dist/ debian/omnecor-hmci/opt/omnecor/backend
+	cp -r server/ debian/omnecor-hmci/opt/omnecor/server
+	cp package.json debian/omnecor-hmci/opt/omnecor/
+	# Create systemd service directory
+	mkdir -p debian/omnecor-hmci/lib/systemd/system/
+	cp packaging/systemd/omnecor.service debian/omnecor-hmci/lib/systemd/system/

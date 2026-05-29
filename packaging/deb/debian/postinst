@@ -1,0 +1,32 @@
+#!/bin/bash
+set -e
+
+# Debian post-installation script for Omnecor HMCI
+
+case "$1" in
+    configure)
+        # Create omnecor user if it doesn't exist
+        if ! id "omnecor" >/dev/null 2>&1; then
+            useradd --system --user-group --create-home --home-dir /var/lib/omnecor omnecor
+        fi
+
+        # Set permissions for /opt/omnecor
+        chown -R omnecor:omnecor /opt/omnecor
+
+        # Reload systemd and enable service
+        systemctl daemon-reload
+        systemctl enable omnecor.service
+        
+        echo "Omnecor HMCI installed and service enabled."
+    ;;
+
+    abort-upgrade|abort-remove|abort-deconfigure)
+    ;;
+
+    *)
+        echo "postinst called with unknown argument \`$1'" >&2
+        exit 1
+    ;;
+esac
+
+exit 0

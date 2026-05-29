@@ -6,15 +6,12 @@ import ReactFlow, {
   Edge,
   Controls,
   Background,
-  useNodesState,
-  useEdgesState,
   MiniMap,
-  Connection,
-  addEdge,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { NeuralNetwork } from "@/lib/neuralNodeTree";
 import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
+import { useBrainMapStore } from "@/lib/stores/brainMapStore";
 
 interface NeuralGraphViewProps {
   network: NeuralNetwork;
@@ -25,14 +22,94 @@ interface NeuralGraphViewProps {
   readOnly?: boolean;
 }
 
-export default function NeuralGraphView({
-  network,
-  projectId,
+/**
+ * Pure viewport component that renders the graph from the global store.
+ * Can be reused in floating and external windows.
+ */
+export function BrainMapViewport({
   onNodeClick,
   onNodeDoubleClick,
   onEdgeClick,
   readOnly = false,
-}: NeuralGraphViewProps) {
+}: Partial<NeuralGraphViewProps>) {
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect } = useBrainMapStore();
+
+  return (
+    <div className="w-full h-full relative">
+      <ReactFlow
+        nodes={nodes}
+        edges={edges}
+        onNodesChange={onNodesChange}
+        onEdgesChange={onEdgesChange}
+        onConnect={onConnect}
+        onNodeClick={(_e, n) => onNodeClick?.(n.id)}
+        onNodeDoubleClick={(_e, n) => onNodeDoubleClick?.(n.id)}
+        onEdgeClick={(_e, e) => onEdgeClick?.(e.id)}
+        fitView
+        className="bg-background/50"
+      >
+        <Background color="#333" gap={20} />
+        <Controls />
+        <MiniMap 
+          nodeColor={(n) => {
+            if (n.data?.type === 'project') return 'var(--accent-purple)';
+            if (n.data?.type === 'folder') return 'var(--bg-elevated)';
+            return 'var(--bg-secondary)';
+          }}
+          maskColor="rgba(0, 0, 0, 0.4)"
+        />
+      </ReactFlow>
+      
+      <style>{`
+        .node-pulse { 
+          box-shadow: 0 0 20px 5px var(--accent-cyan); 
+          border-color: var(--accent-cyan);
+          transition: all 0.3s ease; 
+        }
+        .node-new {
+          animation: node-appear 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        }
+        @keyframes node-appear {
+          from { opacity: 0; transform: scale(0.5); }
+          to { opacity: 1; transform: scale(1); }
+        }
+        .react-flow__node {
+          background: var(--bg-secondary);
+          color: var(--foreground);
+          border: 1px solid var(--border);
+          border-radius: 8px;
+          padding: 8px 12px;
+          font-size: 11px;
+          font-weight: 500;
+          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+          transition: border-color 0.18s cubic-bezier(.2,.8,.2,1);
+        }
+        .react-flow__node:hover {
+          border-color: var(--accent-cyan);
+        }
+        .react-flow__edge-path {
+          stroke: var(--border);
+          stroke-width: 1.5;
+        }
+        .react-flow__controls-button {
+          background: var(--bg-elevated);
+          border-bottom: 1px solid var(--border);
+          fill: var(--muted-foreground);
+        }
+        .react-flow__controls-button:hover {
+          background: var(--bg-secondary);
+        }
+      `}</style>
+    </div>
+  );
+}
+
+export default function NeuralGraphView(props: NeuralGraphViewProps) {
+  const { network, projectId } = props;
+  const setNodes = useBrainMapStore(s => s.setNodes);
+  const setEdges = useBrainMapStore(s => s.setEdges);
+  const setProjectId = useBrainMapStore(s => s.setProjectId);
+
   // Convert neural nodes to React Flow nodes
   const initialNodes: Node[] = useMemo(
     () =>
@@ -61,13 +138,11 @@ export default function NeuralGraphView({
     [network.edges]
   );
 
-  const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
-  const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
-
   useEffect(() => {
+    setProjectId(projectId || null);
     setNodes(initialNodes);
     setEdges(initialEdges);
-  }, [initialNodes, initialEdges, setNodes, setEdges]);
+  }, [initialNodes, initialEdges, projectId, setNodes, setEdges, setProjectId]);
 
   // WebSocket Integration for incremental updates
   const { fileEvents } = useOmnecorSocket({ projectId });
@@ -132,74 +207,5 @@ export default function NeuralGraphView({
     }
   }, [fileEvents, projectId, setNodes, setEdges]);
 
-  const onConnect = useCallback(
-    (connection: Connection) =>
-      !readOnly && setEdges(eds => addEdge(connection, eds)),
-    [readOnly, setEdges]
-  );
-
-  return (
-    <div className="w-full h-full relative">
-      <ReactFlow
-        nodes={nodes}
-        edges={edges}
-        onNodesChange={onNodesChange}
-        onEdgesChange={onEdgesChange}
-        onConnect={onConnect}
-        onNodeClick={(_e, n) => onNodeClick?.(n.id)}
-        onNodeDoubleClick={(_e, n) => onNodeDoubleClick?.(n.id)}
-        onEdgeClick={(_e, e) => onEdgeClick?.(e.id)}
-        fitView
-        className="bg-background/50"
-      >
-        <Background color="#333" gap={20} />
-        <Controls />
-        <MiniMap 
-          nodeColor={(n) => {
-            if (n.data?.type === 'project') return 'oklch(0.65 0.15 260)';
-            if (n.data?.type === 'folder') return 'oklch(0.35 0.1 260)';
-            return 'oklch(0.2 0.05 260)';
-          }}
-          maskColor="rgba(0, 0, 0, 0.1)"
-        />
-      </ReactFlow>
-      
-      <style>{`
-        .node-pulse { 
-          box-shadow: 0 0 20px 5px oklch(0.72 0.18 210 / 0.5); 
-          border-color: oklch(0.72 0.18 210);
-          transition: all 0.3s ease; 
-        }
-        .node-new {
-          animation: node-appear 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-        }
-        @keyframes node-appear {
-          from { opacity: 0; transform: scale(0.5); }
-          to { opacity: 1; transform: scale(1); }
-        }
-        .react-flow__node {
-          background: oklch(0.16 0.015 260);
-          color: oklch(0.9 0.01 260);
-          border: 1px solid oklch(0.3 0.02 260);
-          border-radius: 8px;
-          padding: 8px 12px;
-          font-size: 11px;
-          font-weight: 500;
-          box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
-        }
-        .react-flow__edge-path {
-          stroke: oklch(0.4 0.03 260);
-          stroke-width: 1.5;
-        }
-        .react-flow__controls-button {
-          background: oklch(0.2 0.02 260);
-          border-bottom: 1px solid oklch(0.3 0.02 260);
-          fill: oklch(0.8 0.01 260);
-        }
-        .react-flow__controls-button:hover {
-          background: oklch(0.25 0.02 260);
-        }
-      `}</style>
-    </div>
-  );
+  return <BrainMapViewport {...props} />;
 }

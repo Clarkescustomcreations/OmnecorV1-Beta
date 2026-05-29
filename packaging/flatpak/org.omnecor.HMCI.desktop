@@ -1,0 +1,8 @@
+[Desktop Entry]
+Name=Omnecor
+Comment=Context-Aware AI Infrastructure Workstation
+Exec=omnecor
+Icon=org.omnecor.HMCI
+Terminal=true
+Type=Application
+Categories=Development;Science;ArtificialIntelligence;
