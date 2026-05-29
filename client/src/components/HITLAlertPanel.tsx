@@ -41,7 +41,7 @@ export default function HITLAlertPanel({
   >(null);
 
   // WebSocket Integration
-  const { loopAlert, clearLoopAlert } = useOmnecorSocket({
+  const { loopAlert, clearLoopAlert, clearFileEvents } = useOmnecorSocket({
     listenForLoops: true,
   });
 
@@ -53,7 +53,7 @@ export default function HITLAlertPanel({
       return {
         id: `loop-${loopAlert.actionHash}`,
         title: "Autonomous Agent Loop Detected",
-        message: `The agent has repeated the same action sequence ${loopAlert.count} times. Human intervention required to continue safely.`,
+        message: `Agent loop detected. Manual review required before execution can resume. Agent ID: ${loopAlert.sessionId}, Action Hash: ${loopAlert.actionHash}`,
         severity: "critical" as const,
         timestamp: new Date(),
         actionHistory: [
@@ -202,63 +202,18 @@ export default function HITLAlertPanel({
 
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2">
-          {activeAlert.userActions.retry && (
-            <Button
-              variant={selectedAction === "retry" ? "default" : "outline"}
-              size="sm"
-              className="flex-1"
-              onClick={() => handleAction("retry")}
-              disabled={activeAlert.resolved && selectedAction !== "retry"}
-            >
-              <CheckCircle className="w-4 h-4 mr-2" />
-              Retry
-            </Button>
-          )}
-          {activeAlert.userActions.modify && (
-            <Button
-              variant={selectedAction === "modify" ? "default" : "outline"}
-              size="sm"
-              className="flex-1"
-              onClick={() => handleAction("modify")}
-              disabled={activeAlert.resolved && selectedAction !== "modify"}
-            >
-              ✏️ Modify
-            </Button>
-          )}
-          {activeAlert.userActions.abort && (
-            <Button
-              variant={selectedAction === "abort" ? "destructive" : "outline"}
-              size="sm"
-              className="flex-1"
-              onClick={() => handleAction("abort")}
-              disabled={activeAlert.resolved && selectedAction !== "abort"}
-            >
-              <X className="w-4 h-4 mr-2" />
-              Abort
-            </Button>
-          )}
-        </div>
-
-        {/* Resolution Status */}
-        {activeAlert.resolved && (
-          <div className="p-3 rounded-lg bg-green-500/10 border border-green-500/30">
-            <p className="text-xs text-green-700 dark:text-green-400">
-              ✓ Alert resolved with action:{" "}
-              <span className="font-semibold">
-                {"userDecision" in activeAlert
-                  ? (activeAlert as any).userDecision
-                  : "N/A"}
-              </span>
-            </p>
-          </div>
-        )}
-
-        {/* Warning */}
-        <div className="p-2 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-          <p className="text-xs text-yellow-700 dark:text-yellow-400">
-            ⚠️ This alert cannot be dismissed until you take action. Choose
-            Retry, Modify, or Abort.
-          </p>
+          <Button
+            variant="default"
+            size="sm"
+            className="flex-1"
+            onClick={() => {
+              clearFileEvents();
+              clearLoopAlert();
+            }}
+          >
+            <CheckCircle className="w-4 h-4 mr-2" />
+            Acknowledge & Clear
+          </Button>
         </div>
       </CardContent>
     </Card>

@@ -1,31 +1,41 @@
 import { useState, useEffect, useRef, useCallback } from "react";
-
-export interface FileEvent {
-  eventType: "add" | "addDir" | "change" | "unlink" | "unlinkDir";
-  relativePath: string;
-  size: number;
-  extension: string;
-  timestamp: string;
-}
+import { FileEvent } from "@/types/neural";
 
 export interface JobProgressEvent {
   percent: number;
   message: string;
 }
+
 export interface LoopAlert {
   sessionId: string;
   actionHash: string;
   count: number;
 }
 
+export type OmnecorEventType = 
+  | "FILE_CREATED"
+  | "FILE_UPDATED"
+  | "FILE_DELETED"
+  | "DIRECTORY_CREATED"
+  | "DIRECTORY_REMOVED"
+  | "GRAPH_UPDATED"
+  | "WATCHER_STATUS"
+  | "HITL_ALERT"
+  | "AI_ACTIVITY"
+  | "INDEXING_PROGRESS"
+  | "MAP_SWITCHED"
+  | "MAP_REINDEXED"
+  | "FICTION_EVENT";
+
 export function useOmnecorSocket(
   options: {
     projectId?: string;
     jobId?: string;
     listenForLoops?: boolean;
+    onEvent?: (type: OmnecorEventType, data: any) => void;
   } = {}
 ) {
-  const { projectId, jobId, listenForLoops } = options;
+  const { projectId, jobId, listenForLoops, onEvent } = options;
   const [connected, setConnected] = useState(false);
   const [fileEvents, setFileEvents] = useState<FileEvent[]>([]);
   const [jobProgress, setJobProgress] = useState<JobProgressEvent | null>(null);
@@ -57,23 +67,42 @@ export function useOmnecorSocket(
     }
   }, []);
 
-  const clearLoopAlert = useCallback(() => setLoopAlert(null), []);
-
   const connect = useCallback(
     (reconnectDelay = 1000) => {
+      // Close existing if any
+      if (socketRef.current) {
+        socketRef.current.close();
+      }
+
       socketRef.current = new WebSocket(WS_URL);
 
       socketRef.current.onopen = () => {
         setConnected(true);
-        reconnectDelay = 1000; // Reset backoff
+        reconnectDelay = 1000;
 
-        // Resubscribe on reconnect
+        // Base subscriptions
+        const baseChannels = [
+          "trainingProgress",
+          "lifecycle",
+          ...(listenForLoops ? ["loopDetected"] : [])
+        ];
+        
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({
+            type: "subscribe",
+            projectId,
+            channels: baseChannels
+          }));
+        }
+
+        // Resubscribe custom channels
         subscribedChannels.current.forEach(channel => {
           socketRef.current?.send(
             JSON.stringify({ type: "subscribe", channel })
           );
         });
 
+        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
         pingIntervalRef.current = setInterval(() => {
           if (socketRef.current?.readyState === WebSocket.OPEN) {
             socketRef.current.send(JSON.stringify({ type: "ping" }));
@@ -86,15 +115,21 @@ export function useOmnecorSocket(
           const message = JSON.parse(event.data);
           if (message.type === "pong") return;
 
-          if (message.type === "fileEvent") {
-            setFileEvents(prev => [...prev.slice(-199), message.data]);
-          } else if (message.type === "trainingProgress") {
+          // Dispatch to generic onEvent if provided
+          if (onEvent && message.type) {
+            onEvent(message.type as OmnecorEventType, message.data);
+          }
+
+          if (message.type === "fileEvent" || message.type === "FILE_CREATED" || message.type === "FILE_UPDATED") {
+            const fileData: FileEvent = message.data;
+            setFileEvents(prev => [...prev.slice(-199), fileData]);
+          } else if (message.type === "trainingProgress" || message.type === "INDEXING_PROGRESS") {
             setJobProgress(message.data);
           } else if (message.type === "lifecycle") {
             setJobLifecycle(
               message.data.state === "completed" ? "completed" : "failed"
             );
-          } else if (message.type === "loopDetected" && listenForLoops) {
+          } else if (message.type === "loopDetected" || message.type === "HITL_ALERT") {
             setLoopAlert(message.data);
           }
         } catch (e) {
@@ -110,7 +145,7 @@ export function useOmnecorSocket(
         }, reconnectDelay);
       };
     },
-    [WS_URL, listenForLoops]
+    [WS_URL, listenForLoops, onEvent, projectId]
   );
 
   useEffect(() => {
@@ -123,15 +158,17 @@ export function useOmnecorSocket(
     };
   }, [connect]);
 
-  // Handle projectId change
   useEffect(() => {
     if (projectId) {
       subscribe(`files:${projectId}`);
-      return () => unsubscribe(`files:${projectId}`);
+      subscribe(`neural:${projectId}`); // New neural channel
+      return () => {
+        unsubscribe(`files:${projectId}`);
+        unsubscribe(`neural:${projectId}`);
+      };
     }
   }, [projectId, subscribe, unsubscribe]);
 
-  // Handle jobId change
   useEffect(() => {
     if (jobId) {
       subscribe(`hardware:${jobId}`);
@@ -142,11 +179,13 @@ export function useOmnecorSocket(
   return {
     connected,
     fileEvents,
+    clearFileEvents: () => setFileEvents([]),
     jobProgress,
     jobLifecycle,
     loopAlert,
-    clearLoopAlert,
+    clearLoopAlert: () => setLoopAlert(null),
     subscribe,
     unsubscribe,
+    send: (msg: any) => socketRef.current?.send(JSON.stringify(msg)),
   };
 }
