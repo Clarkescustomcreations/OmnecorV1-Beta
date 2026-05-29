@@ -1,152 +1,126 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback } from 'react';
 
 export interface FileEvent {
-  eventType: "add" | "addDir" | "change" | "unlink" | "unlinkDir";
-  relativePath: string;
-  size: number;
-  extension: string;
-  timestamp: string;
+  type: 'add' | 'unlink' | 'change';
+  path: string;
+  timestamp: number;
 }
 
-export interface JobProgressEvent {
-  percent: number;
+export interface TrainingProgress {
+  jobId: string;
+  progress: number;
+  eta: number;
+}
+
+export interface LifecycleEvent {
+  service: string;
+  status: 'started' | 'stopped' | 'error';
   message: string;
 }
-export interface LoopAlert {
-  sessionId: string;
-  actionHash: string;
+
+export interface LoopEvent {
+  agentId: string;
+  hash: string;
   count: number;
+  halted: boolean;
 }
 
-export function useOmnecorSocket(
-  options: {
-    projectId?: string;
-    jobId?: string;
-    listenForLoops?: boolean;
-  } = {}
-) {
-  const { projectId, jobId, listenForLoops } = options;
-  const [connected, setConnected] = useState(false);
+interface UseOmnecorSocketOptions {
+  projectId?: string;
+  listenForLoops?: boolean;
+}
+
+export function useOmnecorSocket({ projectId, listenForLoops }: UseOmnecorSocketOptions = {}) {
+  const [isConnected, setIsConnected] = useState(false);
   const [fileEvents, setFileEvents] = useState<FileEvent[]>([]);
-  const [jobProgress, setJobProgress] = useState<JobProgressEvent | null>(null);
-  const [jobLifecycle, setJobLifecycle] = useState<
-    "idle" | "running" | "completed" | "failed"
-  >("idle");
-  const [loopAlert, setLoopAlert] = useState<LoopAlert | null>(null);
+  const [trainingProgress, setTrainingProgress] = useState<TrainingProgress | null>(null);
+  const [lifecycle, setLifecycle] = useState<LifecycleEvent | null>(null);
+  const [loopDetected, setLoopDetected] = useState<LoopEvent | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
-  const pingIntervalRef = useRef<any>(null);
-  const subscribedChannels = useRef<Set<string>>(new Set());
+  const reconnectTimeoutRef = useRef<NodeJS.Timeout>();
+  const pingIntervalRef = useRef<NodeJS.Timeout>();
+  const reconnectDelayRef = useRef(1000);
 
-  const WS_URL =
-    import.meta.env.VITE_WS_URL ??
-    `${window.location.protocol === "https:" ? "wss:" : "ws:"}://${window.location.host}/ws`;
+  const getWsUrl = () => {
+    if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    return `${protocol}//${window.location.host}/ws`;
+  };
 
-  const subscribe = useCallback((channel: string) => {
-    subscribedChannels.current.add(channel);
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: "subscribe", channel }));
-    }
-  }, []);
+  const connect = useCallback(() => {
+    const wsUrl = getWsUrl();
+    socketRef.current = new WebSocket(wsUrl);
 
-  const unsubscribe = useCallback((channel: string) => {
-    subscribedChannels.current.delete(channel);
-    if (socketRef.current?.readyState === WebSocket.OPEN) {
-      socketRef.current.send(JSON.stringify({ type: "unsubscribe", channel }));
-    }
-  }, []);
+    socketRef.current.onopen = () => {
+      setIsConnected(true);
+      reconnectDelayRef.current = 1000;
+      
+      // Subscribe
+      const channels = ['fileEvents', 'trainingProgress', 'lifecycle'];
+      if (listenForLoops) channels.push('loopDetected');
+      
+      socketRef.current?.send(JSON.stringify({ 
+        type: 'subscribe', 
+        projectId, 
+        channels 
+      }));
 
-  const clearLoopAlert = useCallback(() => setLoopAlert(null), []);
-
-  const connect = useCallback(
-    (reconnectDelay = 1000) => {
-      socketRef.current = new WebSocket(WS_URL);
-
-      socketRef.current.onopen = () => {
-        setConnected(true);
-        reconnectDelay = 1000; // Reset backoff
-
-        // Resubscribe on reconnect
-        subscribedChannels.current.forEach(channel => {
-          socketRef.current?.send(
-            JSON.stringify({ type: "subscribe", channel })
-          );
-        });
-
-        pingIntervalRef.current = setInterval(() => {
-          if (socketRef.current?.readyState === WebSocket.OPEN) {
-            socketRef.current.send(JSON.stringify({ type: "ping" }));
-          }
-        }, 25000);
-      };
-
-      socketRef.current.onmessage = event => {
-        try {
-          const message = JSON.parse(event.data);
-          if (message.type === "pong") return;
-
-          if (message.type === "fileEvent") {
-            setFileEvents(prev => [...prev.slice(-199), message.data]);
-          } else if (message.type === "trainingProgress") {
-            setJobProgress(message.data);
-          } else if (message.type === "lifecycle") {
-            setJobLifecycle(
-              message.data.state === "completed" ? "completed" : "failed"
-            );
-          } else if (message.type === "loopDetected" && listenForLoops) {
-            setLoopAlert(message.data);
-          }
-        } catch (e) {
-          console.error("Socket message parse error", e);
+      // Keep-alive ping
+      pingIntervalRef.current = setInterval(() => {
+        if (socketRef.current?.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ type: 'ping' }));
         }
-      };
+      }, 25000);
+    };
 
-      socketRef.current.onclose = () => {
-        setConnected(false);
-        if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
-        reconnectTimeoutRef.current = setTimeout(() => {
-          connect(Math.min(reconnectDelay * 2, 30000));
-        }, reconnectDelay);
-      };
-    },
-    [WS_URL, listenForLoops]
-  );
+    socketRef.current.onmessage = (event) => {
+      try {
+        const msg = JSON.parse(event.data);
+        if (msg.type === 'pong') return;
+
+        if (msg.type === 'fileEvent') {
+          setFileEvents(prev => [...prev.slice(-199), msg.data]);
+        } else if (msg.type === 'trainingProgress') {
+          setTrainingProgress(msg.data);
+        } else if (msg.type === 'lifecycle') {
+          setLifecycle(msg.data);
+        } else if (msg.type === 'loopDetected' && listenForLoops) {
+          setLoopDetected(msg.data);
+        }
+      } catch (e) {
+        console.error('Socket message parse error', e);
+      }
+    };
+
+    socketRef.current.onclose = () => {
+      setIsConnected(false);
+      if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
+      
+      reconnectTimeoutRef.current = setTimeout(() => {
+        reconnectDelayRef.current = Math.min(reconnectDelayRef.current * 2, 30000);
+        connect();
+      }, reconnectDelayRef.current);
+    };
+  }, [projectId, listenForLoops]);
 
   useEffect(() => {
     connect();
     return () => {
-      socketRef.current?.close();
-      if (reconnectTimeoutRef.current)
-        clearTimeout(reconnectTimeoutRef.current);
+      socketRef.current?.close(1000);
+      if (reconnectTimeoutRef.current) clearTimeout(reconnectTimeoutRef.current);
       if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);
     };
   }, [connect]);
 
-  // Handle projectId change
-  useEffect(() => {
-    if (projectId) {
-      subscribe(`files:${projectId}`);
-      return () => unsubscribe(`files:${projectId}`);
-    }
-  }, [projectId, subscribe, unsubscribe]);
-
-  // Handle jobId change
-  useEffect(() => {
-    if (jobId) {
-      subscribe(`hardware:${jobId}`);
-      return () => unsubscribe(`hardware:${jobId}`);
-    }
-  }, [jobId, subscribe, unsubscribe]);
+  const clearFileEvents = () => setFileEvents([]);
 
   return {
-    connected,
+    isConnected,
     fileEvents,
-    jobProgress,
-    jobLifecycle,
-    loopAlert,
-    clearLoopAlert,
-    subscribe,
-    unsubscribe,
+    trainingProgress,
+    lifecycle,
+    loopDetected,
+    clearFileEvents,
   };
 }
