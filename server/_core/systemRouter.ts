@@ -1,6 +1,21 @@
 import { z } from "zod";
 import { notifyOwner } from "./notification.js";
 import { adminProcedure, publicProcedure, router } from "./trpc.js";
+import { readFileSync, writeFileSync, existsSync } from "fs";
+import { join } from "path";
+import { homedir } from "os";
+
+const SETTINGS_PATH = join(homedir(), ".omnecor", "settings.json");
+
+// Helper — read settings file, return null if not found
+function readSettingsFile(): unknown {
+  try {
+    if (!existsSync(SETTINGS_PATH)) return null;
+    return JSON.parse(readFileSync(SETTINGS_PATH, "utf-8"));
+  } catch {
+    return null;
+  }
+}
 
 export const systemRouter = router({
   health: publicProcedure
@@ -15,6 +30,22 @@ export const systemRouter = router({
       ollama: { status: "ok" },
       chromadb: { status: "ok" }
     })),
+
+  getSettings: publicProcedure
+    .query(() => {
+      return readSettingsFile();
+    }),
+
+  saveSettings: publicProcedure
+    .input(z.object({ settings: z.record(z.string(), z.unknown()) }))
+    .mutation(({ input }) => {
+      const dir = join(homedir(), ".omnecor");
+      if (!existsSync(dir)) {
+        import("fs").then(({ mkdirSync }) => mkdirSync(dir, { recursive: true }));
+      }
+      writeFileSync(SETTINGS_PATH, JSON.stringify(input.settings, null, 2), "utf-8");
+      return { saved: true };
+    }),
 
   saveKeys: adminProcedure
     .input(

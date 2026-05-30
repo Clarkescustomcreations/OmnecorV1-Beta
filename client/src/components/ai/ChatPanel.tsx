@@ -13,7 +13,38 @@ interface Message {
   content: string;
 }
 
+interface SelectedModel {
+  providerId: "ollama" | "anthropic" | "openai" | "gemini" | "groq" | "grok";
+  modelId: string;
+  apiKey?: string;
+  baseUrl?: string;
+}
+
+function useSelectedModel(): SelectedModel {
+  const [model, setModel] = useState<SelectedModel>(() => {
+    try {
+      const stored = localStorage.getItem("omnecor:selectedModel");
+      return stored ? JSON.parse(stored) : { providerId: "ollama", modelId: "llama3" };
+    } catch {
+      return { providerId: "ollama", modelId: "llama3" };
+    }
+  });
+
+  useEffect(() => {
+    const handler = (e: StorageEvent) => {
+      if (e.key === "omnecor:selectedModel" && e.newValue) {
+        try { setModel(JSON.parse(e.newValue)); } catch {}
+      }
+    };
+    window.addEventListener("storage", handler);
+    return () => window.removeEventListener("storage", handler);
+  }, []);
+
+  return model;
+}
+
 export const ChatPanel: React.FC = () => {
+  const selectedModel = useSelectedModel();
   const [input, setInput] = useState("");
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
@@ -39,8 +70,8 @@ export const ChatPanel: React.FC = () => {
     setIsStreaming(true);
 
     chatMutation.mutate({
-      providerId: "ollama", // TODO: Wire to ModelSelector state
-      modelId: "llama3",   // TODO: Wire to ModelSelector state
+      providerId: selectedModel.providerId,
+      modelId: selectedModel.modelId,
       messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
     });
   };
@@ -55,6 +86,9 @@ export const ChatPanel: React.FC = () => {
     <div className="flex flex-col h-full bg-background border-r">
       <div className="p-4 border-b bg-muted/20 flex justify-between items-center">
         <h2 className="font-bold tracking-tight">AI Orchestrator</h2>
+        <span className="text-xs text-muted-foreground font-mono">
+          {selectedModel.providerId}/{selectedModel.modelId}
+        </span>
       </div>
 
       <ScrollArea className="flex-1 p-4">

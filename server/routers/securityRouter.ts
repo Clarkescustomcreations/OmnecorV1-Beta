@@ -16,8 +16,9 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure, publicProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
+import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 
 // ---------------------------------------------------------------------------
 // Input Schemas
@@ -216,5 +217,12 @@ export const securityRouter = router({
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       return ctx.services.security.listBackups(input.projectId);
+    }),
+
+  forceRefresh: publicProcedure
+    .input(z.object({ provider: z.string() }))
+    .mutation(async ({ input }) => {
+      await TokenRefreshService.getInstance().forceRefresh(input.provider);
+      return { ok: true };
     }),
 });

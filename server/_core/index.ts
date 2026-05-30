@@ -28,6 +28,7 @@ import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
+import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 
 // ─── Phase 2 Service Imports (for lifecycle management) ─────────────────────
 import { OmnecorWebSocketServer } from "../phase2/websocket/WebSocketServer";
@@ -206,6 +207,8 @@ async function startServer() {
     console.log(
       "═══════════════════════════════════════════════════════════════"
     );
+    TokenRefreshService.getInstance().start();
+    console.info("[Omnecor] Token refresh service started");
   });
 
   // ─── Graceful Shutdown ──────────────────────────────────────────────────
@@ -220,6 +223,8 @@ async function startServer() {
       await wsServer.shutdown();
       console.log("[Omnecor] WebSocket server closed");
     }
+
+    TokenRefreshService.getInstance().stop();
 
     // Terminate all running child processes (training, Blender, ESP, etc.)
     try {
