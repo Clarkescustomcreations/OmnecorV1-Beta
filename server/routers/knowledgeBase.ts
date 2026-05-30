@@ -15,7 +15,8 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc.js";
+import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
+import { validatePath } from "../_core/security.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -69,7 +70,7 @@ export const knowledgeBaseRouter = router({
   /**
    * Delete a project's memory collection entirely.
    */
-  deleteCollection: publicProcedure
+  deleteCollection: protectedProcedure
     .input(projectIdSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.services.memoryArchitect.isOnline()) return { success: false };
@@ -85,7 +86,7 @@ export const knowledgeBaseRouter = router({
    * This is the primary mechanism for the "Add Folder as Knowledge Base"
    * feature in the Settings panel.
    */
-  ingestDirectory: publicProcedure
+  ingestDirectory: protectedProcedure
     .input(ingestDirectorySchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.services.memoryArchitect.isOnline()) {
@@ -99,9 +100,11 @@ export const knowledgeBaseRouter = router({
         };
       }
 
+      const resolvedPath = await validatePath(input.directoryPath);
+
       const result = await ctx.services.memoryArchitect.ingestDirectory(
         input.projectId,
-        input.directoryPath,
+        resolvedPath,
         input.recursive
       );
 
@@ -115,7 +118,7 @@ export const knowledgeBaseRouter = router({
    * Ingest a single text document into project memory.
    * Useful for adding notes, summaries, or external content.
    */
-  ingestDocument: publicProcedure
+  ingestDocument: protectedProcedure
     .input(ingestDocumentSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.services.memoryArchitect.isOnline()) {
@@ -136,7 +139,7 @@ export const knowledgeBaseRouter = router({
    * Semantic search across a project's long-term memory.
    * Returns ranked results with source file paths and relevance scores.
    */
-  search: publicProcedure.input(searchSchema).query(async ({ ctx, input }) => {
+  search: protectedProcedure.input(searchSchema).query(async ({ ctx, input }) => {
     if (!ctx.services.memoryArchitect.isOnline()) return [];
 
     return ctx.services.memoryArchitect.search(
@@ -153,7 +156,7 @@ export const knowledgeBaseRouter = router({
    *
    * Returns a formatted string ready for prompt injection.
    */
-  retrieveContext: publicProcedure
+  retrieveContext: protectedProcedure
     .input(retrieveContextSchema)
     .query(async ({ ctx, input }) => {
       if (!ctx.services.memoryArchitect.isOnline())
@@ -176,7 +179,7 @@ export const knowledgeBaseRouter = router({
    * Bridges Layer 3 (Episodic/conversation history) → Layer 2 (Long-Term).
    * Called when a conversation session ends or at periodic intervals.
    */
-  consolidate: publicProcedure
+  consolidate: protectedProcedure
     .input(consolidateSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.services.memoryArchitect.isOnline()) {
@@ -197,7 +200,7 @@ export const knowledgeBaseRouter = router({
    * Ensure a project's memory collection exists.
    * Called when creating a new project or opening one for the first time.
    */
-  ensureProject: publicProcedure
+  ensureProject: protectedProcedure
     .input(projectIdSchema)
     .mutation(async ({ ctx, input }) => {
       if (!ctx.services.memoryArchitect.isOnline()) {
