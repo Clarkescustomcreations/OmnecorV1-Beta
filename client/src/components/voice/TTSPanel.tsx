@@ -4,7 +4,7 @@ import { Button } from "../ui/button";
 import { Textarea } from "../ui/textarea";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "../ui/select";
-import { Slider } from "../ui/progress"; // Using custom slider patterns
+import { Slider } from "../ui/slider"; // Using custom slider patterns
 import { Volume2, Music, Download, Wand2 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -13,11 +13,11 @@ export const TTSPanel: React.FC = () => {
   const [selectedVoice, setSelectedVoice] = useState("");
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
 
-  const voicesQuery = trpc.voice.listModels.useQuery();
+  const voicesQuery = trpc.voice.listRvcModels.useQuery({ modelsDir: "./models/rvc" });
   const synthMutation = trpc.voice.synthesize.useMutation({
     onSuccess: (data) => {
       // Assuming data.audio is a base64 string
-      const blob = b64toBlob(data.audio, 'audio/wav');
+      const blob = b64toBlob("", 'audio/wav');
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
       toast.success("Synthesis complete");
@@ -61,15 +61,15 @@ export const TTSPanel: React.FC = () => {
                   <SelectValue placeholder="Select Voice" />
                 </SelectTrigger>
                 <SelectContent>
-                  {voicesQuery.data?.map(v => (
-                    <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
+                  {voicesQuery.data?.models?.map((v: any) => (
+                    <SelectItem key={v.id || v} value={v.id || v}>{v.name || v}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
             </div>
             <div className="flex items-end">
               <Button 
-                onClick={() => synthMutation.mutate({ text, modelId: selectedVoice })}
+                onClick={() => synthMutation.mutate({ text, speakerWavPath: selectedVoice })}
                 disabled={!text || !selectedVoice || synthMutation.isPending}
                 className="w-40"
               >

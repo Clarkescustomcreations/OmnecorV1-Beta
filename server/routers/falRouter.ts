@@ -37,6 +37,23 @@ const generateVideoSchema = z.object({
 
 export const falRouter = router({
   /**
+   * Stub for listing generated images.
+   */
+  listImages: publicProcedure.query(async () => {
+    return [];
+  }),
+
+  /**
+   * Stub for generating an image.
+   */
+  generateImage: publicProcedure
+    .input(z.object({ prompt: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      // Stub implementation
+      return { id: Date.now().toString(), url: "", prompt: input.prompt };
+    }),
+
+  /**
    * Generate a character image using Flux/Fal.ai.
    */
   generateCharacter: publicProcedure

@@ -319,28 +319,29 @@ export class BlenderBridge extends EventEmitter {
 
     // Securely serialize paths for Python injection prevention
     const safeOutput = JSON.stringify(outputPath);
+    const getPrint = (msg: string) => `print(${JSON.stringify(JSON.stringify({ status: "success", message: msg, output: outputPath }))})`;
 
     // Generate the export script based on target format
     const exportScripts: Record<string, string> = {
       ".glb": `
 import bpy
 bpy.ops.export_scene.gltf(filepath=${safeOutput}, export_format='GLB')
-print('{"status": "success", "message": "Exported to GLB", "output": '${safeOutput}'}')
+${getPrint("Exported to GLB")}
 `,
       ".fbx": `
 import bpy
 bpy.ops.export_scene.fbx(filepath=${safeOutput})
-print('{"status": "success", "message": "Exported to FBX", "output": '${safeOutput}'}')
+${getPrint("Exported to FBX")}
 `,
       ".obj": `
 import bpy
 bpy.ops.wm.obj_export(filepath=${safeOutput})
-print('{"status": "success", "message": "Exported to OBJ", "output": '${safeOutput}'}')
+${getPrint("Exported to OBJ")}
 `,
       ".stl": `
 import bpy
 bpy.ops.export_mesh.stl(filepath=${safeOutput})
-print('{"status": "success", "message": "Exported to STL", "output": '${safeOutput}'}')
+${getPrint("Exported to STL")}
 `,
     };
 

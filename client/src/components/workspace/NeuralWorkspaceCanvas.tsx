@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect } from 'react';
 import ReactFlow, { 
   Background, 
+  BackgroundVariant,
   Controls, 
   MiniMap, 
   useNodesState, 
@@ -27,7 +28,7 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
-  const workspaceQuery = trpc.project.get.useQuery({ id: workspaceId });
+  const workspaceQuery = trpc.project.getFileTree.useQuery({ projectId: workspaceId, rootDir: "." });
 
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
@@ -35,18 +36,18 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
   );
 
   useEffect(() => {
-    if (workspaceQuery.data) {
+    if (workspaceQuery.data && Array.isArray(workspaceQuery.data)) {
       // Map project files to nodes for demonstration
-      const initialNodes = workspaceQuery.data.files.slice(0, 5).map((file, i) => ({
-        id: file.id,
+      const initialNodes = workspaceQuery.data.slice(0, 5).map((file: any, i: number) => ({
+        id: file.path || `file-${i}`,
         type: 'file',
         position: { x: 100 + (i * 200), y: 100 },
         data: { 
           label: file.name,
           path: file.path,
           language: file.name.split('.').pop() || 'text',
-          size: file.size,
-          modified: file.updatedAt.toISOString()
+          size: file.size || 0,
+          modified: file.modifiedAt || new Date().toISOString()
         },
       }));
       setNodes(initialNodes);
@@ -79,7 +80,7 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
         nodeTypes={nodeTypes}
         fitView
       >
-        <Background variant="dots" gap={20} size={1} />
+        <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls />
         <MiniMap zoomable pannable />
         

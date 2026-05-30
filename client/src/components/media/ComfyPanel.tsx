@@ -10,7 +10,7 @@ import { toast } from "sonner";
 export const ComfyPanel: React.FC = () => {
   const [prompt, setPrompt] = useState("");
   
-  const statusQuery = trpc.comfy.status.useQuery(undefined, {
+  const statusQuery = trpc.comfy.getSystemStats.useQuery(undefined, {
     refetchInterval: 5000
   });
 

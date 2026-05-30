@@ -8,11 +8,11 @@ import { router, publicProcedure } from "../../_core/trpc.js";
 
 const agentTaskSchema = z.object({
   type: z.enum(["crewai", "liteagent", "n8n"]),
-  goal: z.string(),
+  goal: z.string().min(1),
   backstory: z.string().optional(),
   tools: z.array(z.string()).optional(),
   workflowId: z.string().optional(),
-  input: z.record(z.any()).optional(),
+  input: z.record(z.string(), z.any()).optional(),
 });
 
 export const agentRouter = router({

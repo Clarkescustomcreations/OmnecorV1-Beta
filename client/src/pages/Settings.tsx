@@ -10,7 +10,7 @@ import { Key, Shield, HardDrive, Cpu, Bell } from "lucide-react";
 import { toast } from "sonner";
 
 export const Settings: React.FC = () => {
-  const saveKeysMutation = trpc.settings.saveKeys.useMutation({
+  const saveKeysMutation = trpc.system.saveKeys.useMutation({
     onSuccess: () => toast.success("API keys updated successfully")
   });
 

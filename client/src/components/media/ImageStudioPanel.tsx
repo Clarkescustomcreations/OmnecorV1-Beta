@@ -10,8 +10,8 @@ import { toast } from "sonner";
 export const ImageStudioPanel: React.FC = () => {
   const [prompt, setPrompt] = useState("");
   
-  const imagesQuery = trpc.media.listImages.useQuery();
-  const generateMutation = trpc.media.generateImage.useMutation({
+  const imagesQuery = trpc.fal.listImages.useQuery();
+  const generateMutation = trpc.fal.generateImage.useMutation({
     onSuccess: () => {
       toast.success("Generation complete");
       imagesQuery.refetch();

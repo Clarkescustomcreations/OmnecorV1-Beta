@@ -32,7 +32,7 @@ export const TaskManager: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-4 overflow-y-auto pr-2">
-        {jobsQuery.data?.map((job: any) => (
+        {jobsQuery.data?.jobs.map((job: any) => (
           <Card key={job.id} className="border-none bg-muted/30 shadow-sm group">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-background border flex items-center justify-center shadow-inner">
@@ -61,7 +61,7 @@ export const TaskManager: React.FC = () => {
             </CardContent>
           </Card>
         ))}
-        {jobsQuery.data?.length === 0 && (
+        {jobsQuery.data?.jobs.length === 0 && (
           <div className="py-24 text-center border border-dashed rounded-xl flex flex-col items-center justify-center">
              <Activity className="w-12 h-12 text-muted-foreground opacity-10 mb-4" />
              <p className="text-muted-foreground italic text-sm">No active processes detected.</p>

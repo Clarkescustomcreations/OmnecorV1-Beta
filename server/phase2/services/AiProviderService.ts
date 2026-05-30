@@ -38,6 +38,39 @@ export interface ChatChunk {
   totalTokens?: number;
 }
 
+class SignalAsyncQueue<T> {
+  private queue: T[] = [];
+  private resolver: (() => void) | null = null;
+  private closed = false;
+
+  push(item: T) {
+    this.queue.push(item);
+    if (this.resolver) {
+      this.resolver();
+      this.resolver = null;
+    }
+  }
+
+  close() {
+    this.closed = true;
+    if (this.resolver) {
+      this.resolver();
+      this.resolver = null;
+    }
+  }
+
+  async *[Symbol.asyncIterator](): AsyncGenerator<T> {
+    while (!this.closed || this.queue.length > 0) {
+      if (this.queue.length === 0) {
+        await new Promise<void>(r => { this.resolver = r; });
+      }
+      while (this.queue.length > 0) {
+        yield this.queue.shift()!;
+      }
+    }
+  }
+}
+
 export class AiProviderService {
   private static instance: AiProviderService;
 
@@ -84,22 +117,17 @@ export class AiProviderService {
 
     const providerId = chatInput.providerId.toLowerCase();
 
-    // High-performance Async Queue for chunks
-    const queue: ChatChunk[] = [];
-    let resolver: (() => void) | null = null;
-    let done = false;
+    // High-performance Signal-driven Async Queue for chunks
+    const queue = new SignalAsyncQueue<ChatChunk>();
 
     const onChunk = (chunk: { content: string; done?: boolean }) => {
-      queue.push({
+      const item = {
         content: chunk.content,
         delta: chunk.content,
         done: !!chunk.done,
-      });
-      if (chunk.done) done = true;
-      if (resolver) {
-        resolver();
-        resolver = null;
-      }
+      };
+      queue.push(item);
+      if (chunk.done) queue.close();
     };
 
     const promise = (async () => {
@@ -142,16 +170,9 @@ export class AiProviderService {
       }
     })();
 
-    while (true) {
-      if (queue.length === 0) {
-        if (done) break;
-        await new Promise<void>(r => (resolver = r));
-      }
-      while (queue.length > 0) {
-        const item = queue.shift()!;
-        yield item;
-        if (item.done) return;
-      }
+    for await (const item of queue) {
+      yield item;
+      if (item.done) break;
     }
     await promise;
   }
@@ -226,7 +247,8 @@ export class AiProviderService {
 
     if (decision.targetNodeId === meshNode.getIdentity().id) return null;
 
-    return meshNode.getDiscovery().getPeers().find(p => p.id === decision.targetNodeId);
+    const peers = meshNode.getDiscovery().getPeers() as any[];
+    return peers.find(p => p.id === decision.targetNodeId);
   }
 
   // ... rest of the private chat methods remain the same ...

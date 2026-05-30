@@ -111,8 +111,8 @@ export const ESPToolPanel: React.FC = () => {
           {detectChipMutation.data && (
             <div className="p-3 bg-muted rounded-md text-xs font-mono">
               <p>Chip: {detectChipMutation.data.chipType}</p>
-              <p>Features: {detectChipMutation.data.features.join(", ")}</p>
-              <p>MAC: {detectChipMutation.data.mac}</p>
+              <p>Chip ID: {detectChipMutation.data.chipId}</p>
+              <p>MAC: {detectChipMutation.data.macAddress}</p>
             </div>
           )}
         </CardContent>

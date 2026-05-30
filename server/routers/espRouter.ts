@@ -40,7 +40,7 @@ export const espRouter = router({
   /** Get chip information from connected device */
   getChipInfo: publicProcedure
     .input(z.object({ port: z.string().min(1) }))
-    .query(async ({ ctx, input }) => {
+    .mutation(async ({ ctx, input }) => {
       try {
         return await ctx.services.esp.getChipInfo(input.port);
       } catch (error) {

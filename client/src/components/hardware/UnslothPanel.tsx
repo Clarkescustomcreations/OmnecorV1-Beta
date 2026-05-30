@@ -4,16 +4,16 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../ui
 import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
-import { Slider } from "../ui/progress";
+import { Slider } from "../ui/slider";
 import { Zap, Save, Database, Activity } from "lucide-react";
 import { toast } from "sonner";
 
 export const UnslothPanel: React.FC = () => {
   const [loraRank, setLoraRank] = useState(16);
   
-  const startFineTuning = trpc.training.startFineTuning.useMutation({
+  const startFineTuning = trpc.training.startTraining.useMutation({
     onSuccess: () => toast.success("Fine-tuning process initialized via Unsloth"),
-    onError: (err) => toast.error("Training error: " + err.message)
+    onError: (err: any) => toast.error("Training error: " + err.message)
   });
 
   return (
@@ -58,7 +58,7 @@ export const UnslothPanel: React.FC = () => {
 
             <div className="flex gap-2">
                <Button className="flex-1 bg-yellow-600 hover:bg-yellow-700" onClick={() => startFineTuning.mutate({ 
-                 projectId: "default", 
+                 datasetPath: "/path/to/dataset.jsonl",
                  r: loraRank,
                  loraAlpha: 32,
                  maxSeqLength: 2048,

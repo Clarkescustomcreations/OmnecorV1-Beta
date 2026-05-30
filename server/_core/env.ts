@@ -12,4 +12,5 @@ export const ENV = {
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   xaiApiKey: process.env.XAI_API_KEY ?? "",
+  n8nUrl: process.env.N8N_URL ?? "http://localhost:5678",
 };

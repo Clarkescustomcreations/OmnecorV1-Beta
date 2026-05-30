@@ -45,6 +45,7 @@ import { exec } from "child_process";
 import { promisify } from "util";
 
 const execAsync = promisify(exec);
+const escapeShell = (str: string) => str.replace(/"/g, '\\"');
 
 // ---------------------------------------------------------------------------
 // Types
@@ -313,7 +314,7 @@ rule OmnecorDefaultScan {
       // Check if yara is installed
       await execAsync("yara --version");
       
-      const { stdout } = await execAsync(`yara "${this.yaraRulesPath}" "${filePath}"`);
+      const { stdout } = await execAsync(`yara "${escapeShell(this.yaraRulesPath)}" "${escapeShell(filePath)}"`);
       if (stdout.trim()) {
         const matches = stdout.trim().split("\n");
         for (const match of matches) {

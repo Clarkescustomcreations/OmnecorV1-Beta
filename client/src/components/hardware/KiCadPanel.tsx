@@ -34,10 +34,10 @@ export const KiCadPanel: React.FC = () => {
           </div>
         </div>
         <div className="flex gap-2">
-            <Badge variant={statusQuery.data?.installed ? "default" : "destructive"}>
-                {statusQuery.data?.installed ? "KiCad CLI Active" : "KiCad Missing"}
+            <Badge variant={statusQuery.data?.isInstalled ? "default" : "destructive"}>
+                {statusQuery.data?.isInstalled ? "KiCad CLI Active" : "KiCad Missing"}
             </Badge>
-            <Button onClick={handleOpenProject} disabled={!statusQuery.data?.installed}>
+            <Button onClick={handleOpenProject} disabled={!statusQuery.data?.isInstalled}>
                 Open Project
             </Button>
         </div>
