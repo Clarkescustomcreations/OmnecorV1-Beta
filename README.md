@@ -25,7 +25,7 @@ Omnecor is engineered as a modular, production-grade workstation, offering a com
 
 ## Screenshots
 
-![Omnecor UI Overview](file_0000000036d471f7a2101a53fc9370a4.png)
+<img width="1254" height="1254" alt="file_0000000036d471f7a2101a53fc9370a4" src="https://github.com/user-attachments/assets/c487fb35-2cd0-4483-936b-6010ec16d91d" />
 
 ---
 
