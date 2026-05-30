@@ -29,6 +29,9 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
+import { createLogger } from "./logger.js";
+
+const log = createLogger("core");
 
 // ─── Phase 2 Service Imports (for lifecycle management) ─────────────────────
 import { OmnecorWebSocketServer } from "../phase2/websocket/WebSocketServer";
@@ -71,9 +74,9 @@ async function startServer() {
   try {
     const security = SecurityService.getInstance();
     await security.initialize();
-    console.log("[Omnecor] SecurityService initialized");
+    log.info("[Omnecor] SecurityService initialized");
   } catch (error) {
-    console.warn(
+    log.warn(
       "[Omnecor] SecurityService init warning:",
       (error as Error).message
     );
@@ -82,11 +85,11 @@ async function startServer() {
   try {
     const vectorDB = VectorDBService.getInstance();
     await vectorDB.init();
-    console.log(
+    log.info(
       "[Omnecor] VectorDBService initialized (or degraded gracefully)"
     );
   } catch (error) {
-    console.warn(
+    log.warn(
       "[Omnecor] VectorDBService init warning:",
       (error as Error).message
     );
@@ -95,9 +98,9 @@ async function startServer() {
   // ─── Initialize OMMESH Node ─────────────────────────────────────────────
   try {
     await meshNode.start();
-    console.log("[Omnecor] OMMESH Node started and broadcasting");
+    log.info("[Omnecor] OMMESH Node started and broadcasting");
   } catch (error) {
-    console.warn("[Omnecor] OMMESH init warning:", (error as Error).message);
+    log.warn("[Omnecor] OMMESH init warning:", (error as Error).message);
   }
 
   // ─── Create Express App ─────────────────────────────────────────────────
@@ -149,9 +152,9 @@ async function startServer() {
   let wsServer: OmnecorWebSocketServer | null = null;
   try {
     wsServer = new OmnecorWebSocketServer(server);
-    console.log("[Omnecor] WebSocket server attached at /ws");
+    log.info("[Omnecor] WebSocket server attached at /ws");
   } catch (error) {
-    console.warn(
+    log.warn(
       "[Omnecor] WebSocket server init warning:",
       (error as Error).message
     );
@@ -169,42 +172,42 @@ async function startServer() {
   const port = await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
-    console.log(
+    log.info(
       `[Omnecor] Port ${preferredPort} is busy, using port ${port} instead`
     );
   }
 
   server.listen(port, () => {
-    console.log(
+    log.info(
       "═══════════════════════════════════════════════════════════════"
     );
-    console.log(
+    log.info(
       "  ██████╗ ███╗   ███╗███╗   ██╗███████╗ ██████╗ ██████╗ ██████╗ "
     );
-    console.log(
+    log.info(
       " ██╔═══██╗████╗ ████║████╗  ██║██╔════╝██╔════╝██╔═══██╗██╔══██╗"
     );
-    console.log(
+    log.info(
       " ██║   ██║██╔████╔██║██╔██╗ ██║█████╗  ██║     ██║   ██║██████╔╝"
     );
-    console.log(
+    log.info(
       " ██║   ██║██║╚██╔╝██║██║╚██╗██║██╔══╝  ██║     ██║   ██║██╔══██╗"
     );
-    console.log(
+    log.info(
       " ╚██████╔╝██║ ╚═╝ ██║██║ ╚████║███████╗╚██████╗╚██████╔╝██║  ██║"
     );
-    console.log(
+    log.info(
       "  ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝"
     );
-    console.log(
+    log.info(
       "═══════════════════════════════════════════════════════════════"
     );
-    console.log(`  Omnecor v2.1.0 — Context-Aware AI Infrastructure (Unified)`);
-    console.log(`  HTTP:      http://localhost:${port}/`);
-    console.log(`  tRPC API:  http://localhost:${port}/api/trpc`);
-    console.log(`  WebSocket: ws://localhost:${port}/ws`);
-    console.log(`  Health:    http://localhost:${port}/health`);
-    console.log(
+    log.info(`  Omnecor v2.1.0 — Context-Aware AI Infrastructure (Unified)`);
+    log.info(`  HTTP:      http://localhost:${port}/`);
+    log.info(`  tRPC API:  http://localhost:${port}/api/trpc`);
+    log.info(`  WebSocket: ws://localhost:${port}/ws`);
+    log.info(`  Health:    http://localhost:${port}/health`);
+    log.info(
       "═══════════════════════════════════════════════════════════════"
     );
     TokenRefreshService.getInstance().start();
@@ -213,7 +216,7 @@ async function startServer() {
 
   // ─── Graceful Shutdown ──────────────────────────────────────────────────
   const shutdown = async (signal: string) => {
-    console.log(`\n[Omnecor] Received ${signal}. Shutting down gracefully...`);
+    log.info(`\n[Omnecor] Received ${signal}. Shutting down gracefully...`);
 
     // Stop accepting new connections
     server.close();
@@ -221,7 +224,7 @@ async function startServer() {
     // Shut down WebSocket server
     if (wsServer) {
       await wsServer.shutdown();
-      console.log("[Omnecor] WebSocket server closed");
+      log.info("[Omnecor] WebSocket server closed");
     }
 
     TokenRefreshService.getInstance().stop();
@@ -230,15 +233,15 @@ async function startServer() {
     try {
       const processManager = ProcessManagerService.getInstance();
       await processManager.shutdown();
-      console.log("[Omnecor] ProcessManager shutdown complete");
+      log.info("[Omnecor] ProcessManager shutdown complete");
     } catch (error) {
-      console.warn(
+      log.warn(
         "[Omnecor] ProcessManager shutdown warning:",
         (error as Error).message
       );
     }
 
-    console.log("[Omnecor] Shutdown complete. Goodbye.");
+    log.info("[Omnecor] Shutdown complete. Goodbye.");
     process.exit(0);
   };
 
@@ -248,6 +251,6 @@ async function startServer() {
 
 // ─── Run ──────────────────────────────────────────────────────────────────────
 startServer().catch(error => {
-  console.error("[Omnecor] Fatal startup error:", error);
+  log.error("[Omnecor] Fatal startup error:", error);
   process.exit(1);
 });

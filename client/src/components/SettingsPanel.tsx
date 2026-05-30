@@ -79,7 +79,7 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
 
   const handleSave = () => {
     setHasChanges(false);
-    saveSettingsMutation.mutate({ settings: settings as Record<string, unknown> });
+    saveSettingsMutation.mutate({ settings: settings as unknown as Record<string, unknown> });
   };
 
   const handleExport = () => {
