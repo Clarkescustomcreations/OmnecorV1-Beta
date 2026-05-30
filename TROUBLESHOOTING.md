@@ -93,5 +93,5 @@ pnpm install
 
 ## Getting Help
 
-- **Support Email:** Contact support@omnecor.ai
+- **Support Email:** Contact support@ th3artistunknown@gmail.com 
 - **GitHub Issues:** Search for similar problems in the repository issues.
