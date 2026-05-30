@@ -15,7 +15,7 @@ graph LR
     D -->|Database Operations| E(Drizzle ORM/Database)
     D -->|File System Access| F(Local Storage)
     D -->|AI Model Inference Requests| G(AI Model Hub)
-    G -->|Local Models (Ollama/Llama.cpp)| F
+    G -->|Local Models (Ollama, Llama.cpp)| F
     G -->|Cloud APIs| H(External AI Services)
     D -->|Hardware Bridge Commands| I(ProcessManagerService)
     I -->|Python Bridges| J(External Tools/Hardware)
