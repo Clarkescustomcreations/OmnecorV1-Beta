@@ -34,6 +34,24 @@ export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
 /**
+ * Integrations table to store OAuth and API integration data.
+ */
+export const integrations = mysqlTable("integrations", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  accessToken: text("accessToken").notNull(),
+  refreshToken: text("refreshToken"),
+  expiresAt: timestamp("expiresAt"),
+  tokenIv: varchar("tokenIv", { length: 64 }),
+  tokenTag: varchar("tokenTag", { length: 64 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type Integration = typeof integrations.$inferSelect;
+export type InsertIntegration = typeof integrations.$inferInsert;
+
+/**
  * Chat Sessions (D1 - Chat Persistence)
  * Represents a conversation thread with an AI provider.
  */
