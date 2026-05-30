@@ -126,6 +126,9 @@ export class AiProviderService {
           case "gemini":
             await this.chatGemini(chatInput, onChunk);
             break;
+          case "grok":
+            await this.chatGrok(chatInput, onChunk);
+            break;
           case "forge":
             await this.chatForge(chatInput, onChunk);
             break;
@@ -174,6 +177,7 @@ export class AiProviderService {
       { id: "openai", name: "OpenAI", status: "online" },
       { id: "anthropic", name: "Anthropic", status: "online" },
       { id: "gemini", name: "Google Gemini", status: "online" },
+      { id: "grok", name: "xAI Grok", status: "online" },
       { id: "forge", name: "Forge API", status: "online" },
     ];
     return filter.length > 0
@@ -377,6 +381,53 @@ export class AiProviderService {
 
     if (!response.ok) {
       throw new Error(`OpenAI error: ${response.statusText}`);
+    }
+
+    if (!onChunk) {
+      const data = await response.json();
+      return data.choices[0].message.content;
+    }
+
+    return this.handleStream(
+      response,
+      line => {
+        if (line === "[DONE]") return { content: "", done: true };
+        const parsed = JSON.parse(line);
+        return {
+          content: parsed.choices[0]?.delta?.content || "",
+          done: false,
+        };
+      },
+      onChunk,
+      "data: "
+    );
+  }
+
+  private async chatGrok(
+    input: ChatInput,
+    onChunk?: (chunk: ChatChunk) => void
+  ): Promise<string> {
+    const apiKey = input.apiKey || ENV.xaiApiKey;
+    if (!apiKey) throw new Error("xAI API Key not configured");
+
+    const baseUrl = input.baseUrl || "https://api.x.ai/v1/chat/completions";
+    const response = await fetch(baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: input.modelId || "grok-beta",
+        messages: input.messages,
+        stream: !!onChunk,
+        max_tokens: input.maxTokens,
+        temperature: input.temperature,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`xAI Grok error: ${response.statusText}`);
     }
 
     if (!onChunk) {

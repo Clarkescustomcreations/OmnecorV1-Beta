@@ -14,7 +14,7 @@ import {
 } from "@/lib/chatContext";
 
 interface SelectedModel {
-  providerId: "ollama" | "anthropic" | "openai" | "gemini" | "groq";
+  providerId: "ollama" | "anthropic" | "openai" | "gemini" | "grok";
   modelId: string;
   apiKey?: string;
   baseUrl?: string;

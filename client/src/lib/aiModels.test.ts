@@ -19,7 +19,7 @@ describe("AI Models Library", () => {
 
     it("should have mock API models", () => {
       expect(mockAPIModels.length).toBeGreaterThan(0);
-      expect(mockAPIModels[0].provider).toMatch(/openai|anthropic|gemini|groq/);
+      expect(mockAPIModels[0].provider).toMatch(/openai|anthropic|gemini|grok/);
     });
 
     it("should have marketplace models", () => {
@@ -181,7 +181,7 @@ describe("AI Models Library", () => {
         expect(model.id).toBeDefined();
         expect(model.name).toBeDefined();
         expect(model.provider).toMatch(
-          /ollama|llamacpp|openai|anthropic|gemini|groq/
+          /ollama|llamacpp|openai|anthropic|gemini|grok/
         );
         expect(model.size).toBeGreaterThan(0);
         expect(model.quantizations).toBeInstanceOf(Array);

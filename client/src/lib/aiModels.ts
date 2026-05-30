@@ -11,7 +11,7 @@ export type ModelSource =
   | "openai"
   | "anthropic"
   | "gemini"
-  | "groq"
+  | "grok"
   | "custom";
 export type ModelStatus = "available" | "loading" | "error" | "offline";
 
@@ -31,7 +31,7 @@ export interface LocalModel {
 export interface APIModel {
   id: string;
   name: string;
-  provider: "openai" | "anthropic" | "gemini" | "groq" | "custom";
+  provider: "openai" | "anthropic" | "gemini" | "grok" | "custom";
   apiKey?: string;
   endpoint?: string;
   status: ModelStatus;
