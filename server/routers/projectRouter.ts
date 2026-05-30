@@ -17,10 +17,11 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc.js";
+import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import path from "path";
 import fs from "fs/promises";
+import { validatePath } from "../_core/security.js";
 
 // ---------------------------------------------------------------------------
 // FileTreeNode — matches fileTreeToNetwork.ts on the frontend exactly
@@ -147,15 +148,15 @@ export const projectRouter = router({
    * ALIAS — canonical name used by NeuralBrainMap.tsx.
    * Identical behaviour to registerWatcher below.
    */
-  registerProject: publicProcedure
+  registerProject: protectedProcedure
     .input(registerProjectSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const resolved = path.resolve(input.rootDir);
+        const resolved = await validatePath(input.rootDir);
 
-        // Validate the path exists and is a directory before handing to chokidar
-        const stat = await fs.stat(resolved).catch(() => null);
-        if (!stat || !stat.isDirectory()) {
+        // Validate the path is a directory before handing to chokidar
+        const stat = await fs.stat(resolved);
+        if (!stat.isDirectory()) {
           throw new Error(`Path is not a directory: ${resolved}`);
         }
 
@@ -182,19 +183,20 @@ export const projectRouter = router({
   /**
    * ORIGINAL — kept for backwards compatibility with any existing callers.
    */
-  registerWatcher: publicProcedure
+  registerWatcher: protectedProcedure
     .input(registerProjectSchema)
     .mutation(async ({ ctx, input }) => {
       try {
+        const resolved = await validatePath(input.rootDir);
         await ctx.services.fileWatcher.registerProject({
           projectId: input.projectId,
-          rootDir: input.rootDir,
+          rootDir: resolved,
           debounceMs: input.debounceMs,
         });
 
         return {
           success: true,
-          message: `Watcher registered for project "${input.projectId}" at "${input.rootDir}"`,
+          message: `Watcher registered for project "${input.projectId}" at "${resolved}"`,
         };
       } catch (error) {
         throw new TRPCError({
@@ -204,14 +206,14 @@ export const projectRouter = router({
       }
     }),
 
-  unregisterWatcher: publicProcedure
+  unregisterWatcher: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await ctx.services.fileWatcher.unregisterProject(input.projectId);
       return { success: true };
     }),
 
-  getWatcherStatus: publicProcedure.query(async ({ ctx }) => {
+  getWatcherStatus: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.fileWatcher.getStatus();
   }),
 
@@ -222,7 +224,7 @@ export const projectRouter = router({
    * NeuralBrainMap.tsx passes result directly to fileTreeToNetwork().
    * The old flat-string version is preserved as getFileTreeFlat below.
    */
-  getFileTree: publicProcedure
+  getFileTree: protectedProcedure
     .input(
       z.object({
         projectId: z.string().min(1),
@@ -231,11 +233,11 @@ export const projectRouter = router({
     )
     .query(async ({ input }) => {
       try {
-        const resolved = path.resolve(input.rootDir);
+        const resolved = await validatePath(input.rootDir);
 
-        // Validate path
-        const stat = await fs.stat(resolved).catch(() => null);
-        if (!stat || !stat.isDirectory()) {
+        // Validate path is directory
+        const stat = await fs.stat(resolved);
+        if (!stat.isDirectory()) {
           throw new Error(`Not a directory: ${resolved}`);
         }
 

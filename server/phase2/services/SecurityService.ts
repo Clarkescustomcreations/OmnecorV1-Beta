@@ -37,15 +37,42 @@
 
 import crypto from "crypto";
 import fs from "fs/promises";
-import { createReadStream, createWriteStream } from "fs";
+import { createReadStream, createWriteStream, existsSync } from "fs";
 import path from "path";
 import { pipeline } from "stream/promises";
 import { createGzip, createGunzip } from "zlib";
-import { exec } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 
-const execAsync = promisify(exec);
-const escapeShell = (str: string) => str.replace(/"/g, '\\"');
+/**
+ * Safely executes a command using spawn to avoid shell injection.
+ */
+async function runCommand(command: string, args: string[], options: any = {}): Promise<{ stdout: string; stderr: string; code: number | null }> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(command, args, options);
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout?.on("data", (data) => {
+      stdout += data.toString();
+    });
+
+    child.stderr?.on("data", (data) => {
+      stderr += data.toString();
+    });
+
+    child.on("close", (code) => {
+      if (code === 0 || options.allowNonZero) {
+        resolve({ stdout, stderr, code });
+      } else {
+        reject(new Error(`Command failed with code ${code}: ${stderr}`));
+      }
+    });
+
+    child.on("error", (err) => {
+      reject(err);
+    });
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -312,9 +339,9 @@ rule OmnecorDefaultScan {
     
     try {
       // Check if yara is installed
-      await execAsync("yara --version");
+      await runCommand("yara", ["--version"]);
       
-      const { stdout } = await execAsync(`yara "${escapeShell(this.yaraRulesPath)}" "${escapeShell(filePath)}"`);
+      const { stdout } = await runCommand("yara", [this.yaraRulesPath, filePath]);
       if (stdout.trim()) {
         const matches = stdout.trim().split("\n");
         for (const match of matches) {
@@ -532,11 +559,8 @@ rule OmnecorDefaultScan {
     const archivePath = path.join(backupDir, archiveName);
     const tempArchive = path.join(backupDir, `${backupId}.tar.gz`);
 
-    // Use tar to create the archive
-    await execAsync(
-      `tar -czf "${tempArchive}" -C "${path.dirname(sourceDir)}" "${path.basename(sourceDir)}"`,
-      { maxBuffer: 50 * 1024 * 1024 }
-    );
+    // Use tar to create the archive safely via spawn
+    await runCommand("tar", ["-czf", tempArchive, "-C", path.dirname(sourceDir), path.basename(sourceDir)]);
 
     // Encrypt if passphrase provided
     if (passphrase) {
@@ -628,14 +652,17 @@ rule OmnecorDefaultScan {
     // Create target directory
     await fs.mkdir(targetDir, { recursive: true });
 
-    // Extract archive
-    await execAsync(`tar -xzf "${extractPath}" -C "${targetDir}"`, {
-      maxBuffer: 50 * 1024 * 1024,
-    });
+    // Extract archive safely via spawn
+    await runCommand("tar", ["-xzf", extractPath, "-C", targetDir]);
 
-    // Count restored files
-    const { stdout } = await execAsync(`find "${targetDir}" -type f | wc -l`);
-    const restoredFiles = parseInt(stdout.trim(), 10) || 0;
+    // Count restored files safely
+    let restoredFiles = 0;
+    try {
+       const { stdout } = await runCommand("find", [targetDir, "-type", "f"]);
+       restoredFiles = stdout.trim().split("\n").filter(Boolean).length;
+    } catch (err) {
+       console.warn("[Omnecor Security] Could not count restored files:", err);
+    }
 
     // Clean up decrypted temp file
     if (extractPath !== archivePath) {

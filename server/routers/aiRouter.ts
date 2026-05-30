@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc.js";
+import { publicProcedure, router, protectedProcedure } from "../_core/trpc.js";
 import { observable } from "@trpc/server/observable";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -21,6 +21,7 @@ import {
   addChatMessage,
   updateChatSession,
 } from "../db.js";
+import { validatePath } from "../_core/security.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -81,7 +82,7 @@ export const aiRouter = router({
   /**
    * Discover available local Ollama models.
    */
-  discoverOllamaModels: publicProcedure.query(async ({ ctx }) => {
+  discoverOllamaModels: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.aiProvider.discoverOllamaModels();
   }),
 
@@ -89,7 +90,7 @@ export const aiRouter = router({
   // Chat Persistence (D1)
   // =========================================================================
 
-  createSession: publicProcedure
+  createSession: protectedProcedure
     .input(createSessionSchema)
     .mutation(async ({ input }) => {
       const sessionId = uuidv4();
@@ -104,13 +105,13 @@ export const aiRouter = router({
       return { sessionId };
     }),
 
-  getSessions: publicProcedure
+  getSessions: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ input }) => {
       return await getChatSessions(input.projectId);
     }),
 
-  getSession: publicProcedure
+  getSession: protectedProcedure
     .input(z.object({ sessionId: z.string().uuid() }))
     .query(async ({ input }) => {
       const session = await getChatSession(input.sessionId);
@@ -119,7 +120,7 @@ export const aiRouter = router({
       return { session, messages };
     }),
 
-  saveMessage: publicProcedure
+  saveMessage: protectedProcedure
     .input(saveMessageSchema)
     .mutation(async ({ input }) => {
       const messageId = uuidv4();
@@ -143,7 +144,7 @@ export const aiRouter = router({
    * Summarize a chat session and consolidate it into Episodic Memory (VectorDB).
    * This handles Context Pruning by creating a dense representation of past context.
    */
-  summarizeAndPruneSession: publicProcedure
+  summarizeAndPruneSession: protectedProcedure
     .input(
       z.object({
         sessionId: z.string().uuid(),
@@ -209,7 +210,7 @@ ${transcript}
    * Send a chat completion request (Blocking).
    * Returns the full content once generation is complete.
    */
-  chat: publicProcedure
+  chat: protectedProcedure
     .input(chatInputSchema)
     .mutation(async ({ ctx, input }) => {
       const content = await ctx.services.aiProvider.chat(input);
@@ -220,7 +221,7 @@ ${transcript}
    * Send a chat completion request (Streaming).
    * Emits chunks as they are generated via WebSockets/Subscriptions.
    */
-  chatStream: publicProcedure
+  chatStream: protectedProcedure
     .input(chatInputSchema)
     .subscription(({ ctx, input }) => {
       return observable(emit => {
@@ -247,7 +248,7 @@ ${transcript}
   // Web Scraping & RAG (references/scraping)
   // =========================================================================
 
-  scrape: publicProcedure
+  scrape: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ ctx, input }) => {
       return await ctx.services.scraper.scrape(input.url);
@@ -257,11 +258,12 @@ ${transcript}
   // Coding Context (references/coding)
   // =========================================================================
 
-  getCodeContext: publicProcedure
+  getCodeContext: protectedProcedure
     .input(z.object({ filepath: z.string(), symbols: z.array(z.string()) }))
     .query(async ({ ctx, input }) => {
+      const resolved = await validatePath(input.filepath);
       return await ctx.services.codingContext.getContextSnippets(
-        input.filepath,
+        resolved,
         input.symbols
       );
     }),

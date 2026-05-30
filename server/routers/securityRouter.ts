@@ -16,33 +16,32 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure, publicProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
+import { validatePath } from "../_core/security.js";
 
 // ---------------------------------------------------------------------------
 // Input Schemas
 // ---------------------------------------------------------------------------
 
-const safePathSchema = z.string().min(1).refine(path => {
-  return !path.includes('..') && !path.startsWith('/');
-}, "Path traversal not allowed. Use relative paths only.");
+const pathSchema = z.string().min(1);
 
 const scanFileSchema = z.object({
-  filePath: safePathSchema,
+  filePath: pathSchema,
 });
 
 const scanDirectorySchema = z.object({
-  dirPath: safePathSchema,
+  dirPath: pathSchema,
 });
 
 const encryptFileSchema = z.object({
-  filePath: safePathSchema,
+  filePath: pathSchema,
   passphrase: z.string().min(8, "Passphrase must be at least 8 characters"),
 });
 
 const decryptFileSchema = z.object({
-  encryptedPath: safePathSchema,
+  encryptedPath: pathSchema,
   passphrase: z.string().min(1),
 });
 
@@ -53,13 +52,13 @@ const generateKeySchema = z.object({
 
 const createBackupSchema = z.object({
   projectId: z.string().min(1),
-  sourceDir: safePathSchema,
+  sourceDir: pathSchema,
   passphrase: z.string().optional(),
 });
 
 const restoreBackupSchema = z.object({
-  archivePath: safePathSchema,
-  targetDir: safePathSchema,
+  archivePath: pathSchema,
+  targetDir: pathSchema,
   passphrase: z.string().optional(),
 });
 
@@ -77,7 +76,8 @@ export const securityRouter = router({
     .input(scanFileSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.services.security.scanFile(input.filePath);
+        const resolvedPath = await validatePath(input.filePath);
+        return await ctx.services.security.scanFile(resolvedPath);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -91,9 +91,8 @@ export const securityRouter = router({
     .input(scanDirectorySchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const results = await ctx.services.security.scanDirectory(
-          input.dirPath
-        );
+        const resolvedPath = await validatePath(input.dirPath);
+        const results = await ctx.services.security.scanDirectory(resolvedPath);
         const threats = results.filter(r => !r.isSafe);
         return {
           totalFiles: results.length,
@@ -118,8 +117,9 @@ export const securityRouter = router({
     .input(encryptFileSchema)
     .mutation(async ({ ctx, input }) => {
       try {
+        const resolvedPath = await validatePath(input.filePath);
         const outputPath = await ctx.services.security.encryptFile(
-          input.filePath,
+          resolvedPath,
           input.passphrase
         );
         return { success: true, outputPath };
@@ -136,8 +136,9 @@ export const securityRouter = router({
     .input(decryptFileSchema)
     .mutation(async ({ ctx, input }) => {
       try {
+        const resolvedPath = await validatePath(input.encryptedPath);
         const outputPath = await ctx.services.security.decryptFile(
-          input.encryptedPath,
+          resolvedPath,
           input.passphrase
         );
         return { success: true, outputPath };
@@ -181,9 +182,10 @@ export const securityRouter = router({
     .input(createBackupSchema)
     .mutation(async ({ ctx, input }) => {
       try {
+        const resolvedPath = await validatePath(input.sourceDir);
         return await ctx.services.security.createBackup(
           input.projectId,
-          input.sourceDir,
+          resolvedPath,
           input.passphrase
         );
       } catch (error) {
@@ -199,9 +201,11 @@ export const securityRouter = router({
     .input(restoreBackupSchema)
     .mutation(async ({ ctx, input }) => {
       try {
+        const resolvedArchive = await validatePath(input.archivePath);
+        const resolvedTarget = await validatePath(input.targetDir);
         return await ctx.services.security.restoreBackup(
-          input.archivePath,
-          input.targetDir,
+          resolvedArchive,
+          resolvedTarget,
           input.passphrase
         );
       } catch (error) {
@@ -219,7 +223,7 @@ export const securityRouter = router({
       return ctx.services.security.listBackups(input.projectId);
     }),
 
-  forceRefresh: publicProcedure
+  forceRefresh: protectedProcedure
     .input(z.object({ provider: z.string() }))
     .mutation(async ({ input }) => {
       await TokenRefreshService.getInstance().forceRefresh(input.provider);
