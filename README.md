@@ -1,115 +1,94 @@
-# 👁️ Omnecor V1-Beta
+# Omnecor
 
-> **Context-Aware AI Infrastructure.**
+Operational Memory Never Escapes. Context Overview Remains. Omnecor is a powerful, elegant, and polished local-first AI workstation designed for power users who demand both function and beauty. It seamlessly integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows—all in one refined interface.
 
-**Omnecor** is the premier **Human-Machine Collaboration Interface (HMCI)**. Designed as the central nervous system for your digital and physical workflow, Omnecor unites software development, business automation, media generation, and hardware engineering under one unified, intelligent, and Beta-V1 workspace.
-
-## ✨ Core Capabilities
-
-### 🚦 The Unified AI Orchestrator
-
-At the heart of Omnecor is a high-performance orchestration layer. It analyzes your prompts in real-time and routes them to the ideal model—optimizing for performance, cost, and task-specific capabilities across local models and cloud providers.
-
-### 🔗 Service-Oriented Backend
-
-Omnecor features a unified, production-capable Express/tRPC backend. This centralized architecture ensures real-time synchronization across your entire workspace, providing robust state management for complex AI-driven workflows.
-
-### 🧠 Distributed Mesh Infrastructure
-
-Omnecor visualizes your workflow by generating dynamic, interactive neural networks for your data. Build custom, isolated "neural workspaces" for every individual project. Watch in real-time as your AI agents map out files, connect research documents, and build semantic memory contexts.
-
-### 🤖 The Multi-Modal Workforce
-
-Leverage specialized autonomous agents that collaborate natively:
-
-- **Software & Web:** Agents read your local codebase, write applications, and handle deployment.
-- **Media Studio:** Node-based generation for images, video, and voice cloning.
-- **Hardware Integration Layer:** Bridge the gap to the physical world with integrated Blender 3D modeling and KiCad PCB routing.
-
-## ⚙️ Execution Environments
-
-Omnecor adapts to your specific hardware needs:
-
-1. **Hybrid Orchestration**: Leverage local compute for UI/orchestration, while offloading heavy tasks to authorized cloud providers.
-2. **Sovereign Execution**: 100% local, offline execution. From custom LoRA training to local vector databases, your data stays within your high-end rig.
-3. **Ephemeral Cloud Infrastructure**: Autonomously provision and terminate ephemeral cloud resources (e.g., RunPod) to handle intense compute tasks on-demand, with strict budget tracking.
+Where imagination becomes infrastructure.
 
 ---
 
-## 🎯 Technical Overview
+## Features
 
-**Omnecor** is a comprehensive, Beta-V1 AI workstation for Linux that combines the power of multiple AI models, advanced project management, and specialized engineering tools into a single, unified interface.
+Omnecor is engineered as a modular, production-grade workstation, offering a comprehensive suite of features for AI-driven workflows:
 
-### Key Technical Features
-
-- **Unified Backend** - Centralized, service-oriented tRPC architecture
-- **Spatial Knowledge Organization** - Neural Workspaces for project visualization
-- **Multi-Model Support** - Extensive local (Ollama) and cloud (OpenAI, Anthropic, Gemini) integration
-- **Context Transparency** - Real-time insight into AI-accessible data
-- **Unified ProcessManagerService** - Real-time tracking and lifecycle management of autonomous processes
-- **Specialized Engineering Bridges** - Native integration for Blender, KiCad, and ESPTool
-- **Security Hardening** - CSRF protection, path traversal protection, and secure data handling
-
-## 🚀 Quick Start
-
-### Prerequisites
-
-- Linux (Debian 12, Ubuntu 20.04+)
-- Node.js 22+
-- 8GB+ RAM recommended
-- 10GB free disk space
-
-### Installation
-
-```bash
-# Clone the repository
-git clone [repository-url]
-
-# Install dependencies
-pnpm install
-
-# Start the workstation
-npm run dev
-```
-
-Open `http://localhost:3000` in your browser.
-
-## 📚 Documentation
-
-- **[Installation Guide](./INSTALLATION.md)** - Detailed setup and configuration.
-- **[User Guide](./USER_GUIDE.md)** - Comprehensive feature documentation.
-- **[Troubleshooting Guide](./TROUBLESHOOTING.md)** - Solutions to common issues.
-- **[Architecture Documentation](./docs/PHASE2_ARCHITECTURE.md)** - Deep dive into Omnecor's infrastructure.
-
-## 🏗️ Architecture
-
-Omnecor leverages a service-oriented, unified backend to provide a stable, Beta-V1 environment.
-
-### Core Stack
-
-- **Frontend**: React 19, TypeScript, shadcn/ui.
-- **Backend**: Express.js, tRPC, Drizzle ORM.
-- **Orchestration**: Unified WebSocket endpoint, TrpcContext.
-- **Visualization**: React Flow (Neural Workspaces).
-- **Testing**: Vitest (comprehensive coverage).
-
-## 🤝 Contributing
-
-We welcome professional contributions. Please follow the repository conventions:
-
-1. Fork the repository.
-2. Create a feature branch.
-3. Adhere to the established architecture and coding standards.
-4. Add verification tests.
-5. Submit a pull request.
-
-## 📄 License
-
-Omnecor is licensed under the MIT License. See [LICENSE](./LICENSE) file for details.
+- **Unified Backend**: A centralized Express.js/tRPC engine ensuring real-time UI/data state synchronization via WebSockets.
+- **Neural Workspaces**: Spatial graph-based project management using React Flow for semantic file/knowledge visualization.
+- **Multi-Modal Workforce**: Integrated autonomous agent orchestration for software, media, and hardware tasks.
+- **Hardware Integration Layer**: Secure, process-managed bridges for Blender (3D), KiCad (PCB), and ESPTool (Firmware).
+- **Voice Pipeline**: A high-performance inference bridge to FastAPI-based STT (Whisper) and TTS/RVC microservices.
+- **OMMESH**: A distributed mesh intelligence layer enabling multiple Omnecor nodes to discover each other on a LAN, federate securely via mTLS, and route inference requests by available VRAM.
+- **Strictly Local Data Sovereignty**: Your data stays on your machine. Always.
+- **Interactive Neural Brain Maps**: Visualize, connect, and understand your projects like never before.
+- **Run Any Local or Cloud AI Model**: Use the models you trust, on your own terms.
+- **Zero Mandatory Monthly Bills**: No lock-in. No surprise fees. Just pure ownership.
 
 ---
 
-**Building the future of human-machine collaboration.**
+## Screenshots
 
-Omnecor HMCI: Unified. Intelligent. Beta-V1. 🧠✨
-Operational Memory Never Escapes Context Overview Remains
+![Omnecor UI Overview](file_0000000036d471f7a2101a53fc9370a4.png)
+
+---
+
+## Architecture Overview
+
+Omnecor operates as a unified application with a single Express server serving as the entry point. It integrates a tRPC API for efficient communication, a WebSocket server for real-time updates, and handles static file serving for the frontend. Key architectural components include:
+
+- **tRPC API**: All API endpoints are accessible at `/api/trpc/`.
+- **WebSocket Server**: Attached at `/ws` on the same HTTP server, facilitating real-time Neural Node-Tree and training progress updates.
+- **OMMESH**: The distributed mesh intelligence layer for multi-node discovery and inference routing.
+- **Phase 2 Services**: Singletons like `SecurityService`, `VectorDBService`, and `ProcessManagerService` are initialized at startup to ensure readiness.
+
+---
+
+## Installation
+
+For detailed installation instructions, including system requirements and platform-specific guides, please refer to the [INSTALL.md](INSTALL.md) file.
+
+---
+
+## Quick Start
+
+To get Omnecor up and running quickly, follow the steps outlined in the [QUICKSTART.md](QUICKSTART.md) guide.
+
+---
+
+## Configuration
+
+Omnecor's configuration is managed through environment variables (e.g., `.env` file) and granular UI settings. For comprehensive details on available configuration options and their impact, consult the [Configuration Guide](docs/user-guides/USER_GUIDE.md#8-configuration-guide).
+
+---
+
+## Project Structure
+
+The repository is organized into several key directories:
+
+- `client/`: Contains the frontend application built with React and Vite.
+- `server/`: Houses the backend services, tRPC routers, and AI integration bridges.
+- `docs/`: Stores detailed documentation, including architecture, API, and user guides.
+- `packaging/`: Contains scripts and configurations for application packaging (AppImage, Deb, Flatpak).
+- `drizzle/`: Database schema and migration files.
+- `shared/`: Shared types and utilities between client and server.
+
+---
+
+## Development
+
+Information on contributing to Omnecor, including coding standards, pull request processes, and testing expectations, can be found in the [CONTRIBUTING.md](CONTRIBUTING.md) file.
+
+---
+
+## Roadmap
+
+For upcoming features, planned enhancements, and the overall direction of the Omnecor project, please refer to the [ROADMAP.md](ROADMAP.md) file.
+
+---
+
+## Documentation
+
+Explore the comprehensive documentation suite in the [docs/](docs/) directory for in-depth information on various aspects of Omnecor.
+
+---
+
+## License
+
+Omnecor is released under the [MIT License](LICENSE).

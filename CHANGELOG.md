@@ -9,6 +9,10 @@
 - **Voice System:** RVC voice conversion pipeline.
 - **Branding:** Rebranded to Omnecor HMCI.
 - **Documentation:** Full rewrite and modernization of project docs.
+- **Neural Workspaces:** Spatial graph-based project management using React Flow.
+- **Multi-Modal Workforce:** Integrated autonomous agent orchestration.
+- **OMMESH:** Distributed mesh intelligence layer.
+- **Local-First Data Sovereignty:** Your data stays on your machine. Always.
 
 ### Changed
 

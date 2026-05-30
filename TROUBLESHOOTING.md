@@ -1,97 +1,179 @@
-# Omnecor Troubleshooting Guide
+# Troubleshooting Guide for Omnecor
 
-This guide helps you resolve common issues and problems with your Omnecor workstation.
+This guide provides solutions to common issues you might encounter while installing, configuring, or operating Omnecor. For more in-depth information, please refer to the [User Guide](docs/user-guides/USER_GUIDE.md) and the [Installation Guide](INSTALL.md).
 
-## Table of Contents
+## 1. General Troubleshooting Steps
 
-1. [Installation Issues](#installation-issues)
-2. [Performance Issues](#performance-issues)
-3. [AI Model Issues](#ai-model-issues)
-4. [Integration Issues](#integration-issues)
-5. [Data & Storage Issues](#data--storage-issues)
+Before diving into specific issues, consider these general troubleshooting steps:
 
-## Installation Issues
+1.  **Check System Requirements**: Ensure your system meets the minimum and recommended requirements outlined in [INSTALL.md](INSTALL.md).
+2.  **Review Logs**: Examine the backend runtime logs located in `server/_core/logs` for any error messages or warnings. Process-specific logs are streamed as JSON for backend parsing.
+3.  **Restart Omnecor**: Sometimes, simply restarting the Omnecor application can resolve transient issues.
+4.  **Update Dependencies**: Ensure all project dependencies are up-to-date by running `pnpm install`.
+5.  **Consult Documentation**: Refer to the relevant sections of the [User Guide](docs/user-guides/USER_GUIDE.md) or other documentation files for detailed explanations of features and configurations.
 
-### Problem: Port Already in Use
+## 2. Common Installation Issues
 
-**Solution:**
+### Issue: Port Already in Use
 
-```bash
-# Find the process using the port (default 3000)
-lsof -i :3000
+**Symptoms**: Omnecor fails to start, and the console output indicates that the default port (e.g., `3000`) is already in use.
 
-# Kill the process
-kill -9 <PID>
+**Causes**: Another application is using the port Omnecor is trying to bind to.
 
-# Or change the PORT in your .env file
-PORT=3001 npm run dev
+**Diagnostics**: The startup logs will explicitly state that the port is unavailable. You can also use `lsof -i :<PORT>` to identify the process.
+
+**Fixes**: Omnecor is designed to automatically find an available port if the preferred one is busy. Check the console output for the actual URL where Omnecor is running. Alternatively, you can specify a different port in your `.env` file:
+
+```env
+PORT=3001
 ```
 
-### Problem: Node.js/pnpm Missing
-
-**Solution:**
+To manually kill a process occupying the port:
 
 ```bash
-# Verify installation
+lsof -i :3000
+kill -9 <PID>
+```
+
+**Prevention**: Ensure no other applications are running on the ports Omnecor typically uses (e.g., 3000, 3001, etc.) before starting Omnecor.
+
+### Issue: Node.js/pnpm Missing or Incorrect Version
+
+**Symptoms**: `pnpm install` fails, or the application throws errors related to missing modules during startup, or `node --version` / `pnpm --version` commands fail.
+
+**Causes**: Node.js or pnpm are not installed, or an incompatible version is being used.
+
+**Diagnostics**: Error messages during `pnpm install` or runtime errors indicating `Cannot find module`. Verify installed versions:
+
+```bash
 node --version
 pnpm --version
-
-# Ensure dependencies are installed
-pnpm install
 ```
 
-## Performance Issues
+**Fixes**:
 
-### Problem: Application Runs Slowly
+1.  **Install Node.js and pnpm**: Follow the instructions in [INSTALL.md](INSTALL.md) to install the correct versions.
+2.  **Clean Install**: Delete the `node_modules` directory and `pnpm-lock.yaml` file, then run `pnpm install` again:
+    ```bash
+    rm -rf node_modules pnpm-lock.yaml
+    pnpm install
+    ```
 
-**Solutions:**
+**Prevention**: Always ensure your development environment matches the prerequisites specified in [INSTALL.md](INSTALL.md).
 
-1. **Reduce Context Size:** Adjust context limits in `Settings > Advanced`.
-2. **Close Unused Workspaces:** Free up system memory.
-3. **Restart Service:** Sometimes helps with memory management in the unified backend.
+### Issue: Build Failures
 
-### Problem: GPU Not Being Used
+**Symptoms**: `npm run build` command fails with compilation errors.
 
-**Solutions:**
+**Causes**: TypeScript errors, misconfigured `vite.config.ts`, or issues with static assets.
 
-1. **Verify GPU Installation:** `nvidia-smi`
-2. **Configure Ollama for GPU:** Ensure Ollama is correctly detecting your hardware.
+**Diagnostics**: The build output will show specific error messages from TypeScript or Vite.
 
-## AI Model Issues
+**Fixes**:
 
-### Problem: Models Not Appearing
+1.  **Check TypeScript Errors**: Run `pnpm run check` to identify and fix any TypeScript compilation errors.
+2.  **Review Configuration**: Ensure `vite.config.ts` and `tsconfig.json` are correctly configured.
 
-**Solutions:**
+**Prevention**: Regularly run `pnpm run check` during development to catch type errors early.
 
-1. **Check Ollama Status:** `curl http://localhost:11434/api/tags`
-2. **Verify Configuration:** Check `Settings > Model Hub` for Ollama host settings.
+## 3. Runtime and Operational Issues
 
-### Problem: API Model Errors
+### Issue: AI Model Loading Failures
 
-**Solutions:**
+**Symptoms**: Omnecor cannot connect to local AI models (e.g., Ollama/Llama.cpp) or fails to load them, or models do not appear in the UI.
 
-1. **Verify API Key:** Check your keys in `Settings > Integrations`.
-2. **Test Connection:** Use `curl` to verify API access from your workstation terminal.
+**Causes**: Incorrect endpoint configuration, the local AI model server is not running, or network issues.
 
-## Integration Issues
+**Diagnostics**: Check Omnecor logs for connection errors to the AI model endpoint. Verify the AI model server is running independently. You can check Ollama status with `curl http://localhost:11434/api/tags`.
 
-### Problem: Bridge Not Connecting (Blender/KiCad)
+**Fixes**:
 
-**Solutions:**
+1.  **Verify AI Server Status**: Ensure your local AI model server (e.g., Ollama) is running and accessible.
+2.  **Check `.env` Configuration**: Confirm that `OLLAMA_ENDPOINT` (or similar) in your `.env` file points to the correct address and port of your local AI model server.
+3.  **Firewall Settings**: Ensure your firewall is not blocking communication between Omnecor and your local AI model server.
+4.  **Verify Configuration in UI**: Check `Settings > Model Hub` for Ollama host settings.
 
-1. **Check Python Environment:** Ensure the Python environment used by the bridge has the necessary dependencies installed.
-2. **View Bridge Logs:** Check the logs generated by the `ProcessManagerService`.
+**Prevention**: Always start your local AI model server before launching Omnecor if you intend to use local models.
 
-## Data & Storage Issues
+### Issue: GPU Issues / Performance Problems
 
-### Problem: Knowledge Base Not Indexed
+**Symptoms**: Slow AI inference, UI lag, or errors indicating GPU memory exhaustion. Application runs slowly or GPU is not being used.
 
-**Solutions:**
+**Causes**: Insufficient GPU VRAM, outdated GPU drivers, or resource-intensive AI models.
 
-1. **Check File Permissions:** Ensure the workstation has read access to the directory.
-2. **Manual Reindex:** Use the reindex action in the Knowledge Base settings.
+**Diagnostics**: System monitoring tools (e.g., `nvidia-smi` for NVIDIA GPUs) can show GPU utilization and memory usage. Omnecor logs might show warnings related to performance.
 
-## Getting Help
+**Fixes**:
 
-- **Support Email:** Contact support@ th3artistunknown@gmail.com 
-- **GitHub Issues:** Search for similar problems in the repository issues.
+1.  **Reduce Context Size**: Adjust context limits in `Settings > Advanced`.
+2.  **Close Unused Workspaces**: Free up system memory.
+3.  **Reduce Model Size**: Use smaller AI models or quantizations if VRAM is limited.
+4.  **Update Drivers**: Ensure your GPU drivers are up-to-date.
+5.  **Zram**: For memory-constrained Linux systems, ensure Zram is enabled to prevent Out-Of-Memory (OOM) terminations. Refer to [User Guide](docs/user-guides/USER_GUIDE.md#16-performance-optimization) for details.
+6.  **Configure Ollama for GPU**: Ensure Ollama is correctly detecting and utilizing your hardware.
+
+**Prevention**: Monitor GPU usage during heavy AI tasks. Allocate sufficient resources for your intended AI workloads.
+
+### Issue: WebSocket Connection Problems
+
+**Symptoms**: Real-time updates (e.g., Neural Node-Tree, training progress) are not functioning, or the UI shows connection errors.
+
+**Causes**: Firewall blocking WebSocket connections, incorrect WebSocket URL, or server-side WebSocket issues.
+
+**Diagnostics**: Browser developer console (Network tab) will show WebSocket connection attempts and any errors. Omnecor server logs will indicate WebSocket server status.
+
+**Fixes**:
+
+1.  **Firewall**: Ensure your firewall allows WebSocket connections on the Omnecor port.
+2.  **Server Status**: Verify the Omnecor server is running and the WebSocket server is initialized (check startup logs).
+
+**Prevention**: Ensure consistent network configuration and monitor server health.
+
+### Issue: Bridge Not Connecting (Blender/KiCad/ESPTool)
+
+**Symptoms**: Integrations with external tools like Blender or KiCad fail to establish a connection or execute commands.
+
+**Causes**: Incorrect Python environment setup, missing dependencies for the bridge scripts, or issues with the `ProcessManagerService`.
+
+**Diagnostics**:
+
+1.  **Check Python Environment**: Ensure the Python environment used by the bridge has the necessary dependencies installed.
+2.  **View Bridge Logs**: Check the logs generated by the `ProcessManagerService` for specific errors related to the bridge.
+
+**Fixes**:
+
+1.  **Install Python Dependencies**: Ensure all required Python packages for the specific bridge are installed.
+2.  **Verify Python Path**: Confirm that Omnecor is configured to use the correct Python interpreter and environment.
+
+**Prevention**: Follow the specific setup instructions for each hardware integration in the [User Guide](docs/user-guides/USER_GUIDE.md).
+
+### Issue: Knowledge Base Not Indexed
+
+**Symptoms**: Semantic search or knowledge retrieval features are not working as expected, or the knowledge base appears empty.
+
+**Causes**: File permission issues, indexing process failure, or incorrect configuration of the `VectorDBService`.
+
+**Diagnostics**:
+
+1.  **Check File Permissions**: Ensure Omnecor has read access to the directories you are trying to index.
+2.  **Review `VectorDBService` Logs**: Check logs for errors during the indexing process.
+
+**Fixes**:
+
+1.  **Manual Reindex**: Use the reindex action in the Knowledge Base settings within the Omnecor UI.
+2.  **Verify Configuration**: Ensure the `VectorDBService` is correctly configured and initialized.
+
+**Prevention**: Grant appropriate file system permissions and monitor the indexing process for large datasets.
+
+## 4. Getting Help
+
+If you encounter an issue not covered in this guide, please report it on the [GitHub Issues page](https://github.com/Clarkescustomcreations/OmnecorV1-Beta/issues). When reporting, please include:
+
+-   A clear and concise description of the problem.
+-   Steps to reproduce the behavior.
+-   Expected behavior.
+-   Screenshots or error messages, if applicable.
+-   Your operating system and Omnecor version.
+-   Relevant log snippets.
+
+Alternatively, you can contact support at `th3artistunknown@gmail.com`.
