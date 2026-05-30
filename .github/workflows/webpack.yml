@@ -23,7 +23,7 @@ jobs:
         node-version: ${{ matrix.node-version }}
 
     - name: Setup pnpm
-      uses: pnpm/action-setup@v2
+      uses: pnpm/action-setup@v4
 
     - name: Get pnpm store directory
       id: pnpm-cache
@@ -32,7 +32,7 @@ jobs:
         echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
 
     - name: Setup pnpm cache
-      uses: actions/cache@v3
+      uses: actions/cache@v4
       with:
         path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
         key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
@@ -42,5 +42,5 @@ jobs:
     - name: Install dependencies
       run: pnpm install
 
-    - name: Build with Webpack
-      run: pnpm exec webpack
+    - name: Build
+      run: pnpm run build
