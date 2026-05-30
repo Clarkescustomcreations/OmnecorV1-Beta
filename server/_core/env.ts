@@ -13,4 +13,8 @@ export const ENV = {
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   xaiApiKey: process.env.XAI_API_KEY ?? "",
   n8nUrl: process.env.N8N_URL ?? "http://localhost:5678",
+  notionClientId: process.env.NOTION_CLIENT_ID ?? "",
+  notionClientSecret: process.env.NOTION_CLIENT_SECRET ?? "",
+  slackClientId: process.env.SLACK_CLIENT_ID ?? "",
+  slackClientSecret: process.env.SLACK_CLIENT_SECRET ?? "",
 };

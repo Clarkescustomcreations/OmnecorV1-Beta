@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   Card,
   CardContent,
@@ -32,9 +32,12 @@ import {
   Settings,
   Zap,
   Save,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { createMockSettings, type AppSettings } from "@/lib/settings";
+import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 interface SettingsPanelProps {
   className?: string;
@@ -51,9 +54,24 @@ interface SettingsPanelProps {
  * - Advanced configuration
  */
 export default function SettingsPanel({ className }: SettingsPanelProps) {
+  const { data: savedSettings } = trpc.system.getSettings.useQuery(undefined, {
+    staleTime: Infinity, // only fetch once per session
+  });
+  const saveSettingsMutation = trpc.system.saveSettings.useMutation({
+    onSuccess: () => toast.success("Settings saved"),
+    onError: (err) => toast.error("Failed to save: " + err.message),
+  });
+
   const [settings, setSettings] = useState<AppSettings>(createMockSettings());
   const [activeTab, setActiveTab] = useState<string>("general");
   const [hasChanges, setHasChanges] = useState(false);
+
+  // Populate from backend when loaded:
+  useEffect(() => {
+    if (savedSettings) {
+      setSettings(savedSettings as AppSettings);
+    }
+  }, [savedSettings]);
 
   const handleSettingChange = () => {
     setHasChanges(true);
@@ -61,7 +79,7 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
 
   const handleSave = () => {
     setHasChanges(false);
-    // TODO: Persist settings to backend
+    saveSettingsMutation.mutate({ settings: settings as Record<string, unknown> });
   };
 
   const handleExport = () => {
@@ -628,9 +646,11 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
             Import
           </Button>
         </div>
-        <Button size="sm" disabled={!hasChanges} onClick={handleSave}>
-          <Save className="w-4 h-4 mr-2" />
-          Save Changes
+        <Button size="sm" disabled={!hasChanges || saveSettingsMutation.isPending} onClick={handleSave}>
+          {saveSettingsMutation.isPending
+            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+            : <><Save className="w-4 h-4 mr-2" />Save Changes</>
+          }
         </Button>
       </div>
     </div>
