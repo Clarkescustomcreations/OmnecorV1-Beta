@@ -64,6 +64,31 @@ def parse_args():
         default=1,
         help="Total number of full training epochs to perform."
     )
+    parser.add_argument(
+        "--r",
+        type=int,
+        default=16,
+        help="LoRA rank dimension."
+    )
+    parser.add_argument(
+        "--lora_alpha",
+        type=int,
+        default=16,
+        help="LoRA scaling factor."
+    )
+    parser.add_argument(
+        "--max_seq_length",
+        type=int,
+        default=2048,
+        help="Maximum sequence length."
+    )
+    parser.add_argument(
+        "--save_method",
+        type=str,
+        default="lora",
+        choices=["lora", "merged_16bit", "merged_4bit", "gguf", "ollama"],
+        help="Method used to save the final model."
+    )
     return parser.parse_args()
 
 
@@ -71,7 +96,7 @@ def main():
     args = parse_args()
 
     # 1. Load the pre-quantized 4-bit base model and its matching tokenizer via Unsloth
-    max_seq_length = 2048  # Defaulting to 2048 context window for local workstation limits
+    max_seq_length = args.max_seq_length
     dtype = None           # None automatically detects and sets float16/bfloat16 depending on GPU
     load_in_4bit = True    # Strictly enforce 4-bit quantization to fit commodity hardware VRAM
 
@@ -89,8 +114,8 @@ def main():
     # 2. Configure Parameter-Efficient Fine-Tuning (PEFT/LoRA) wrappers on top of the base model
     model = FastLanguageModel.get_peft_model(
         model,
-        r=16,               # Rank dimension; higher means more expressiveness but more memory
-        lora_alpha=16,      # Scaling factor for the LoRA adapter weights
+        r=args.r,           # Rank dimension; higher means more expressiveness but more memory
+        lora_alpha=args.lora_alpha, # Scaling factor for the LoRA adapter weights
         target_modules=["q_proj", "k_proj", "v_proj", "o_proj", "gate_proj", "up_proj", "down_proj"],
         lora_dropout=0,     # Optimally set to 0 by Unsloth for exact computational speedups
         bias="none",        # Optimally set to none

@@ -31,6 +31,7 @@ import { FileSystemWatcherService } from "../phase2/services/FileSystemWatcherSe
 import { HashTrackerService } from "../phase2/services/HashTrackerService.js";
 import { VectorDBService } from "../phase2/services/VectorDBService.js";
 import { ProcessManagerService } from "../phase2/services/ProcessManagerService.js";
+import { AgentService } from "../phase2/services/AgentService.js";
 import { VoiceService } from "../phase2/services/VoiceService.js";
 import { AiProviderService } from "../phase2/services/AiProviderService.js";
 import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
@@ -41,6 +42,7 @@ import { ESPToolBridge } from "../phase2/services/ESPToolService.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { MeshDiscoveryService } from "../phase2/services/MeshDiscoveryService.js";
 import { FalApiService } from "../phase2/services/FalApiService.js";
+import { ComfyService } from "../phase2/services/ComfyService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified Context Type
@@ -66,6 +68,7 @@ export type TrpcContext = {
     hashTracker: HashTrackerService;
     vectorDB: VectorDBService;
     processManager: ProcessManagerService;
+    agent: AgentService;
     voice: VoiceService;
     aiProvider: AiProviderService;
     memoryArchitect: MemoryArchitectService;
@@ -76,6 +79,7 @@ export type TrpcContext = {
     hitl: HITLApprovalService;
     mesh: MeshDiscoveryService;
     fal: FalApiService;
+    comfy: ComfyService;
   };
 };
 
@@ -112,6 +116,7 @@ export async function createContext(
       hashTracker: HashTrackerService.getInstance(),
       vectorDB: VectorDBService.getInstance(),
       processManager: ProcessManagerService.getInstance(),
+      agent: AgentService.getInstance(),
       voice: VoiceService.getInstance(),
       aiProvider: AiProviderService.getInstance(),
       memoryArchitect: MemoryArchitectService.getInstance(),
@@ -122,6 +127,7 @@ export async function createContext(
       hitl: HITLApprovalService.getInstance(),
       mesh: MeshDiscoveryService.getInstance(),
       fal: FalApiService.getInstance(),
+      comfy: ComfyService.getInstance(),
     },
   };
 }

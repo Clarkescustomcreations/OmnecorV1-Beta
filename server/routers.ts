@@ -44,9 +44,11 @@ import { espRouter } from "./routers/espRouter.js";
 import { voiceRouter } from "./routers/voiceRouter.js";
 import { trainingRouter } from "./routers/trainingRouter.js";
 import { projectRouter } from "./routers/projectRouter.js";
+import { agentRouter } from "./phase2/routers/agentRouter.js";
 import { securityRouter } from "./routers/securityRouter.js";
 import { ommeshRouter } from "./routers/ommesh.router.js";
 import { falRouter } from "./routers/falRouter.js";
+import { comfyRouter } from "./routers/comfyRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -85,11 +87,17 @@ export const appRouter = router({
   // ─── Project Management (File Watcher + Neural Node-Tree + Loop Detector) ─
   project: projectRouter,
 
+  // ─── Agent Orchestration (CrewAI + LiteAgent + n8n) ───────────────────────
+  agent: agentRouter,
+
   // ─── Mesh Intelligence (OMMESH Node Discovery) ───────────────────────────
   mesh: ommeshRouter,
 
   // ─── OpenArt AI (Video Clone / Character Gen) ─────────────────────────────
   fal: falRouter,
+
+  // ─── ComfyUI Bridge ───────────────────────────────────────────────────────
+  comfy: comfyRouter,
 
   // ─── Hardware (Specialized integration bridges) ───────────────────────────
   blender: blenderRouter,

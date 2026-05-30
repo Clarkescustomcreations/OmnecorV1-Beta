@@ -2,7 +2,7 @@
 
 > **Context-Aware AI Infrastructure.**
 
-**Omnecor** is the premier **Human-Machine Collaboration Interface (HMCI)**. Designed as the central nervous system for your digital and physical workflow, Omnecor unites software development, business automation, media generation, and hardware engineering under one unified, intelligent, and production-ready workspace.
+**Omnecor** is the premier **Human-Machine Collaboration Interface (HMCI)**. Designed as the central nervous system for your digital and physical workflow, Omnecor unites software development, business automation, media generation, and hardware engineering under one unified, intelligent, and Beta-V1 workspace.
 
 ## ✨ Core Capabilities
 
@@ -38,7 +38,7 @@ Omnecor adapts to your specific hardware needs:
 
 ## 🎯 Technical Overview
 
-**Omnecor** is a comprehensive, production-ready AI workstation for Linux that combines the power of multiple AI models, advanced project management, and specialized engineering tools into a single, unified interface.
+**Omnecor** is a comprehensive, Beta-V1 AI workstation for Linux that combines the power of multiple AI models, advanced project management, and specialized engineering tools into a single, unified interface.
 
 ### Key Technical Features
 
@@ -83,7 +83,7 @@ Open `http://localhost:3000` in your browser.
 
 ## 🏗️ Architecture
 
-Omnecor leverages a service-oriented, unified backend to provide a stable, production-ready environment.
+Omnecor leverages a service-oriented, unified backend to provide a stable, Beta-V1 environment.
 
 ### Core Stack
 
@@ -111,4 +111,4 @@ Omnecor is licensed under the MIT License. See [LICENSE](./LICENSE) file for det
 
 **Building the future of human-machine collaboration.**
 
-Omnecor HMCI: Unified. Intelligent. Production-Ready. 🧠✨
+Omnecor HMCI: Unified. Intelligent. Beta-V1. 🧠✨

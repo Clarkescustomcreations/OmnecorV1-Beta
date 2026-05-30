@@ -96,7 +96,7 @@ const DEFAULT_OPTIONS: Required<FileSystemWatcherOptions> = {
 // ---------------------------------------------------------------------------
 
 /**
- * A production-ready, typed file system watcher for Omnecor.
+ * A Beta-V1, typed file system watcher for Omnecor.
  *
  * @example
  * ```ts

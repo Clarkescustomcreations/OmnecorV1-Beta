@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc.js";
+import { protectedProcedure, publicProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 
@@ -43,7 +43,7 @@ export const blenderRouter = router({
   }),
 
   /** Execute a Python script inside Blender's headless environment */
-  executeScript: publicProcedure
+  executeScript: protectedProcedure
     .input(blenderScriptSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -62,7 +62,7 @@ export const blenderRouter = router({
     }),
 
   /** Render the current Blender scene to an image file */
-  render: publicProcedure
+  render: protectedProcedure
     .input(blenderRenderSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -88,12 +88,13 @@ export const blenderRouter = router({
     }),
 
   /** Export a .blend file to another format (GLB, FBX, OBJ, STL) */
-  export: publicProcedure
+  export: protectedProcedure
     .input(blenderExportSchema)
     .mutation(async ({ ctx, input }) => {
       try {
+        const validatedBlend = await validatePath(input.blendFile);
         const jobId = await ctx.services.blender.exportFile(
-          input.blendFile,
+          validatedBlend,
           input.outputPath
         );
         return { success: true, jobId };

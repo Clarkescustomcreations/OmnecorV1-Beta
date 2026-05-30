@@ -181,8 +181,12 @@ export class ProcessManagerService extends EventEmitter {
     datasetPath: string;
     outputDir?: string;
     epochs?: number;
+    r?: number;
+    loraAlpha?: number;
+    maxSeqLength?: number;
+    saveMethod?: string;
   }): Promise<string> {
-    const { modelName, datasetPath, outputDir, epochs } = config;
+    const { modelName, datasetPath, outputDir, epochs, r, loraAlpha, maxSeqLength, saveMethod } = config;
 
     // Validate dataset file exists
     await this.validatePath(datasetPath, "Dataset file");
@@ -197,6 +201,18 @@ export class ProcessManagerService extends EventEmitter {
     }
     if (epochs) {
       args.push("--epochs", String(epochs));
+    }
+    if (r) {
+      args.push("--r", String(r));
+    }
+    if (loraAlpha) {
+      args.push("--lora_alpha", String(loraAlpha));
+    }
+    if (maxSeqLength) {
+      args.push("--max_seq_length", String(maxSeqLength));
+    }
+    if (saveMethod) {
+      args.push("--save_method", saveMethod);
     }
 
     return this.spawn({

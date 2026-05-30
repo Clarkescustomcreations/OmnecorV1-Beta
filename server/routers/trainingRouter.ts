@@ -34,6 +34,14 @@ const startTrainingSchema = z.object({
   outputDir: z.string().optional(),
   /** Number of training epochs (default: 1) */
   epochs: z.number().int().min(1).max(100).optional(),
+  /** LoRA Rank (r) parameter (default: 16) */
+  r: z.number().int().min(1).optional(),
+  /** LoRA Alpha parameter (default: 16) */
+  loraAlpha: z.number().int().min(1).optional(),
+  /** Maximum sequence length (default: 2048) */
+  maxSeqLength: z.number().int().min(128).optional(),
+  /** Save method: lora, merged_16bit, merged_4bit, gguf, ollama */
+  saveMethod: z.enum(["lora", "merged_16bit", "merged_4bit", "gguf", "ollama"]).optional(),
 });
 
 const validateDatasetSchema = z.object({
@@ -111,6 +119,10 @@ export const trainingRouter = router({
           datasetPath: validatedPath,
           outputDir: input.outputDir,
           epochs: input.epochs,
+          r: input.r,
+          loraAlpha: input.loraAlpha,
+          maxSeqLength: input.maxSeqLength,
+          saveMethod: input.saveMethod,
         });
 
         return {

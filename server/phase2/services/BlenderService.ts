@@ -317,27 +317,30 @@ export class BlenderBridge extends EventEmitter {
   async exportFile(blendFile: string, outputPath: string): Promise<string> {
     const ext = path.extname(outputPath).toLowerCase();
 
+    // Securely serialize paths for Python injection prevention
+    const safeOutput = JSON.stringify(outputPath);
+
     // Generate the export script based on target format
     const exportScripts: Record<string, string> = {
       ".glb": `
 import bpy
-bpy.ops.export_scene.gltf(filepath="${outputPath}", export_format='GLB')
-print('{"status": "success", "message": "Exported to GLB", "output": "${outputPath}"}')
+bpy.ops.export_scene.gltf(filepath=${safeOutput}, export_format='GLB')
+print('{"status": "success", "message": "Exported to GLB", "output": '${safeOutput}'}')
 `,
       ".fbx": `
 import bpy
-bpy.ops.export_scene.fbx(filepath="${outputPath}")
-print('{"status": "success", "message": "Exported to FBX", "output": "${outputPath}"}')
+bpy.ops.export_scene.fbx(filepath=${safeOutput})
+print('{"status": "success", "message": "Exported to FBX", "output": '${safeOutput}'}')
 `,
       ".obj": `
 import bpy
-bpy.ops.wm.obj_export(filepath="${outputPath}")
-print('{"status": "success", "message": "Exported to OBJ", "output": "${outputPath}"}')
+bpy.ops.wm.obj_export(filepath=${safeOutput})
+print('{"status": "success", "message": "Exported to OBJ", "output": '${safeOutput}'}')
 `,
       ".stl": `
 import bpy
-bpy.ops.export_mesh.stl(filepath="${outputPath}")
-print('{"status": "success", "message": "Exported to STL", "output": "${outputPath}"}')
+bpy.ops.export_mesh.stl(filepath=${safeOutput})
+print('{"status": "success", "message": "Exported to STL", "output": '${safeOutput}'}')
 `,
     };
 

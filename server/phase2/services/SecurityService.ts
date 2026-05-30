@@ -175,12 +175,19 @@ const SUSPICIOUS_EXTENSIONS = new Set([
 export class SecurityService {
   private static instance: SecurityService | null = null;
   private keyStorePath: string;
+  private yaraRulesPath: string;
 
   private constructor() {
     this.keyStorePath = path.join(
       process.env.HOME || "/tmp",
       ".omnecor",
       "keystore"
+    );
+    this.yaraRulesPath = path.join(
+      process.env.HOME || "/tmp",
+      ".omnecor",
+      "security",
+      "rules.yar"
     );
   }
 
@@ -192,9 +199,24 @@ export class SecurityService {
     return SecurityService.instance;
   }
 
-  /** Initialize the key store directory */
+  /** Initialize the key store directory and security assets */
   async initialize(): Promise<void> {
     await fs.mkdir(this.keyStorePath, { recursive: true, mode: 0o700 });
+    await fs.mkdir(path.dirname(this.yaraRulesPath), { recursive: true });
+    
+    // Create a dummy YARA rule if it doesn't exist
+    try {
+      await fs.access(this.yaraRulesPath);
+    } catch {
+      const dummyRule = `
+rule OmnecorDefaultScan {
+    strings:
+        $a = "EVIL_MALWARE_STRING_PLACEHOLDER"
+    condition:
+        $a
+}`;
+      await fs.writeFile(this.yaraRulesPath, dummyRule);
+    }
   }
 
   // =========================================================================
@@ -205,6 +227,7 @@ export class SecurityService {
    * Scan a file for potential security threats.
    *
    * Performs:
+   *  - YARA-rule based scanning (if yara binary is available)
    *  - Magic byte verification (file type vs extension)
    *  - Dangerous signature detection
    *  - Symlink traversal check
@@ -219,7 +242,7 @@ export class SecurityService {
     const resolvedPath = path.resolve(filePath);
 
     // Check for symlink traversal
-    const realPath = await fs.realpath(resolvedPath);
+    const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
     if (realPath !== resolvedPath) {
       threats.push(`Symlink detected: resolves to ${realPath}`);
     }
@@ -235,6 +258,10 @@ export class SecurityService {
     if (stat.size > 100 * 1024 * 1024) {
       threats.push(`Large file: ${(stat.size / 1024 / 1024).toFixed(1)}MB`);
     }
+
+    // YARA Scanning
+    const yaraThreats = await this.scanWithYara(resolvedPath);
+    threats.push(...yaraThreats);
 
     // Read first 8KB for magic byte analysis
     const fd = await fs.open(resolvedPath, "r");
@@ -273,6 +300,32 @@ export class SecurityService {
       sha256,
       scannedAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Internal method to perform YARA scanning using system binary.
+   * TODO: Integrate 'yara-node' for more robust, in-process scanning.
+   */
+  private async scanWithYara(filePath: string): Promise<string[]> {
+    const threats: string[] = [];
+    
+    try {
+      // Check if yara is installed
+      await execAsync("yara --version");
+      
+      const { stdout } = await execAsync(`yara "${this.yaraRulesPath}" "${filePath}"`);
+      if (stdout.trim()) {
+        const matches = stdout.trim().split("\n");
+        for (const match of matches) {
+          threats.push(`YARA Match: ${match.split(" ")[0]}`);
+        }
+      }
+    } catch (error) {
+      // Yara likely not installed or rule error
+      console.log("[Omnecor Security] YARA scan skipped or failed:", (error as Error).message);
+    }
+    
+    return threats;
   }
 
   /**

@@ -10,7 +10,7 @@
  */
 
 import { ENV } from "../../_core/env.js";
-import { MeshDiscoveryService, MeshNode } from "./MeshDiscoveryService.js";
+import { meshNode } from "../../ommesh/core/MeshNode.js";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -40,11 +40,8 @@ export interface ChatChunk {
 
 export class AiProviderService {
   private static instance: AiProviderService;
-  private meshService: MeshDiscoveryService;
 
-  private constructor() {
-    this.meshService = MeshDiscoveryService.getInstance();
-  }
+  private constructor() {}
 
   public static getInstance(): AiProviderService {
     if (!AiProviderService.instance) {
@@ -87,8 +84,9 @@ export class AiProviderService {
 
     const providerId = chatInput.providerId.toLowerCase();
 
-    // Simple queue for chunks since we need to convert callback to generator
+    // High-performance Async Queue for chunks
     const queue: ChatChunk[] = [];
+    let resolver: (() => void) | null = null;
     let done = false;
 
     const onChunk = (chunk: { content: string; done?: boolean }) => {
@@ -98,10 +96,23 @@ export class AiProviderService {
         done: !!chunk.done,
       });
       if (chunk.done) done = true;
+      if (resolver) {
+        resolver();
+        resolver = null;
+      }
     };
 
     const promise = (async () => {
       try {
+        // Federated Routing Check
+        if (await this.shouldOffload(chatInput)) {
+          const peer = await this.selectPeerNode(chatInput);
+          if (peer) {
+            await this.routeToPeer(peer, chatInput, onChunk);
+            return;
+          }
+        }
+
         switch (providerId) {
           case "ollama":
             await this.chatOllama(chatInput, onChunk);
@@ -122,17 +133,21 @@ export class AiProviderService {
             throw new Error(`Unsupported provider: ${providerId}`);
         }
       } catch (err) {
-        queue.push({ content: `Error: ${(err as Error).message}`, delta: "", done: true });
+        onChunk({ content: `Error: ${(err as Error).message}`, done: true });
       } finally {
-        done = true;
+        onChunk({ content: "", done: true });
       }
     })();
 
-    while (!done || queue.length > 0) {
-      if (queue.length > 0) {
-        yield queue.shift()!;
-      } else {
-        await new Promise(r => setTimeout(r, 5));
+    while (true) {
+      if (queue.length === 0) {
+        if (done) break;
+        await new Promise<void>(r => (resolver = r));
+      }
+      while (queue.length > 0) {
+        const item = queue.shift()!;
+        yield item;
+        if (item.done) return;
       }
     }
     await promise;
@@ -187,23 +202,40 @@ export class AiProviderService {
     }
   }
 
-  private shouldOffload(input: ChatInput): boolean {
-    return false;
+  private async shouldOffload(input: ChatInput): Promise<boolean> {
+    // Decision based on prompt length or explicit request
+    const promptLength = input.messages.reduce((acc, m) => acc + m.content.length, 0);
+    const decision = await meshNode.getRouting().decide(input.messages[input.messages.length - 1]?.content || "", {
+      model: input.modelId,
+      tokens: promptLength
+    });
+
+    return decision.targetNodeId !== meshNode.getIdentity().id;
   }
 
-  private selectPeerNode(input: ChatInput): MeshNode | undefined {
-    const nodes = this.meshService.getNodes();
-    return nodes.find(n => n.capabilities.includes("inference"));
+  private async selectPeerNode(input: ChatInput): Promise<any> {
+    const promptLength = input.messages.reduce((acc, m) => acc + m.content.length, 0);
+    const decision = await meshNode.getRouting().decide(input.messages[input.messages.length - 1]?.content || "", {
+      model: input.modelId,
+      tokens: promptLength
+    });
+
+    if (decision.targetNodeId === meshNode.getIdentity().id) return null;
+
+    return meshNode.getDiscovery().getPeers().find(p => p.id === decision.targetNodeId);
   }
 
   // ... rest of the private chat methods remain the same ...
 
   private async routeToPeer(
-    peer: MeshNode,
+    peer: any,
     input: ChatInput,
     onChunk?: (chunk: ChatChunk) => void
   ): Promise<string> {
-    const url = `http://${peer.address}:${peer.port}/api/trpc/ai.chat`;
+    const address = peer.addresses?.[0] || peer.address;
+    const port = peer.port || 3000;
+    const url = `http://${address}:${port}/api/trpc/ai.chat`;
+    
     const response = await fetch(url, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -212,8 +244,18 @@ export class AiProviderService {
 
     if (!response.ok)
       throw new Error(`Federated routing failed: ${response.statusText}`);
+
+    if (onChunk) {
+      // If the peer doesn't support streaming via tRPC over HTTP easily, 
+      // we might just get the full response here.
+      const data = await response.json();
+      const content = data.result.data.content || data.result.data;
+      onChunk({ content, delta: content, done: true });
+      return content;
+    }
+
     const data = await response.json();
-    return data.result.data.content;
+    return data.result.data.content || data.result.data;
   }
 
   // ─── Provider Implementations ──────────────────────────────────────────────
