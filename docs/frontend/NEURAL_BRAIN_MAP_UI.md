@@ -82,3 +82,5 @@ Omnecor supports various node types, each with specific visual representations a
 
 -   **Automatic Saving**: Changes made to the Neural Brain Map are automatically saved to the backend, ensuring that the workspace state is preserved across sessions.
 -   **Workspace Management**: Users can create, load, and manage multiple neural workspaces, each representing a different project or area of focus.
+          <img width="1254" height="1254" alt="file_000000007fb0720c9104289d01aed3cb" src="https://github.com/user-attachments/assets/25aab8f5-1525-412c-82ce-dc66285ffaa5" />
+
