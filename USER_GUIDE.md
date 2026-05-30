@@ -1,6 +1,7 @@
 # Omnecor User Guide
 
-Welcome to **Omnecor HMCI**, your production-grade, unified workstation for intelligent AI workflows.
+Welcome to **Omnecor HMCI**, your 
+Localized-Private, unified workstation for intelligent AI workflows.
 
 ## Table of Contents
 
