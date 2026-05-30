@@ -1,4 +1,4 @@
-# 👁️ Omnecor
+# 👁️ Omnecor V1-Beta
 
 > **Context-Aware AI Infrastructure.**
 
