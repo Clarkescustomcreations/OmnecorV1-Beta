@@ -242,4 +242,27 @@ ${transcript}
         };
       });
     }),
+
+  // =========================================================================
+  // Web Scraping & RAG (references/scraping)
+  // =========================================================================
+
+  scrape: publicProcedure
+    .input(z.object({ url: z.string().url() }))
+    .mutation(async ({ ctx, input }) => {
+      return await ctx.services.scraper.scrape(input.url);
+    }),
+
+  // =========================================================================
+  // Coding Context (references/coding)
+  // =========================================================================
+
+  getCodeContext: publicProcedure
+    .input(z.object({ filepath: z.string(), symbols: z.array(z.string()) }))
+    .query(async ({ ctx, input }) => {
+      return await ctx.services.codingContext.getContextSnippets(
+        input.filepath,
+        input.symbols
+      );
+    }),
 });

@@ -71,4 +71,24 @@ export const systemRouter = router({
         success: delivered,
       } as const;
     }),
+
+  // =========================================================================
+  // Docker Management (Sandboxing)
+  // =========================================================================
+
+  runInSandbox: adminProcedure
+    .input(z.object({ image: z.string(), command: z.array(z.string()) }))
+    .mutation(async ({ ctx, input }) => {
+      return await ctx.services.docker.runInSandbox(input.image, input.command);
+    }),
+
+  listContainers: adminProcedure.query(async ({ ctx }) => {
+    return await ctx.services.docker.listContainers();
+  }),
+
+  stopContainer: adminProcedure
+    .input(z.object({ containerId: z.string() }))
+    .mutation(async ({ ctx, input }) => {
+      return await ctx.services.docker.stopContainer(input.containerId);
+    }),
 });

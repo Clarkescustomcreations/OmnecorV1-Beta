@@ -43,6 +43,9 @@ import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { MeshDiscoveryService } from "../phase2/services/MeshDiscoveryService.js";
 import { FalApiService } from "../phase2/services/FalApiService.js";
 import { ComfyService } from "../phase2/services/ComfyService.js";
+import { ScraperService } from "../phase2/services/ScraperService.js";
+import { CodingContextService } from "../phase2/services/CodingContextService.js";
+import { DockerService } from "../phase2/services/DockerService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified Context Type
@@ -80,6 +83,9 @@ export type TrpcContext = {
     mesh: MeshDiscoveryService;
     fal: FalApiService;
     comfy: ComfyService;
+    scraper: ScraperService;
+    codingContext: CodingContextService;
+    docker: DockerService;
   };
 };
 
@@ -128,6 +134,9 @@ export async function createContext(
       mesh: MeshDiscoveryService.getInstance(),
       fal: FalApiService.getInstance(),
       comfy: ComfyService.getInstance(),
+      scraper: ScraperService.getInstance(),
+      codingContext: CodingContextService.getInstance(),
+      docker: DockerService.getInstance(),
     },
   };
 }
