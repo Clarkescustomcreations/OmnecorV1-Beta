@@ -62,7 +62,7 @@ export const TTSPanel: React.FC = () => {
                   <SelectValue placeholder="Select Voice" />
                 </SelectTrigger>
                 <SelectContent>
-                  {voicesQuery.data?.models?.map((v: any) => (
+                  {voicesQuery.data?.models?.map((v) => (
                     <SelectItem key={v.id || v} value={v.id || v}>{v.name || v}</SelectItem>
                   ))}
                 </SelectContent>

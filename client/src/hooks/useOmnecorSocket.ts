@@ -32,7 +32,7 @@ export function useOmnecorSocket(
     projectId?: string;
     jobId?: string;
     listenForLoops?: boolean;
-    onEvent?: (type: OmnecorEventType, data: any) => void;
+    onEvent?: (type: OmnecorEventType, data: Record<string, unknown>) => void;
   } = {}
 ) {
   const { projectId, jobId, listenForLoops, onEvent } = options;
@@ -45,8 +45,8 @@ export function useOmnecorSocket(
   const [loopAlert, setLoopAlert] = useState<LoopAlert | null>(null);
 
   const socketRef = useRef<WebSocket | null>(null);
-  const reconnectTimeoutRef = useRef<any>(null);
-  const pingIntervalRef = useRef<any>(null);
+  const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const subscribedChannels = useRef<Set<string>>(new Set());
 
   const WS_URL =
@@ -186,6 +186,6 @@ export function useOmnecorSocket(
     clearLoopAlert: () => setLoopAlert(null),
     subscribe,
     unsubscribe,
-    send: (msg: any) => socketRef.current?.send(JSON.stringify(msg)),
+    send: (msg: Record<string, unknown>) => socketRef.current?.send(JSON.stringify(msg)),
   };
 }

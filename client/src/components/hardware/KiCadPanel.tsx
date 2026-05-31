@@ -66,7 +66,7 @@ export const KiCadPanel: React.FC = () => {
             </div>
             {drcMutation.data ? (
               <div className="space-y-2">
-                {(drcMutation.data as any).violations?.map((v: any, i: number) => (
+                {(drcMutation.data as unknown as { violations?: Array<{ severity: string; rule: string; description: string }> }).violations?.map((v, i) => (
                   <div key={i} className="flex items-start gap-3 p-3 bg-muted rounded-md text-xs">
                     <Badge variant={v.severity === "Error" ? "destructive" : "outline"}>{v.severity}</Badge>
                     <div>

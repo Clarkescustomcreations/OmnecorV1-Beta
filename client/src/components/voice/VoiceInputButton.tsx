@@ -53,7 +53,7 @@ export const VoiceInputButton: React.FC<{ onTranscription: (text: string) => voi
 
   useEffect(() => {
     const ws = WebSocketManager.getInstance();
-    const unsub = ws.on("voice.transcription", (data: any) => {
+    const unsub = ws.on<{ text: string }>("voice.transcription", (data) => {
       onTranscription(data.text);
       setIsProcessing(false);
       toast.success("Voice transcribed");

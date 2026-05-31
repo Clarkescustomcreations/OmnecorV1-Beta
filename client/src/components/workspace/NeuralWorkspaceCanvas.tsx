@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect } from 'react';
-import ReactFlow, { 
-  Background, 
+import ReactFlow, {
+  Background,
   BackgroundVariant,
-  Controls, 
-  MiniMap, 
-  useNodesState, 
-  useEdgesState, 
+  Controls,
+  MiniMap,
+  useNodesState,
+  useEdgesState,
   addEdge,
   Connection,
   Edge,
+  Node,
   Panel
 } from 'reactflow';
 import 'reactflow/dist/style.css';
@@ -20,12 +21,22 @@ import { Button } from '../ui/button';
 import { Search, Plus, LayoutGrid, Download } from 'lucide-react';
 import { toast } from 'sonner';
 
+interface FileNodeData {
+  label: string;
+  path: string;
+  language: string;
+  size: number;
+  modified: string;
+}
+
+interface WorkspaceNodeEvent { node: Node<FileNodeData>; }
+
 const nodeTypes = {
   file: FileNode,
 };
 
 export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ workspaceId }) => {
-  const [nodes, setNodes, onNodesChange] = useNodesState([]);
+  const [nodes, setNodes, onNodesChange] = useNodesState<FileNodeData>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
 
   const workspaceQuery = trpc.project.getFileTree.useQuery({ projectId: workspaceId, rootDir: "." });
@@ -38,7 +49,7 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
   useEffect(() => {
     if (workspaceQuery.data && Array.isArray(workspaceQuery.data)) {
       // Map project files to nodes for demonstration
-      const initialNodes = workspaceQuery.data.slice(0, 5).map((file: any, i: number) => ({
+      const initialNodes = workspaceQuery.data.slice(0, 5).map((file, i) => ({
         id: file.path || `file-${i}`,
         type: 'file',
         position: { x: 100 + (i * 200), y: 100 },
@@ -56,7 +67,7 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
 
   useEffect(() => {
     const ws = WebSocketManager.getInstance();
-    const unsubNode = ws.on("workspace.nodeAdded", (data: any) => {
+    const unsubNode = ws.on<WorkspaceNodeEvent>("workspace.nodeAdded", (data) => {
       setNodes((nds) => [...nds, data.node]);
       toast.info(`Node added: ${data.node.data.label}`);
     });

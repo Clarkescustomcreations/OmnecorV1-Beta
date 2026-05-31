@@ -8,6 +8,8 @@ import { Badge } from "../ui/badge";
 import { Activity, XCircle, Terminal, Clock } from "lucide-react";
 import { toast } from "sonner";
 
+interface JobInfo { id: string; label?: string; createdAt: string; status: string; }
+
 export const TaskManager: React.FC = () => {
   const jobsQuery = trpc.jobs.list.useQuery(undefined, {
     refetchInterval: 5000
@@ -33,7 +35,7 @@ export const TaskManager: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-4 overflow-y-auto pr-2">
-        {jobsQuery.data?.jobs.map((job: any) => (
+        {(jobsQuery.data?.jobs as unknown as JobInfo[])?.map((job) => (
           <Card key={job.id} className="border-none bg-muted/30 shadow-sm group">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-background border flex items-center justify-center shadow-inner">

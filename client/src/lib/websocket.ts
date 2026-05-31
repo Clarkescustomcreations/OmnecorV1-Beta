@@ -1,12 +1,14 @@
 
 import { useAppStore } from "./store/app.store";
 
+type WsPayload = Record<string, unknown>;
+
 export class WebSocketManager {
   private static instance: WebSocketManager;
   private ws: WebSocket | null = null;
   private messageQueue: string[] = [];
   private reconnectAttempts = 0;
-  private listeners: Map<string, Set<(data: any) => void>> = new Map();
+  private listeners: Map<string, Set<(data: WsPayload) => void>> = new Map();
   private url: string | null = null;
 
   private constructor() {}
@@ -60,7 +62,7 @@ export class WebSocketManager {
     this.url = null;
   }
 
-  send(type: string, payload: any): void {
+  send(type: string, payload: WsPayload): void {
     const message = JSON.stringify({ type, payload });
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(message);
@@ -70,16 +72,16 @@ export class WebSocketManager {
     }
   }
 
-  on(type: string, handler: (data: any) => void): () => void {
+  on<T extends object = WsPayload>(type: string, handler: (data: T) => void): () => void {
     if (!this.listeners.has(type)) {
       this.listeners.set(type, new Set());
     }
-    this.listeners.get(type)!.add(handler);
+    this.listeners.get(type)!.add(handler as (data: WsPayload) => void);
 
     return () => {
       const handlers = this.listeners.get(type);
       if (handlers) {
-        handlers.delete(handler);
+        handlers.delete(handler as (data: WsPayload) => void);
         if (handlers.size === 0) {
           this.listeners.delete(type);
         }

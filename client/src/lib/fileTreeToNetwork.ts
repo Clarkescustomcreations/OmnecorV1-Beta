@@ -1,5 +1,14 @@
 import { NeuralNetwork, NeuralNode, NeuralEdge } from "./neuralNodeTree";
-import { FileTreeNode } from "../../../server/routers/projectRouter"; // I'll define a shared type or copy it
+
+interface FileTreeNode {
+  name: string;
+  path: string;
+  type: "file" | "directory";
+  size?: number;
+  extension?: string;
+  children?: FileTreeNode[];
+  modifiedAt?: string;
+}
 
 export interface FileTreeToNetworkOptions {
   projectId: string;
@@ -11,7 +20,7 @@ export interface FileTreeToNetworkOptions {
  * Converts a nested FileTreeNode structure into a NeuralNetwork graph.
  */
 export function fileTreeToNetwork(
-  tree: any[], // FileTreeNode[]
+  tree: FileTreeNode[],
   options: FileTreeToNetworkOptions
 ): NeuralNetwork {
   const nodes: NeuralNode[] = [];
@@ -36,7 +45,7 @@ export function fileTreeToNetwork(
   nodes.push(rootNode);
 
   const processNode = (
-    fileNode: any,
+    fileNode: FileTreeNode,
     parentId: string,
     depth: number,
     angleStart: number,
@@ -81,7 +90,7 @@ export function fileTreeToNetwork(
     if (fileNode.children && fileNode.children.length > 0) {
       const childCount = fileNode.children.length;
       const childAngleRange = angleRange / childCount;
-      fileNode.children.forEach((child: any, index: number) => {
+      fileNode.children.forEach((child: FileTreeNode, index: number) => {
         processNode(
           child,
           id,

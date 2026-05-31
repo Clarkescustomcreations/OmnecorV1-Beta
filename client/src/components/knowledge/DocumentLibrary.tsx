@@ -55,7 +55,7 @@ export const DocumentLibrary: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {searchMutation.data?.map((res: any, i: number) => (
+              {(searchMutation.data as unknown as Array<{ content: string; score: number }>)?.map((res, i) => (
                 <TableRow key={i} className="group transition-colors hover:bg-muted/30">
                   <TableCell>
                     <div className="flex items-center gap-3">
