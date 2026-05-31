@@ -292,6 +292,122 @@ export const mockContextFiles: ContextFile[] = [
   },
 ];
 
+// ---------------------------------------------------------------------------
+// Model selection type (shared across chat components)
+// ---------------------------------------------------------------------------
+
+export interface SelectedModel {
+  providerId: "ollama" | "anthropic" | "openai" | "gemini" | "grok";
+  modelId: string;
+  apiKey?: string;
+  baseUrl?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Conversation persistence (localStorage)
+// ---------------------------------------------------------------------------
+
+export interface StoredConversationMeta {
+  id: string;
+  title: string;
+  lastMessage: string;
+  updatedAt: string; // ISO string
+  messageCount: number;
+}
+
+const CONV_INDEX_KEY = "omnecor:conv-index";
+const convStorageKey = (id: string) => `omnecor:conv:${id}`;
+
+function reviveConversation(raw: Record<string, unknown>): ConversationContext {
+  const reviveDate = (v: unknown) =>
+    typeof v === "string" ? new Date(v) : (v as Date);
+  return {
+    ...(raw as unknown as ConversationContext),
+    createdAt: reviveDate(raw.createdAt),
+    updatedAt: reviveDate(raw.updatedAt),
+    messages: ((raw.messages ?? []) as Array<Record<string, unknown>>).map(m => ({
+      ...(m as unknown as ChatMessage),
+      timestamp: reviveDate(m.timestamp),
+    })),
+    contextFiles: ((raw.contextFiles ?? []) as Array<Record<string, unknown>>).map(f => ({
+      ...(f as unknown as ContextFile),
+      lastModified: reviveDate(f.lastModified),
+    })),
+  };
+}
+
+export function getStoredConversationIndex(): StoredConversationMeta[] {
+  try {
+    const raw = localStorage.getItem(CONV_INDEX_KEY);
+    return raw ? (JSON.parse(raw) as StoredConversationMeta[]) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function saveConversationToStorage(conv: ConversationContext): void {
+  try {
+    localStorage.setItem(convStorageKey(conv.id), JSON.stringify(conv));
+    const index = getStoredConversationIndex();
+    const lastUserMsg = [...conv.messages].reverse().find(m => m.role === "user");
+    const meta: StoredConversationMeta = {
+      id: conv.id,
+      title: conv.title,
+      lastMessage: lastUserMsg ? lastUserMsg.content.slice(0, 80) : "",
+      updatedAt: conv.updatedAt.toISOString(),
+      messageCount: conv.messages.length,
+    };
+    const newIndex = [meta, ...index.filter(m => m.id !== conv.id)].slice(0, 50);
+    localStorage.setItem(CONV_INDEX_KEY, JSON.stringify(newIndex));
+  } catch {
+    // localStorage quota exceeded — silently ignore
+  }
+}
+
+export function loadConversationFromStorage(id: string): ConversationContext | null {
+  try {
+    const raw = localStorage.getItem(convStorageKey(id));
+    if (!raw) return null;
+    return reviveConversation(JSON.parse(raw) as Record<string, unknown>);
+  } catch {
+    return null;
+  }
+}
+
+export function deleteConversationFromStorage(id: string): void {
+  try {
+    localStorage.removeItem(convStorageKey(id));
+    const index = getStoredConversationIndex().filter(m => m.id !== id);
+    localStorage.setItem(CONV_INDEX_KEY, JSON.stringify(index));
+  } catch {
+    // ignore
+  }
+}
+
+export function renameConversationInStorage(id: string, newTitle: string): void {
+  try {
+    const index = getStoredConversationIndex().map(m =>
+      m.id === id ? { ...m, title: newTitle } : m
+    );
+    localStorage.setItem(CONV_INDEX_KEY, JSON.stringify(index));
+    const raw = localStorage.getItem(convStorageKey(id));
+    if (raw) {
+      const conv = JSON.parse(raw) as Record<string, unknown>;
+      conv.title = newTitle;
+      localStorage.setItem(convStorageKey(id), JSON.stringify(conv));
+    }
+  } catch {
+    // ignore
+  }
+}
+
+export function autoGenerateTitle(messages: ChatMessage[]): string {
+  const firstUser = messages.find(m => m.role === "user");
+  if (!firstUser) return "New Conversation";
+  const words = firstUser.content.trim().split(/\s+/).slice(0, 6).join(" ");
+  return words.length > 40 ? words.slice(0, 40) + "…" : words;
+}
+
 /**
  * Mock conversation for demo
  */
