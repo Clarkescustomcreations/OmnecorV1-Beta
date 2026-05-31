@@ -1,0 +1,61 @@
+services:
+  omnecor:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "${OMNECOR_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+      - OMNECOR_PORT=3000
+      - DATABASE_URL=mysql://omnecor:omnecor@db:3306/omnecor
+      - CHROMA_URL=http://chromadb:8000
+      - LOG_LEVEL=${LOG_LEVEL:-info}
+    env_file:
+      - .env.local
+    volumes:
+      - omnecor-data:/home/omnecor/.omnecor
+    depends_on:
+      db:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+    restart: unless-stopped
+
+  db:
+    image: mysql:8.0
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-rootpw}
+      MYSQL_DATABASE: omnecor
+      MYSQL_USER: omnecor
+      MYSQL_PASSWORD: omnecor
+    volumes:
+      - mysql-data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "omnecor", "-pomnecor"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    restart: unless-stopped
+
+  chromadb:
+    image: chromadb/chroma:latest
+    volumes:
+      - chroma-data:/chroma/chroma
+    environment:
+      - IS_PERSISTENT=TRUE
+    restart: unless-stopped
+
+  # Optional: run Python bridges as containers
+  # whisper:
+  #   image: your-whisper-image
+  #   ports: ["8001:8001"]
+  # tts:
+  #   image: your-tts-image
+  #   ports: ["8002:8002"]
+
+volumes:
+  omnecor-data:
+  mysql-data:
+  chroma-data:
