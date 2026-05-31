@@ -29,7 +29,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
-import { createLogger } from "./logger.js";
+import { createLogger, closeAuditLog } from "./logger.js";
 import { SERVER_CONFIG } from "../phase2/config/index.js";
 
 const log = createLogger("core");
@@ -243,6 +243,7 @@ async function startServer() {
     }
 
     log.info("[Omnecor] Shutdown complete. Goodbye.");
+    await closeAuditLog();
     process.exit(0);
   };
 

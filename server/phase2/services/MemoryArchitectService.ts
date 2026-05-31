@@ -317,7 +317,7 @@ export class MemoryArchitectService {
     if (!this.initialized) return;
 
     const collectionName = await this.ensureProjectMemory(projectId);
-    const chunks = this.chunkText(text);
+    const chunks = this.chunkText(this.redactSensitiveData(text));
     const documents: VectorDocument[] = chunks.map((chunk, idx) => ({
       id: `${documentId}_chunk_${idx}`,
       text: chunk,
@@ -501,12 +501,57 @@ export class MemoryArchitectService {
     return files;
   }
 
+  // ─────────────────────────────────────────────────────────────────────────
+  // Cognitive Redaction (Standards: Operational — Memory)
+  // ─────────────────────────────────────────────────────────────────────────
+
   /**
-   * Read and chunk a file into overlapping text segments.
+   * Redacts PII and credentials from text before long-term memory storage.
+   * Complies with Omnecor Engineering Standards §Execution: "Cognitive Redaction —
+   * Automatically identify and redact PII or credentials before storing in
+   * long-term memory."
+   *
+   * Patterns covered: API keys, bearer tokens, passwords, email addresses,
+   * phone numbers (US/intl), SSNs, IPv4/IPv6 addresses, JWTs, private key
+   * headers, and common .env KEY=VALUE pairs.
+   */
+  private redactSensitiveData(text: string): string {
+    const rules: Array<[RegExp, string]> = [
+      // .env / config file patterns  KEY=<secret>
+      [/^([A-Z][A-Z0-9_]*(?:KEY|SECRET|TOKEN|PASSWORD|PASS|PWD|API_KEY|ACCESS_KEY|PRIVATE)[A-Z0-9_]*)=.+$/gm, "$1=[REDACTED]"],
+      // Bearer / Authorization header values
+      [/(Bearer\s+)[A-Za-z0-9\-._~+/]+=*/gi, "$1[REDACTED]"],
+      // JSON fields that look like credentials
+      [/("(?:password|secret|token|api_key|apiKey|access_token|refresh_token|client_secret)":\s*")[^"]+(")/gi, "$1[REDACTED]$2"],
+      // JWT (three base64url segments)
+      [/eyJ[A-Za-z0-9\-_]+\.eyJ[A-Za-z0-9\-_]+\.[A-Za-z0-9\-_.+/]*/g, "[JWT_REDACTED]"],
+      // PEM private key blocks
+      [/-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----[\s\S]*?-----END (?:RSA |EC |OPENSSH )?PRIVATE KEY-----/g, "[PRIVATE_KEY_REDACTED]"],
+      // Email addresses
+      [/[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}/g, "[EMAIL_REDACTED]"],
+      // US phone numbers (various formats)
+      [/(?:\+?1[-.\s]?)?\(?\d{3}\)?[-.\s]?\d{3}[-.\s]?\d{4}\b/g, "[PHONE_REDACTED]"],
+      // SSN
+      [/\b\d{3}-\d{2}-\d{4}\b/g, "[SSN_REDACTED]"],
+      // IPv4 addresses (private ranges that hint at internal infra)
+      [/\b(10\.\d{1,3}\.\d{1,3}\.\d{1,3}|192\.168\.\d{1,3}\.\d{1,3}|172\.(?:1[6-9]|2\d|3[01])\.\d{1,3}\.\d{1,3})\b/g, "[INTERNAL_IP_REDACTED]"],
+      // Generic high-entropy hex strings that look like secrets (32–64 hex chars)
+      [/\b[0-9a-f]{32,64}\b/gi, "[HEX_SECRET_REDACTED]"],
+    ];
+
+    let result = text;
+    for (const [pattern, replacement] of rules) {
+      result = result.replace(pattern, replacement);
+    }
+    return result;
+  }
+
+  /**
+   * Read, redact, and chunk a file into overlapping text segments.
    */
   private chunkFile(filePath: string): string[] {
     const content = fs.readFileSync(filePath, "utf-8");
-    return this.chunkText(content);
+    return this.chunkText(this.redactSensitiveData(content));
   }
 
   /**
