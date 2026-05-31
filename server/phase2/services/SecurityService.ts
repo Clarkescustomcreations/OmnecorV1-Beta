@@ -41,14 +41,16 @@ import { createReadStream, createWriteStream, existsSync } from "fs";
 import path from "path";
 import { pipeline } from "stream/promises";
 import { createGzip, createGunzip } from "zlib";
-import { spawn } from "child_process";
+import { spawn, type SpawnOptions } from "child_process";
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("Security");
+
+type CommandOptions = SpawnOptions & { allowNonZero?: boolean };
 
 /**
  * Safely executes a command using spawn to avoid shell injection.
  */
-async function runCommand(command: string, args: string[], options: any = {}): Promise<{ stdout: string; stderr: string; code: number | null }> {
+async function runCommand(command: string, args: string[], options: CommandOptions = {}): Promise<{ stdout: string; stderr: string; code: number | null }> {
   return new Promise((resolve, reject) => {
     const child = spawn(command, args, options);
     let stdout = "";
@@ -333,8 +335,10 @@ rule OmnecorDefaultScan {
   }
 
   /**
-   * Internal method to perform YARA scanning using system binary.
-   * TODO: Integrate 'yara-node' for more robust, in-process scanning.
+   * Runs YARA rule matching against a file via the system `yara` binary.
+   * Degrades gracefully when YARA is not installed — returns no threats.
+   * Shell invocation is intentional: native bindings require YARA dev headers
+   * and node-gyp, which conflicts with the Alpine-based Docker image.
    */
   private async scanWithYara(filePath: string): Promise<string[]> {
     const threats: string[] = [];
