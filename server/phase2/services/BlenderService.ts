@@ -31,6 +31,8 @@ import path from "path";
 import fs from "fs/promises";
 import { ProcessManagerService } from "./ProcessManagerService.js";
 import { PYTHON_SCRIPTS } from "../config/index.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("Blender");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -226,9 +228,7 @@ export class BlenderBridge extends EventEmitter {
       timeoutMs: 600000, // 10 minute timeout for complex renders
     });
 
-    console.log(
-      `[Omnecor Blender] Job started: id="${jobId}" script="${resolvedScript}"`
-    );
+    log.info("Blender job started", { jobId, script: resolvedScript });
 
     return jobId;
   }

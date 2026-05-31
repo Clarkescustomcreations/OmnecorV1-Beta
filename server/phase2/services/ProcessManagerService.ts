@@ -32,6 +32,8 @@ import path from "path";
 import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { PYTHON_SCRIPTS, TRAINING_CONFIG } from "../config/index.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("ProcessManager");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -285,10 +287,7 @@ export class ProcessManagerService extends EventEmitter {
     managed.process = child;
     managed.pid = child.pid || null;
 
-    console.log(
-      `[Omnecor ProcessManager] Spawned: jobId="${jobId}" type="${config.type}" ` +
-        `pid=${child.pid} cmd="${config.command} ${config.args.join(" ")}"`
-    );
+    log.info("Process spawned", { jobId, type: config.type, pid: child.pid });
 
     // Emit lifecycle event: started
     this.emitLifecycle(managed, "running");
@@ -379,9 +378,7 @@ export class ProcessManagerService extends EventEmitter {
         this.emitLifecycle(managed, "failed", code);
       }
 
-      console.log(
-        `[Omnecor ProcessManager] Exited: jobId="${jobId}" code=${code} signal=${signal}`
-      );
+      log.info("Process exited", { jobId, code, signal });
     });
 
     child.on("error", err => {
@@ -501,9 +498,7 @@ export class ProcessManagerService extends EventEmitter {
       await this.cancelJob(jobId);
     }
 
-    console.log(
-      `[Omnecor ProcessManager] Shut down ${running.length} running process(es).`
-    );
+    log.info("Processes shut down", { count: running.length });
   }
 
   // -------------------------------------------------------------------------

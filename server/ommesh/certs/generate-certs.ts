@@ -3,20 +3,22 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { execSync } from 'child_process';
 import * as crypto from 'crypto';
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("OMMESH:Certs");
 
 // ESM compatibility for __dirname
 const CERT_DIR = path.join(process.cwd(), 'server/ommesh/certs');
 const DAYS = 365 * 2; // 2 years
 
 function run(cmd: string) {
-  console.log(`> ${cmd}`);
+  log.debug("exec", { cmd });
   execSync(cmd, { stdio: 'inherit', cwd: CERT_DIR });
 }
 
 function generate() {
   if (!fs.existsSync(CERT_DIR)) fs.mkdirSync(CERT_DIR, { recursive: true });
 
-  console.log('🔐 Generating OMMESH Local CA and Node Certificates...');
+  log.info("Generating OMMESH CA and node certificates");
 
   // 1. Root CA
   run(`openssl genrsa -out ca-key.pem 4096`);
@@ -31,8 +33,8 @@ function generate() {
 
   run(`openssl x509 -req -in node.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out node-cert.pem -days ${DAYS}`);
 
-  console.log('✅ Certificates generated successfully!');
-  console.log(`Node ID: ${nodeId}`);
+  log.info("Certificates generated successfully");
+  log.info("Certificate info", { nodeId });
 }
 
 // In ESM we can't easily use require('os'), using import instead
@@ -43,7 +45,7 @@ const hostname = os.hostname();
 function generateESM() {
   if (!fs.existsSync(CERT_DIR)) fs.mkdirSync(CERT_DIR, { recursive: true });
 
-  console.log('🔐 Generating OMMESH Local CA and Node Certificates...');
+  log.info("Generating OMMESH CA and node certificates");
 
   try {
     // 1. Root CA
@@ -58,8 +60,8 @@ function generateESM() {
 
     run(`openssl x509 -req -in node.csr -CA ca-cert.pem -CAkey ca-key.pem -CAcreateserial -out node-cert.pem -days ${DAYS}`);
 
-    console.log('✅ Certificates generated successfully!');
-    console.log(`Node ID: ${nodeId}`);
+    log.info("Certificates generated successfully");
+    log.info("Certificate info", { nodeId });
   } catch (err) {
     console.error('❌ Failed to generate certificates. Ensure openssl is installed.', err);
   }
