@@ -32,7 +32,7 @@ export interface NeuralNode {
     fileCount?: number;
     depth: number;
     isExpanded?: boolean;
-    metadata?: Record<string, any>;
+    metadata?: Record<string, unknown>;
   };
   position: {
     x: number;

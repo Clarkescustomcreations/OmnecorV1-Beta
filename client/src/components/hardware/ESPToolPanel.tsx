@@ -10,6 +10,9 @@ import { Badge } from "../ui/badge";
 import { Terminal, Cpu, Zap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 
+interface ESPProgressEvent { percent: number; phase: string; }
+interface ESPSerialEvent { line: string; }
+
 export const ESPToolPanel: React.FC = () => {
   const [selectedPort, setSelectedPort] = useState<string>("");
   const [flashProgress, setFlashProgress] = useState<number>(0);
@@ -35,12 +38,12 @@ export const ESPToolPanel: React.FC = () => {
 
   useEffect(() => {
     const ws = WebSocketManager.getInstance();
-    const unsubProgress = ws.on("esptool.progress", (data: any) => {
+    const unsubProgress = ws.on<ESPProgressEvent>("esptool.progress", (data) => {
       setFlashProgress(data.percent);
       setFlashPhase(data.phase);
     });
 
-    const unsubSerial = ws.on("esptool.serial.rx", (data: any) => {
+    const unsubSerial = ws.on<ESPSerialEvent>("esptool.serial.rx", (data) => {
       setSerialOutput(prev => [...prev.slice(-100), data.line]);
     });
 
@@ -70,7 +73,7 @@ export const ESPToolPanel: React.FC = () => {
                 <SelectValue placeholder="Select Port" />
               </SelectTrigger>
               <SelectContent>
-                {portsQuery.data?.map((port: any) => (
+                {portsQuery.data?.map((port) => (
                   <SelectItem key={port.path} value={port.path}>
                     {port.path} ({port.description})
                   </SelectItem>

@@ -26,6 +26,10 @@ import {
   createMockSlackIntegration,
   createMockGoogleDriveIntegration,
   type Integration,
+  type GitHubIntegration,
+  type NotionIntegration,
+  type SlackIntegration,
+  type CloudStorageIntegration,
 } from "@/lib/integrations";
 
 interface IntegrationsHubProps {
@@ -136,15 +140,15 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
           {/* GitHub Repositories */}
           {integration.type === "github" &&
             "repositories" in integration &&
-            (integration as any).repositories &&
-            (integration as any).repositories.length > 0 && (
+            (integration as GitHubIntegration).repositories &&
+            (integration as GitHubIntegration).repositories!.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground">
                   Repositories
                 </p>
                 <ScrollArea className="h-24">
                   <div className="space-y-1">
-                    {(integration as any).repositories.map((repo: any) => (
+                    {(integration as GitHubIntegration).repositories!.map((repo) => (
                       <div
                         key={repo.id}
                         className="text-xs p-2 rounded bg-background/50"
@@ -163,15 +167,15 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
           {/* Notion Databases */}
           {integration.type === "notion" &&
             "databases" in integration &&
-            (integration as any).databases &&
-            (integration as any).databases.length > 0 && (
+            (integration as NotionIntegration).databases &&
+            (integration as NotionIntegration).databases!.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground">
                   Databases
                 </p>
                 <ScrollArea className="h-24">
                   <div className="space-y-1">
-                    {(integration as any).databases.map((db: any) => (
+                    {(integration as NotionIntegration).databases!.map((db) => (
                       <div
                         key={db.id}
                         className="text-xs p-2 rounded bg-background/50"
@@ -192,15 +196,15 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
           {/* Slack Workspaces */}
           {integration.type === "slack" &&
             "workspaces" in integration &&
-            (integration as any).workspaces &&
-            (integration as any).workspaces.length > 0 && (
+            (integration as SlackIntegration).workspaces &&
+            (integration as SlackIntegration).workspaces!.length > 0 && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground">
                   Workspaces
                 </p>
                 <ScrollArea className="h-24">
                   <div className="space-y-1">
-                    {(integration as any).workspaces.map((ws: any) => (
+                    {(integration as SlackIntegration).workspaces!.map((ws) => (
                       <div
                         key={ws.id}
                         className="text-xs p-2 rounded bg-background/50"
@@ -223,7 +227,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
             integration.type === "dropbox" ||
             integration.type === "onedrive") &&
             "storageQuota" in integration &&
-            integration.storageQuota && (
+            (integration as CloudStorageIntegration).storageQuota && (
               <div className="space-y-2">
                 <p className="text-xs font-semibold text-muted-foreground">
                   Storage
@@ -232,7 +236,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                   <div className="flex justify-between text-xs">
                     <span>
                       {(
-                        (integration.storageQuota as any).used /
+                        (integration as CloudStorageIntegration).storageQuota!.used /
                         1024 /
                         1024 /
                         1024
@@ -241,7 +245,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                     </span>
                     <span className="text-muted-foreground">
                       {(
-                        (integration.storageQuota as any).total /
+                        (integration as CloudStorageIntegration).storageQuota!.total /
                         1024 /
                         1024 /
                         1024
@@ -253,7 +257,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                     <div
                       className="bg-accent h-2 rounded-full"
                       style={{
-                        width: `${((integration.storageQuota as any).used / (integration.storageQuota as any).total) * 100}%`,
+                        width: `${((integration as CloudStorageIntegration).storageQuota!.used / (integration as CloudStorageIntegration).storageQuota!.total) * 100}%`,
                       }}
                     />
                   </div>

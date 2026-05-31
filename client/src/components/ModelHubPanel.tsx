@@ -147,7 +147,7 @@ export default function ModelHubPanel({
         </div>
         <Select
           value={filterType}
-          onValueChange={(value: any) => setFilterType(value)}
+          onValueChange={(value) => setFilterType(value as "all" | "local" | "api")}
         >
           <SelectTrigger className="w-32">
             <SelectValue />

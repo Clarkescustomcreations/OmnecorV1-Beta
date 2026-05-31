@@ -95,10 +95,10 @@ export default function Chat() {
           baseUrl: selectedModel.baseUrl,
           messages: conversation.messages
             .concat(userMsg)
-            .map(m => ({ role: m.role as any, content: m.content })),
+            .map(m => ({ role: m.role as "user" | "assistant" | "system", content: m.content })),
         },
         {
-          onData(chunk: any) {
+          onData(chunk) {
             assistantContent += chunk.delta;
             setConversation(prev => ({
               ...prev,
@@ -118,7 +118,7 @@ export default function Chat() {
               setIsStreaming(false);
             }
           },
-          onError(err: any) {
+          onError(err) {
             console.error("[chat stream error]", err);
             setConversation(prev => ({
               ...prev,

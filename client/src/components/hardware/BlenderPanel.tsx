@@ -8,6 +8,9 @@ import { Badge } from "../ui/badge";
 import { Play, FileText, Image as ImageIcon, Box } from "lucide-react";
 import { toast } from "sonner";
 
+interface BlenderStdoutEvent { line: string; }
+interface BlenderRenderProgressEvent { percent: number; preview?: string; }
+
 export const BlenderPanel: React.FC = () => {
   const [stdout, setStdout] = useState<string[]>([]);
   const [renderProgress, setRenderProgress] = useState<number>(0);
@@ -29,11 +32,11 @@ export const BlenderPanel: React.FC = () => {
 
   useEffect(() => {
     const ws = WebSocketManager.getInstance();
-    const unsubStdout = ws.on("blender.stdout", (data: any) => {
+    const unsubStdout = ws.on<BlenderStdoutEvent>("blender.stdout", (data) => {
       setStdout(prev => [...prev.slice(-200), data.line]);
     });
 
-    const unsubRender = ws.on("blender.renderProgress", (data: any) => {
+    const unsubRender = ws.on<BlenderRenderProgressEvent>("blender.renderProgress", (data) => {
       setRenderProgress(data.percent);
       if (data.preview) setPreviewUrl(data.preview);
     });

@@ -17,6 +17,7 @@ import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useBrainMapStore } from "@/lib/stores/brainMapStore";
 import { trpc } from "@/lib/trpc";
 import { fileTreeToNetwork } from "@/lib/fileTreeToNetwork";
+import type { NeuralNetwork } from "@/lib/neuralNodeTree";
 import { NeuralMapProvider, useNeuralMap } from "@/contexts/NeuralMapContext";
 import { FictionModeProvider, useFictionMode } from "@/contexts/FictionModeContext";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
@@ -77,7 +78,7 @@ function BrainMapContent() {
         type: "master",
         nodes: [],
         edges: [],
-      } as any;
+      } as NeuralNetwork;
     
     return fileTreeToNetwork(fileTree, {
       projectId: activeMap.id,
@@ -86,7 +87,7 @@ function BrainMapContent() {
   }, [fileTree, activeMap]);
 
   const selectedNode = neuralNetwork.nodes.find(
-    (n: any) => n.id === selectedNodeId
+    (n) => n.id === selectedNodeId
   );
 
   const { windowMode, setWindowMode, windowPosition, windowSize } = useBrainMapStore();

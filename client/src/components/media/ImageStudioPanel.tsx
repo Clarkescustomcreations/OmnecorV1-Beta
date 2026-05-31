@@ -61,7 +61,7 @@ export const ImageStudioPanel: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {imagesQuery.data?.map((img: any) => (
+            {(imagesQuery.data as unknown as Array<{ id: string; url: string; prompt: string }>)?.map((img) => (
               <Card key={img.id} className="group relative overflow-hidden aspect-square border-none bg-muted rounded-xl transition-all hover:ring-2 hover:ring-purple-500 shadow-sm">
                 <img src={img.url} alt={img.prompt} className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">

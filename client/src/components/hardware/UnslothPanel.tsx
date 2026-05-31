@@ -13,7 +13,7 @@ export const UnslothPanel: React.FC = () => {
   
   const startFineTuning = trpc.training.startTraining.useMutation({
     onSuccess: () => toast.success("Fine-tuning process initialized via Unsloth"),
-    onError: (err: any) => toast.error("Training error: " + err.message)
+    onError: (err) => toast.error("Training error: " + err.message)
   });
 
   return (
