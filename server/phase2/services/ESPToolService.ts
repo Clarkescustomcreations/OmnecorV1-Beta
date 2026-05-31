@@ -30,6 +30,8 @@ import path from "path";
 import fs from "fs/promises";
 import { ProcessManagerService } from "./ProcessManagerService.js";
 import { PYTHON_SCRIPTS } from "../config/index.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("ESPTool");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -308,9 +310,7 @@ export class ESPToolBridge extends EventEmitter {
       timeoutMs: 120000, // 2 minute timeout for flashing
     });
 
-    console.log(
-      `[Omnecor ESP] Flash job started: id="${jobId}" port="${port}" firmware="${path.basename(firmwarePath)}"`
-    );
+    log.info("Flash job started", { jobId, port, firmware: path.basename(firmwarePath) });
 
     return jobId;
   }

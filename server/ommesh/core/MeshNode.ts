@@ -3,6 +3,8 @@ import { NodeIdentity, NodeCapabilities } from '../../../shared/types/ommesh.typ
 import { DiscoveryService } from './DiscoveryService.js';
 import { securityManager, SecurityManager } from './SecurityManager.js';
 import { RoutingEngine } from './RoutingEngine.js';
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("OMMESH:MeshNode");
 
 export class MeshNode {
   private identity: NodeIdentity;
@@ -18,14 +20,14 @@ export class MeshNode {
 
     // Wire up peer notification broadcast logic
     this.security.on('certificate-rotated', async (data: { newFingerprint: string }) => {
-      console.log('🔄 Certificate rotated, broadcasting update to mesh...');
+      log.info("Certificate rotated — broadcasting update to mesh");
       await this.discovery.broadcastFingerprintUpdate(data.newFingerprint);
     });
   }
 
   async start() {
     await this.discovery.startMdnsBeacon();
-    console.log(`🚀 OMMESH Node started: ${this.identity.id}`);
+    log.info("OMMESH node started", { nodeId: this.identity.id });
   }
 
   // Expose components
@@ -39,12 +41,12 @@ export class MeshNode {
     const decision = await this.routing.decide(prompt, options);
     
     if (decision.targetNodeId === this.identity.id) {
-      console.log(`🏠 Executing inference locally on ${this.identity.id}`);
+      log.info("Executing inference locally", { nodeId: this.identity.id });
       // In a full integration, this would call ctx.services.aiProvider.chat(...)
       return { content: `Local execution stub for: ${prompt.slice(0, 20)}...` };
     }
 
-    console.log(`🌐 Routing inference to remote node: ${decision.targetNodeId}`);
+    log.info("Routing inference to remote node", { targetNodeId: decision.targetNodeId });
     // Remote call logic using SecurityManager's mTLS options would go here
     return { content: `Remote routing stub for: ${decision.targetNodeId}` };
   }

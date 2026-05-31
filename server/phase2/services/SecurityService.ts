@@ -42,6 +42,8 @@ import path from "path";
 import { pipeline } from "stream/promises";
 import { createGzip, createGunzip } from "zlib";
 import { spawn } from "child_process";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("Security");
 
 /**
  * Safely executes a command using spawn to avoid shell injection.
@@ -350,7 +352,7 @@ rule OmnecorDefaultScan {
       }
     } catch (error) {
       // Yara likely not installed or rule error
-      console.log("[Omnecor Security] YARA scan skipped or failed:", (error as Error).message);
+      log.warn("YARA scan skipped or failed", { error: (error as Error).message });
     }
     
     return threats;

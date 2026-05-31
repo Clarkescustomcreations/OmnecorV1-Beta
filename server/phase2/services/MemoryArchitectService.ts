@@ -32,6 +32,8 @@ import {
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("MemoryArchitect");
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Configuration
@@ -148,9 +150,7 @@ export class MemoryArchitectService {
       const status = await this.vectorDB.getStatus();
       this.initialized = status.isConnected;
       if (this.initialized) {
-        console.log(
-          "[Omnecor MemoryArchitect] Layer 2 (Long-Term Memory) online."
-        );
+        log.info("Layer 2 Long-Term Memory online");
       }
       return this.initialized;
     } catch (error) {

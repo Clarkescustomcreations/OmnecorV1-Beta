@@ -19,6 +19,8 @@
  */
 
 import { VECTOR_DB_CONFIG } from "../config/index.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("VectorDB");
 
 // ---------------------------------------------------------------------------
 // Types (ChromaDB client types — defined here to avoid hard dependency at import)
@@ -128,9 +130,7 @@ export class VectorDBService {
 
       this.isInitialized = true;
       this.initError = null;
-      console.log(
-        `[Omnecor VectorDB] Connected to ChromaDB at ${this.chromaUrl}`
-      );
+      log.info("Connected to ChromaDB", { chromaUrl: this.chromaUrl });
     } catch (error) {
       this.isInitialized = false;
       this.client = null;
@@ -240,9 +240,7 @@ export class VectorDBService {
       }
     }
 
-    console.log(
-      `[Omnecor VectorDB] Ingested ${documents.length} document(s) into '${collectionName}'`
-    );
+    log.info("Documents ingested", { count: documents.length, collection: collectionName });
   }
 
   /**
@@ -348,7 +346,7 @@ export class VectorDBService {
 
     try {
       await this.client.deleteCollection({ name: collectionName });
-      console.log(`[Omnecor VectorDB] Deleted collection '${collectionName}'`);
+      log.info("Collection deleted", { collectionName });
     } catch (error) {
       console.warn(
         `[Omnecor VectorDB] Failed to delete collection '${collectionName}': ${(error as Error).message}`

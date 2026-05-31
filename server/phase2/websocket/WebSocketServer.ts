@@ -48,6 +48,8 @@ import { HashTrackerService } from "../services/HashTrackerService.js";
 import { VoiceService, VoiceEventData } from "../services/VoiceService.js";
 import { HITLApprovalService } from "../services/HITLApprovalService.js";
 import { SERVER_CONFIG } from "../config/index.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("WebSocket");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -145,7 +147,7 @@ export class OmnecorWebSocketServer {
     // Start heartbeat monitoring
     this.startHeartbeat();
 
-    console.log("[Omnecor WS] WebSocket server initialized on path /ws");
+    log.info("WebSocket server initialized at /ws");
   }
 
   // -------------------------------------------------------------------------
@@ -162,10 +164,7 @@ export class OmnecorWebSocketServer {
 
     this.clients.set(ws.id, ws);
 
-    console.log(
-      `[Omnecor WS] Client connected: id="${ws.id}" ip="${req.socket.remoteAddress}" ` +
-        `total=${this.clients.size}`
-    );
+    log.info("Client connected", { id: ws.id, ip: req.socket.remoteAddress, total: this.clients.size });
 
     // Handle incoming messages
     ws.on("message", raw => {
@@ -188,9 +187,7 @@ export class OmnecorWebSocketServer {
     // Handle disconnection
     ws.on("close", () => {
       this.clients.delete(ws.id);
-      console.log(
-        `[Omnecor WS] Client disconnected: id="${ws.id}" total=${this.clients.size}`
-      );
+      log.info("Client disconnected", { id: ws.id, total: this.clients.size });
     });
 
     // Handle errors
@@ -566,7 +563,7 @@ export class OmnecorWebSocketServer {
     // Close the server
     return new Promise(resolve => {
       this.wss.close(() => {
-        console.log("[Omnecor WS] WebSocket server shut down.");
+        log.info("WebSocket server shut down");
         resolve();
       });
     });

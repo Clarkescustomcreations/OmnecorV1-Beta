@@ -22,6 +22,8 @@ import { EventEmitter } from "events";
 import path from "path";
 import fs from "fs/promises";
 import { WATCHER_CONFIG } from "../config/index.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("FileSystemWatcher");
 
 // ---------------------------------------------------------------------------
 // Types
@@ -179,9 +181,7 @@ export class FileSystemWatcherService extends EventEmitter {
     watcher.on("ready", () => {
       managed.isReady = true;
       this.emit("watcherReady", { projectId, rootDir: resolvedRoot });
-      console.log(
-        `[Omnecor FileWatcher] Ready: project="${projectId}" root="${resolvedRoot}" files=${managed.fileCount}`
-      );
+      log.info("Watcher registered", { projectId, root: resolvedRoot, files: managed.fileCount });
     });
 
     watcher.on("error", err => {
@@ -193,9 +193,7 @@ export class FileSystemWatcherService extends EventEmitter {
     });
 
     this.watchers.set(projectId, managed);
-    console.log(
-      `[Omnecor FileWatcher] Registered: project="${projectId}" root="${resolvedRoot}"`
-    );
+    log.info("Watcher update", { projectId, root: resolvedRoot });
   }
 
   /**
@@ -217,7 +215,7 @@ export class FileSystemWatcherService extends EventEmitter {
     await managed.watcher.close();
     this.watchers.delete(projectId);
 
-    console.log(`[Omnecor FileWatcher] Unregistered: project="${projectId}"`);
+    log.info("Watcher unregistered", { projectId });
   }
 
   /**
@@ -271,7 +269,7 @@ export class FileSystemWatcherService extends EventEmitter {
     const projectIds = Array.from(this.watchers.keys());
     await Promise.all(projectIds.map(id => this.unregisterProject(id)));
     this.removeAllListeners();
-    console.log("[Omnecor FileWatcher] All watchers shut down.");
+    log.info("All watchers shut down");
   }
 
   // -------------------------------------------------------------------------

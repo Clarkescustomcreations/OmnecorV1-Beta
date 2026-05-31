@@ -2,6 +2,8 @@
 import bonjour from 'bonjour';
 import { NodeIdentity } from '../../../shared/types/ommesh.types.js';
 import { SecurityManager } from './SecurityManager.js';
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("OMMESH:Discovery");
 
 export class DiscoveryService {
   private bonjourInstance: any;
@@ -11,7 +13,7 @@ export class DiscoveryService {
   }
 
   async startMdnsBeacon() {
-    console.log(`📡 Starting OMMESH mDNS Beacon for node: ${this.identity.id}`);
+    log.info("Starting mDNS beacon", { nodeId: this.identity.id });
     
     try {
       this.bonjourInstance.publish({
@@ -37,7 +39,7 @@ export class DiscoveryService {
     // Basic validation: don't discover ourselves
     if (service.name === this.identity.id) return;
     
-    console.log(`🔍 Discovered OMMESH peer: ${service.name} at ${service.addresses[0]}:${service.port}`);
+    log.info("Discovered OMMESH peer", { name: service.name, address: service.addresses[0], port: service.port });
     // Further validation and trust logic would happen here or in MeshNode
   }
 
@@ -47,7 +49,7 @@ export class DiscoveryService {
    * signed message sent to all known peer WebSockets.
    */
   async broadcastFingerprintUpdate(newFingerprint: string) {
-    console.log(`📢 Broadcasting fingerprint update: ${newFingerprint}`);
+    log.info("Broadcasting fingerprint update", { fingerprint: newFingerprint });
     // Re-publish the beacon with the new fingerprint
     try {
       this.bonjourInstance.unpublishAll(() => {

@@ -7,6 +7,8 @@ import { execSync } from 'child_process';
 import { MeshMessage, NodeIdentity } from '../../../shared/types/ommesh.types.js';
 import { EventEmitter } from 'events';
 import os from 'os';
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("OMMESH:Security");
 
 // ESM compatibility: using process.cwd() for reliable root-relative paths
 const CERTS_DIR = path.join(process.cwd(), 'server/ommesh/certs');
@@ -62,7 +64,7 @@ export class SecurityManager extends EventEmitter {
       lastSeen: new Date()
     };
 
-    console.log(`🔐 OMMESH Security loaded | Node: ${this.identity.id} | FP: ${fingerprint.slice(0, 16)}...`);
+    log.info("OMMESH Security loaded", { nodeId: this.identity.id, fingerprint: fingerprint.slice(0, 16) });
     this.checkExpiration();
   }
 
@@ -72,7 +74,7 @@ export class SecurityManager extends EventEmitter {
     const expiryDate = new Date(certObj.validTo);
     const daysUntilExpiry = Math.floor((expiryDate.getTime() - Date.now()) / (1000 * 3600 * 24));
 
-    console.log(`📅 Certificate expires in ${daysUntilExpiry} days (${expiryDate.toISOString()})`);
+    log.info("Certificate expiry", { daysUntilExpiry, expiryDate: expiryDate.toISOString() });
 
     if (daysUntilExpiry < ROTATION_THRESHOLD_DAYS) {
       console.warn(`⚠️  Certificate rotation recommended (${daysUntilExpiry} days left)`);
@@ -93,7 +95,7 @@ export class SecurityManager extends EventEmitter {
     }
 
     this.rotationInProgress = true;
-    console.log('🔄 Starting OMMESH certificate rotation...');
+    log.info("Starting certificate rotation");
 
     const oldFingerprint = this.identity.fingerprint;
 
@@ -105,7 +107,7 @@ export class SecurityManager extends EventEmitter {
       fs.copyFileSync(path.join(CERTS_DIR, 'node-key.pem'), path.join(backupDir, 'node-key.pem'));
       fs.copyFileSync(path.join(CERTS_DIR, 'node-cert.pem'), path.join(backupDir, 'node-cert.pem'));
 
-      console.log(`📦 Backed up old certificates to ${backupDir}`);
+      log.info("Certificates backed up", { backupDir });
 
       // Generate new key + CSR
       const hostname = os.hostname();
@@ -138,9 +140,8 @@ export class SecurityManager extends EventEmitter {
       this.identity.fingerprint = newFingerprint;
       this.identity.publicKey = newCertObj.publicKey.export({ type: 'spki', format: 'pem' }) as string;
 
-      console.log(`✅ Certificate rotated successfully!`);
-      console.log(`   Old FP: ${oldFingerprint.slice(0, 16)}...`);
-      console.log(`   New FP: ${newFingerprint.slice(0, 16)}...`);
+      log.info("Certificate rotated successfully");
+      log.info("Certificate fingerprints", { old: oldFingerprint.slice(0, 16), new: newFingerprint.slice(0, 16) });
 
       // Emit clean event with proper old/new fingerprints
       this.emit('certificate-rotated', {
