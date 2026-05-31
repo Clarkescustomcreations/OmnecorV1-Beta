@@ -4,7 +4,12 @@ import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { WebSocketManager } from '../../lib/websocket';
 import { toast } from 'sonner';
 
-export const VoiceInputButton: React.FC<{ onTranscription: (text: string) => void }> = ({ onTranscription }) => {
+export const VoiceInputButton: React.FC<{
+  onTranscription: (text: string) => void;
+  className?: string;
+  size?: "sm" | "md";
+}> = ({ onTranscription, className, size = "md" }) => {
+  const sizeClass = size === "sm" ? "h-7 w-7" : "h-10 w-10";
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
@@ -66,7 +71,7 @@ export const VoiceInputButton: React.FC<{ onTranscription: (text: string) => voi
       variant={isRecording ? "destructive" : "outline"}
       size="icon"
       type="button"
-      className={`rounded-full h-10 w-10 transition-all ${isRecording ? 'animate-pulse scale-110 shadow-lg' : ''}`}
+      className={`rounded-full ${sizeClass} transition-all ${isRecording ? 'animate-pulse scale-110 shadow-lg' : ''} ${className ?? ''}`}
       onMouseDown={startRecording}
       onMouseUp={stopRecording}
       disabled={isProcessing}
