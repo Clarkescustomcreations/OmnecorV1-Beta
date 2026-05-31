@@ -17,7 +17,8 @@ export const TaskManager: React.FC = () => {
     onSuccess: () => {
       toast.success("Task cancelled");
       jobsQuery.refetch();
-    }
+    },
+    onError: (err) => toast.error("Failed to stop job: " + err.message),
   });
 
   return (

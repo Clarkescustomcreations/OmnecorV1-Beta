@@ -21,7 +21,8 @@ export const TTSPanel: React.FC = () => {
       const url = URL.createObjectURL(blob);
       setAudioUrl(url);
       toast.success("Synthesis complete");
-    }
+    },
+    onError: (err) => toast.error("Voice synthesis failed: " + err.message),
   });
 
   const b64toBlob = (b64Data: string, contentType = '', sliceSize = 512) => {
