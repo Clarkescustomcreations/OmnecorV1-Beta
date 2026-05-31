@@ -29,7 +29,9 @@ export const ESPToolPanel: React.FC = () => {
     }
   });
 
-  const detectChipMutation = trpc.esp.getChipInfo.useMutation();
+  const detectChipMutation = trpc.esp.getChipInfo.useMutation({
+    onError: (err) => toast.error("Chip detection failed: " + err.message),
+  });
 
   useEffect(() => {
     const ws = WebSocketManager.getInstance();

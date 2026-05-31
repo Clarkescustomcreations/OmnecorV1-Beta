@@ -21,6 +21,7 @@ import { NeuralMapProvider, useNeuralMap } from "@/contexts/NeuralMapContext";
 import { FictionModeProvider, useFictionMode } from "@/contexts/FictionModeContext";
 import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 /**
  * Neural Brain Map Page Content
@@ -53,7 +54,9 @@ function BrainMapContent() {
   );
 
   // Register watchers for all roots of active map
-  const registerProject = trpc.project.registerProject.useMutation();
+  const registerProject = trpc.project.registerProject.useMutation({
+    onError: (err) => toast.error("Failed to watch directory: " + err.message),
+  });
   
   useEffect(() => {
     if (activeMap?.rootDirectories) {

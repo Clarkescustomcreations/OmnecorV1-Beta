@@ -15,7 +15,8 @@ export const ImageStudioPanel: React.FC = () => {
     onSuccess: () => {
       toast.success("Generation complete");
       imagesQuery.refetch();
-    }
+    },
+    onError: (err) => toast.error("Image generation failed: " + err.message),
   });
 
   return (

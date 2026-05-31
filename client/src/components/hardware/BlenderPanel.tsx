@@ -23,7 +23,8 @@ export const BlenderPanel: React.FC = () => {
   });
 
   const renderMutation = trpc.blender.render.useMutation({
-    onSuccess: () => toast.success("Render job submitted")
+    onSuccess: () => toast.success("Render job submitted"),
+    onError: (err) => toast.error("Render failed: " + err.message),
   });
 
   useEffect(() => {

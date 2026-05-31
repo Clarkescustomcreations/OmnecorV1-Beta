@@ -11,7 +11,8 @@ import { toast } from "sonner";
 
 export const Settings: React.FC = () => {
   const saveKeysMutation = trpc.system.saveKeys.useMutation({
-    onSuccess: () => toast.success("API keys updated successfully")
+    onSuccess: () => toast.success("API keys updated successfully"),
+    onError: (err) => toast.error("Failed to save providers: " + err.message),
   });
 
   return (

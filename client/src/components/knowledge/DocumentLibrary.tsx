@@ -11,7 +11,9 @@ import { Badge } from "../ui/badge";
 export const DocumentLibrary: React.FC = () => {
   const [search, setSearch] = useState("");
   
-  const docsQuery = trpc.knowledgeBase.ensureProject.useMutation(); // Just using available procedures
+  const docsQuery = trpc.knowledgeBase.ensureProject.useMutation({
+    onError: (err) => toast.error("Indexing failed: " + err.message),
+  });
   const searchMutation = trpc.knowledgeBase.search.useQuery({ projectId: "default", query: search }, { enabled: search.length > 2 });
 
   return (

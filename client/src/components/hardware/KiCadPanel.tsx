@@ -12,9 +12,15 @@ export const KiCadPanel: React.FC = () => {
   const [activeProject, setActiveProject] = useState<string | null>(null);
 
   const statusQuery = trpc.kicad.status.useQuery();
-  const drcMutation = trpc.kicad.runDRC.useMutation();
-  const exportMutation = trpc.kicad.exportSchematic.useMutation();
-  const bomMutation = trpc.kicad.exportBOM.useMutation();
+  const drcMutation = trpc.kicad.runDRC.useMutation({
+    onError: (err) => toast.error("DRC failed: " + err.message),
+  });
+  const exportMutation = trpc.kicad.exportSchematic.useMutation({
+    onError: (err) => toast.error("Export failed: " + err.message),
+  });
+  const bomMutation = trpc.kicad.exportBOM.useMutation({
+    onError: (err) => toast.error("BOM export failed: " + err.message),
+  });
 
   const handleOpenProject = () => {
     setActiveProject("project.kicad_pro");
