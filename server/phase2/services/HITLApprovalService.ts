@@ -1,8 +1,8 @@
 import { EventEmitter } from "events";
 import { v4 as uuidv4 } from "uuid";
-import { CriticalAction } from "../../../shared/hitl.js";
+import type { CriticalAction } from "../../../shared/hitl.js";
 
-export { CriticalAction };
+export type { CriticalAction };
 
 /**
  * HITLApprovalService
