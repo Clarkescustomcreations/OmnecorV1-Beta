@@ -30,6 +30,7 @@ import { createContext } from "./context";
 import { serveStatic, setupVite } from "./vite";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 import { createLogger } from "./logger.js";
+import { SERVER_CONFIG } from "../phase2/config/index.js";
 
 const log = createLogger("core");
 
@@ -54,7 +55,7 @@ function isPortAvailable(port: number): Promise<boolean> {
   });
 }
 
-async function findAvailablePort(startPort: number = 3000): Promise<number> {
+async function findAvailablePort(startPort: number = SERVER_CONFIG.port): Promise<number> {
   for (let port = startPort; port < startPort + 20; port++) {
     if (await isPortAvailable(port)) {
       return port;
@@ -168,7 +169,7 @@ async function startServer() {
   }
 
   // ─── Start Listening ────────────────────────────────────────────────────
-  const preferredPort = parseInt(process.env.PORT || "3000");
+  const preferredPort = SERVER_CONFIG.port;
   const port = await findAvailablePort(preferredPort);
 
   if (port !== preferredPort) {
