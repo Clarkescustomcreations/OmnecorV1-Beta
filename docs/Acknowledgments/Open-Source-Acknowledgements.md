@@ -42,4 +42,37 @@ The Omnecor (CORTEX) Human-Machine Collaboration Interface leverages various ope
 
 ---
 
+---
+
+### AI Routing & Local Inference (v3.0.0 Roadmap)
+- **[Unsloth / Qwen2.5-1.5B](https://huggingface.co/unsloth/Qwen2.5-1.5B-Instruct-bnb-4bit)**: Provides the quantized base model for the 1.5B Valet Router fine-tuning pipeline — the local brain that routes prompts to the right provider without any cloud call.
+- **[llama-cpp-python](https://github.com/abetlen/llama-cpp-python)**: Python bindings for llama.cpp enabling CPU-based GGUF inference for the Valet Router bridge and the Llama.cpp direct integration path.
+
+### Multi-Agent Systems & Protocols (v3.0.0 Roadmap)
+- **[Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk)**: Official TypeScript SDK for MCP used to connect Omnecor agents to self-hosted MCP tool servers in the Tool Directory integration.
+- **[RecursiveMAS](https://github.com/RecursiveMAS/RecursiveMAS)**: Research reference and architectural inspiration for latent-space recursive multi-agent collaboration, informing the RecursiveMAS orchestration layer.
+- **[AgenticOS](https://agentico.dev/)**: Reference for MCPServer declarative management and Tool Directory browsing model.
+
+### Frontend & 3D Visualization (v3.0.0 Roadmap)
+- **[React Three Fiber](https://github.com/pmndrs/react-three-fiber)**: React renderer for Three.js used to build the PCB 3D viewer component (`PCBViewer3D.tsx`) in the KiCad integration panel.
+- **[React Three Drei](https://github.com/pmndrs/drei)**: Utility helpers for React Three Fiber providing camera controls, loaders, and 3D UI primitives for the PCB viewer.
+- **[axe-core](https://github.com/dequelabs/axe-core)**: Accessibility testing engine powering the automated WCAG 2.1 AA test suite across all Omnecor pages.
+
+### Security & Threat Intelligence (v3.0.0 Roadmap)
+- **[Semgrep](https://github.com/semgrep/semgrep)**: Open-source static analysis engine used in the automated vulnerability scanning module (`threat_scanner.py`) for code-level security issue detection.
+- **[MISP](https://github.com/MISP/MISP)**: Self-hosted threat intelligence platform used as the IoC data source for the `ThreatIntelService.ts` integration.
+
+### Voice & Media (v3.0.0 Roadmap)
+- **[ElevenLabs JavaScript SDK](https://github.com/elevenlabs/elevenlabs-js)**: Official SDK for ElevenLabs voice synthesis, integrated as an optional cloud voice enhancement alongside the local XTTS-v2 default pipeline.
+
+### Database & Infrastructure (v3.0.0 Roadmap)
+- **[better-sqlite3](https://github.com/WiseLibs/better-sqlite3)**: Synchronous SQLite3 bindings for Node.js, used as the zero-dependency metadata store fallback in Sovereign/Zero-Login mode.
+- **[onnxruntime-node](https://github.com/microsoft/onnxruntime)**: ONNX Runtime Node.js bindings for running local embedding models without a Python dependency (`ONNXEmbeddingService.ts`).
+- **[Lithic API](https://www.lithic.com/)**: Virtual card issuance API used as the optional provider for the Agentic Wallet's ephemeral cloud compute credit card feature.
+
+### PCB Manufacturing Integration (v3.0.0 Roadmap)
+- **[PCBWay Partner API](https://www.pcbway.com/api-partner.html)**: RESTful API for PCB quoting and order management, enabling one-click manufacturing workflows from within the KiCad bridge.
+
+---
+
 *This project is built with deep respect for the open-source ethos. Each project listed above has played a vital role in informing the development of Omnecor HMCI.*
