@@ -70,14 +70,14 @@ export default function ModelHub() {
   }));
 
   const apiModels: AIModel[] = providerHealth
-    .filter(p => p.providerId !== "ollama")
+    .filter(p => p.id !== "ollama")
     .map(p => ({
-      id: p.providerId,
-      name: p.providerId,
-      displayName: p.providerId.charAt(0).toUpperCase() + p.providerId.slice(1),
+      id: p.id,
+      name: p.name,
+      displayName: p.name,
       type: "api" as const,
-      source: p.providerId as AIModel["source"],
-      status: p.available ? "available" : ("offline" as const),
+      source: p.id as AIModel["source"],
+      status: p.status === "online" ? "available" : ("offline" as const),
     }));
 
   const allModels = [...localModels, ...apiModels];
