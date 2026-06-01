@@ -7,7 +7,7 @@
  *
  *  - LoRA fine-tuning jobs (localLLMfine-tuning.py)
  *  - Blender headless script execution (blender_bridge.py)
- *  - ESP firmware flashing (flash_mcu.py)
+ *  - ESP firmware flashing (esptool_bridge.py)
  *  - Any future Python CLI bridges
  *
  * Architecture Notes:

@@ -760,57 +760,44 @@ export class AiProviderService {
       return data[0]?.candidates?.[0]?.content?.parts?.[0]?.text || "";
     }
 
-    // Gemini stream is a continuous JSON array `[ {...}, {...} ]`.
-    // The fetch API receives chunks that might break in the middle of JSON objects.
+    // Gemini streaming: the REST API (alt=sse) sends SSE lines ("data: {...}").
+    // The non-SSE path sends a JSON array chunked over the wire.
+    // We handle both: strip the "data: " SSE prefix when present, then try to
+    // parse each line as a complete GeminiChunk JSON object.
     const reader = response.body!.getReader();
     const decoder = new TextDecoder();
     let fullContent = "";
     let buffer = "";
+
+    const processLine = (raw: string) => {
+      const line = raw.startsWith("data: ") ? raw.slice(6) : raw;
+      const trimmed = line.trim();
+      if (!trimmed || trimmed === "[" || trimmed === "]" || trimmed === ",") return;
+      // Strip trailing comma from array-format streaming
+      const jsonStr = trimmed.endsWith(",") ? trimmed.slice(0, -1) : trimmed;
+      try {
+        const chunk = JSON.parse(jsonStr) as { candidates?: Array<{ content?: { parts?: Array<{ text?: string }> } }> };
+        const text = chunk.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (text) {
+          fullContent += text;
+          onChunk({ content: text, delta: text, done: false });
+        }
+      } catch {
+        // Incomplete or non-JSON line — silently skip
+      }
+    };
 
     while (true) {
       const { done, value } = await reader.read();
       if (done) break;
 
       buffer += decoder.decode(value, { stream: true });
-
-      // Try to extract complete JSON objects from the buffer array format
-      // Format is roughly: `[\n{\n  "candidates": [...]\n},\n{\n...`
-
-      // Basic regex to find JSON objects that look like Gemini responses
-      const regex = /{[^{}]*"candidates"[^{}]*}/g;
-      // Note: This regex is overly simplistic for real-world nested JSON.
-      // For robust Gemini streaming, it's safer to handle it line by line
-      // or use a proper streaming JSON parser. Since Gemini returns a JSON array,
-      // we can try splitting by lines and looking for "text": "..."
-
       const lines = buffer.split("\n");
-      buffer = lines.pop() || ""; // Keep the last incomplete line in buffer
-
-      for (const line of lines) {
-        // Very simplistic extraction of text from Gemini's streaming output lines
-        const match = line.match(/"text":\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
-        if (match) {
-          try {
-            // Unescape the JSON string value
-            const content = JSON.parse(`"${match[1]}"`);
-            fullContent += content;
-            onChunk({ content, delta: content, done: false });
-          } catch (e) {
-            // Ignore parse errors
-          }
-        }
-      }
+      buffer = lines.pop() ?? "";
+      for (const line of lines) processLine(line);
     }
 
-    // Process any remaining buffer
-    const match = buffer.match(/"text":\s*"([^"\\]*(?:\\.[^"\\]*)*)"/);
-    if (match) {
-      try {
-        const content = JSON.parse(`"${match[1]}"`);
-        fullContent += content;
-        onChunk({ content, delta: content, done: false });
-      } catch (e) {}
-    }
+    if (buffer.trim()) processLine(buffer);
 
     onChunk({ content: "", delta: "", done: true });
     return fullContent;

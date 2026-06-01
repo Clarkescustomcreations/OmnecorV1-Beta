@@ -71,7 +71,7 @@ export class TokenRefreshService {
       .where(eq(integrations.provider, provider))
       .limit(1);
 
-    if (!integration?.refreshToken || !integration.tokenIv || !integration.tokenTag) return;
+    if (!integration?.refreshToken) return;
 
     const refreshToken = Buffer.from(integration.refreshToken, "base64").toString("utf-8");
 

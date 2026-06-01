@@ -12,7 +12,7 @@
  *  - Handles serial port permissions and error recovery
  *
  * Architecture Notes:
- *  - Uses our flash_mcu.py wrapper which emits JSON progress lines
+ *  - Uses our esptool_bridge.py wrapper which emits JSON progress lines
  *  - Serial port detection uses /dev/ttyUSB* and /dev/ttyACM* patterns on Linux
  *  - Flash operations are managed by ProcessManagerService for unified tracking
  *  - Progress events include: info, stdout, stderr, success, error
@@ -281,7 +281,7 @@ export class ESPToolBridge extends EventEmitter {
 
   /**
    * Flash firmware to an ESP device.
-   * Uses the flash_mcu.py wrapper for JSON progress streaming.
+   * Uses the esptool_bridge.py wrapper for JSON progress streaming.
    *
    * @param config - Flash configuration
    * @returns Job ID for tracking via ProcessManagerService
