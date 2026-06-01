@@ -6,13 +6,15 @@ Omnecor's Hardware Integration Layer is a defining feature that bridges the gap 
 
 The bridge system is designed to securely and reliably execute specialized tasks using external tools that are not natively available within the Node.js environment.
 
+### System Architecture Diagram
+
 ```mermaid
 graph LR
     A[Frontend UI] -->|tRPC Request| B(Backend Router)
     B --> C(ProcessManagerService)
     C -->|Spawns & Manages| D[Python Bridge Script]
     D -->|Interacts with| E(External Tool/Hardware)
-    D -->|Streams Output (JSON)| C
+    D -->|Streams Output JSON| C
     C -->|WebSocket Broadcast| A
 ```
 
