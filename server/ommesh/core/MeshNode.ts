@@ -42,13 +42,13 @@ export class MeshNode {
     
     if (decision.targetNodeId === this.identity.id) {
       log.info("Executing inference locally", { nodeId: this.identity.id });
-      // In a full integration, this would call ctx.services.aiProvider.chat(...)
-      return { content: `Local execution stub for: ${prompt.slice(0, 20)}...` };
+      // Phase 9: wire to ctx.services.aiProvider.chat() for real local execution
+      return { content: `[Phase 9 stub] Local execution for: ${prompt.slice(0, 20)}...` };
     }
 
     log.info("Routing inference to remote node", { targetNodeId: decision.targetNodeId });
-    // Remote call logic using SecurityManager's mTLS options would go here
-    return { content: `Remote routing stub for: ${decision.targetNodeId}` };
+    // Phase 9: implement mTLS peer HTTP call via SecurityManager credentials
+    return { content: `[Phase 9 stub] Remote routing to: ${decision.targetNodeId}` };
   }
 }
 

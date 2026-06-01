@@ -107,7 +107,7 @@ export function useCommandRegistry(): CommandEntry[] {
   const handleYaraScan = useCallback(() => {
     const projectRoot =
       import.meta.env.VITE_PROJECT_ROOT ??
-      "/home/linux/Documents/Omnecor (AltV1)/Omnecor-HMCI-ai-workstation-AltV1";
+      ".";
     toast.info("Starting YARA scan on project root…");
     scanDirMut.mutate({ dirPath: projectRoot });
   }, [scanDirMut]);
@@ -246,7 +246,7 @@ export function useCommandRegistry(): CommandEntry[] {
       action: () => {
         const projectRoot =
           import.meta.env.VITE_PROJECT_ROOT ??
-          "/home/linux/Documents/Omnecor (AltV1)/Omnecor-HMCI-ai-workstation-AltV1";
+          ".";
         toast.info("Starting vulnerability scan…");
         vulnScanMut?.mutate?.({ targetPath: projectRoot });
       },

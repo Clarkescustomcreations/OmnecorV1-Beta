@@ -93,7 +93,7 @@ export const PYTHON_SCRIPTS = {
     "../../python_bridges/blender_bridge.py"
   ),
   /** Path to the ESP flash tool wrapper */
-  espFlash: path.resolve(__dirname, "../python_scripts/flash_mcu.py"),
+  espFlash: path.resolve(__dirname, "../../python_bridges/esptool_bridge.py"),
   /** Python executable (can be overridden for venvs) */
   pythonBin: process.env.PYTHON_BIN || "python3",
   /** Blender executable path */

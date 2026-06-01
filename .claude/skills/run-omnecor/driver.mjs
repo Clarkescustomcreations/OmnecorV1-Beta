@@ -10,12 +10,27 @@
  *   SHOT_DIR      screenshot output dir (default: /tmp/omnecor-shots)
  */
 import { chromium } from "/usr/share/code/resources/app/node_modules/playwright-core/index.mjs";
+import { execSync } from "child_process";
 import fs from "fs";
 import path from "path";
 
 const BASE_URL = process.env.OMNECOR_URL ?? "http://localhost:3000";
 const SHOT_DIR = process.env.SHOT_DIR ?? "/tmp/omnecor-shots";
-const CHROMIUM = "/home/linux/.cache/ms-playwright/chromium-1223/chrome-linux64/chrome";
+
+// Resolve Chromium: prefer CHROMIUM env var, then search the Playwright cache,
+// then fall back to any system chrome/chromium binary.
+function findChromium() {
+  if (process.env.CHROMIUM) return process.env.CHROMIUM;
+  try {
+    const found = execSync("find ~/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1", { encoding: "utf8" }).trim();
+    if (found) return found;
+  } catch { /* ignore */ }
+  for (const bin of ["chromium-browser", "chromium", "google-chrome"]) {
+    try { return execSync(`which ${bin}`, { encoding: "utf8" }).trim(); } catch { /* ignore */ }
+  }
+  throw new Error("No Chromium binary found. Set CHROMIUM env var or install chromium.");
+}
+const CHROMIUM = findChromium();
 
 fs.mkdirSync(SHOT_DIR, { recursive: true });
 

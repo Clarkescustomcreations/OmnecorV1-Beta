@@ -19,6 +19,7 @@
 
 import "dotenv/config";
 import express from "express";
+import helmet from "helmet";
 import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import net from "net";
@@ -108,6 +109,11 @@ async function startServer() {
   // ─── Create Express App ─────────────────────────────────────────────────
   const app = express();
   const server = createServer(app);
+
+  app.use(helmet({
+    // Allow inline styles needed by shadcn/ui and Recharts
+    contentSecurityPolicy: false,
+  }));
 
   const limiter = rateLimit({
     windowMs: 60 * 1000,
