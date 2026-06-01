@@ -162,16 +162,4 @@ Omnecor is released under the [MIT License](LICENSE).
 
 ---
 
-<div align="center">
-
-```
-O — Operational
-M — Memory
-N — Never
-E — Escapes
-C — Context
-O — Overview
-R — Remains
-```
-
-</div>
+                      Operational Memory Never Escapes Context Overview Remains
