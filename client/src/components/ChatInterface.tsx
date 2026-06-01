@@ -354,6 +354,7 @@ export interface ChatInterfaceProps {
   onExport?: () => void;
   onStop?: () => void;
   onCommand?: (cmd: SlashCommand) => void;
+  onBtw?: (note: string) => void;
 
   className?: string;
 }
@@ -383,6 +384,7 @@ export default function ChatInterface({
   onExport,
   onStop,
   onCommand,
+  onBtw,
   className,
 }: ChatInterfaceProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -418,7 +420,8 @@ export default function ChatInterface({
     (cmd: SlashCommand) => {
       if (cmd === "help") {
         toast.info(
-          "Shortcuts: Enter → send · Shift+Enter → new line · /clear → clear · /new → new chat · /system → system prompt · /export → download"
+          "Commands: /clear · /new · /system · /export · /compress · /btw [note] · /skill · /plan\nShortcuts: Enter → send · Shift+Enter → new line",
+          { duration: 6000 }
         );
         return;
       }
@@ -592,6 +595,7 @@ export default function ChatInterface({
           onAddImage={file => onAddImage?.(file)}
           onStop={() => onStop?.()}
           onCommand={handleCommand}
+          onBtw={onBtw}
           contextFiles={contextFiles}
           isLoading={isLoading}
         />

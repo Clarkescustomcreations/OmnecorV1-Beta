@@ -118,6 +118,10 @@ Omnecor is engineered as a modular, production-grade workstation. This section p
 -   **Dependencies**: `AgentService`, `WorkflowSequencing`, `MemoryArchitectService`, `VectorDBService`.
 -   **Limitations**: Agent capabilities are defined by their programming and available tools.
 -   **Related Settings**: Agent permissions, workflow configurations.
+-   **1.5B Valet Router**: A locally-running fine-tuned model that serves as the intelligent dispatch layer. It classifies every task into one of 10 categories and routes it to the optimal provider or chain. The routing decision itself never leaves your machine.
+-   **Routing Modes**: Ten user-configurable modes control how the Valet dispatches tasks — from direct API pass-through, to multi-API distribution, to sequential MoE chains through custom LLM-Builder models, to full OMMESH + multi-API hybrid routing. See [VALET_ROUTER.md](../ai-agents/VALET_ROUTER.md) for the full reference.
+-   **Multi-API Support**: Run agents against multiple AI subscriptions or APIs simultaneously (Claude, Gemini, OpenAI/ChatGPT, Grok, local models, etc.). The Valet selects the best-suited provider per task type within the same workflow.
+-   **Guided Walk-Through Scrapper Mode**: When automated routing fails or no API keys are available, the Valet guides the user manually — generating detailed prompt instruction sets, recommending the best free web UI, and integrating the result when the user returns it.
 
 ### 2.4. Hardware Integration Layer (Python Bridges)
 
@@ -333,6 +337,24 @@ Neural Brain Map icon in the Navigation Sidebar.
 4.  **Generate Image**: Click "Generate". The `fal_bridge.py` will send the request to Fal.ai.
 5.  **View Results**: The generated images will appear in the UI, and can be saved or further edited.
 
+### 7.5. Project Planning with `/plan` Mode
+
+The `/plan` command activates the Valet Router's guided planning session. This is the recommended starting point for any significant new project.
+
+1.  **Activate**: Type `/plan` in the chat input or select "Plan Mode" from the Command Palette (`Ctrl+K`).
+2.  **Guided Questioning**: The 1.5B Valet asks structured questions about your project goal, audience, constraints, and preferences, referencing any loaded Neural Brain Map context.
+3.  **Bootstrap Files Created**: The Valet creates `todo.md` (task list) and `status.md` (project goal and status) in the project root. These are mandatory and are updated after every completed task.
+4.  **Project Docs Suite**: The Valet guides creation of a `project-docs/` folder containing:
+    -   `PRD.md` — Product/Project Requirements Document
+    -   `Feature-Plan.md` — Feature breakdown and implementation order
+    -   `Voice-Tone.md` — Communication style and brand voice
+    -   `Design-Preferences.md` — Visual and aesthetic constraints
+    -   `Rules/standards.md` — Coding standards and architectural rules
+5.  **Ongoing Maintenance**: After each significant task, the Valet offers to update the relevant project docs and flag progress in `todo.md` and `status.md`.
+6.  **Skill Packaging**: When a repeatable task is completed, the Valet offers to save it as a reusable skill — a named workflow that can be invoked in any future project.
+
+> **Hardcoded Rule**: The Valet will not route substantive tasks until `todo.md` and `status.md` exist. This rule is always active regardless of routing mode or execution mode.
+
 ---
 
 ## 8. Configuration Guide
@@ -396,6 +418,7 @@ Omnecor is built around a powerful and flexible AI infrastructure. For detailed 
 -   [AI Model Hub and Pipelines](docs/architecture/AI_PIPELINES.md)
 -   [AI Agent Responsibilities](docs/ai-agents/AGENT_RESPONSIBILITIES.md)
 -   [AI Agent Workflow Sequencing](docs/ai-agents/WORKFLOW_SEQUENCING.md)
+-   [Valet Router Reference](docs/ai-agents/VALET_ROUTER.md)
 
 ---
 
@@ -534,17 +557,22 @@ For answers to frequently asked questions, please refer to the dedicated [FAQ.md
 
 ## 19. Glossary
 
+-   **`/plan` Mode**: A Valet Router guided session that creates and maintains the project documentation suite (`todo.md`, `status.md`, `project-docs/`).
 -   **Agentic Wallet**: Omnecor's built-in cost management system for cloud AI providers, featuring project budgets, spend logging, and optional Lithic virtual card integration.
 -   **AI Agent**: An autonomous software entity designed to perform specific tasks, often leveraging AI models.
 -   **Big Spender Mode**: An Execution Mode that prefers high-performance cloud AI models for maximum output quality.
 -   **ChromaDB**: An open-source vector database used by Omnecor for semantic indexing and retrieval.
 -   **Drizzle ORM**: A TypeScript ORM used for interacting with the database.
 -   **Execution Mode**: A per-user setting (`sovereign`, `scrapper`, `big_spender`) controlling which AI providers are permitted. Enforced at the tRPC middleware layer.
+-   **Guided Walk-Through Scrapper Mode**: A fallback Valet mode for when automated routing fails; the Valet manually guides the user to generate inference via free web UIs and integrates the result.
 -   **HMCI (Human-Machine Collaboration Interface)**: A system designed to facilitate seamless interaction and collaboration between humans and AI.
 -   **HITL (Human-In-The-Loop)**: A process where human intervention or approval is required at critical stages of an automated workflow.
 -   **Lithic**: A virtual card issuance API used by the Agentic Wallet for project-level financial isolation.
+-   **LLM-Builder**: Omnecor's fine-tuning interface for creating custom specialized models, used in MoE Chain routing.
 -   **Llama.cpp**: A C/C++ port of Facebook's LLaMA model, enabling local inference on various hardware.
+-   **MoE Chain (Mixture of Experts Chain)**: A Valet routing mode that sends tasks sequentially through multiple specialized fine-tuned models, one task at a time, to conserve compute.
 -   **mTLS (Mutual Transport Layer Security)**: A security protocol that ensures both client and server authenticate each other.
+-   **Multi-API Mode**: A Valet routing mode that distributes tasks across multiple user-configured AI provider APIs or subscriptions.
 -   **Neural Brain Map**: Omnecor's spatial, graph-based interface for project and knowledge management.
 -   **Ollama**: A tool for running large language models locally.
 -   **OMMESH**: Omnecor's distributed mesh intelligence layer for multi-node collaboration.
@@ -555,9 +583,11 @@ For answers to frequently asked questions, please refer to the dedicated [FAQ.md
 -   **shadcn/ui**: A collection of reusable UI components built with Radix UI and Tailwind CSS.
 -   **Sovereign Mode**: An Execution Mode that blocks all cloud API calls at the server middleware layer. Ensures 100% local data residency.
 -   **STT (Speech-to-Text)**: The process of converting spoken language into written text.
+-   **`todo.md` / `status.md`**: Mandatory project files created by the Valet Router at the start of every project. Cannot be bypassed.
 -   **tRPC**: A framework for building end-to-end type-safe APIs in TypeScript.
 -   **TTS (Text-to-Speech)**: The process of converting written text into spoken language.
 -   **Vector Embedding**: A numerical representation of text or other data that captures its semantic meaning.
+-   **Valet Router**: The locally-running 1.5B parameter model that classifies and dispatches all tasks to optimal providers without making a cloud call for the routing decision.
 -   **Vector Database**: A database optimized for storing and querying vector embeddings.
 -   **Vite**: A fast build tool for modern web projects.
 -   **WSL2 (Windows Subsystem for Linux 2)**: A compatibility layer for running Linux binary executables natively on Windows.
