@@ -1,0 +1,101 @@
+{
+  "manifest_version": "1.0.0",
+  "knowledge_base_version": "1.0.0",
+  "updated": "2026-06-01",
+  "notes": "Authoritative best-model-per-task map. Read by the dataset generator AND the live router. Update model names here as providers release new models — no retraining required. Models are DEFAULTS; the user's configured providers/keys always take precedence, and Sovereign mode forces local.",
+  "cost_tiers": ["free", "low", "medium", "high"],
+  "providers": {
+    "ollama":    { "kind": "local", "cost_tier": "free", "notes": "VRAM-aware local inference; honors Sovereign mode." },
+    "ommesh":    { "kind": "local", "cost_tier": "free", "notes": "LAN mesh; VRAM-weighted across peer nodes." },
+    "llamacpp":  { "kind": "local", "cost_tier": "free", "notes": "GGUF local inference." },
+    "anthropic": { "kind": "cloud", "cost_tier": "medium", "notes": "Strong code + reasoning." },
+    "openai":    { "kind": "cloud", "cost_tier": "medium", "notes": "Writing, structured output, vision." },
+    "gemini":    { "kind": "cloud", "cost_tier": "low",   "notes": "Research, long-context, cheap flash tier." },
+    "xai":       { "kind": "cloud", "cost_tier": "medium", "notes": "Current events / analysis (Grok)." },
+    "fal":       { "kind": "cloud", "cost_tier": "medium", "notes": "Media generation." }
+  },
+  "categories": {
+    "code_generation": {
+      "description": "Write new code from a specification.",
+      "primary":   { "provider": "anthropic", "model": "claude-opus-4-8" },
+      "secondary": [{ "provider": "openai", "model": "gpt-4o" }],
+      "local":     { "provider": "ollama", "model": "qwen2.5-coder:latest" },
+      "local_capable": true, "cost_tier": "medium", "default_mode": "main_api"
+    },
+    "code_review": {
+      "description": "Review, debug, audit existing code.",
+      "primary":   { "provider": "anthropic", "model": "claude-opus-4-8" },
+      "secondary": [{ "provider": "xai", "model": "grok-latest" }],
+      "local":     { "provider": "ollama", "model": "qwen2.5-coder:latest" },
+      "local_capable": true, "cost_tier": "medium", "default_mode": "main_api"
+    },
+    "research": {
+      "description": "Fact-finding, web search, current events.",
+      "primary":   { "provider": "gemini", "model": "gemini-1.5-pro" },
+      "secondary": [{ "provider": "xai", "model": "grok-latest" }],
+      "local":     { "provider": "ollama", "model": "llama3.2:latest" },
+      "local_capable": false, "cost_tier": "low", "default_mode": "multi_api"
+    },
+    "synthesis": {
+      "description": "Summarize, compare, merge information; write documents.",
+      "primary":   { "provider": "openai", "model": "gpt-4o" },
+      "secondary": [{ "provider": "gemini", "model": "gemini-1.5-pro" }],
+      "local":     { "provider": "ollama", "model": "llama3.2:latest" },
+      "local_capable": true, "cost_tier": "medium", "default_mode": "main_api"
+    },
+    "media_generation": {
+      "description": "Images, video, audio creation.",
+      "primary":   { "provider": "fal", "model": "fal-ai/flux" },
+      "secondary": [{ "provider": "ollama", "model": "comfyui-local" }],
+      "local":     { "provider": "ollama", "model": "comfyui-local" },
+      "local_capable": true, "cost_tier": "medium", "default_mode": "main_api"
+    },
+    "knowledge_retrieval": {
+      "description": "Query the Neural Brain Map / vector DB.",
+      "primary":   { "provider": "ollama", "model": "valet-router" },
+      "secondary": [{ "provider": "ommesh", "model": "peer-best-vram" }],
+      "local":     { "provider": "ollama", "model": "valet-router" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "local_omesh"
+    },
+    "instruction_writing": {
+      "description": "Create step-by-step guides or prompt sets.",
+      "primary":   { "provider": "ollama", "model": "valet-router" },
+      "secondary": [{ "provider": "anthropic", "model": "claude-sonnet-4-6" }],
+      "local":     { "provider": "ollama", "model": "llama3.2:latest" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
+    },
+    "integration": {
+      "description": "Merge AI output into the project; resolve conflicts.",
+      "primary":   { "provider": "ollama", "model": "valet-router" },
+      "secondary": [{ "provider": "anthropic", "model": "claude-sonnet-4-6" }],
+      "local":     { "provider": "ollama", "model": "valet-router" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
+    },
+    "hardware": {
+      "description": "Blender, KiCad, ESPTool, ComfyUI operations.",
+      "primary":   { "provider": "local_bridge", "model": "none" },
+      "secondary": [],
+      "local":     { "provider": "local_bridge", "model": "none" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "api_direct"
+    },
+    "reporting": {
+      "description": "Summarize results back to the user.",
+      "primary":   { "provider": "ollama", "model": "valet-router" },
+      "secondary": [{ "provider": "ollama", "model": "llama3.2:latest" }],
+      "local":     { "provider": "ollama", "model": "valet-router" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
+    },
+    "local_task": {
+      "description": "Simple local utility tasks (list files, status, quick calc).",
+      "primary":   { "provider": "ollama", "model": "llama3.2:latest" },
+      "secondary": [],
+      "local":     { "provider": "ollama", "model": "llama3.2:latest" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "local_omesh"
+    }
+  },
+  "execution_mode_overrides": {
+    "sovereign":   { "force_local": true,  "blocked_kinds": ["cloud"] },
+    "scrapper":    { "force_local": false, "prefer_local": true },
+    "big_spender": { "force_local": false, "prefer_primary": true }
+  }
+}

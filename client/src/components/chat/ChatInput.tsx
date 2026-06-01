@@ -6,7 +6,7 @@ import { VoiceInputButton } from "@/components/voice/VoiceInputButton";
 import { cn } from "@/lib/utils";
 import type { ContextFile } from "@/lib/chatContext";
 
-export type SlashCommand = "clear" | "new" | "system" | "export" | "help";
+export type SlashCommand = "clear" | "new" | "system" | "export" | "help" | "compress" | "btw" | "skill" | "plan";
 
 interface Attachment {
   name: string;
@@ -19,6 +19,7 @@ interface ChatInputProps {
   onAddImage: (file: File) => void;
   onStop: () => void;
   onCommand: (cmd: SlashCommand) => void;
+  onBtw?: (note: string) => void;
   contextFiles: ContextFile[];
   isLoading: boolean;
   disabled?: boolean;
@@ -30,6 +31,10 @@ const COMMANDS: { cmd: SlashCommand; label: string; description: string }[] = [
   { cmd: "system", label: "/system", description: "Toggle system prompt editor" },
   { cmd: "export", label: "/export", description: "Export conversation as Markdown" },
   { cmd: "help", label: "/help", description: "Show keyboard shortcuts" },
+  { cmd: "compress", label: "/compress", description: "Compress history to save tokens" },
+  { cmd: "btw", label: "/btw", description: "Add a persistent background context note" },
+  { cmd: "skill", label: "/skill", description: "Save this workflow as a reusable skill" },
+  { cmd: "plan", label: "/plan", description: "Start guided project planning with Valet" },
 ];
 
 export default function ChatInput({
@@ -38,6 +43,7 @@ export default function ChatInput({
   onAddImage,
   onStop,
   onCommand,
+  onBtw,
   contextFiles,
   isLoading,
   disabled,
@@ -103,6 +109,14 @@ export default function ChatInput({
   };
 
   const execCommand = (cmd: SlashCommand) => {
+    // /btw keeps the input open so the user can type the note inline
+    if (cmd === "btw") {
+      setValue("/btw ");
+      setSlashOpen(false);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      textareaRef.current?.focus();
+      return;
+    }
     setValue("");
     setSlashOpen(false);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -121,6 +135,19 @@ export default function ChatInput({
   const handleSend = () => {
     const trimmed = value.trim();
     if (!trimmed || isLoading || disabled) return;
+
+    // Intercept /btw notes — store as session context, don't send as chat
+    if (trimmed.startsWith("/btw ")) {
+      const note = trimmed.slice(5).trim();
+      if (note) {
+        onBtw?.(note);
+        setValue("");
+        setAttachments([]);
+        if (textareaRef.current) textareaRef.current.style.height = "auto";
+      }
+      return;
+    }
+
     onSend(trimmed);
     setValue("");
     setAttachments([]);

@@ -26,6 +26,15 @@ import {
 } from "@/lib/chatContext";
 import type { SlashCommand } from "@/components/chat/ChatInput";
 import { toast } from "sonner";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -106,6 +115,33 @@ export default function Chat() {
     () => localStorage.getItem("omnecor:systemPrompt") ?? ""
   );
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+
+  // ── BTW notes ────────────────────────────────────────────────────────────
+  const [btwNotes, setBtwNotes] = useState<string[]>(
+    () => JSON.parse(localStorage.getItem("omnecor:btwNotes") ?? "[]")
+  );
+
+  const handleBtw = useCallback((note: string) => {
+    setBtwNotes(prev => {
+      const updated = [...prev, note];
+      localStorage.setItem("omnecor:btwNotes", JSON.stringify(updated));
+      return updated;
+    });
+    toast.success("Context note added — Valet will keep this in mind");
+  }, []);
+
+  const removeBtwNote = useCallback((idx: number) => {
+    setBtwNotes(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      localStorage.setItem("omnecor:btwNotes", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  // ── Skill modal ──────────────────────────────────────────────────────────
+  const [showSkillModal, setShowSkillModal] = useState(false);
+  const [skillName, setSkillName] = useState("");
+  const [skillDesc, setSkillDesc] = useState("");
 
   const handleSystemPromptChange = useCallback((prompt: string) => {
     setSystemPrompt(prompt);
@@ -289,8 +325,10 @@ export default function Chat() {
       }));
 
       const apiMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [];
-      if (systemPrompt.trim()) {
-        apiMessages.push({ role: "system", content: systemPrompt });
+      const btwContext = btwNotes.map(n => `[Background context: ${n}]`).join("\n");
+      const fullSystem = [systemPrompt.trim(), btwContext].filter(Boolean).join("\n\n");
+      if (fullSystem) {
+        apiMessages.push({ role: "system", content: fullSystem });
       }
       priorMessages.forEach(m => {
         if (m.role === "user" || m.role === "assistant") {
@@ -351,7 +389,7 @@ export default function Chat() {
 
       streamRef.current = sub;
     },
-    [selectedModel, systemPrompt]
+    [selectedModel, systemPrompt, btwNotes]
   );
 
   // ── Send message ─────────────────────────────────────────────────────────
@@ -457,11 +495,56 @@ export default function Chat() {
             toast.success("Exported as Markdown");
           }
           break;
+
+        case "compress": {
+          const msgs = conversation.messages;
+          if (msgs.length <= 6) {
+            toast.info("Not enough history to compress — need more than 6 messages");
+            break;
+          }
+          const toCompress = msgs.slice(0, -6);
+          const kept = msgs.slice(-6);
+          const summaryLines = toCompress
+            .map(m => `[${m.role}]: ${m.content.slice(0, 140).replace(/\n/g, " ")}${m.content.length > 140 ? "…" : ""}`)
+            .join("\n");
+          const summaryMsg: ChatMessage = {
+            id: crypto.randomUUID(),
+            role: "system" as const,
+            content: `[Compressed — ${toCompress.length} messages summarized]\n\n${summaryLines}`,
+            timestamp: new Date(),
+            tokens: Math.ceil(summaryLines.length / 4),
+          };
+          setConversation(prev => ({
+            ...prev,
+            messages: [summaryMsg, ...kept],
+            updatedAt: new Date(),
+          }));
+          toast.success(`Compressed ${toCompress.length} messages → 1 summary block`);
+          break;
+        }
+
+        case "skill":
+          if (conversation.messages.length === 0) {
+            toast.info("No conversation to save as a skill yet");
+            break;
+          }
+          setSkillName("");
+          setSkillDesc("");
+          setShowSkillModal(true);
+          break;
+
+        case "plan":
+          toast.info(
+            "Plan mode active — Valet will guide project setup. Start by describing your goal.",
+            { duration: 5000 }
+          );
+          break;
+
         default:
           break;
       }
     },
-    [handleClearHistory, handleNewConversation, conversation]
+    [handleClearHistory, handleNewConversation, conversation, setConversation]
   );
 
   // ── Context panel ────────────────────────────────────────────────────────
@@ -488,6 +571,28 @@ export default function Chat() {
 
         {/* Main chat area */}
         <div className="flex-1 flex gap-4 p-4 overflow-hidden min-w-0">
+          <div className="flex-1 flex flex-col min-w-0 gap-1.5 overflow-hidden">
+            {/* BTW context note chips */}
+            {btwNotes.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-0.5 flex-shrink-0">
+                {btwNotes.map((note, i) => (
+                  <div
+                    key={i}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/40 border border-border text-xs max-w-xs"
+                  >
+                    <span className="font-semibold text-accent-foreground opacity-70">btw</span>
+                    <span className="text-muted-foreground truncate">{note}</span>
+                    <button
+                      onClick={() => removeBtwNote(i)}
+                      className="text-muted-foreground hover:text-destructive transition-colors leading-none ml-0.5"
+                      aria-label="Remove note"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
           <ChatInterface
             className="flex-1 min-w-0"
             messages={conversation.messages}
@@ -518,7 +623,9 @@ export default function Chat() {
             }}
             onStop={handleStop}
             onCommand={handleCommand}
+            onBtw={handleBtw}
           />
+          </div>
 
           {/* Context panel */}
           <div className="w-72 flex flex-col gap-3 overflow-hidden flex-shrink-0 hidden xl:flex">
@@ -539,6 +646,59 @@ export default function Chat() {
           </div>
         </div>
       </div>
+      {/* Skill save modal */}
+      <Dialog open={showSkillModal} onOpenChange={setShowSkillModal}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>Save as Reusable Skill</DialogTitle>
+          </DialogHeader>
+          <div className="flex flex-col gap-3 py-2">
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Skill Name</label>
+              <Input
+                value={skillName}
+                onChange={e => setSkillName(e.target.value)}
+                placeholder="e.g. auth-flow-research"
+                autoFocus
+                onKeyDown={e => { if (e.key === "Enter") e.currentTarget.blur(); }}
+              />
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <label className="text-sm font-medium">Description <span className="text-muted-foreground font-normal">(optional)</span></label>
+              <Input
+                value={skillDesc}
+                onChange={e => setSkillDesc(e.target.value)}
+                placeholder="What does this skill do?"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setShowSkillModal(false)}>Cancel</Button>
+            <Button
+              onClick={() => {
+                if (!skillName.trim()) { toast.error("Enter a skill name"); return; }
+                const skill = {
+                  id: crypto.randomUUID(),
+                  name: skillName.trim(),
+                  description: skillDesc.trim(),
+                  messages: conversation.messages,
+                  systemPrompt,
+                  btwNotes,
+                  model: selectedModel,
+                  createdAt: new Date().toISOString(),
+                };
+                const existing: unknown[] = JSON.parse(localStorage.getItem("omnecor:skills") ?? "[]");
+                existing.push(skill);
+                localStorage.setItem("omnecor:skills", JSON.stringify(existing));
+                setShowSkillModal(false);
+                toast.success(`Skill "${skill.name}" saved — invoke it from the Command Palette`);
+              }}
+            >
+              Save Skill
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </OmnecorDashboardLayout>
   );
 }

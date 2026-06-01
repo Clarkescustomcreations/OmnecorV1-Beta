@@ -14,13 +14,18 @@ graph LR
     C -->|Service Calls| D(Internal Services)
     D -->|Database Operations| E(Drizzle ORM/Database)
     D -->|File System Access| F(Local Storage)
-    D -->|AI Model Inference Requests| G(AI Model Hub)
-    G -->|Local Models<br/>Ollama, Llama cpp| F
-    G -->|Cloud APIs| H(External AI Services)
+    D -->|Inference Request| V(1.5B Valet Router)
+    V -->|Task Classification| V
+    V -->|Route Decision - Local| G1(Local Models\nOllama / Llama.cpp)
+    V -->|Route Decision - Cloud| G2(Cloud APIs\nOpenAI / Anthropic / Gemini)
+    V -->|Route Decision - OMMESH| K(OMMESH Network)
+    V -->|Route Decision - MoE Chain| G3(LLM-Builder Models)
+    G1 --> F
+    G2 --> H(External AI Services)
+    K -->|Node Discovery/Routing| L(Other Omnecor Nodes)
+    G3 --> F
     D -->|Hardware Bridge Commands| I(ProcessManagerService)
     I -->|Python Bridges| J(External Tools/Hardware)
-    D -->|OMMESH Communication| K(OMMESH Network)
-    K -->|Node Discovery/Routing| L(Other Omnecor Nodes)
     C -->|WebSocket Broadcasts| B
     D -->|Log/Diagnostic Output| F
 ```
@@ -51,11 +56,38 @@ graph LR
 
 ### 2.4. AI Model Data Flow
 
--   **Inference Requests**: The `AI Model Hub` receives requests from internal services, containing prompts, context, and model parameters.
--   **Local Models**: For local models (e.g., Ollama/Llama.cpp), requests are routed to the local inference server. Input data (e.g., text, embeddings) is processed, and results are returned to the `AiProviderService`.
--   **Cloud APIs**: For cloud-based models (e.g., OpenAI, Anthropic), requests are sent to external API endpoints. API keys and credentials are securely managed by the `SecurityService`.
--   **Memory Layer**: The `VectorDBService` stores and retrieves embeddings for Retrieval-Augmented Generation (RAG), ensuring AI models have access to relevant context from local documents.
--   **Output**: AI-generated responses (text, images, code) are returned to the calling service or directly to the frontend via WebSockets.
+#### 2.4.1. Valet Router Dispatch Layer
+
+All inference requests from internal services pass through the **1.5B Valet Router** before reaching any model. The Valet runs entirely locally — the routing decision itself never makes a cloud call.
+
+**Dispatch sequence:**
+1. Internal service sends task to `AiProviderService`
+2. `AiProviderService` forwards to the Valet Router (local inference)
+3. Valet classifies the task into one of 10 categories (research, code_generation, synthesis, etc.)
+4. Valet selects the routing target based on the user's configured Valet routing mode (see [VALET_ROUTER.md](../ai-agents/VALET_ROUTER.md))
+5. Valet dispatches to the selected provider(s) or chain
+
+**sovereignCheck interaction:** Before any cloud dispatch, the `sovereignCheck` middleware verifies that the user's Execution Mode is not `sovereign`. If it is, the dispatch throws `FORBIDDEN` and the Valet falls back to local routing automatically.
+
+#### 2.4.2. Local Model Path
+
+For local models (Ollama / Llama.cpp), requests are routed to the local inference server. Input data (prompts, context, embeddings) is processed on-device, and results are returned to `AiProviderService`.
+
+#### 2.4.3. Cloud API Path
+
+For cloud-based models, requests pass through `sovereignCheck` middleware first. If permitted, they are sent to external API endpoints. API keys are managed by `SecurityService` and never logged (redacted before any audit entry).
+
+#### 2.4.4. OMMESH Path
+
+For OMMESH-targeted routing, the `RoutingEngine` selects the peer node with the most available VRAM and forwards the inference request over the mTLS-secured mesh connection. In `moe_chain_omesh` mode, OMMESH tasks are dispatched before the local chain begins.
+
+#### 2.4.5. MoE Chain Path
+
+For `moe_chain` and `moe_chain_omesh` modes, the Valet sequences tasks through multiple locally-stored LLM-Builder fine-tuned models. Only one model runs at a time to conserve GPU/CPU resources. Output of each step becomes input to the next.
+
+#### 2.4.6. Memory Layer
+
+The `VectorDBService` stores and retrieves embeddings for RAG across all routing paths. The Valet queries the Neural Brain Map before dispatching context-sensitive tasks to ensure the selected provider receives the most relevant project context.
 
 ### 2.5. OMMESH Data Flow
 

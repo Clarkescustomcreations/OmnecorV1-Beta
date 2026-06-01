@@ -45,7 +45,9 @@ To prevent data corruption and ensure consistency when multiple agents might int
 -   **File Locking**: Mechanisms are implemented to prevent simultaneous write access to critical files, ensuring that only one agent can modify a file at a time.
 -   **Merge Procedures**: For scenarios where concurrent modifications are possible, merge procedures (potentially involving HITL) are used to reconcile changes and resolve conflicts.
 
-## 3. Example Multi-Agent Workflow: Documentation Generation
+## 3. Example Workflows
+
+### 3.1. Documentation Generation Workflow
 
 Consider a workflow for generating comprehensive documentation for a new feature:
 
@@ -56,6 +58,30 @@ Consider a workflow for generating comprehensive documentation for a new feature
 5.  **Documentation Agent**: Collects all generated content, formats it according to brand guidelines, and updates the relevant Markdown files (e.g., `README.md`, `docs/api/TRPC_API.md`, `docs/user-guides/USER_GUIDE.md`).
 6.  **Review (HITL)**: The Orchestrator Agent pauses the workflow and requests human review of the generated documentation before final publication.
 
+---
+
+### 3.2. Valet-Routed Multi-API Research-to-Implementation Workflow
+
+The following illustrates how the 1.5B Valet Router orchestrates a complex multi-domain task when running in `multi_api` or `multi_api_omesh` mode. The Valet analyzes the incoming task, classifies it into sub-tasks using its 10-category taxonomy, and dispatches each sub-task to the most appropriate provider or local model.
+
+> **Note:** All model names below are illustrative examples only. Omnecor is provider-agnostic — you configure your own API pool.
+
+**User Request:** *"Research and implement a new authentication flow"*
+
+| Phase | Agent(s) | Task | Notes |
+|---|---|---|---|
+| **1. Research** | Grok Agent, Gemini Agent | Current auth standards, CVEs, RFCs, academic research | Can run one or both simultaneously |
+| **2. Synthesis** | OpenAI Agent, Gemini Agent | Write synthesis document; cross-reference and fact-check | One or both |
+| **3. Context Comparison** | 1.5B Valet and/or OMMESH Model, API Model | Query Neural Brain Map for existing project context; compare against synthesis | Local-first |
+| **4. Instruction Writing** | 1.5B Valet or OMMESH Model, API Model | Generate detailed step-by-step implementation instructions | Local preferred; API for complex architectures |
+| **5. Code Generation** | Claude Agent, Grok Agent, Gemini Agent | Core logic + security review + test generation | One or any combination |
+| **6. Integration** | 1.5B Valet and/or OMMESH Model, API Model | Merge generated code into project; resolve conflicts | Local-first |
+| **7. Report** | 1.5B Valet or API Model | Summarize results, update `todo.md` and `status.md`, offer skill packaging | |
+
+**Key principle:** The Valet selects agents based on task classification — not on a fixed assignment. If only one provider is configured, it handles all phases. If an OMMESH network is available, background phases (research, knowledge retrieval) are offloaded to peer nodes while the local chain handles foreground work.
+
+For the full routing mode reference and taxonomy, see [VALET_ROUTER.md](VALET_ROUTER.md).
+
 ## 4. OMMESH and Distributed Collaboration
 
 In an OMMESH environment, multi-agent collaboration can extend across multiple Omnecor nodes.
@@ -63,6 +89,16 @@ In an OMMESH environment, multi-agent collaboration can extend across multiple O
 -   **Distributed Task Execution**: Agents on different nodes can contribute to a single workflow, leveraging the collective compute resources of the mesh.
 -   **Shared Knowledge**: The `MeshDiscoveryService` and `RoutingEngine` facilitate the sharing of knowledge and context across the distributed network, allowing agents to access resources from any connected node.
 -   **Secure Communication**: All inter-node agent communication is secured via mTLS, ensuring data integrity and confidentiality.
+
+### 4.4. Valet + OMMESH Task Sequencing
+
+In `moe_chain_omesh` and `multi_api_omesh` modes, the order of task dispatch matters:
+
+1. **OMMESH tasks are dispatched first.** Network inference takes time to initialize; dispatching these first ensures they are already running before the local chain begins.
+2. **Local tasks start second.** Once OMMESH nodes confirm receipt, the 1.5B Valet begins the local processing chain.
+3. **Results merge asynchronously.** OMMESH outputs return as they complete and are merged into the workflow by the Valet as they arrive.
+
+This sequencing rule is hardcoded in the Valet Router's dispatch logic to prevent the local chain from consuming compute resources that the routing layer needs for OMMESH coordination.
 
 ## 5. Best Practices for Designing Collaborative Agents
 
