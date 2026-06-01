@@ -1,5 +1,6 @@
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
 import IntegrationsHub from "@/components/IntegrationsHub";
+import MCPToolDirectory from "@/components/integrations/MCPToolDirectory";
 import { Plug } from "lucide-react";
 
 /**
@@ -27,8 +28,12 @@ export default function Integrations() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-6">
+        <div className="flex-1 overflow-auto p-6 space-y-8">
           <IntegrationsHub />
+          <div>
+            <h2 className="text-lg font-semibold mb-4">MCP Tool Directory</h2>
+            <MCPToolDirectory />
+          </div>
         </div>
       </div>
     </OmnecorDashboardLayout>

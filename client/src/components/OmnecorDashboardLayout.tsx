@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/_core/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -20,6 +20,10 @@ import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import HITLAlertPanel from "./HITLAlertPanel";
 import { useFictionMode } from "@/contexts/FictionModeContext";
+import ExecutionModeBadge from "@/components/shell/ExecutionModeBadge";
+import ZeroLoginBanner from "@/components/shell/ZeroLoginBanner";
+import { useAppStore } from "@/lib/store/app.store";
+import { trpc } from "@/lib/trpc";
 
 interface OmnecorDashboardLayoutProps {
   children: React.ReactNode;
@@ -49,6 +53,11 @@ export default function OmnecorDashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const { user, logout } = useAuth();
   const { isFictionMode, toggleFictionMode } = useFictionMode();
+  const { data: me } = trpc.auth.me.useQuery();
+  const setExecutionMode = useAppStore((s) => s.setExecutionMode);
+  useEffect(() => {
+    if (me?.executionMode) setExecutionMode(me.executionMode);
+  }, [me?.executionMode]);
 
   const navItems = [
     {
@@ -92,7 +101,9 @@ export default function OmnecorDashboardLayout({
   const isActive = (href: string) => location === href;
 
   return (
-    <div className="flex h-screen bg-background text-foreground">
+    <div className="flex flex-col h-screen bg-background text-foreground">
+      {me?.loginMethod === "zero-login" && <ZeroLoginBanner />}
+      <div className="flex flex-1 overflow-hidden">
       {/* Sidebar */}
       <aside
         className={cn(
@@ -188,6 +199,8 @@ export default function OmnecorDashboardLayout({
           </button>
           <div className="flex-1" />
 
+          <ExecutionModeBadge />
+
           <Button
             variant={isFictionMode ? "default" : "outline"}
             size="sm"
@@ -228,6 +241,7 @@ export default function OmnecorDashboardLayout({
           aria-hidden="true"
         />
       )}
+      </div>
     </div>
   );
 }

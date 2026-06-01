@@ -1,0 +1,43 @@
+version: "3.8"
+
+services:
+  ollama:
+    image: ollama/ollama:latest
+    container_name: omnecor-ollama
+    ports:
+      - "${OLLAMA_BIND_ADDRESS:-127.0.0.1}:11434:11434"
+    volumes:
+      - ollama_models:/root/.ollama
+    environment:
+      - OLLAMA_HOST=0.0.0.0:11434
+    deploy:
+      resources:
+        limits:
+          memory: 16g
+          cpus: "8.0"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:11434/api/tags"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  ollama-proxy:
+    build:
+      context: .
+      dockerfile: Dockerfile.ollama-proxy
+    container_name: omnecor-ollama-proxy
+    ports:
+      - "127.0.0.1:11435:11435"
+    environment:
+      - OLLAMA_URL=http://ollama:11434
+      - OLLAMA_PROXY_TOKEN=${OLLAMA_PROXY_TOKEN:-}
+    depends_on:
+      ollama:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  ollama_models:
+    driver: local

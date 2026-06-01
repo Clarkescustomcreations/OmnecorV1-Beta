@@ -847,4 +847,24 @@ rule OmnecorDefaultScan {
       files,
     };
   }
+
+  async runVulnerabilityScan(targetPath: string): Promise<{
+    findings: Array<{ tool: string; rule: string; file: string; line: number; message: string }>;
+    error?: string;
+  }> {
+    const resolvedPath = path.resolve(targetPath);
+    const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);
+    try {
+      const resp = await fetch("http://127.0.0.1:8012/scan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ target_path: realPath, scan_type: "combined" }),
+        signal: AbortSignal.timeout(30000),
+      });
+      if (!resp.ok) return { findings: [], error: `Threat scanner returned ${resp.status}` };
+      return resp.json() as Promise<{ findings: Array<{ tool: string; rule: string; file: string; line: number; message: string }> }>;
+    } catch (err) {
+      return { findings: [], error: (err as Error).message };
+    }
+  }
 }

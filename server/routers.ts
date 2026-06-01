@@ -26,6 +26,9 @@
  *   esp         — Specialized integration bridge
  *   security    — File scanning, encryption, backup/restore
  *   mesh        — OMMESH distributed discovery
+ *   wallet      — Per-project budget limits and spend tracking
+ *   virtualCard — Optional Lithic virtual card issuance (opt-in, requires LITHIC_API_KEY)
+ *   audit       — Immutable audit log (admin-only)
  */
 
 import { COOKIE_NAME } from "@shared/const";
@@ -49,6 +52,14 @@ import { securityRouter } from "./routers/securityRouter.js";
 import { ommeshRouter } from "./routers/ommesh.router.js";
 import { falRouter } from "./routers/falRouter.js";
 import { comfyRouter } from "./routers/comfyRouter.js";
+import { walletRouter } from "./routers/walletRouter.js";
+import { virtualCardRouter } from "./routers/virtualCardRouter.js";
+import { auditRouter } from "./routers/auditRouter.js";
+import { valetRouter } from "./routers/valetRouter.js";
+import { ollamaRouter } from "./routers/ollamaRouter.js";
+import { mcpRouter } from "./routers/mcpRouter.js";
+import { pipelineRouter } from "./routers/pipelineRouter.js";
+import { imageGenRouter } from "./routers/imageGenRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -99,6 +110,12 @@ export const appRouter = router({
   // ─── ComfyUI Bridge ───────────────────────────────────────────────────────
   comfy: comfyRouter,
 
+  // ─── Agentic Wallet (Budget + Spend Tracking) ─────────────────────────────
+  wallet: walletRouter,
+
+  // ─── Virtual Cards (Agentic Wallet opt-in) ────────────────────────────────
+  virtualCard: virtualCardRouter,
+
   // ─── Hardware (Specialized integration bridges) ───────────────────────────
   blender: blenderRouter,
   kicad: kicadRouter,
@@ -106,6 +123,24 @@ export const appRouter = router({
 
   // ─── Security (File scanning + Encryption + Backup/Restore) ───────────────
   security: securityRouter,
+
+  // ─── Audit Log (Immutable event log, admin-only) ──────────────────────────
+  audit: auditRouter,
+
+  // ─── Valet Router (Multi-API intelligent routing) ─────────────────────────
+  valet: valetRouter,
+
+  // ─── Ollama (Local model management) ──────────────────────────────────────
+  ollama: ollamaRouter,
+
+  // ─── MCP Client (Model Context Protocol tool directory) ───────────────────
+  mcp: mcpRouter,
+
+  // ─── GodMode Pipeline Framework (Phase 28) ────────────────────────────────
+  pipeline: pipelineRouter,
+
+  // ─── Image Generation (ComfyUI / Fal / OpenArt) (Phase 30) ───────────────
+  imageGen: imageGenRouter,
 });
 
 export type AppRouter = typeof appRouter;

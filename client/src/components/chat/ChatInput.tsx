@@ -253,6 +253,7 @@ export default function ChatInput({
           onPaste={handlePaste}
           disabled={isLoading || disabled}
           rows={1}
+          aria-label="Message input"
           className="flex-1 resize-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0 shadow-none leading-relaxed"
           style={{ minHeight: "24px", maxHeight: "200px" }}
         />
@@ -328,6 +329,7 @@ export default function ChatInput({
               onClick={handleSend}
               disabled={!value.trim() || disabled}
               title="Send (Enter)"
+              aria-label="Send message"
               type="button"
             >
               <Send className="w-3.5 h-3.5" />

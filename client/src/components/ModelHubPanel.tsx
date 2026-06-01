@@ -191,7 +191,7 @@ export default function ModelHubPanel({
       {/* Content Area */}
       <div className="flex-1 overflow-auto">
         {activeTab === "models" ? (
-          <div className="space-y-3">
+          <div role="list" className="space-y-3">
             {filteredModels.length === 0 ? (
               <div className="flex items-center justify-center h-48 text-muted-foreground">
                 <p>No models found</p>
@@ -200,6 +200,7 @@ export default function ModelHubPanel({
               filteredModels.map(model => (
                 <Card
                   key={model.id}
+                  role="listitem"
                   className={cn(
                     "cursor-pointer transition-all hover:border-accent",
                     selectedModelId === model.id && "border-accent bg-accent/5"
@@ -280,8 +281,9 @@ export default function ModelHubPanel({
                           size="sm"
                           variant="ghost"
                           className="text-destructive hover:text-destructive"
+                          aria-label={`Delete model ${model.displayName}`}
                         >
-                          <Trash2 className="w-4 h-4" />
+                          <Trash2 className="w-4 h-4" aria-hidden="true" />
                         </Button>
                       </div>
                     </div>
@@ -291,7 +293,7 @@ export default function ModelHubPanel({
             )}
           </div>
         ) : (
-          <div className="space-y-3">
+          <div role="list" className="space-y-3">
             {marketplaceModels.length === 0 ? (
               <div className="flex items-center justify-center h-48 text-muted-foreground">
                 <p>No models found in marketplace</p>
@@ -300,6 +302,7 @@ export default function ModelHubPanel({
               marketplaceModels.map(item => (
                 <Card
                   key={item.id}
+                  role="listitem"
                   className="cursor-pointer transition-all hover:border-accent"
                 >
                   <CardContent className="pt-4">
@@ -345,8 +348,12 @@ export default function ModelHubPanel({
                           ))}
                         </div>
                       </div>
-                      <Button size="sm" onClick={() => onModelDownload?.(item)}>
-                        <Download className="w-4 h-4 mr-2" />
+                      <Button
+                        size="sm"
+                        aria-label={`Download model ${item.name}`}
+                        onClick={() => onModelDownload?.(item)}
+                      >
+                        <Download className="w-4 h-4 mr-2" aria-hidden="true" />
                         Download
                       </Button>
                     </div>

@@ -47,6 +47,7 @@ import {
 import { HashTrackerService } from "../services/HashTrackerService.js";
 import { VoiceService, VoiceEventData } from "../services/VoiceService.js";
 import { HITLApprovalService } from "../services/HITLApprovalService.js";
+import { AgentService } from "../services/AgentService.js";
 import { SERVER_CONFIG } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("WebSocket");
@@ -119,6 +120,7 @@ export class OmnecorWebSocketServer {
   private hashTracker: HashTrackerService;
   private voiceService: VoiceService;
   private hitlService: HITLApprovalService;
+  private agentService: AgentService;
 
   constructor(httpServer: HttpServer) {
     // Create WebSocket server attached to the HTTP server (upgrade path)
@@ -135,6 +137,7 @@ export class OmnecorWebSocketServer {
     this.hashTracker = HashTrackerService.getInstance();
     this.voiceService = VoiceService.getInstance();
     this.hitlService = HITLApprovalService.getInstance();
+    this.agentService = AgentService.getInstance();
 
     // Wire up connection handling
     this.wss.on("connection", (ws, req) =>
@@ -395,6 +398,17 @@ export class OmnecorWebSocketServer {
         timestamp: event.timestamp,
       });
     });
+
+    // --- Security: Injection Attempt Events ---
+    this.agentService.on("security:injection_attempt", (data: { procedure: string; violations: string[] }) => {
+      log.warn("Injection attempt broadcast to security:alerts", data);
+      this.broadcastToChannel("security:alerts", {
+        type: "loopDetected", // reuse closest existing type; channel disambiguates
+        channel: "security:alerts",
+        data: { event: "injection_attempt", ...data },
+        timestamp: new Date().toISOString(),
+      });
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -416,8 +430,13 @@ export class OmnecorWebSocketServer {
   }
 
   /** Broadcast a message to ALL connected clients (for system-wide events) */
-  public broadcastAll(message: ServerMessage): void {
-    const payload = JSON.stringify(message);
+  public broadcastAll(messageOrType: ServerMessage | string, data?: unknown): void {
+    let payload: string;
+    if (typeof messageOrType === "string") {
+      payload = JSON.stringify({ type: messageOrType, data, timestamp: new Date().toISOString() });
+    } else {
+      payload = JSON.stringify(messageOrType);
+    }
 
     for (const client of this.clients.values()) {
       if (client.readyState === WebSocket.OPEN) {
@@ -568,4 +587,20 @@ export class OmnecorWebSocketServer {
       });
     });
   }
+}
+
+// ---------------------------------------------------------------------------
+// Module-level singleton reference — set by the server bootstrap
+// ---------------------------------------------------------------------------
+
+let _wsInstance: OmnecorWebSocketServer | null = null;
+
+/** Called once from server bootstrap after construction. */
+export function setWsInstance(instance: OmnecorWebSocketServer): void {
+  _wsInstance = instance;
+}
+
+/** Returns the WebSocket server instance, or null if not yet initialized. */
+export function getWsInstance(): OmnecorWebSocketServer | null {
+  return _wsInstance;
 }

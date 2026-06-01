@@ -5,15 +5,23 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Slider } from "../ui/slider";
-import { Zap, Save, Database, Activity } from "lucide-react";
+import { Zap, Save, Database, Activity, Route, Loader2 } from "lucide-react";
+import { Badge } from "../ui/badge";
 import { toast } from "sonner";
 
 export const UnslothPanel: React.FC = () => {
   const [loraRank, setLoraRank] = useState(16);
-  
+
+  const valetStatus = (trpc as any).valet?.status?.useQuery(undefined, { refetchInterval: 15000 });
+
   const startFineTuning = trpc.training.startTraining.useMutation({
     onSuccess: () => toast.success("Fine-tuning process initialized via Unsloth"),
     onError: (err) => toast.error("Training error: " + err.message)
+  });
+
+  const generateValetDataset = trpc.training.generateValetDataset.useMutation({
+    onSuccess: (data) => toast.success(`Dataset generation started — monitor in Jobs panel (job: ${data.jobId})`),
+    onError: (err) => toast.error("Dataset generation error: " + err.message),
   });
 
   return (
@@ -90,6 +98,70 @@ export const UnslothPanel: React.FC = () => {
           </CardContent>
         </Card>
       </div>
+
+      {/* Valet Router Status */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Route className="w-4 h-4 text-blue-500" aria-hidden="true" />
+            Valet Router
+          </CardTitle>
+          <CardDescription className="text-xs">1.5B local routing model for intelligent multi-API task distribution.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <div className={`w-2 h-2 rounded-full ${valetStatus?.data?.available ? "bg-green-500" : "bg-red-400"}`} aria-hidden="true" />
+            <span className="text-sm font-medium">
+              {valetStatus?.isLoading ? "Checking…" : valetStatus?.data?.available ? "Online" : "Offline"}
+            </span>
+            {valetStatus?.data?.url && (
+              <span className="text-xs text-muted-foreground font-mono ml-auto">{valetStatus.data.url}</span>
+            )}
+          </div>
+          {!valetStatus?.data?.available && (
+            <p className="text-xs text-muted-foreground">
+              Start the Valet Router with: <code className="font-mono bg-muted px-1 rounded">python server/python_bridges/valet_router_inference.py</code>
+            </p>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-sm font-medium flex items-center gap-2">
+            <Route className="w-4 h-4" /> Valet Router Dataset
+          </CardTitle>
+          <CardDescription className="text-xs">
+            Generate training data for the 1.5B local routing model (Qwen2.5-1.5B).
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <div className="flex items-center gap-2">
+            <Badge variant="secondary" className="text-xs">~4,000 routing examples</Badge>
+            <Badge variant="outline" className="text-xs">10 categories</Badge>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Uses Ollama oracle to annotate prompts with optimal provider, model, cost tier, and local_capable flag.
+            Output saved to <span className="font-mono">data/valet_router_dataset.jsonl</span> with 90/10 train/val split.
+          </p>
+          <Button
+            variant="outline"
+            size="sm"
+            disabled={generateValetDataset.isPending}
+            onClick={() => generateValetDataset.mutate({})}
+          >
+            {generateValetDataset.isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+              : <><Route className="w-4 h-4 mr-2" /> Generate Valet Dataset</>
+            }
+          </Button>
+          {generateValetDataset.isSuccess && (
+            <p className="text-xs text-green-500">
+              Dataset generation started — monitor in Jobs panel (job: {generateValetDataset.data.jobId})
+            </p>
+          )}
+        </CardContent>
+      </Card>
     </div>
   );
 };

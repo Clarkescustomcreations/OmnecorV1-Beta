@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { FileEvent } from "@/types/neural";
+import { useAppStore } from "@/lib/store/app.store";
 
 export interface JobProgressEvent {
   percent: number;
@@ -12,7 +13,7 @@ export interface LoopAlert {
   count: number;
 }
 
-export type OmnecorEventType = 
+export type OmnecorEventType =
   | "FILE_CREATED"
   | "FILE_UPDATED"
   | "FILE_DELETED"
@@ -25,7 +26,8 @@ export type OmnecorEventType =
   | "INDEXING_PROGRESS"
   | "MAP_SWITCHED"
   | "MAP_REINDEXED"
-  | "FICTION_EVENT";
+  | "FICTION_EVENT"
+  | "budget:spend";
 
 export function useOmnecorSocket(
   options: {
@@ -131,6 +133,8 @@ export function useOmnecorSocket(
             );
           } else if (message.type === "loopDetected" || message.type === "HITL_ALERT") {
             setLoopAlert(message.data);
+          } else if (message.type === "budget:spend") {
+            useAppStore.getState().setWalletSpend(message.data);
           }
         } catch (e) {
           console.error("Socket message parse error", e);

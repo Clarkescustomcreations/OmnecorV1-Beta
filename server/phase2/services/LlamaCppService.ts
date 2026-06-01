@@ -1,0 +1,58 @@
+export interface LlamaCppGenerateOptions {
+  maxTokens?: number;
+  temperature?: number;
+}
+
+export class LlamaCppService {
+  private static instance: LlamaCppService | null = null;
+  private readonly bridgeUrl = "http://127.0.0.1:8013";
+
+  static getInstance(): LlamaCppService {
+    if (!LlamaCppService.instance) LlamaCppService.instance = new LlamaCppService();
+    return LlamaCppService.instance;
+  }
+
+  async isOnline(): Promise<boolean> {
+    try {
+      const resp = await fetch(`${this.bridgeUrl}/health`, { signal: AbortSignal.timeout(3000) });
+      return resp.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async generate(prompt: string, modelPath: string, options?: LlamaCppGenerateOptions): Promise<string> {
+    const resp = await fetch(`${this.bridgeUrl}/generate`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt,
+        model_path: modelPath,
+        max_tokens: options?.maxTokens ?? 256,
+        temperature: options?.temperature ?? 0.7,
+      }),
+      signal: AbortSignal.timeout(60000),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText })) as { detail: string };
+      throw new Error(`llama.cpp bridge error: ${err.detail}`);
+    }
+    const data = await resp.json() as { text: string };
+    return data.text;
+  }
+
+  async getEmbedding(text: string, modelPath: string): Promise<number[]> {
+    const resp = await fetch(`${this.bridgeUrl}/embeddings`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ text, model_path: modelPath }),
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!resp.ok) {
+      const err = await resp.json().catch(() => ({ detail: resp.statusText })) as { detail: string };
+      throw new Error(`llama.cpp embedding error: ${err.detail}`);
+    }
+    const data = await resp.json() as { embedding: number[] };
+    return data.embedding;
+  }
+}

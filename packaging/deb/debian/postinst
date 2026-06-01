@@ -13,6 +13,11 @@ case "$1" in
         # Set permissions for /opt/omnecor
         chown -R omnecor:omnecor /opt/omnecor
 
+        # Detect GPU and configure Ollama layer count
+        if command -v python3 >/dev/null 2>&1; then
+            python3 /opt/omnecor/packaging/scripts/detect_gpu.py || true
+        fi
+
         # Reload systemd and enable service
         systemctl daemon-reload
         systemctl enable omnecor.service

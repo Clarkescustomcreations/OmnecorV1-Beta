@@ -10,7 +10,13 @@
  */
 
 import { ENV } from "../../_core/env.js";
+import { ValetRouterService } from "./ValetRouterService.js";
+// PromptSanitizer imported dynamically to avoid hard dep (Phase 22 parallel work)
 import { meshNode } from "../../ommesh/core/MeshNode.js";
+import { v4 as uuidv4 } from "uuid";
+import { getDb } from "../../db.js";
+import { spendLog, projectBudgets } from "../../../drizzle/schema.js";
+import { calculateCostMicrocents } from "../config/providerPricing.js";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -29,6 +35,8 @@ export interface ChatInput {
   maxTokens?: number;
   temperature?: number;
   isFictionMode?: boolean;
+  projectId?: string;  // for Agentic Wallet budget tracking
+  sessionId?: string;  // for spend log correlation
 }
 
 export interface ChatChunk {
@@ -106,6 +114,44 @@ export class AiProviderService {
     if (messages) chatInput.messages = messages;
     if (systemPrompt) chatInput.systemPrompt = systemPrompt;
 
+    // Agentic Wallet — budget enforcement pre-flight
+    if (chatInput.projectId) {
+      try {
+        const db = await getDb();
+        if (db) {
+          const { eq, sum } = await import("drizzle-orm");
+          const { spendLog: spendLogTable } = await import("../../../drizzle/schema.js");
+
+          const budgetRows = await db
+            .select()
+            .from(projectBudgets)
+            .where(eq(projectBudgets.projectId, chatInput.projectId))
+            .limit(1);
+
+          const budget = budgetRows[0];
+          if (budget && budget.limitCents > 0) {
+            const spentRows = await db
+              .select({ total: sum(spendLogTable.estimatedCostMicrocents) })
+              .from(spendLogTable)
+              .where(eq(spendLogTable.projectId, chatInput.projectId));
+
+            const spentMicrocents = Number(spentRows[0]?.total ?? 0);
+            const spentCents = spentMicrocents / 1_000_000;
+
+            if (spentCents >= budget.limitCents && budget.mode === "hard") {
+              // Auto-downgrade to Ollama — never silently drop the request
+              chatInput.providerId = "ollama";
+              chatInput.modelId = "llama3.2:latest";
+              chatInput.apiKey = undefined;
+            }
+          }
+        }
+      } catch (err) {
+        // Non-fatal — budget check must never break the AI call
+        console.warn("[AiProviderService] budget pre-flight failed:", err);
+      }
+    }
+
     if (chatInput.isFictionMode) {
       const fictionPrompt: Message = {
         role: "system",
@@ -113,6 +159,39 @@ export class AiProviderService {
           "You are in Fiction Mode. Maintain a narrative, creative tone and prioritize immersive, imaginative descriptions.",
       };
       chatInput.messages = [fictionPrompt, ...chatInput.messages];
+    }
+
+    // Valet pre-routing: consult the Valet Router for routing decisions
+    // Only if not api_direct mode and valet is configured
+    const routingMode = (chatInput as any).routingMode as string | undefined;
+    if (routingMode !== "api_direct") {
+      try {
+        const valetDecision = await ValetRouterService.getInstance().route({
+          task: chatInput.messages[chatInput.messages.length - 1]?.content?.slice(0, 500) ?? "chat",
+          preferredMode: (routingMode as any) ?? "main_api",
+          availableProviders: [chatInput.providerId],
+          taskType: "chat",
+        });
+        // Log the routing decision but don't override the explicit providerId
+        // (the decision informs future multi-API routing phases)
+        if (process.env.NODE_ENV === "development") {
+          console.log(`[ValetRouter] Decision: ${valetDecision.mode} → ${valetDecision.primaryProvider} (confidence: ${valetDecision.confidence})`);
+        }
+      } catch {
+        // Valet routing is advisory — never block chat on routing failure
+      }
+    }
+
+    // Prompt sanitizer integration (Phase 22)
+    try {
+      const { PromptSanitizer } = await import("./PromptSanitizer.js");
+      const sanitized = PromptSanitizer.getInstance().sanitizeMessages(chatInput.messages);
+      if (sanitized.anyFlagged) {
+        console.warn("[PromptSanitizer] Injection attempt detected:", sanitized.violations);
+      }
+      chatInput.messages = sanitized.messages as typeof chatInput.messages;
+    } catch {
+      // PromptSanitizer not yet available — skip silently
     }
 
     const providerId = chatInput.providerId.toLowerCase();
@@ -160,6 +239,17 @@ export class AiProviderService {
           case "forge":
             await this.chatForge(chatInput, onChunk);
             break;
+          case "llamacpp": {
+            const { LlamaCppService } = await import("./LlamaCppService.js") as typeof import("./LlamaCppService.js");
+            const modelPath = (chatInput as any).modelPath ?? "";
+            if (!modelPath) throw new Error("modelPath required for llamacpp provider");
+            const text = await LlamaCppService.getInstance().generate(
+              chatInput.messages.map((m: any) => m.content).join("\n"),
+              modelPath,
+            );
+            onChunk({ content: text, done: false });
+            break;
+          }
           default:
             throw new Error(`Unsupported provider: ${providerId}`);
         }
@@ -170,11 +260,31 @@ export class AiProviderService {
       }
     })();
 
+    let completionChars = 0;
     for await (const item of queue) {
+      completionChars += item.delta?.length ?? 0;
       yield item;
       if (item.done) break;
     }
     await promise;
+
+    // Agentic Wallet — log spend after stream completes
+    if (chatInput.projectId) {
+      const promptTokens = chatInput.messages.reduce(
+        (acc, m) => acc + Math.ceil(m.content.length / 4),
+        0
+      );
+      // Use totalTokens from last chunk if available; otherwise estimate from chars
+      const completionTokens = Math.ceil(completionChars / 4);
+      void this.logSpend({
+        projectId: chatInput.projectId,
+        provider: chatInput.providerId,
+        modelId: chatInput.modelId,
+        promptTokens,
+        completionTokens,
+        sessionId: chatInput.sessionId,
+      });
+    }
   }
 
   /**
@@ -204,6 +314,77 @@ export class AiProviderService {
     return filter.length > 0
       ? providers.filter(p => filter.includes(p.id))
       : providers;
+  }
+
+  /**
+   * Estimate the cost of an AI API call in microcents.
+   * Returns 0 for local providers (ollama, forge).
+   */
+  public estimateCost(
+    provider: string,
+    modelId: string,
+    promptTokens: number,
+    completionTokens: number
+  ): number {
+    return calculateCostMicrocents(provider, modelId, promptTokens, completionTokens);
+  }
+
+  /**
+   * Insert an immutable spend record and emit a budget:spend WebSocket event.
+   * Called after every successful AI API call completion.
+   */
+  private async logSpend(params: {
+    projectId: string;
+    provider: string;
+    modelId: string;
+    promptTokens: number;
+    completionTokens: number;
+    sessionId?: string;
+  }): Promise<void> {
+    const costMicrocents = calculateCostMicrocents(
+      params.provider,
+      params.modelId,
+      params.promptTokens,
+      params.completionTokens
+    );
+
+    try {
+      const db = await getDb();
+      if (db) {
+        await db.insert(spendLog).values({
+          id: uuidv4(),
+          projectId: params.projectId,
+          provider: params.provider,
+          modelId: params.modelId,
+          promptTokens: params.promptTokens,
+          completionTokens: params.completionTokens,
+          estimatedCostMicrocents: costMicrocents,
+          sessionId: params.sessionId ?? null,
+        });
+      }
+    } catch (err) {
+      // Non-fatal — spend logging must never break the AI call
+      console.warn("[AiProviderService] logSpend failed:", err);
+    }
+
+    // Emit real-time budget:spend event to all connected clients
+    const { getWsInstance } = await import("../websocket/WebSocketServer.js");
+    const ws = getWsInstance();
+    if (ws) {
+      ws.broadcastAll("budget:spend", {
+        projectId: params.projectId,
+        provider: params.provider,
+        modelId: params.modelId,
+        costMicrocents,
+        promptTokens: params.promptTokens,
+        completionTokens: params.completionTokens,
+      });
+    }
+    console.info(
+      `[AiProviderService] spend logged: project=${params.projectId} ` +
+      `provider=${params.provider} model=${params.modelId} ` +
+      `cost=${costMicrocents} microcents`
+    );
   }
 
   /**

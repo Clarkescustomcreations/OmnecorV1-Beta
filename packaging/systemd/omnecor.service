@@ -12,6 +12,8 @@ Restart=on-failure
 Environment=NODE_ENV=production
 # Add paths for hardware bridges if necessary
 Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
+# Uncomment for air-gapped/offline deployments (disables OAuth, all requests as local admin):
+# Environment=ZERO_LOGIN_MODE=true
 
 [Install]
 WantedBy=multi-user.target

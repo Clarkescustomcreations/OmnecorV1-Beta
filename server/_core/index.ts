@@ -23,7 +23,7 @@ import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes } from "./oauth";
+import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -31,11 +31,12 @@ import { serveStatic, setupVite } from "./vite";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 import { createLogger, closeAuditLog } from "./logger.js";
 import { SERVER_CONFIG } from "../phase2/config/index.js";
+import { ENV } from "./env.js";
 
 const log = createLogger("core");
 
 // ─── Phase 2 Service Imports (for lifecycle management) ─────────────────────
-import { OmnecorWebSocketServer } from "../phase2/websocket/WebSocketServer";
+import { OmnecorWebSocketServer, setWsInstance } from "../phase2/websocket/WebSocketServer";
 import { ProcessManagerService } from "../phase2/services/ProcessManagerService";
 import { SecurityService } from "../phase2/services/SecurityService";
 import { VectorDBService } from "../phase2/services/VectorDBService";
@@ -136,7 +137,11 @@ async function startServer() {
 
   // ─── Storage & OAuth ────────────────────────────────────────────────────
   registerStorageProxy(app);
-  registerOAuthRoutes(app);
+  if (!ENV.zeroLoginMode) {
+    registerOAuthRoutes(app);
+    registerGoogleOAuthRoutes(app);
+    registerMicrosoftOAuthRoutes(app);
+  }
 
   // ─── tRPC API (unified router) ─────────────────────────────────────────
   app.use(
@@ -153,6 +158,7 @@ async function startServer() {
   let wsServer: OmnecorWebSocketServer | null = null;
   try {
     wsServer = new OmnecorWebSocketServer(server);
+    setWsInstance(wsServer);
     log.info("[Omnecor] WebSocket server attached at /ws");
   } catch (error) {
     log.warn(
@@ -214,6 +220,25 @@ async function startServer() {
     TokenRefreshService.getInstance().start();
     console.info("[Omnecor] Token refresh service started");
   });
+
+  async function logStartupChecklist() {
+    const checks = [
+      { name: "Ollama", url: `${ENV.ollamaUrl}/api/tags` },
+      { name: "ChromaDB", url: "http://localhost:8000/api/v1/heartbeat" },
+    ];
+    for (const check of checks) {
+      try {
+        const r = await fetch(check.url, { signal: AbortSignal.timeout(2000) });
+        log.info(`${check.name}: ${r.ok ? "✓ online" : "✗ unreachable (status " + r.status + ")"}`);
+      } catch {
+        log.info(`${check.name}: ✗ offline (not required)`);
+      }
+    }
+    if (ENV.zeroLoginMode) {
+      log.warn("ZERO_LOGIN_MODE enabled — OAuth disabled, all requests authenticated as local admin");
+    }
+  }
+  logStartupChecklist();
 
   // ─── Graceful Shutdown ──────────────────────────────────────────────────
   const shutdown = async (signal: string) => {

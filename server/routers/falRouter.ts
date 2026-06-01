@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc.js";
+import { router, publicProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 
 // ---------------------------------------------------------------------------
@@ -56,7 +56,7 @@ export const falRouter = router({
   /**
    * Generate a character image using Flux/Fal.ai.
    */
-  generateCharacter: publicProcedure
+  generateCharacter: cloudProcedure
     .input(generateCharacterSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -75,7 +75,7 @@ export const falRouter = router({
   /**
    * Generate a video clone from a character image and prompt using MiniMax/Fal.ai.
    */
-  generateVideo: publicProcedure
+  generateVideo: cloudProcedure
     .input(generateVideoSchema)
     .mutation(async ({ ctx, input }) => {
       try {

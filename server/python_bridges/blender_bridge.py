@@ -27,6 +27,8 @@ import os
 import sys
 import traceback
 
+SOVEREIGN_MODE = os.environ.get("SOVEREIGN_MODE", "false").lower() == "true"
+
 
 # ============================================================
 # JSON Response Helper

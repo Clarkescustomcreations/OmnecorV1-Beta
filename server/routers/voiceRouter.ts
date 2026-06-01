@@ -19,9 +19,10 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc.js";
+import { router, publicProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
+import { ElevenLabsService } from "../phase2/services/ElevenLabsService.js";
 
 // ---------------------------------------------------------------------------
 // Input Schemas (Zod validation)
@@ -51,6 +52,16 @@ const rvcConvertInputSchema = z.object({
 
 const rvcListModelsInputSchema = z.object({
   modelsDir: z.string().min(1),
+});
+
+const elevenLabsSynthesizeSchema = z.object({
+  voiceId: z.string().min(1).max(128),
+  text: z.string().min(1).max(5000),
+  modelId: z.string().optional(),
+  stability: z.number().min(0).max(1).optional(),
+  similarityBoost: z.number().min(0).max(1).optional(),
+  style: z.number().min(0).max(1).optional(),
+  speakerBoost: z.boolean().optional(),
 });
 
 // ---------------------------------------------------------------------------
@@ -234,5 +245,48 @@ export const voiceRouter = router({
           message: `Synthesis failed: ${message}`,
         });
       }
+    }),
+
+  // ---------------------------------------------------------------------------
+  // ElevenLabs Cloud TTS
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Check whether ELEVENLABS_API_KEY is configured.
+   */
+  elevenLabsStatus: cloudProcedure.query(() => {
+    return { configured: ElevenLabsService.getInstance().isConfigured() };
+  }),
+
+  /**
+   * List available ElevenLabs voices for the configured account.
+   */
+  listElevenLabsVoices: cloudProcedure.query(async () => {
+    const svc = ElevenLabsService.getInstance();
+    if (!svc.isConfigured()) {
+      throw new TRPCError({ code: "PRECONDITION_FAILED", message: "ELEVENLABS_API_KEY not configured." });
+    }
+    const voices = await svc.listVoices();
+    return { voices };
+  }),
+
+  /**
+   * Synthesize speech via ElevenLabs cloud TTS.
+   * Returns base64-encoded MP3 audio for the client to play.
+   */
+  synthesizeElevenLabs: cloudProcedure
+    .input(elevenLabsSynthesizeSchema)
+    .mutation(async ({ input }) => {
+      const svc = ElevenLabsService.getInstance();
+      if (!svc.isConfigured()) {
+        throw new TRPCError({ code: "PRECONDITION_FAILED", message: "ELEVENLABS_API_KEY not configured." });
+      }
+      const result = await svc.synthesize(input);
+      // Return base64 audio for the client to play
+      return {
+        audioBase64: result.audioBuffer.toString("base64"),
+        mimeType: result.mimeType,
+        characterCount: result.characterCount,
+      };
     }),
 });

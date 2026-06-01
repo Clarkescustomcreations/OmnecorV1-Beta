@@ -6,8 +6,11 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc.js";
+import { publicProcedure, protectedProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
+import { PCBWayService } from "../phase2/services/PCBWayService.js";
+import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
+import { AuditLogService } from "../phase2/services/AuditLogService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -137,5 +140,47 @@ export const kicadRouter = router({
           message: (error as Error).message,
         });
       }
+    }),
+
+  getQuote: protectedProcedure
+    .input(z.object({ pcbPath: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      return PCBWayService.getInstance().getQuote(input.pcbPath);
+    }),
+
+  exportForManufacturing: protectedProcedure
+    .input(z.object({ pcbPath: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.services.kicad.exportGerbers({ inputFile: input.pcbPath, outputDir: "/tmp/omnecor_gerbers" });
+    }),
+
+  placeOrder: protectedProcedure
+    .input(z.object({
+      quoteId: z.string().min(1),
+      shippingAddress: z.object({
+        name: z.string(),
+        address: z.string(),
+        city: z.string(),
+        country: z.string(),
+        zipCode: z.string(),
+      }),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const approved = await HITLApprovalService.getInstance().requestApproval("kicad.placeOrder", {
+        quoteId: input.quoteId,
+        riskLevel: "high",
+      });
+      if (!approved) throw new TRPCError({ code: "FORBIDDEN", message: "HITL approval denied for PCBWay order." });
+      AuditLogService.getInstance().log({
+        eventType: "pcbway_order_placed",
+        actorId: ctx.user!.id,
+        actorType: "user",
+        procedure: "kicad.placeOrder",
+        args: { quoteId: input.quoteId },
+        result: null,
+        ipAddress: ctx.req.ip ?? null,
+        sessionId: null,
+      }).catch(() => {});
+      return PCBWayService.getInstance().placeOrder(input.quoteId, input.shippingAddress);
     }),
 });

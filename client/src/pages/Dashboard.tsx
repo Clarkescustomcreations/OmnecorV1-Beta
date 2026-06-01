@@ -1,4 +1,5 @@
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import BudgetPanel from "@/components/wallet/BudgetPanel";
 import {
   Card,
   CardContent,
@@ -136,6 +137,8 @@ export default function Dashboard() {
             </p>
           </div>
 
+          <BudgetPanel projectId="default" className="col-span-full lg:col-span-1 mb-6" />
+
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {features.map(feature => {
               const Icon = feature.icon;
@@ -161,9 +164,10 @@ export default function Dashboard() {
                         variant="ghost"
                         size="sm"
                         className="gap-2 group/btn"
+                        aria-label={`Explore ${feature.title}`}
                       >
                         Explore
-                        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
+                        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
                       </Button>
                     </CardContent>
                   </Card>

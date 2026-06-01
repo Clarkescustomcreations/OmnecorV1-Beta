@@ -32,6 +32,11 @@ graph TD
     A --> L(jobRouter)
     A --> M(knowledgeBaseRouter)
     A --> N(trainingRouter)
+    A --> O(walletRouter)
+    A --> P(virtualCardRouter)
+    A --> Q(auditRouter)
+    A --> R(systemRouter)
+    A --> S(agentRouter)
 ```
 
 ### 2.1. Routers
@@ -43,6 +48,27 @@ Each router (`server/routers/*.ts` and `server/phase2/routers/*.ts`) defines a s
 -   `projectRouter.ts`: Procedures for managing projects, neural workspaces, and associated data.
 -   `securityRouter.ts`: Procedures for authentication, authorization, and user management.
 -   `blenderRouter.ts`: Procedures for interacting with the Blender bridge.
+
+### 2.3. Procedure Metadata Tags
+
+Omnecor uses two special metadata tags to classify procedures by their sovereignty requirements:
+
+#### `cloudProcedure`
+Any tRPC procedure that makes an outbound call to a third-party cloud service (OpenAI, Anthropic, Fal.ai, Lithic, etc.) must be tagged with `cloudProcedure`. Example:
+
+```typescript
+export const myCloudRouter = createTRPCRouter({
+  generateImage: cloudProcedure
+    .input(z.object({ prompt: z.string() }))
+    .mutation(async ({ input }) => { /* fal.ai call */ }),
+});
+```
+
+#### `adminProcedure`
+Procedures that require `role = 'admin'` or `role = 'owner'` use `adminProcedure`. These are inaccessible to standard `user` or `viewer` roles and will throw `UNAUTHORIZED` if called without the correct role.
+
+#### `sovereignCheck` Middleware
+All `cloudProcedure` calls are automatically wrapped by the `sovereignCheck` middleware (defined in `server/_core/trpc.ts`). If the requesting user's `executionMode` is `'sovereign'`, the middleware throws a `FORBIDDEN` error before the procedure body executes. This enforces strict data locality at the API layer — no cloud bytes escape.
 
 ### 2.2. Procedures
 
@@ -129,3 +155,44 @@ tRPC provides robust error handling. Errors thrown in backend procedures are aut
 ## 6. Extensibility
 
 Omnecor's tRPC API is designed to be extensible. Developers can easily add new routers and procedures to integrate new features or third-party modules, maintaining type safety across the entire application.
+
+## 7. Missing Routers Reference
+
+### 7.1. `wallet` Router
+Manages per-project AI spend budgets. All write procedures are `cloudProcedure` by convention since they interact with cloud billing.
+
+| Procedure | Type | Description |
+|---|---|---|
+| `wallet.getBudget` | Query | Returns the current `ProjectBudget` for a given `projectId`. |
+| `wallet.setBudget` | Mutation | Creates or updates the budget limit and alert threshold for a project. |
+| `wallet.getSpendSummary` | Query | Returns aggregated spend from `spend_log` grouped by provider and model for a given time range. |
+
+### 7.2. `virtualCard` Router
+Manages Lithic virtual credit cards for financial isolation per project or agent. Requires `LITHIC_API_KEY` in `.env`.
+
+| Procedure | Type | Description |
+|---|---|---|
+| `virtualCard.issueCard` | Mutation (`cloudProcedure`) | Issues a new Lithic virtual card scoped to a project, with optional spend limits mirroring the project budget. |
+| `virtualCard.getCardStatus` | Query (`cloudProcedure`) | Returns the current status, spend, and limits of an issued virtual card. |
+
+### 7.3. `audit` Router
+Read-only access to the immutable audit log. All procedures require `adminProcedure`.
+
+| Procedure | Type | Description |
+|---|---|---|
+| `audit.getAuditLog` | Query (`adminProcedure`) | Returns paginated audit log entries, filterable by `eventType`, `actorId`, and date range. |
+| `audit.exportAuditLog` | Mutation (`adminProcedure`) | Streams the full audit log as a CSV download. |
+
+### 7.4. `system` Router
+System-wide configuration procedures.
+
+| Procedure | Type | Description |
+|---|---|---|
+| `system.setExecutionMode` | Mutation | Updates the authenticated user's `executionMode` to `sovereign`, `scrapper`, or `big_spender`. Immediately enforced by subsequent `sovereignCheck` calls. |
+| `system.loginProviders` | Query | Returns the list of enabled OAuth providers (manus, google, microsoft) based on which client IDs are configured in `.env`. |
+
+### 7.5. `training` Router (Valet Dataset)
+
+| Procedure | Type | Description |
+|---|---|---|
+| `training.generateValetDataset` | Mutation | Triggers the Valet Router dataset builder. Samples recent `audit_log` + `spend_log` entries and generates labeled JSONL training examples across the 10-category routing taxonomy. Output is saved locally for fine-tuning. |

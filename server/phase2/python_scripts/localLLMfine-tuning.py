@@ -89,11 +89,26 @@ def parse_args():
         choices=["lora", "merged_16bit", "merged_4bit", "gguf", "ollama"],
         help="Method used to save the final model."
     )
+    parser.add_argument(
+        "--task_type",
+        type=str,
+        default="chat",
+        choices=["chat", "code", "research", "summarization", "router"],
+        help="Task type for specialized fine-tuning (use 'router' to fine-tune the 1.5B Valet Router model)"
+    )
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+
+    # Router fine-tuning mode: adjust LoRA rank for the 1.5B Valet Router model
+    if args.task_type == "router":
+        # Valet Router fine-tuning: use smaller rank, routing-specific dataset format
+        print("[ValetRouter] Fine-tuning in router mode: LoRA rank reduced, routing dataset expected")
+        # The dataset should have fields: task, available_providers, decision (JSON)
+        if hasattr(args, 'r'):
+            args.r = min(args.r, 8)  # Router model stays small
 
     # 1. Load the pre-quantized 4-bit base model and its matching tokenizer via Unsloth
     max_seq_length = args.max_seq_length

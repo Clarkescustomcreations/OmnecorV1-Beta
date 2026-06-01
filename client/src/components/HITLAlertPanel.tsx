@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect, useRef } from "react";
 import {
   Card,
   CardContent,
@@ -12,6 +12,7 @@ import { AlertTriangle, AlertCircle, CheckCircle, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { HITLAlert } from "@/lib/actionHashDetector";
 import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
+import { useAppStore } from "@/lib/store/app.store";
 
 interface HITLAlertPanelProps {
   alert?: HITLAlert;
@@ -39,6 +40,9 @@ export default function HITLAlertPanel({
   const [selectedAction, setSelectedAction] = useState<
     "retry" | "modify" | "abort" | null
   >(null);
+  const dismissButtonRef = useRef<HTMLButtonElement>(null);
+
+  const walletSpend = useAppStore((s) => s.walletSpend);
 
   // WebSocket Integration
   const { loopAlert, clearLoopAlert, clearFileEvents } = useOmnecorSocket({
@@ -75,7 +79,31 @@ export default function HITLAlertPanel({
     return null;
   }, [propAlert, loopAlert]);
 
-  if (!activeAlert) return null;
+  // Autofocus the primary action button when alert becomes active
+  useEffect(() => {
+    if (activeAlert) {
+      dismissButtonRef.current?.focus();
+    }
+  }, [activeAlert]);
+
+  if (!activeAlert) {
+    return (
+      <>
+        {walletSpend && (
+          <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+            <div className="flex items-center gap-2 text-amber-400 text-sm font-medium mb-1">
+              <AlertTriangle className="h-4 w-4" />
+              Budget Spend Event
+            </div>
+            <div className="text-xs text-amber-200/80 space-y-0.5">
+              <div>Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
+              <div>Cost: <span className="font-mono">${(walletSpend.costMicrocents / 100_000_000).toFixed(6)}</span></div>
+            </div>
+          </div>
+        )}
+      </>
+    );
+  }
 
   const getSeverityIcon = () => {
     switch (activeAlert.severity) {
@@ -124,7 +152,22 @@ export default function HITLAlertPanel({
   };
 
   return (
+    <>
+      {walletSpend && (
+        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+          <div className="flex items-center gap-2 text-amber-400 text-sm font-medium mb-1">
+            <AlertTriangle className="h-4 w-4" />
+            Budget Spend Event
+          </div>
+          <div className="text-xs text-amber-200/80 space-y-0.5">
+            <div>Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
+            <div>Cost: <span className="font-mono">${(walletSpend.costMicrocents / 100_000_000).toFixed(6)}</span></div>
+          </div>
+        </div>
+      )}
     <Card
+      role="alert"
+      aria-live="assertive"
       className={cn(
         "border-2 shadow-2xl animate-in fade-in zoom-in duration-300",
         getSeverityColor(),
@@ -203,9 +246,11 @@ export default function HITLAlertPanel({
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2">
           <Button
+            ref={dismissButtonRef}
             variant="default"
             size="sm"
             className="flex-1"
+            aria-label="Acknowledge and clear alert"
             onClick={() => {
               clearFileEvents();
               clearLoopAlert();
@@ -217,5 +262,6 @@ export default function HITLAlertPanel({
         </div>
       </CardContent>
     </Card>
+    </>
   );
 }
