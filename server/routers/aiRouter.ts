@@ -20,7 +20,7 @@ import {
   getChatMessages,
   addChatMessage,
   updateChatSession,
-} from "../db.js";
+} from "../db.factory.js";
 import { validatePath } from "../_core/security.js";
 
 // ─────────────────────────────────────────────────────────────────────────────

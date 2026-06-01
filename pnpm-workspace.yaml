@@ -24,6 +24,13 @@ overrides:
 patchedDependencies:
   "wouter@3.7.1": patches/wouter@3.7.1.patch
 
+# Native modules whose install/build script MUST run so the compiled binding
+# (or downloaded prebuilt) is present. pnpm v10 blocks all build scripts by
+# default; without this allowlist `pnpm install` silently ships better-sqlite3
+# with no native binding and the SQLite DB layer fails to load at runtime.
+onlyBuiltDependencies:
+  - "better-sqlite3"
+
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"
   - "esbuild"

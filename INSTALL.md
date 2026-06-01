@@ -65,13 +65,17 @@ Refer to the `server/_core/env.ts` file or the `Configuration Guide` in the user
 
 ### Step 4: Database Setup
 
-Omnecor uses Drizzle ORM for database management. You need to push the database schema to ensure synchronization:
+Omnecor supports two database backends, selected by the `OMNECOR_DB` environment variable (default `auto`):
 
-```bash
-pnpm run db:push
-```
+- **SQLite (default, zero-infra)** — If you do **not** set `DATABASE_URL`, Omnecor uses a local SQLite database file (`./data/omnecor.db`). The schema is created automatically on first launch — **no setup command is required**. This is the recommended path for beta testing and Sovereign / offline operation. To force it explicitly, set `OMNECOR_DB=sqlite`.
 
-This command will generate and apply any pending database migrations.
+- **MySQL/MariaDB (optional, multi-user / production)** — Set `DATABASE_URL` to a valid MySQL connection string (see `.env.example`), then push the schema:
+
+  ```bash
+  pnpm run db:push
+  ```
+
+  This generates and applies any pending migrations. (Required only for the MySQL backend.)
 
 ### Step 5: Build the Application
 
