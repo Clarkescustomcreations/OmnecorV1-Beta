@@ -173,6 +173,51 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
+    // Lazily-loaded page chunks (Chat ~1025kB gzip 293kB) and language syntax files
+    // (emacs-lisp ~780kB) are acceptably large for on-demand loads.
+    chunkSizeWarningLimit: 1100,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          // CodeMirror runtime + extensions (editor, not language chunks which auto-split)
+          if (id.includes("node_modules/@codemirror") || id.includes("node_modules/@lezer")) {
+            return "vendor-codemirror";
+          }
+          // Lucide icon library — large icon set
+          if (id.includes("node_modules/lucide-react")) {
+            return "vendor-icons";
+          }
+          // Three.js + react-three ecosystem — heavy 3D runtime
+          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) {
+            return "vendor-three";
+          }
+          // Radix UI primitives — large but stable design-system dep
+          if (id.includes("node_modules/@radix-ui")) {
+            return "vendor-radix";
+          }
+          // TanStack / tRPC / Zod — core data layer
+          if (
+            id.includes("node_modules/@tanstack") ||
+            id.includes("node_modules/@trpc") ||
+            id.includes("node_modules/zod")
+          ) {
+            return "vendor-data";
+          }
+          // Recharts / ReactFlow — charting & diagram libs
+          if (id.includes("node_modules/recharts") || id.includes("node_modules/reactflow")) {
+            return "vendor-charts";
+          }
+          // React core + framer-motion (animation)
+          if (
+            id.includes("node_modules/react/") ||
+            id.includes("node_modules/react-dom/") ||
+            id.includes("node_modules/framer-motion")
+          ) {
+            return "vendor-react";
+          }
+        },
+      },
+    },
   },
   server: {
     host: true,

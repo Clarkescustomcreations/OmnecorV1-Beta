@@ -12,7 +12,7 @@ import { toast } from "sonner";
 export const UnslothPanel: React.FC = () => {
   const [loraRank, setLoraRank] = useState(16);
 
-  const valetStatus = (trpc as any).valet?.status?.useQuery(undefined, { refetchInterval: 15000 });
+  const valetStatus = trpc.valet.status.useQuery(undefined, { refetchInterval: 15000 });
 
   const startFineTuning = trpc.training.startTraining.useMutation({
     onSuccess: () => toast.success("Fine-tuning process initialized via Unsloth"),

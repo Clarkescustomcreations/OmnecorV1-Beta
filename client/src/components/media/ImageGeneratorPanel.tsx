@@ -20,12 +20,12 @@ export default function ImageGeneratorPanel() {
   const [width, setWidth] = useState(512);
   const [height, setHeight] = useState(512);
 
-  const providers = (trpc as any).imageGen?.providers?.useQuery?.();
-  const generate = (trpc as any).imageGen?.generate?.useMutation?.({
-    onError: (err: { message?: string }) => toast.error(`Generation failed: ${err?.message}`),
+  const providers = trpc.imageGen.providers.useQuery();
+  const generate = trpc.imageGen.generate.useMutation({
+    onError: (err) => toast.error(`Generation failed: ${err.message}`),
   });
 
-  const providerData = providers?.data as { local: boolean; fal: boolean; openart: boolean } | undefined;
+  const providerData = providers.data;
 
   const isDisabled = (p: Provider) => {
     if (p === "fal" && providerData && !providerData.fal) return true;
@@ -33,7 +33,7 @@ export default function ImageGeneratorPanel() {
     return false;
   };
 
-  const resultUrl: string | null = (generate?.data as any)?.imageUrl ?? null;
+  const resultUrl: string | null = generate.data?.imageUrl ?? null;
 
   return (
     <div className="space-y-4">
@@ -98,14 +98,14 @@ export default function ImageGeneratorPanel() {
       </div>
 
       <Button
-        onClick={() => generate?.mutate?.({ prompt, provider, model: model || undefined, width, height })}
-        disabled={generate?.isPending || !prompt.trim()}
+        onClick={() => generate.mutate({ prompt, provider, model: model || undefined, width, height })}
+        disabled={generate.isPending || !prompt.trim()}
       >
-        {generate?.isPending ? "Generating..." : "Generate"}
+        {generate.isPending ? "Generating..." : "Generate"}
       </Button>
 
-      {generate?.isError && (
-        <p className="text-red-400 text-sm">{(generate.error as any)?.message}</p>
+      {generate.isError && (
+        <p className="text-red-400 text-sm">{generate.error?.message}</p>
       )}
 
       {resultUrl && (

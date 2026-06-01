@@ -25,18 +25,18 @@ export default function Pipelines() {
   const [name, setName] = useState("");
   const [goal, setGoal] = useState("");
 
-  const listPipelines = (trpc as any).pipeline?.listPipelines?.useQuery?.(undefined, {
+  const listPipelines = trpc.pipeline.listPipelines.useQuery(undefined, {
     refetchInterval: 3000,
   });
 
-  const createPipeline = (trpc as any).pipeline?.createPipeline?.useMutation?.({
+  const createPipeline = trpc.pipeline.createPipeline.useMutation({
     onSuccess: () => {
       setShowCreateForm(false);
       setName("");
       setGoal("");
-      listPipelines?.refetch?.();
+      listPipelines.refetch();
     },
-    onError: (err: { message?: string }) => toast.error(`Failed to create pipeline: ${err?.message}`),
+    onError: (err) => toast.error(`Failed to create pipeline: ${err.message}`),
   });
 
   if (selectedPipelineId) {
@@ -90,14 +90,14 @@ export default function Pipelines() {
               <div className="flex gap-2">
                 <Button
                   size="sm"
-                  onClick={() => createPipeline?.mutate?.({ name, goal })}
-                  disabled={createPipeline?.isPending || name.length < 1 || goal.length < 10}
+                  onClick={() => createPipeline.mutate({ name, goal })}
+                  disabled={createPipeline.isPending || name.length < 1 || goal.length < 10}
                 >
-                  {createPipeline?.isPending ? "Creating..." : "Create"}
+                  {createPipeline.isPending ? "Creating..." : "Create"}
                 </Button>
                 <Button size="sm" variant="ghost" onClick={() => setShowCreateForm(false)}>Cancel</Button>
               </div>
-              {createPipeline?.isError && (
+              {createPipeline.isError && (
                 <p className="text-red-400 text-xs">{createPipeline.error?.message}</p>
               )}
             </div>
@@ -105,11 +105,11 @@ export default function Pipelines() {
 
           <div className="space-y-3">
             <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pipelines</h2>
-            {listPipelines?.isLoading && <p className="text-gray-400 text-sm">Loading...</p>}
-            {!listPipelines?.isLoading && (!listPipelines?.data || listPipelines.data.length === 0) && (
+            {listPipelines.isLoading && <p className="text-gray-400 text-sm">Loading...</p>}
+            {!listPipelines.isLoading && (!listPipelines.data || listPipelines.data.length === 0) && (
               <p className="text-gray-500 text-sm">No pipelines yet. Create one above.</p>
             )}
-            {listPipelines?.data?.map((p: any) => (
+            {listPipelines.data?.map((p) => (
               <div key={p.id} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 mb-1">

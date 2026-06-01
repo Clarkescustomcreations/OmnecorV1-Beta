@@ -165,7 +165,7 @@ export const trainingRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      const outputPath = input.outputPath;
+      const outputPath = await validatePath(input.outputPath);
       const env: Record<string, string> = {
         OLLAMA_URL: process.env.OLLAMA_URL ?? "http://localhost:11434",
         EXAMPLES_PER_CATEGORY: String(input.examplesPerCategory),

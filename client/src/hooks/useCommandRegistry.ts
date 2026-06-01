@@ -54,10 +54,10 @@ export function useCommandRegistry(): CommandEntry[] {
     onError: (err) => toast.error(`Scan failed: ${err.message}`),
   });
 
-  const vulnScanMut = (trpc as any).security?.runVulnerabilityScan?.useMutation?.({
-    onSuccess: (result: any) =>
+  const vulnScanMut = trpc.security.runVulnerabilityScan.useMutation({
+    onSuccess: (result) =>
       toast.info(`Vulnerability scan complete — ${result?.findings?.length ?? 0} finding(s).`),
-    onError: (err: any) => toast.error(`Scan failed: ${err?.message}`),
+    onError: (err) => toast.error(`Scan failed: ${err.message}`),
   });
 
   // ── Blender status query (lazy — refetch on demand) ───────────────────────
