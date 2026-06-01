@@ -3,12 +3,15 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 export default function ThreatDashboard() {
   const [activeTab, setActiveTab] = useState<"scan" | "ioc">("scan");
   const [targetPath, setTargetPath] = useState(".");
 
-  const scanMut = (trpc as any).security?.runVulnerabilityScan?.useMutation?.();
+  const scanMut = (trpc as any).security?.runVulnerabilityScan?.useMutation?.({
+    onError: (err: { message?: string }) => toast.error(`Scan failed: ${err?.message}`),
+  });
   const iocQuery = (trpc as any).security?.getIoCFeed?.useQuery?.(undefined, { enabled: activeTab === "ioc" });
 
   const findings = (scanMut?.data as any)?.findings ?? [];

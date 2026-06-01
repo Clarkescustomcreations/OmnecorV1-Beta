@@ -24,6 +24,7 @@ import {
   CollapsibleContent,
 } from "@/components/ui/collapsible";
 import { Plus, ChevronDown, X, AlertTriangle, Plug } from "lucide-react";
+import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
 // Local type definitions (MCPClientService is not importable from frontend)
@@ -90,6 +91,7 @@ function ConnectServerForm() {
         setOpen(false);
         setForm({ id: "", name: "", transport: "stdio", command: "", url: "" });
       },
+      onError: (err: { message?: string }) => toast.error(`Connect failed: ${err.message}`),
     });
   }
 
@@ -211,7 +213,7 @@ function ServerChip({ server }: { server: MCPServerConfig }) {
       {server.name}
       <button
         className="ml-1 rounded-full hover:bg-muted p-0.5 transition-colors"
-        onClick={() => disconnectMutation?.mutate?.({ serverId: server.id })}
+        onClick={() => disconnectMutation?.mutate?.({ serverId: server.id }, { onError: (err: { message?: string }) => toast.error(`Disconnect failed: ${err?.message}`) })}
         aria-label={`Disconnect ${server.name}`}
       >
         <X className="w-3 h-3" />

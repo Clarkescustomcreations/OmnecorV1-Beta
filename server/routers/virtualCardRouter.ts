@@ -13,6 +13,9 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { VirtualCardService } from "../phase2/services/VirtualCardService.js";
+import { createLogger } from "../_core/logger.js";
+
+const log = createLogger("VirtualCard");
 
 // In-memory rate limiter: userId → last issuance timestamp
 const issuanceRateMap = new Map<number, number>();
@@ -57,7 +60,7 @@ export const virtualCardRouter = router({
 
       // TODO: Wire HITLApprovalService here when the approval flow is integrated in Phase 28 (GodMode)
       // For now, log the action for audit trail
-      console.log(`[VirtualCard] User ${userId} issuing card — $${input.spendLimitDollars} limit`);
+      log.info(`User ${userId} issuing card — $${input.spendLimitDollars} limit`);
 
       const spendLimitCents = Math.round(input.spendLimitDollars * 100);
       const card = await service.issueCard({

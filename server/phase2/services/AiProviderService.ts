@@ -10,7 +10,10 @@
  */
 
 import { ENV } from "../../_core/env.js";
+import { createLogger } from "../../_core/logger.js";
 import { ValetRouterService } from "./ValetRouterService.js";
+
+const log = createLogger("AiProvider");
 // PromptSanitizer imported dynamically to avoid hard dep (Phase 22 parallel work)
 import { meshNode } from "../../ommesh/core/MeshNode.js";
 import { v4 as uuidv4 } from "uuid";
@@ -175,7 +178,7 @@ export class AiProviderService {
         // Log the routing decision but don't override the explicit providerId
         // (the decision informs future multi-API routing phases)
         if (process.env.NODE_ENV === "development") {
-          console.log(`[ValetRouter] Decision: ${valetDecision.mode} → ${valetDecision.primaryProvider} (confidence: ${valetDecision.confidence})`);
+          log.debug(`ValetRouter decision: ${valetDecision.mode} → ${valetDecision.primaryProvider} (confidence: ${valetDecision.confidence})`);
         }
       } catch {
         // Valet routing is advisory — never block chat on routing failure
