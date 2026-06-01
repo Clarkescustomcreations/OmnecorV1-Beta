@@ -1,6 +1,6 @@
 # Omnecor AI Bridges (Hardware Integration Layer)
 
-Omnecor's Hardware Integration Layer is a defining feature that bridges the gap between digital AI workflows and physical engineering tasks. This is achieved through specialized Python bridges managed by the backend's `ProcessManagerService`.
+Omnecor's Hardware Integration Layer is a defining feature that bridges the gap between digital AI workflows and physical engineering tasks. This is achieved through specialized Python bridges managed by the `ProcessManagerService`.
 
 ## 1. Architecture of the Bridge System
 
@@ -27,7 +27,7 @@ The `ProcessManagerService` is the orchestrator for all Python bridges. Its resp
 
 ### 1.2. Python Bridge Scripts
 
-The actual integration logic resides in Python scripts located in the `server/python_bridges/` directory. These scripts act as intermediaries, translating commands from Omnecor into actions performed by the target tool.
+The actual integration logic resides in Python scripts located in the `server/python_bridges/` directory. These scripts act as intermediaries, translating commands from Omnecor into actions performed by external tools and hardware.
 
 ## 2. Supported Bridges
 
@@ -78,7 +78,7 @@ The actual integration logic resides in Python scripts located in the `server/py
 Communication between the `ProcessManagerService` and the Python bridges relies on standard input/output streams.
 
 -   **Input**: The backend passes arguments and configuration data to the Python script via command-line arguments or environment variables.
--   **Output**: The Python scripts are designed to output structured JSON data to `stdout`. This allows the `ProcessManagerService` to easily parse progress updates, results, and error messages, which are then relayed to the frontend via WebSockets.
+-   **Output**: The Python scripts are designed to output structured JSON data to `stdout`. This allows the `ProcessManagerService` to easily parse progress updates, results, and error messages, which are then relayed to the frontend.
 
 ## 4. Security Considerations
 
