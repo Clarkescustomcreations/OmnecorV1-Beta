@@ -12,7 +12,7 @@ import superjson from "superjson";
 export const trpc = createTRPCReact<AppRouter>();
 
 const wsClient = createWSClient({
-  url: `${window.location.protocol === "https:" ? "wss:" : "ws:"}://${window.location.host}/ws`,
+  url: `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`,
 });
 
 export const vanillaTrpc = createTRPCProxyClient<AppRouter>({
