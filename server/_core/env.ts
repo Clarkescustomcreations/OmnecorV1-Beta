@@ -2,6 +2,12 @@ export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
   databaseUrl: process.env.DATABASE_URL ?? "",
+  // Database backend selection. "auto" (default) uses MySQL when DATABASE_URL is
+  // set, otherwise falls back to the local SQLite store (Sovereign / offline
+  // mode). "mysql" / "sqlite" force a specific backend.
+  dbMode: (["auto", "mysql", "sqlite"].includes(process.env.OMNECOR_DB ?? "")
+    ? process.env.OMNECOR_DB
+    : "auto") as "auto" | "mysql" | "sqlite",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
@@ -43,9 +49,17 @@ if (process.env.NODE_ENV === "production") {
       "FATAL: JWT_SECRET must be set in production. An empty secret allows session cookie forgery."
     );
   }
-  if (!ENV.databaseUrl) {
+  // Only fail hard when MySQL is explicitly requested but unconfigured. In
+  // "auto" or "sqlite" mode a missing DATABASE_URL is a supported, persistent
+  // configuration: the app uses the local SQLite store (see db.factory.ts).
+  if (ENV.dbMode === "mysql" && !ENV.databaseUrl) {
     throw new Error(
-      "FATAL: DATABASE_URL must be set in production. Start the server with a valid MySQL connection string."
+      "FATAL: OMNECOR_DB=mysql but DATABASE_URL is not set. Provide a MySQL connection string or use OMNECOR_DB=sqlite."
+    );
+  }
+  if (!ENV.databaseUrl) {
+    console.warn(
+      "[Database] DATABASE_URL not set — using local SQLite store (Sovereign mode)."
     );
   }
 }

@@ -13,7 +13,11 @@ import { ENV } from "./_core/env.js";
 let _db: ReturnType<typeof drizzle> | null = null;
 
 // Lazily create the drizzle instance so local tooling can run without a DB.
+// Returns null when SQLite is the active backend (OMNECOR_DB=sqlite, or "auto"
+// with no DATABASE_URL) — raw-drizzle callers null-guard and the high-level
+// domain functions route through db.factory to the SQLite store instead.
 export async function getDb() {
+  if (ENV.dbMode === "sqlite") return null;
   if (!_db && process.env.DATABASE_URL) {
     try {
       _db = drizzle(process.env.DATABASE_URL);

@@ -46,6 +46,12 @@ pids
 *.pid.lock
 *.bak
 
+# Local SQLite store (Sovereign / offline mode)
+/data/
+*.db
+*.db-shm
+*.db-wal
+
 # Coverage directory used by tools like istanbul
 coverage/
 *.lcov

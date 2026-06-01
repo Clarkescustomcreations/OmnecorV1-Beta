@@ -1,8 +1,8 @@
 /**
  * Database factory — selects MySQL or SQLite at startup.
  *
- * MySQL is used when DATABASE_URL is set (production / development with a DB).
- * SQLite is used when DATABASE_URL is absent (Sovereign Mode offline operation).
+ * Default ("auto"): MySQL when DATABASE_URL is set, else the local SQLite store
+ * (Sovereign Mode offline operation). Set OMNECOR_DB=mysql|sqlite to force one.
  *
  * Callers that need the raw drizzle instance via getDb() will receive null in
  * SQLite mode — those callers already null-guard and degrade gracefully. The
@@ -21,7 +21,12 @@ export { getDb } from "./db.js";
 // High-level domain functions — route to the right implementation
 // ---------------------------------------------------------------------------
 
-const isMySql = Boolean(ENV.databaseUrl);
+const isMySql =
+  ENV.dbMode === "mysql"
+    ? true
+    : ENV.dbMode === "sqlite"
+      ? false
+      : Boolean(ENV.databaseUrl); // "auto": MySQL when a URL is configured
 
 // Lazy-require so the TS import doesn't force both backends to load at once
 type DbModule = typeof import("./db.js");
