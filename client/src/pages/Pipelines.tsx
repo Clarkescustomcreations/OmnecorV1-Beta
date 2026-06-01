@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Zap, ArrowLeft, Plus } from "lucide-react";
+import { toast } from "sonner";
 
 const phaseColor: Record<string, string> = {
   DEFINE: "bg-slate-700",
@@ -35,6 +36,7 @@ export default function Pipelines() {
       setGoal("");
       listPipelines?.refetch?.();
     },
+    onError: (err: { message?: string }) => toast.error(`Failed to create pipeline: ${err?.message}`),
   });
 
   if (selectedPipelineId) {

@@ -1,6 +1,7 @@
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 const PHASES = ["DEFINE", "PLAN", "EXECUTE", "REVIEW", "SHIP"] as const;
 
@@ -24,8 +25,12 @@ export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string })
     }
   );
 
-  const approvePhase = (trpc as any).pipeline?.approvePhase?.useMutation?.();
-  const abortPipeline = (trpc as any).pipeline?.abortPipeline?.useMutation?.();
+  const approvePhase = (trpc as any).pipeline?.approvePhase?.useMutation?.({
+    onError: (err: { message?: string }) => toast.error(`Approval failed: ${err?.message}`),
+  });
+  const abortPipeline = (trpc as any).pipeline?.abortPipeline?.useMutation?.({
+    onError: (err: { message?: string }) => toast.error(`Abort failed: ${err?.message}`),
+  });
 
   if (result?.isLoading) {
     return <div className="text-gray-400 text-sm p-4">Loading pipeline...</div>;

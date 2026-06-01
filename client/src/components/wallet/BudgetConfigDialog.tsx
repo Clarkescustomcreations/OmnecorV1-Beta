@@ -9,6 +9,7 @@ import { Slider } from "@/components/ui/slider";
 import { Badge } from "@/components/ui/badge";
 import { Settings2, CreditCard, AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { toast } from "sonner";
 
 interface BudgetConfigDialogProps {
   projectId: string;
@@ -29,6 +30,7 @@ export default function BudgetConfigDialog({ projectId }: BudgetConfigDialogProp
       utils.wallet.getSpendSummary.invalidate({ projectId });
       setOpen(false);
     },
+    onError: (err) => toast.error(`Failed to save budget: ${err.message}`),
   });
 
   const handleOpen = (o: boolean) => {
@@ -48,7 +50,9 @@ export default function BudgetConfigDialog({ projectId }: BudgetConfigDialogProp
   const { data: cardConfig } = trpc.virtualCard.isConfigured.useQuery(undefined, { enabled: open });
   const [cardLimit, setCardLimit] = useState("10.00");
   const [cardMemo, setCardMemo] = useState("");
-  const issueCard = trpc.virtualCard.issueCard.useMutation();
+  const issueCard = trpc.virtualCard.issueCard.useMutation({
+    onError: (err) => toast.error(`Card issuance failed: ${err.message}`),
+  });
 
   const handleIssueCard = () => {
     issueCard.mutate({

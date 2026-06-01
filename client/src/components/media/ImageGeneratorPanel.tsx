@@ -3,6 +3,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
 
 type Provider = "local" | "fal" | "openart";
 
@@ -20,7 +21,9 @@ export default function ImageGeneratorPanel() {
   const [height, setHeight] = useState(512);
 
   const providers = (trpc as any).imageGen?.providers?.useQuery?.();
-  const generate = (trpc as any).imageGen?.generate?.useMutation?.();
+  const generate = (trpc as any).imageGen?.generate?.useMutation?.({
+    onError: (err: { message?: string }) => toast.error(`Generation failed: ${err?.message}`),
+  });
 
   const providerData = providers?.data as { local: boolean; fal: boolean; openart: boolean } | undefined;
 
