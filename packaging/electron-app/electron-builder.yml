@@ -1,0 +1,111 @@
+appId: com.omnecor.workstation
+productName: Omnecor
+copyright: Copyright © 2026 Omnecor Team
+
+directories:
+  output: dist
+  buildResources: build
+
+# Files included in the app package
+files:
+  - out/**/*
+  - '!**/.vscode/*'
+  - '!src/*'
+  - '!electron.vite.config.{js,ts,mjs,cjs}'
+  - '!{.eslintignore,.eslintrc.cjs,.prettierignore,.prettierrc.yaml,dev-app-update.yml,CHANGELOG.md,README.md}'
+  - '!{.env,.env.*,.npmrc,pnpm-lock.yaml,package-lock.json}'
+  - '!{tsconfig.json,tsconfig.node.json,tsconfig.web.json}'
+  - '!tailwind.config.js'
+  - '!postcss.config.cjs'
+
+# Unpack from ASAR: backend dist (Node.js child process) and native modules
+asarUnpack:
+  - resources/**
+  - backend/**
+  - node_modules/onnxruntime-node
+
+# Bundle the compiled Omnecor backend alongside the Electron app
+extraResources:
+  # Pre-built backend bundle (run `pnpm build` in project root first)
+  - from: ../../dist
+    to: app.asar.unpacked/backend
+    filter:
+      - "**/*.js"
+      - "**/*.mjs"
+      - "!**/*.map"
+  # Packaging scripts (install.sh, ollama_install.sh, post-install.sh)
+  - from: ../scripts
+    to: scripts
+    filter:
+      - "**/*"
+  # Model recommendation metadata
+  - from: ../models
+    to: models
+    filter:
+      - "**/*"
+
+# ─── Windows ────────────────────────────────────────────────────────────────
+win:
+  target:
+    - nsis
+    - portable
+  icon: build/icon.ico
+  artifactName: ${productName}-Setup-${version}.${ext}
+  requestedExecutionLevel: asInvoker
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true
+  installerIcon: build/icon.ico
+  uninstallerIcon: build/icon.ico
+  runAfterFinish: true
+  shortcutName: Omnecor HMCI
+  include: ../windows/omnecor.nsh
+
+# ─── Linux ──────────────────────────────────────────────────────────────────
+linux:
+  target:
+    - AppImage
+    - deb
+    - rpm
+  category: Development
+  icon: build/icon.png
+  maintainer: Omnecor Team <dev@omnecor.local>
+  vendor: Omnecor
+  desktop:
+    Name: Omnecor HMCI
+    Comment: Human-Machine Collaboration Interface
+    Categories: Development;AI;Science;
+
+appImage:
+  artifactName: ${productName}-${version}-${arch}.AppImage
+
+deb:
+  packageName: omnecor-hmci
+  depends:
+    - libnotify4
+    - libxtst6
+    - libnss3
+    - nodejs
+    - python3
+  afterInstall: ../deb/debian/postinst
+  artifactName: ${productName}_${version}_${arch}.deb
+
+rpm:
+  artifactName: ${productName}-${version}.${arch}.rpm
+
+# ─── Android (Capacitor thin client) ─────────────────────────────────────────
+# Build via: pnpm build:android → npx cap open android → Android Studio APK
+# The capacitor.config.ts controls the server URL for LAN connections.
+
+# ─── Publishing ─────────────────────────────────────────────────────────────
+publish:
+  provider: github
+  owner: omnecor
+  repo: workstation
+  releaseType: draft
+
+npmRebuild: false

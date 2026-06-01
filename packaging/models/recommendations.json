@@ -1,0 +1,96 @@
+{
+  "legacy": [
+    {
+      "name": "Llama 3.2 1B (4-bit)",
+      "id": "llama3.2:1b",
+      "strengths": "Ultra-low RAM, fast on CPU",
+      "size": "740MB",
+      "hardware": "4GB+ RAM, any CPU"
+    },
+    {
+      "name": "Phi-3 Mini 3.8B (4-bit)",
+      "id": "phi3:mini",
+      "strengths": "Strong reasoning per MB",
+      "size": "2.2GB",
+      "hardware": "4GB+ RAM"
+    },
+    {
+      "name": "TinyLlama 1.1B",
+      "id": "tinyllama",
+      "strengths": "Fastest inference, minimal footprint",
+      "size": "637MB",
+      "hardware": "4GB+ RAM, any CPU"
+    },
+    {
+      "name": "Gemma 2B (4-bit)",
+      "id": "gemma:2b",
+      "strengths": "Google quality at 2B scale",
+      "size": "1.4GB",
+      "hardware": "4GB+ RAM"
+    }
+  ],
+  "valet": [
+    {
+      "name": "Llama 3.1 8B",
+      "id": "llama3.1:8b",
+      "strengths": "Reasoning, Coding, General",
+      "size": "4.7GB",
+      "hardware": "8GB+ VRAM recommended"
+    },
+    {
+      "name": "Gemma 2 9B",
+      "id": "gemma2:9b",
+      "strengths": "Creative, Knowledge",
+      "size": "5.4GB",
+      "hardware": "8GB+ VRAM recommended"
+    },
+    {
+      "name": "Mistral NeMo 12B",
+      "id": "mistral-nemo",
+      "strengths": "Nuance, Multilingual",
+      "size": "7.1GB",
+      "hardware": "12GB+ VRAM recommended"
+    }
+  ],
+  "coding": [
+    {
+      "name": "DeepSeek Coder V2 Lite",
+      "id": "deepseek-coder-v2:16b",
+      "strengths": "State-of-the-art coding",
+      "size": "8.9GB",
+      "hardware": "12GB+ VRAM recommended"
+    },
+    {
+      "name": "CodeLlama 7B",
+      "id": "codellama:7b",
+      "strengths": "Fast, reliable coding",
+      "size": "3.8GB",
+      "hardware": "8GB+ RAM"
+    }
+  ],
+  "creative": [
+    {
+      "name": "Command-R",
+      "id": "command-r",
+      "strengths": "Long context, RAG, Creative",
+      "size": "20GB",
+      "hardware": "24GB+ VRAM recommended"
+    }
+  ],
+  "vision": [
+    {
+      "name": "Moondream 2",
+      "id": "moondream",
+      "strengths": "Lightweight vision",
+      "size": "829MB",
+      "hardware": "Any"
+    },
+    {
+      "name": "LLaVA 1.6 7B",
+      "id": "llava:7b",
+      "strengths": "General vision",
+      "size": "4.5GB",
+      "hardware": "8GB+ VRAM"
+    }
+  ]
+}

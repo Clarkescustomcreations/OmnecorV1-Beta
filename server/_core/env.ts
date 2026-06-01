@@ -34,3 +34,18 @@ export const ENV = {
   openArtApiKey: process.env.OPENART_API_KEY ?? "",
   updateCheckRepo: process.env.UPDATE_CHECK_REPO ?? "Omnecor/omnecor-hmci",
 };
+
+// Startup validation — halt early on critical misconfigurations rather than
+// silently using insecure defaults (e.g. empty JWT secret → session forgery).
+if (process.env.NODE_ENV === "production") {
+  if (!ENV.cookieSecret) {
+    throw new Error(
+      "FATAL: JWT_SECRET must be set in production. An empty secret allows session cookie forgery."
+    );
+  }
+  if (!ENV.databaseUrl) {
+    throw new Error(
+      "FATAL: DATABASE_URL must be set in production. Start the server with a valid MySQL connection string."
+    );
+  }
+}

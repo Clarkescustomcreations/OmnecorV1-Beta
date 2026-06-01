@@ -76,7 +76,7 @@ function ConnectServerForm() {
     url: "",
   });
 
-  const connectMutation = (trpc as any).mcp?.connectServer?.useMutation?.();
+  const connectMutation = trpc.mcp.connectServer.useMutation();
 
   function handleConnect() {
     if (!connectMutation) return;
@@ -86,12 +86,12 @@ function ConnectServerForm() {
       transport: form.transport,
       ...(form.transport === "stdio" ? { command: form.command } : { url: form.url }),
     };
-    connectMutation.mutate?.(config, {
+    connectMutation.mutate(config, {
       onSuccess: () => {
         setOpen(false);
         setForm({ id: "", name: "", transport: "stdio", command: "", url: "" });
       },
-      onError: (err: { message?: string }) => toast.error(`Connect failed: ${err.message}`),
+      onError: (err) => toast.error(`Connect failed: ${err.message}`),
     });
   }
 
@@ -182,9 +182,9 @@ function ConnectServerForm() {
             <Button
               size="sm"
               onClick={handleConnect}
-              disabled={!form.id || !form.name || connectMutation?.isLoading}
+              disabled={!form.id || !form.name || connectMutation.isPending}
             >
-              {connectMutation?.isLoading ? "Connecting…" : "Connect"}
+              {connectMutation.isPending ? "Connecting…" : "Connect"}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setOpen(false)}>
               Cancel
@@ -206,14 +206,14 @@ function ConnectServerForm() {
 // Connected server chip
 // ---------------------------------------------------------------------------
 function ServerChip({ server }: { server: MCPServerConfig }) {
-  const disconnectMutation = (trpc as any).mcp?.disconnectServer?.useMutation?.();
+  const disconnectMutation = trpc.mcp.disconnectServer.useMutation();
 
   return (
     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium border border-border">
       {server.name}
       <button
         className="ml-1 rounded-full hover:bg-muted p-0.5 transition-colors"
-        onClick={() => disconnectMutation?.mutate?.({ serverId: server.id }, { onError: (err: { message?: string }) => toast.error(`Disconnect failed: ${err?.message}`) })}
+        onClick={() => disconnectMutation.mutate({ serverId: server.id }, { onError: (err) => toast.error(`Disconnect failed: ${err.message}`) })}
         aria-label={`Disconnect ${server.name}`}
       >
         <X className="w-3 h-3" />
@@ -234,7 +234,7 @@ function ToolTestPanel({ tool }: { tool: MCPTool }) {
     jsonError: false,
   });
 
-  const callMutation = (trpc as any).mcp?.callTool?.useMutation?.();
+  const callMutation = trpc.mcp.callTool.useMutation();
 
   function handleRun() {
     let parsed: unknown;
@@ -246,16 +246,16 @@ function ToolTestPanel({ tool }: { tool: MCPTool }) {
     }
 
     setState(s => ({ ...s, loading: true, result: null, jsonError: false }));
-    callMutation?.mutate?.(
-      { serverId: tool.serverId, toolName: tool.name, args: parsed },
+    callMutation.mutate(
+      { serverId: tool.serverId, toolName: tool.name, args: parsed as Record<string, unknown> },
       {
-        onSuccess: (data: unknown) =>
+        onSuccess: (data) =>
           setState(s => ({ ...s, loading: false, result: data })),
-        onError: (err: { message?: string }) =>
+        onError: (err) =>
           setState(s => ({
             ...s,
             loading: false,
-            result: { error: err?.message ?? "Call failed" },
+            result: { error: err.message ?? "Call failed" },
           })),
       }
     );
@@ -351,10 +351,10 @@ function ToolCard({ tool }: { tool: MCPTool }) {
 // AgenticOS status row
 // ---------------------------------------------------------------------------
 function AgenticOsStatus() {
-  const statusQuery = (trpc as any).mcp?.agenticOsStatus?.useQuery?.();
-  const data = statusQuery?.data as { configured?: boolean } | undefined;
+  const statusQuery = trpc.mcp.agenticOsStatus.useQuery();
+  const data = statusQuery.data;
 
-  if (!statusQuery || statusQuery.isLoading) return null;
+  if (statusQuery.isLoading) return null;
 
   return (
     <div className="flex items-center gap-2 text-sm">
@@ -377,11 +377,11 @@ function AgenticOsStatus() {
 // Main component
 // ---------------------------------------------------------------------------
 export default function MCPToolDirectory() {
-  const serversQuery = (trpc as any).mcp?.listConnectedServers?.useQuery?.();
-  const toolsQuery = (trpc as any).mcp?.listTools?.useQuery?.({});
+  const serversQuery = trpc.mcp.listConnectedServers.useQuery();
+  const toolsQuery = trpc.mcp.listTools.useQuery({});
 
-  const servers: MCPServerConfig[] = serversQuery?.data ?? [];
-  const tools: MCPTool[] = toolsQuery?.data ?? [];
+  const servers = serversQuery.data ?? [];
+  const tools = toolsQuery.data ?? [];
 
   // Group tools by serverName
   const grouped: Record<string, MCPTool[]> = {};

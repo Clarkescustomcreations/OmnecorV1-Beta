@@ -233,7 +233,8 @@ export const securityRouter = router({
   runVulnerabilityScan: protectedProcedure
     .input(z.object({ targetPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.services.security.runVulnerabilityScan(input.targetPath);
+      const safePath = await validatePath(input.targetPath);
+      return ctx.services.security.runVulnerabilityScan(safePath);
     }),
 
   getIoCFeed: protectedProcedure

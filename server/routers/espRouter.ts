@@ -8,6 +8,7 @@
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
+import { validatePath } from "../_core/security.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -92,7 +93,8 @@ export const espRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        const jobId = await ctx.services.esp.readFlash(input);
+        const safeOutputFile = await validatePath(input.outputFile);
+        const jobId = await ctx.services.esp.readFlash({ ...input, outputFile: safeOutputFile });
         return { success: true, jobId };
       } catch (error) {
         throw new TRPCError({

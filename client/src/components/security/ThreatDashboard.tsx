@@ -5,17 +5,19 @@ import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
+type Finding = { tool: string; rule: string; file: string; line: number; message: string };
+
 export default function ThreatDashboard() {
   const [activeTab, setActiveTab] = useState<"scan" | "ioc">("scan");
   const [targetPath, setTargetPath] = useState(".");
 
-  const scanMut = (trpc as any).security?.runVulnerabilityScan?.useMutation?.({
-    onError: (err: { message?: string }) => toast.error(`Scan failed: ${err?.message}`),
+  const scanMut = trpc.security.runVulnerabilityScan.useMutation({
+    onError: (err) => toast.error(`Scan failed: ${err.message}`),
   });
-  const iocQuery = (trpc as any).security?.getIoCFeed?.useQuery?.(undefined, { enabled: activeTab === "ioc" });
+  const iocQuery = trpc.security.getIoCFeed.useQuery(undefined, { enabled: activeTab === "ioc" });
 
-  const findings = (scanMut?.data as any)?.findings ?? [];
-  const iocEntries = (iocQuery?.data as any[]) ?? [];
+  const findings: Finding[] = scanMut.data?.findings ?? [];
+  const iocEntries = iocQuery.data ?? [];
 
   return (
     <div className="space-y-4">
@@ -42,15 +44,15 @@ export default function ThreatDashboard() {
             />
             <Button
               size="sm"
-              onClick={() => scanMut?.mutate?.({ targetPath })}
-              disabled={scanMut?.isPending}
+              onClick={() => scanMut.mutate({ targetPath })}
+              disabled={scanMut.isPending}
             >
-              {scanMut?.isPending ? "Scanning..." : "Scan"}
+              {scanMut.isPending ? "Scanning..." : "Scan"}
             </Button>
           </div>
 
-          {scanMut?.isError && (
-            <p className="text-red-400 text-sm">{(scanMut.error as any)?.message}</p>
+          {scanMut.isError && (
+            <p className="text-red-400 text-sm">{scanMut.error?.message}</p>
           )}
 
           {findings.length > 0 && (
@@ -66,7 +68,7 @@ export default function ThreatDashboard() {
                   </tr>
                 </thead>
                 <tbody>
-                  {findings.map((f: any, i: number) => (
+                  {findings.map((f, i) => (
                     <tr key={i} className="border-b border-gray-800">
                       <td className="py-1 pr-3"><Badge className="text-xs">{f.tool}</Badge></td>
                       <td className="py-1 pr-3 font-mono">{f.rule}</td>
@@ -80,7 +82,7 @@ export default function ThreatDashboard() {
             </div>
           )}
 
-          {scanMut?.isSuccess && findings.length === 0 && (
+          {scanMut.isSuccess && findings.length === 0 && (
             <p className="text-green-400 text-sm">No findings.</p>
           )}
         </div>
@@ -88,8 +90,8 @@ export default function ThreatDashboard() {
 
       {activeTab === "ioc" && (
         <div className="space-y-3">
-          {iocQuery?.isLoading && <p className="text-gray-400 text-sm">Loading IoC feed...</p>}
-          {!iocQuery?.isLoading && iocEntries.length === 0 && (
+          {iocQuery.isLoading && <p className="text-gray-400 text-sm">Loading IoC feed...</p>}
+          {!iocQuery.isLoading && iocEntries.length === 0 && (
             <div className="text-gray-500 text-sm p-4 rounded border border-gray-700 bg-gray-900">
               {process.env.NODE_ENV !== "production"
                 ? "Configure MISP_URL environment variable to enable the IoC feed."
@@ -98,7 +100,7 @@ export default function ThreatDashboard() {
           )}
           {iocEntries.length > 0 && (
             <div className="space-y-2">
-              {iocEntries.map((entry: any, i: number) => (
+              {iocEntries.map((entry, i) => (
                 <div key={i} className="flex items-center gap-3 p-2 rounded bg-gray-900 border border-gray-800 text-xs">
                   <Badge className="text-xs shrink-0">{entry.type}</Badge>
                   <span className="font-mono text-gray-200 flex-1 truncate">{entry.value}</span>

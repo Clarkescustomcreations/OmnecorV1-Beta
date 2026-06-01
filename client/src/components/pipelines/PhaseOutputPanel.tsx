@@ -14,10 +14,10 @@ const phaseStatusColor: Record<string, string> = {
 };
 
 export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string }) {
-  const result = (trpc as any).pipeline?.getPipeline?.useQuery?.(
+  const result = trpc.pipeline.getPipeline.useQuery(
     { pipelineId },
     {
-      refetchInterval: (query: any) => {
+      refetchInterval: (query) => {
         const data = query.state.data;
         if (data?.pipeline?.status === "complete" || data?.pipeline?.status === "aborted") return false;
         return 2000;
@@ -25,18 +25,18 @@ export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string })
     }
   );
 
-  const approvePhase = (trpc as any).pipeline?.approvePhase?.useMutation?.({
-    onError: (err: { message?: string }) => toast.error(`Approval failed: ${err?.message}`),
+  const approvePhase = trpc.pipeline.approvePhase.useMutation({
+    onError: (err) => toast.error(`Approval failed: ${err.message}`),
   });
-  const abortPipeline = (trpc as any).pipeline?.abortPipeline?.useMutation?.({
-    onError: (err: { message?: string }) => toast.error(`Abort failed: ${err?.message}`),
+  const abortPipeline = trpc.pipeline.abortPipeline.useMutation({
+    onError: (err) => toast.error(`Abort failed: ${err.message}`),
   });
 
-  if (result?.isLoading) {
+  if (result.isLoading) {
     return <div className="text-gray-400 text-sm p-4">Loading pipeline...</div>;
   }
 
-  const { pipeline, phases } = result?.data ?? { pipeline: null, phases: [] };
+  const { pipeline, phases } = result.data ?? { pipeline: null, phases: [] };
 
   if (!pipeline) return null;
 
@@ -57,8 +57,8 @@ export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string })
             <Button
               variant="destructive"
               size="sm"
-              onClick={() => abortPipeline?.mutate?.({ pipelineId })}
-              disabled={abortPipeline?.isPending}
+              onClick={() => abortPipeline.mutate({ pipelineId })}
+              disabled={abortPipeline.isPending}
             >
               Abort
             </Button>
@@ -68,7 +68,7 @@ export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string })
 
       <div className="space-y-3">
         {PHASES.map((phaseName) => {
-          const phaseData = phases?.find((p: any) => p.phase === phaseName);
+          const phaseData = phases?.find((p) => p.phase === phaseName);
           const isActive = pipeline.currentPhase === phaseName;
 
           return (
@@ -90,8 +90,8 @@ export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string })
                 <Button
                   size="sm"
                   className="mt-3"
-                  onClick={() => approvePhase?.mutate?.({ pipelineId, phase: phaseName })}
-                  disabled={approvePhase?.isPending}
+                  onClick={() => approvePhase.mutate({ pipelineId, phase: phaseName })}
+                  disabled={approvePhase.isPending}
                 >
                   Approve
                 </Button>
