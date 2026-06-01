@@ -1,28 +1,30 @@
 # Omnecor Backend Server Architecture
 
-Omnecor's backend is a unified, Express.js-based server that acts as the central hub for all application logic, data management, and AI orchestration. This document details its architecture, key components, and how it interacts with other parts of the system.
+Omnecor's backend is a unified, Express.js-based server that acts as the central hub for all application logic, data management, and AI orchestration. This document details its architecture, key components, and operational flow.
 
 ## 1. Unified Server Design
 
-The Omnecor backend consolidates various functionalities into a single Express server, eliminating the need for separate microservices for core operations. This design choice simplifies deployment, reduces operational overhead, and ensures tight integration between the frontend, internal services, and external AI/hardware integrations.
+The Omnecor backend consolidates various functionalities into a single Express server, eliminating the need for separate microservices for core operations. This design choice simplifies deployment, reduces infrastructure complexity, and ensures tight integration between components.
+
+### System Architecture Diagram
 
 ```mermaid
 graph TD
-    A[Client (Frontend)] -->|HTTP/WS| B(Express Server)
-    B --> C(Middleware)
-    B --> D(tRPC Routers)
-    B --> E(WebSocket Server)
-    D --> F(Internal Services)
+    A[Client Frontend] -->|HTTP/WS| B[Express Server]
+    B --> C[Middleware]
+    B --> D[tRPC Routers]
+    B --> E[WebSocket Server]
+    D --> F[Internal Services]
     E --> F
-    F --> G(Database)
-    F --> H(File System)
-    F --> I(OMMESH Network)
-    F --> J(Process Manager Service)
-    J --> K(Python Bridges)
-    K --> L(External Tools/Hardware)
-    F --> M(AI Model Hub)
-    M --> N(Local AI Models)
-    M --> O(Cloud AI APIs)
+    F --> G[Database]
+    F --> H[File System]
+    F --> I[OMMESH Network]
+    F --> J[Process Manager Service]
+    J --> K[Python Bridges]
+    K --> L[External Tools/Hardware]
+    F --> M[AI Model Hub]
+    M --> N[Local AI Models]
+    M --> O[Cloud AI APIs]
 ```
 
 ## 2. Core Components
@@ -49,7 +51,7 @@ Express middleware is used to process requests before they reach the route handl
 Omnecor utilizes tRPC for its API layer, providing end-to-end type safety between the frontend and backend. All tRPC endpoints are accessible under the `/api/trpc/` path.
 
 -   **`appRouter`**: The root tRPC router that aggregates all sub-routers.
--   **Sub-Routers**: Organized by domain (e.g., `aiRouter.ts`, `projectRouter.ts`, `securityRouter.ts`, `blenderRouter.ts`, `kicadRouter.ts`, `ommesh.router.ts`, `voiceRouter.ts`). These define the API procedures for specific functionalities.
+-   **Sub-Routers**: Organized by domain (e.g., `aiRouter.ts`, `projectRouter.ts`, `securityRouter.ts`, `blenderRouter.ts`, `kicadRouter.ts`, `ommesh.router.ts`, `voiceRouter.ts`). These define the API endpoints for their respective domains.
 -   **`createContext`**: A factory function that creates the tRPC context for each request, providing access to singleton services and other request-scoped data.
 
 ### 2.4. WebSocket Server (`server/phase2/websocket/WebSocketServer.ts`)
