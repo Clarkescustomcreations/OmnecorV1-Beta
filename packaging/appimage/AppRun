@@ -31,6 +31,12 @@ echo "  Data:    $OMNECOR_DATA"
 echo "  Config:  $OMNECOR_CONFIG"
 echo "═══════════════════════════════════════════════════════════════"
 
+# Set ZERO_LOGIN_MODE=true for air-gapped/offline deployments
+# Usage: --zero-login flag sets ZERO_LOGIN_MODE=true
+if [[ "$*" == *"--zero-login"* ]]; then
+  export ZERO_LOGIN_MODE=true
+fi
+
 # Start the application
 # We expect the bundled application to be in usr/lib/omnecor/backend
 cd "$SELF_DIR/usr/lib/omnecor/backend"

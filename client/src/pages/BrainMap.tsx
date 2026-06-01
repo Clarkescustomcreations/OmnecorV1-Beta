@@ -223,18 +223,39 @@ function BrainMapContent() {
                       ) : (
                         <>
                           {windowMode === "embedded" ? (
-                            viewMode === "graph" ? (
-                              <NeuralGraphView
-                                network={neuralNetwork}
-                                projectId={activeMap.id}
-                                onNodeClick={setSelectedNodeId}
-                              />
-                            ) : (
-                              <NeuralTreeView
-                                network={neuralNetwork}
-                                onNodeClick={setSelectedNodeId}
-                              />
-                            )
+                            <>
+                              <span className="sr-only">
+                                Use arrow keys to navigate nodes, Enter to select
+                              </span>
+                              <div
+                                aria-label="Neural brain map visualization"
+                                className="flex-1 flex overflow-hidden"
+                              >
+                                {viewMode === "graph" ? (
+                                  <NeuralGraphView
+                                    network={neuralNetwork}
+                                    projectId={activeMap.id}
+                                    onNodeClick={setSelectedNodeId}
+                                  />
+                                ) : (
+                                  <NeuralTreeView
+                                    network={neuralNetwork}
+                                    onNodeClick={setSelectedNodeId}
+                                  />
+                                )}
+                              </div>
+                              <details className="absolute bottom-2 left-2 z-10 text-xs bg-card/90 border border-border rounded p-1">
+                                <summary className="cursor-pointer text-muted-foreground select-none">Text view</summary>
+                                <ul className="mt-1 max-h-40 overflow-y-auto space-y-0.5 pl-2">
+                                  {neuralNetwork.nodes.map(n => (
+                                    <li key={n.id} className="text-foreground font-mono text-[10px]">{n.label}</li>
+                                  ))}
+                                  {neuralNetwork.nodes.length === 0 && (
+                                    <li className="text-muted-foreground">No nodes</li>
+                                  )}
+                                </ul>
+                              </details>
+                            </>
                           ) : (
                             <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-muted/20">
                               <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center mb-4">

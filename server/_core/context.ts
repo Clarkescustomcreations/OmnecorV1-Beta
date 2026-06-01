@@ -23,6 +23,7 @@
 import type { CreateExpressContextOptions } from "@trpc/server/adapters/express";
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
+import { ENV } from "./env.js";
 
 // ─── Phase 2 Service Imports ────────────────────────────────────────────────
 // These are the singleton services from the Phase 2 backend.
@@ -46,6 +47,10 @@ import { ComfyService } from "../phase2/services/ComfyService.js";
 import { ScraperService } from "../phase2/services/ScraperService.js";
 import { CodingContextService } from "../phase2/services/CodingContextService.js";
 import { DockerService } from "../phase2/services/DockerService.js";
+import { PromptSanitizer } from "../phase2/services/PromptSanitizer.js";
+import { ElevenLabsService } from "../phase2/services/ElevenLabsService.js";
+import { MCPClientService } from "../phase2/services/MCPClientService.js";
+import { PipelineEngineService } from "../phase2/services/PipelineEngineService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified Context Type
@@ -86,6 +91,10 @@ export type TrpcContext = {
     scraper: ScraperService;
     codingContext: CodingContextService;
     docker: DockerService;
+    promptSanitizer: PromptSanitizer;
+    elevenLabs: ElevenLabsService;
+    mcpClient: MCPClientService;
+    pipeline: PipelineEngineService;
   };
 };
 
@@ -106,11 +115,25 @@ export async function createContext(
 ): Promise<TrpcContext> {
   let user: User | null = null;
 
-  try {
-    user = await sdk.authenticateRequest(opts.req);
-  } catch (error) {
-    // Authentication is optional for public procedures.
-    user = null;
+  if (ENV.zeroLoginMode) {
+    user = {
+      id: 0,
+      openId: "local-zero-login",
+      name: "Local Admin",
+      email: null,
+      loginMethod: "zero-login",
+      role: "admin",
+      executionMode: "sovereign",
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      lastSignedIn: new Date(),
+    } satisfies User;
+  } else {
+    try {
+      user = await sdk.authenticateRequest(opts.req);
+    } catch {
+      user = null;
+    }
   }
 
   return {
@@ -137,6 +160,10 @@ export async function createContext(
       scraper: ScraperService.getInstance(),
       codingContext: CodingContextService.getInstance(),
       docker: DockerService.getInstance(),
+      promptSanitizer: PromptSanitizer.getInstance(),
+      elevenLabs: ElevenLabsService.getInstance(),
+      mcpClient: MCPClientService.getInstance(),
+      pipeline: PipelineEngineService.getInstance(),
     },
   };
 }

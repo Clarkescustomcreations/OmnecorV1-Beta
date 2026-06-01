@@ -11,6 +11,12 @@ mkdir -p "$OMNECOR_CONFIG"
 
 export NODE_ENV=production
 
+# Set ZERO_LOGIN_MODE=true for air-gapped/offline deployments
+# Usage: --zero-login flag sets ZERO_LOGIN_MODE=true
+if [[ "$*" == *"--zero-login"* ]]; then
+  export ZERO_LOGIN_MODE=true
+fi
+
 echo "═══════════════════════════════════════════════════════════════"
 echo "  Omnecor HMCI — Flatpak Mode"
 echo "  Data:   $OMNECOR_DATA"

@@ -129,8 +129,8 @@ export default function SpecializedModuleLauncher({
                       {config.epochs}
                     </p>
                   </div>
-                  <Button size="sm" variant="ghost">
-                    <Settings className="w-4 h-4" />
+                  <Button size="sm" variant="ghost" aria-label={`Configure ${config.name}`}>
+                    <Settings className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
               ))}
@@ -179,12 +179,12 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1">
-          <Play className="w-4 h-4 mr-2" />
+        <Button className="flex-1" aria-label="Start LLM training">
+          <Play className="w-4 h-4 mr-2" aria-hidden="true" />
           Start Training
         </Button>
-        <Button variant="outline" className="flex-1">
-          <Settings className="w-4 h-4 mr-2" />
+        <Button variant="outline" className="flex-1" aria-label="Configure LLM training">
+          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Configure
         </Button>
       </div>
@@ -266,8 +266,8 @@ export default function SpecializedModuleLauncher({
                       Type: {obj.type} | Pos: ({obj.position.join(", ")})
                     </p>
                   </div>
-                  <Button size="sm" variant="ghost">
-                    <Settings className="w-4 h-4" />
+                  <Button size="sm" variant="ghost" aria-label={`Configure ${obj.name}`}>
+                    <Settings className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
               ))}
@@ -280,12 +280,12 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1">
-          <Box className="w-4 h-4 mr-2" />
+        <Button className="flex-1" aria-label="Open project in Blender">
+          <Box className="w-4 h-4 mr-2" aria-hidden="true" />
           Open in Blender
         </Button>
-        <Button variant="outline" className="flex-1">
-          <Settings className="w-4 h-4 mr-2" />
+        <Button variant="outline" className="flex-1" aria-label="Configure 3D Modeler settings">
+          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Settings
         </Button>
       </div>
@@ -382,12 +382,12 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1">
-          <Zap className="w-4 h-4 mr-2" />
+        <Button className="flex-1" aria-label="Open project in KiCad">
+          <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
           Open in KiCad
         </Button>
-        <Button variant="outline" className="flex-1">
-          <Settings className="w-4 h-4 mr-2" />
+        <Button variant="outline" className="flex-1" aria-label="Configure PCB Designer settings">
+          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Settings
         </Button>
       </div>

@@ -1,32 +1,100 @@
 [![CodeQL](https://github.com/Clarkescustomcreations/OmnecorV1-Beta/actions/workflows/codeql.yml/badge.svg)](https://github.com/Clarkescustomcreations/OmnecorV1-Beta/actions/workflows/codeql.yml)
-#                                       Omnecor
+<div align="center">
 
-Operational Memory Never Escapes. Context Overview Remains. Omnecor is a powerful, elegant, and polished local-first AI workstation designed for power users who demand both function and beauty. It seamlessly integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows—all in one refined interface.
+```
+ ██████╗ ███╗   ███╗███╗   ██╗███████╗ ██████╗ ██████╗ ██████╗ 
+██╔═══██╗████╗ ████║████╗  ██║██╔════╝██╔════╝██╔═══██╗██╔══██╗
+██║   ██║██╔████╔██║██╔██╗ ██║█████╗  ██║     ██║   ██║██████╔╝
+██║   ██║██║╚██╔╝██║██║╚██╗██║██╔══╝  ██║     ██║   ██║██╔══██╗
+╚██████╔╝██║ ╚═╝ ██║██║ ╚████║███████╗╚██████╗╚██████╔╝██║  ██║
+ ╚═════╝ ╚═╝     ╚═╝╚═╝  ╚═══╝╚══════╝ ╚═════╝ ╚═════╝ ╚═╝  ╚═╝
+      H · M · C · I   —   Human-Machine Collaboration Interface
+```
 
-Where imagination becomes infrastructure.
+**The Sovereign AI Workstation. Where imagination becomes infrastructure.**
+
+</div>
+
+---
+
+
+Omnecor is a powerful, elegant, and polished local-first AI workstation designed for power users who demand both function and beauty. It seamlessly integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows—all in one refined interface.
+
+---
+<img width="1254" height="1254" alt="file_0000000036d471f7a2101a53fc9370a4" src="https://github.com/user-attachments/assets/c487fb35-2cd0-4483-936b-6010ec16d91d" />
 
 ---
 
 ## Features
 
-Omnecor is engineered as a modular, production-grade workstation, offering a comprehensive suite of features for AI-driven workflows:
+Omnecor is engineered as a modular, production-grade workstation. Every feature below is implemented and available in the current release.
 
-- **Unified Backend**: A centralized Express.js/tRPC engine ensuring real-time UI/data state synchronization via WebSockets.
-- **Neural Workspaces**: Spatial graph-based project management using React Flow for semantic file/knowledge visualization.
-- **Multi-Modal Workforce**: Integrated autonomous agent orchestration for software, media, and hardware tasks.
-- **Hardware Integration Layer**: Secure, process-managed bridges for Blender (3D), KiCad (PCB), and ESPTool (Firmware).
-- **Voice Pipeline**: A high-performance inference bridge to FastAPI-based STT (Whisper) and TTS/RVC microservices.
-- **OMMESH**: A distributed mesh intelligence layer enabling multiple Omnecor nodes to discover each other on a LAN, federate securely via mTLS, and route inference requests by available VRAM.
-- **Strictly Local Data Sovereignty**: Your data stays on your machine. Always.
-- **Interactive Neural Brain Maps**: Visualize, connect, and understand your projects like never before.
-- **Run Any Local or Cloud AI Model**: Use the models you trust, on your own terms.
-- **Zero Mandatory Monthly Bills**: No lock-in. No surprise fees. Just pure ownership.
+### Core Infrastructure
+- **Unified Backend** — Centralized Express.js/tRPC engine with real-time UI/data state synchronization via WebSockets.
+- **End-to-End Type Safety** — tRPC + Drizzle ORM + Zod across the full stack. No runtime type surprises.
+- **MySQL/TiDB Persistence** — Chat history, session state, budgets, audit logs, and pipeline records stored in a relational DB.
+- **Real-Time WebSocket Layer** — Live event streaming for AI responses, training progress, hardware jobs, budget alerts, and mesh topology.
 
----
+### AI & Model Hub
+- **Multi-Provider AI Routing** — Connect OpenAI, Anthropic, Google Gemini, Ollama, Llama.cpp, and Fal.ai from a single interface.
+- **Execution Modes** — Three user-selectable modes enforced at the server middleware layer:
+  - 🔴 **Sovereign** — 100% local. All cloud calls blocked by `sovereignCheck` middleware.
+  - ⚡ **Scrapper** *(default)* — Local-first with cloud fallback. Maximum efficiency.
+  - 🔥 **Big Spender** — Cloud-first for maximum quality on production runs.
+- **Valet Router** — Fine-tuned local 1.5B classifier that routes prompts to the optimal provider without a cloud call.
+- **Local LLM Support** — First-class Ollama and Llama.cpp integration with VRAM-aware model selection.
 
-## Screenshots
+### Agentic Workforce
+- **Multi-Agent Orchestration** — Autonomous agents collaborate on software, media, and hardware tasks using shared context.
+- **Human-in-the-Loop (HITL)** — Critical agent actions require explicit human approval before execution.
+- **GodMode Pipelines** — 5-phase gated execution (DEFINE → PLAN → EXECUTE → REVIEW → SHIP) with per-phase approval gates.
+- **Agent Memory (RAG)** — ChromaDB vector store + `MemoryArchitectService` for semantic, long-horizon context retrieval.
+- **Agent Audit Trail** — Every agent spawn, termination, and tool call is written to the immutable audit log.
 
-<img width="1254" height="1254" alt="file_0000000036d471f7a2101a53fc9370a4" src="https://github.com/user-attachments/assets/c487fb35-2cd0-4483-936b-6010ec16d91d" />
+### Neural Brain Map
+- **Spatial Graph Workspaces** — React Flow canvas for visualizing projects, files, and knowledge as interactive node graphs.
+- **Semantic Indexing** — Import any folder; Omnecor chunks, embeds, and indexes it into ChromaDB automatically.
+- **Drag-and-Drop Construction** — Build knowledge graphs, pipeline flows, and project structures visually.
+
+### Hardware Integration
+- **Blender Bridge** — Headless Python subprocess bridge for 3D modeling, rendering, and scene automation.
+- **KiCad Bridge** — PCB design automation and 3D viewer (`PCBViewer3D.tsx`) powered by React Three Fiber.
+- **ESPTool Bridge** — Flash ESP32/ESP8266 firmware, auto-detect serial ports, monitor flash progress in real-time.
+- **ComfyUI Integration** — Node-based media generation pipeline with async prompt queueing.
+
+### Voice Pipeline
+- **Speech-to-Text (STT)** — Faster-Whisper powered microservice with real-time transcription.
+- **Text-to-Speech (TTS)** — XTTS-v2 synthesis with optional ElevenLabs cloud enhancement.
+- **Voice Cloning (RVC)** — Real-time voice conversion for generating speech in any cloned voice.
+
+### OMMESH Distributed Intelligence
+- **LAN Mesh Discovery** — mDNS/Bonjour auto-discovery of other Omnecor nodes on the local network.
+- **Secure Federation** — mTLS mutual authentication between all mesh nodes.
+- **VRAM-Weighted Routing** — Inference requests delegated to the mesh node with the most available VRAM.
+- **Real-Time Topology** — `mesh:node_joined` / `mesh:node_left` WebSocket events keep the UI in sync.
+
+### Agentic Wallet & Budgeting
+- **Per-Project Budgets** — Set hard or soft spend limits (in cents) per project.
+- **Real-Time Spend Tracking** — `budget:spend` WebSocket events update spend meters after every cloud API call.
+- **Auto-Downgrade** — When a hard limit is hit, remaining tasks are automatically re-routed to local Ollama models.
+- **Virtual Credit Cards** — Lithic API integration issues unique virtual cards per project for total financial isolation.
+- **Manual Tracking Mode** — Full spend logging without `LITHIC_API_KEY`; no card required.
+
+### Security & Sovereignty
+- **Immutable Audit Log** — Append-only `audit_log` table captures all privileged events. No delete/update API exists.
+- **PII Redaction** — `redactSensitiveData()` scrubs API keys and personal data before any log entry is written.
+- **Prompt Injection Defense** — `PromptSanitizer` blocks injection attempts and fires `security:injection_attempt` events.
+- **Zero-Login / Air-Gapped Mode** — `ZERO_LOGIN_MODE=true` bypasses OAuth entirely; auto-enforces Sovereign Mode.
+- **Extended OAuth** — Manus, Google, and Microsoft identity providers supported out of the box.
+- **Role-Based Access Control** — Four roles: `viewer`, `user`, `admin`, `owner`.
+
+### Developer Experience
+- **Command Palette** — `Ctrl+K` global search and action launcher.
+- **Fine-Tuning UI** — Unsloth/LoRA training pipeline with live loss/accuracy charts.
+- **Valet Dataset Builder** — One-click JSONL training data generation from real audit + spend log history.
+- **YARA Security Scanning** — Integrated malware/threat pattern scanning for uploaded files.
+- **Accessibility** — WCAG 2.1 AA compliance tested with axe-core across all pages.
+- **Packaging** — AppImage, `.deb`, Flatpak, and systemd service targets included.
 
 ---
 
@@ -90,6 +158,28 @@ Explore the comprehensive documentation suite in the [docs/](docs/) directory fo
 
 ---
 
+## Acknowledgments
+
+Omnecor stands on the shoulders of giants. See the full [Open Source Acknowledgements](docs/Acknowledgments/Open-Source-Acknowledgements.md) for the complete list of libraries, frameworks, and projects that made this workstation possible.
+
+---
+
 ## License
 
 Omnecor is released under the [MIT License](LICENSE).
+
+---
+
+<div align="center">
+
+```
+O — Operational
+M — Memory
+N — Never
+E — Escapes
+C — Context
+O — Overview
+R — Remains
+```
+
+</div>

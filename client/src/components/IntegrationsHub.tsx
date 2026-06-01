@@ -268,6 +268,8 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
           {/* Sync Status */}
           {integration.isConnected && integration.syncStatus !== "idle" && (
             <div
+              role="status"
+              aria-live="polite"
               className={cn(
                 "p-2 rounded text-xs flex items-center gap-2",
                 integration.syncStatus === "syncing" &&
@@ -307,29 +309,31 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                   size="sm"
                   variant="outline"
                   className="flex-1"
+                  aria-label={`Sync ${info.title}`}
                   onClick={() => handleSync(integration.id)}
                   disabled={integration.syncStatus === "syncing"}
                 >
-                  <RefreshCw className="w-3 h-3 mr-1" />
+                  <RefreshCw className="w-3 h-3 mr-1" aria-hidden="true" />
                   Sync
                 </Button>
-                <Button size="sm" variant="outline" className="flex-1">
-                  <Settings className="w-3 h-3 mr-1" />
+                <Button size="sm" variant="outline" className="flex-1" aria-label={`${info.title} settings`}>
+                  <Settings className="w-3 h-3 mr-1" aria-hidden="true" />
                   Settings
                 </Button>
                 <Button
                   size="sm"
                   variant="destructive"
                   className="flex-1"
+                  aria-label={`Disconnect ${info.title}`}
                   onClick={() => handleDisconnect(integration.id)}
                 >
-                  <Unlink2 className="w-3 h-3 mr-1" />
+                  <Unlink2 className="w-3 h-3 mr-1" aria-hidden="true" />
                   Disconnect
                 </Button>
               </>
             ) : (
-              <Button size="sm" className="w-full">
-                <Link2 className="w-3 h-3 mr-2" />
+              <Button size="sm" className="w-full" aria-label={`Connect ${info.title} account`}>
+                <Link2 className="w-3 h-3 mr-2" aria-hidden="true" />
                 Connect Account
               </Button>
             )}

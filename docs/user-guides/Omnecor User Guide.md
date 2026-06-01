@@ -10,21 +10,23 @@ Operational Memory Never Escapes. Context Overview Remains.
 2.  [Feature Overview](#2-feature-overview)
 3.  [System Requirements](#3-system-requirements)
 4.  [Installation Guide](#4-installation-guide)
+    -   4.4. [Zero-Login & Air-Gapped Operation](#44-zero-login--air-gapped-operation)
 5.  [First Launch Walkthrough](#5-first-launch-walkthrough)
 6.  [User Interface Guide](#6-user-interface-guide)
 7.  [Core Workflows](#7-core-workflows)
 8.  [Configuration Guide](#8-configuration-guide)
 9.  [AI Systems Documentation](#9-ai-systems-documentation)
-10. [Networking & Multi-System Operation](#10-networking--multi-system-operation)
-11. [Security & Permissions](#11-security--permissions)
-12. [Backup, Recovery, and Migration](#12-backup-recovery-and-migration)
-13. [Troubleshooting Guide](#13-troubleshooting-guide)
-14. [Logs & Diagnostics](#14-logs--diagnostics)
-15. [Advanced Usage](#15-advanced-usage)
-16. [Performance Optimization](#16-performance-optimization)
-17. [FAQ](#17-faq)
-18. [Glossary](#18-glossary)
-19. [Appendix](#19-appendix)
+10. [Agentic Wallet & Budgeting](#10-agentic-wallet--budgeting)
+11. [Networking & Multi-System Operation](#11-networking--multi-system-operation)
+12. [Security & Permissions](#12-security--permissions)
+13. [Backup, Recovery, and Migration](#13-backup-recovery-and-migration)
+14. [Troubleshooting Guide](#14-troubleshooting-guide)
+15. [Logs & Diagnostics](#15-logs--diagnostics)
+16. [Advanced Usage](#16-advanced-usage)
+17. [Performance Optimization](#17-performance-optimization)
+18. [FAQ](#18-faq)
+19. [Glossary](#19-glossary)
+20. [Appendix](#20-appendix)
 
 ---
 
@@ -167,6 +169,16 @@ Omnecor is engineered as a modular, production-grade workstation. This section p
 -   **User Interaction**: Navigating settings categories, modifying values.
 -   **Dependencies**: `appPreferences.ts`, `.env` file.
 
+### 2.10. Agentic Wallet
+
+-   **Purpose**: Real-time cost management for cloud AI providers (OpenAI, Anthropic, Fal.ai, etc.) to prevent runaway spend during agentic workflows.
+-   **Workflow**: Every outbound cloud API call is intercepted by `WalletService`, which logs token counts and estimated cost to the `spend_log` table and emits a `budget:spend` WebSocket event to the UI.
+-   **Project Budgets**: Set a hard limit in cents for each project. When `mode = 'hard'`, requests are blocked once the limit is reached and remaining tasks are automatically routed to local Ollama/Llama.cpp models.
+-   **Alert Thresholds**: Receive a real-time notification when spend reaches a configured percentage of your budget (default: 80%).
+-   **Virtual Credit Cards**: Integrated with the Lithic API, Omnecor can issue a unique virtual card per project or agent, providing complete financial isolation at the card network level. Requires `LITHIC_API_KEY` in `.env`.
+-   **Manual Tracking Mode**: Without `LITHIC_API_KEY`, the wallet operates in tracking-only mode — no cards are issued but spend is still logged and alerts are still fired.
+-   **Related Settings**: `LITHIC_API_KEY`, wallet UI under Settings → Agentic Wallet.
+
 ---
 
 ## 3. System Requirements
@@ -210,6 +222,19 @@ For users requiring specific configurations or deeper control over the installat
 ### 4.3. Developer Installation Path
 
 Developers should follow the [CONTRIBUTING.md](../CONTRIBUTING.md) guide, which covers setting up the development environment, running tests, and contributing code.
+
+### 4.4. Zero-Login & Air-Gapped Operation
+
+For enterprise or high-security environments that prohibit external network calls during boot:
+
+1.  **Enable**: Set `ZERO_LOGIN_MODE=true` in your `.env` file.
+2.  **Behavior**:
+    -   Skips all OAuth provider checks (Manus, Google, Microsoft).
+    -   Generates a synthetic "Local Admin" session on startup with `role = 'owner'`.
+    -   Automatically enforces **Sovereign Mode** (`executionMode = 'sovereign'`) — no cloud procedures can execute.
+    -   No external SDK calls are made during the boot sequence.
+3.  **Limitations**: Multi-user support and cloud-dependent features (Agentic Wallet card issuance, Fal.ai, cloud LLMs) are unavailable.
+4.  **Use Case**: Air-gapped workstations, classified environments, offline demos.
 
 ---
 
@@ -337,6 +362,13 @@ The `.env` file, located in the root of your Omnecor installation, contains crit
 | `OMMESH_PORT` | Port for OMMESH communication. | `7777` | Default `7777`. |
 | `OMMESH_MDNS_NAME` | mDNS name for Omnecor node discovery. | `omnecor-node` | Default `omnecor-node`. |
 | `OMMESH_SECURITY_KEY` | Shared secret for mTLS in OMMESH. | `a_strong_secret_key` | Required if `OMMESH_ENABLED=true`. |
+| `LITHIC_API_KEY` | API key for Lithic virtual card issuance. | `lithic_prod_xxxxx` | Optional. Without it, Wallet runs in tracking-only mode. |
+| `ZERO_LOGIN_MODE` | Skips OAuth; creates a synthetic Local Admin session. | `true` or `false` | Default `false`. Forces Sovereign Mode when `true`. |
+| `GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID. | `xxxxxxx.apps.googleusercontent.com` | Optional, enables Google login. |
+| `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret. | `GOCSPX-xxxxxxxx` | Required if `GOOGLE_CLIENT_ID` is set. |
+| `MICROSOFT_CLIENT_ID` | Microsoft Entra (Azure AD) Application Client ID. | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | Optional, enables Microsoft login. |
+| `MICROSOFT_CLIENT_SECRET` | Microsoft Entra Client Secret. | `xxxxxxxxxxxxxxxxxxxxxxxx` | Required if `MICROSOFT_CLIENT_ID` is set. |
+| `OLLAMA_PROXY_TOKEN` | Shared bearer token for the Ollama reverse proxy (Dockerfile.ollama-proxy). | `a_strong_random_secret` | Required if using the Ollama proxy container. |
 
 ### 8.2. In-Application Settings
 
@@ -367,7 +399,18 @@ Omnecor is built around a powerful and flexible AI infrastructure. For detailed 
 
 ---
 
-## 10. Networking & Multi-System Operation
+## 10. Agentic Wallet & Budgeting
+
+See [Section 2.10](#210-agentic-wallet) for a full feature overview. This section provides quick-reference information for configuring budgets and virtual cards.
+
+-   Navigate to **Settings → Agentic Wallet** to create and manage project budgets.
+-   Set `LITHIC_API_KEY` in `.env` to enable virtual card issuance per project or agent.
+-   Without `LITHIC_API_KEY`, the wallet runs in tracking-only mode — spend is still logged and threshold alerts are still fired.
+-   Budget overruns in `hard` mode automatically reroute remaining tasks to local Ollama/Llama.cpp models.
+
+---
+
+## 11. Networking & Multi-System Operation
 
 Omnecor supports multi-system operation through its OMMESH distributed intelligence layer. For detailed information on how to set up and manage a mesh network of Omnecor instances, refer to:
 
@@ -376,39 +419,73 @@ Omnecor supports multi-system operation through its OMMESH distributed intellige
 
 ---
 
-## 11. Security & Permissions
+## 12. Security & Permissions
 
-Security is a paramount concern in Omnecor, especially given its local-first approach and handling of sensitive data. For comprehensive details on security features, data encryption, and permission management, refer to the dedicated [SECURITY.md](../SECURITY.md) document and the `SecurityService` documentation.
+Security is a paramount concern in Omnecor. For a comprehensive reference, see [SECURITY.md](../SECURITY.md) and the `SecurityService` documentation.
+
+### 12.1. Execution Modes
+
+Omnecor operates in three distinct **Execution Modes** that balance power with privacy. Toggle from the header badge or via Settings → Execution Mode.
+
+| Mode | Badge | Behavior |
+|---|---|---|
+| **Sovereign** | 🔴 Red Lock | All cloud-dependent tRPC procedures are blocked server-side by the `sovereignCheck` middleware. 100% local operation enforced. Use for classified or sensitive data. |
+| **Scrapper** | ⚡ Green Zap | **(Default)** Local models (Ollama, Llama.cpp) are preferred. Cloud models are used only when no local model can fulfill the request, or when a cloud-exclusive tool (e.g., Fal.ai video generation) is explicitly requested. |
+| **Big Spender** | 🔥 Amber Flame | High-performance cloud models (GPT-4o, Claude Sonnet) are preferred by default. Optimizes for output quality over cost. Ideal for final production runs or complex reasoning tasks. |
+
+Your selected mode is persisted to `users.executionMode` in the database and survives session restarts. The `sovereignCheck` middleware enforces Sovereign Mode at the tRPC layer — it cannot be bypassed by the frontend.
+
+### 12.2. Immutable Audit Log
+
+Omnecor maintains an append-only audit log of all privileged system events.
+
+-   **Integrity**: The `audit_log` table is insert-only. The API provides no mutation procedures for updating or deleting log entries.
+-   **Redaction**: Sensitive data (API keys, PII, tokens) is automatically scrubbed by the `redactSensitiveData()` utility before any entry is written.
+-   **Viewing**: Admin and Owner roles can access the log via Settings → Audit Log or via `audit.getAuditLog` tRPC procedure.
+-   **Export**: Use `audit.exportAuditLog` (Admin only) to download a CSV of the full log for compliance reporting.
+-   **Captured Events**: User logins/logouts, HITL approvals/rejections, agent spawns/terminations, critical tool calls (Blender, KiCad, ESPTool), budget changes, virtual card issuance.
+
+### 12.3. Extended OAuth Providers (Phase 23)
+
+Omnecor supports three OAuth identity providers. Configure the required environment variables to enable each:
+
+| Provider | Required Variables |
+|---|---|
+| **Manus** (default) | `MANUS_CLIENT_ID`, `MANUS_CLIENT_SECRET` |
+| **Google** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
+| **Microsoft** | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` |
+
+Use `ZERO_LOGIN_MODE=true` to skip all OAuth providers for air-gapped deployments.
 
 ---
 
-## 12. Backup, Recovery, and Migration
+## 13. Backup, Recovery, and Migration
 
 Regular backups are crucial for protecting your data. Omnecor stores critical data in its database and local file system.
 
-### 12.1. Backup Procedures
+### 13.1. Backup Procedures
 
 -   **Database Backup**: Regularly export your MySQL/TiDB database using standard database tools (e.g., `mysqldump`).
 -   **File System Backup**: Back up your project folders, the `.omnecor` configuration directory, and any custom AI models.
 
-### 12.2. Recovery Procedures
+### 13.2. Recovery Procedures
 
 -   In case of data loss, restore your database from the latest backup and replace affected files from your file system backup.
 
-### 12.3. Migration
+### 13.3. Migration
 
 -   **Database Migrations**: Use Drizzle Kit for schema migrations (`pnpm drizzle-kit generate`, `pnpm run db:push`).
 -   **System Migration**: To move your Omnecor installation to a new machine, copy the entire installation directory, including the `.env` file, and restore your database.
 
 ---
 
-## 13. Troubleshooting Guide
+## 14. Troubleshooting Guide
 
 For common issues and their solutions, please refer to the dedicated [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) document.
 
 ---
 
-## 14. Logs & Diagnostics
+## 15. Logs & Diagnostics
 
 Omnecor generates detailed logs to assist with debugging and monitoring.
 
@@ -418,26 +495,26 @@ Omnecor generates detailed logs to assist with debugging and monitoring.
 
 ---
 
-## 15. Advanced Usage
+## 16. Advanced Usage
 
-### 15.1. Custom AI Model Integration
+### 16.1. Custom AI Model Integration
 
 -   **Local Models**: Integrate new local AI models by configuring their API endpoints in the `.env` file or through the Model Hub settings.
 -   **Custom Providers**: For advanced users, it is possible to extend the `AiProviderService` to support new AI service providers.
 
-### 15.2. Extending Python Bridges
+### 16.2. Extending Python Bridges
 
 -   **New Bridges**: Create new Python scripts in `server/python_bridges/` to integrate with additional external tools or hardware.
 -   **Custom Commands**: Extend existing bridges with new commands or functionalities.
 
-### 15.3. Developing Custom Agents
+### 16.3. Developing Custom Agents
 
 -   **Agent API**: Utilize the `AgentService` to define and register new autonomous AI agents with specific responsibilities and capabilities.
 -   **Workflow Integration**: Integrate custom agents into existing or new workflows using the `WorkflowSequencing` mechanisms.
 
 ---
 
-## 16. Performance Optimization
+## 17. Performance Optimization
 
 To ensure Omnecor runs optimally, consider the following:
 
@@ -449,19 +526,23 @@ To ensure Omnecor runs optimally, consider the following:
 
 ---
 
-## 17. FAQ
+## 18. FAQ
 
 For answers to frequently asked questions, please refer to the dedicated [FAQ.md](../FAQ.md) document.
 
 ---
 
-## 18. Glossary
+## 19. Glossary
 
+-   **Agentic Wallet**: Omnecor's built-in cost management system for cloud AI providers, featuring project budgets, spend logging, and optional Lithic virtual card integration.
 -   **AI Agent**: An autonomous software entity designed to perform specific tasks, often leveraging AI models.
+-   **Big Spender Mode**: An Execution Mode that prefers high-performance cloud AI models for maximum output quality.
 -   **ChromaDB**: An open-source vector database used by Omnecor for semantic indexing and retrieval.
 -   **Drizzle ORM**: A TypeScript ORM used for interacting with the database.
+-   **Execution Mode**: A per-user setting (`sovereign`, `scrapper`, `big_spender`) controlling which AI providers are permitted. Enforced at the tRPC middleware layer.
 -   **HMCI (Human-Machine Collaboration Interface)**: A system designed to facilitate seamless interaction and collaboration between humans and AI.
 -   **HITL (Human-In-The-Loop)**: A process where human intervention or approval is required at critical stages of an automated workflow.
+-   **Lithic**: A virtual card issuance API used by the Agentic Wallet for project-level financial isolation.
 -   **Llama.cpp**: A C/C++ port of Facebook's LLaMA model, enabling local inference on various hardware.
 -   **mTLS (Mutual Transport Layer Security)**: A security protocol that ensures both client and server authenticate each other.
 -   **Neural Brain Map**: Omnecor's spatial, graph-based interface for project and knowledge management.
@@ -469,8 +550,10 @@ For answers to frequently asked questions, please refer to the dedicated [FAQ.md
 -   **OMMESH**: Omnecor's distributed mesh intelligence layer for multi-node collaboration.
 -   **RAG (Retrieval-Augmented Generation)**: An AI technique that combines information retrieval with text generation to produce more informed and accurate responses.
 -   **React Flow**: A library for building node-based editors and interactive diagrams in React.
+-   **Scrapper Mode**: The default Execution Mode. Prefers local models; uses cloud as fallback.
 -   **RVC (Real-time Voice Cloning)**: A technology for generating speech in a cloned voice.
 -   **shadcn/ui**: A collection of reusable UI components built with Radix UI and Tailwind CSS.
+-   **Sovereign Mode**: An Execution Mode that blocks all cloud API calls at the server middleware layer. Ensures 100% local data residency.
 -   **STT (Speech-to-Text)**: The process of converting spoken language into written text.
 -   **tRPC**: A framework for building end-to-end type-safe APIs in TypeScript.
 -   **TTS (Text-to-Speech)**: The process of converting written text into spoken language.
@@ -478,21 +561,22 @@ For answers to frequently asked questions, please refer to the dedicated [FAQ.md
 -   **Vector Database**: A database optimized for storing and querying vector embeddings.
 -   **Vite**: A fast build tool for modern web projects.
 -   **WSL2 (Windows Subsystem for Linux 2)**: A compatibility layer for running Linux binary executables natively on Windows.
+-   **ZERO_LOGIN_MODE**: An environment variable that enables air-gapped operation by bypassing OAuth and creating a synthetic Local Admin session.
 -   **Zustand**: A small, fast, and scalable state-management solution for React.
 
 ---
 
-## 19. Appendix
+## 20. Appendix
 
-### 19.1. Third-Party Libraries and Licenses
+### 20.1. Third-Party Libraries and Licenses
 
 Refer to the `package.json` file for a comprehensive list of third-party libraries and their respective licenses.
 
-### 19.2. Contributing
+### 20.2. Contributing
 
 For information on how to contribute to the Omnecor project, please see the [CONTRIBUTING.md](../CONTRIBUTING.md) file.
 
-### 19.3. Contact and Support
+### 20.3. Contact and Support
 
 For support, bug reports, or feature requests, please visit the [GitHub repository](https://github.com/Clarkescustomcreations/OmnecorV1-Beta) or contact the development team.
 

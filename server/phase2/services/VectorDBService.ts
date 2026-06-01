@@ -243,6 +243,23 @@ export class VectorDBService {
     log.info("Documents ingested", { count: documents.length, collection: collectionName });
   }
 
+  public async addWithEmbeddings(
+    collectionName: string,
+    documents: string[],
+    embeddings: number[][],
+    metadatas?: Record<string, unknown>[],
+  ): Promise<void> {
+    if (!this.isInitialized) return;
+    const collection = await this.getOrCreateCollection(collectionName);
+    const ids = documents.map((_, i) => `${Date.now()}_${i}`);
+    await collection.add({
+      ids,
+      documents,
+      embeddings,
+      metadatas: (metadatas ?? documents.map(() => ({}))) as Record<string, any>[],
+    });
+  }
+
   /**
    * Update a single document in the collection (upsert semantics).
    * Used when a file changes and needs re-indexing.

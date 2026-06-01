@@ -33,6 +33,7 @@ import crypto from "crypto";
 import fs from "fs";
 import path from "path";
 import { createLogger } from "../../_core/logger.js";
+import { PromptSanitizer } from "./PromptSanitizer.js";
 const log = createLogger("MemoryArchitect");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -209,6 +210,25 @@ export class MemoryArchitectService {
   }
 
   /**
+   * Create or return a per-agent ChromaDB collection name.
+   * Used by RecursiveMAS to give each agent an isolated memory space.
+   *
+   * Collection name format: `agent_<sanitized_agentId>_memory`
+   */
+  async ensureAgentMemory(agentId: string): Promise<string> {
+    if (!this.initialized) throw new Error("MemoryArchitect not initialized");
+
+    const sanitizedId = agentId
+      .toLowerCase()
+      .replace(/[^a-z0-9]/g, "_")
+      .replace(/_+/g, "_")
+      .slice(0, 44); // keep total ≤ 63 chars: "agent_" (6) + id + "_memory" (7) = 13 + 44 = 57
+    const name = `agent_${sanitizedId}_memory`;
+    await this.vectorDB.getOrCreateCollection(name);
+    return name;
+  }
+
+  /**
    * Delete a project's memory collection.
    */
   async deleteCollection(projectId: string): Promise<void> {
@@ -316,8 +336,14 @@ export class MemoryArchitectService {
   ): Promise<void> {
     if (!this.initialized) return;
 
+    const sanitized = PromptSanitizer.getInstance().sanitize(text);
+    if (sanitized.flagged) {
+      log.warn("Injection attempt detected in ingestDocument", { documentId, violations: sanitized.violations });
+    }
+    const safeText = sanitized.clean;
+
     const collectionName = await this.ensureProjectMemory(projectId);
-    const chunks = this.chunkText(this.redactSensitiveData(text));
+    const chunks = this.chunkText(this.redactSensitiveData(safeText));
     const documents: VectorDocument[] = chunks.map((chunk, idx) => ({
       id: `${documentId}_chunk_${idx}`,
       text: chunk,
@@ -353,12 +379,18 @@ export class MemoryArchitectService {
   ): Promise<MemorySearchResult[]> {
     if (!this.initialized) return [];
 
+    const sanitized = PromptSanitizer.getInstance().sanitize(query);
+    if (sanitized.flagged) {
+      log.warn("Injection attempt detected in search query", { projectId, violations: sanitized.violations });
+    }
+    const safeQuery = sanitized.clean;
+
     const collectionName = this.collectionName(projectId);
 
     try {
       const results = await this.vectorDB.semanticSearch(
         collectionName,
-        query,
+        safeQuery,
         limit
       );
       return results.map(r => ({

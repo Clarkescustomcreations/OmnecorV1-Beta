@@ -16,7 +16,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc.js";
+import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import fs from "fs/promises";
@@ -152,6 +152,44 @@ export const trainingRouter = router({
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Failed to start training: ${message}`,
+        });
+      }
+    }),
+
+  generateValetDataset: protectedProcedure
+    .input(
+      z.object({
+        examplesPerCategory: z.number().int().min(10).max(1000).default(400),
+        oracleModel: z.string().default("llama3.2:latest"),
+        outputPath: z.string().default("data/valet_router_dataset.jsonl"),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const outputPath = input.outputPath;
+      const env: Record<string, string> = {
+        OLLAMA_URL: process.env.OLLAMA_URL ?? "http://localhost:11434",
+        EXAMPLES_PER_CATEGORY: String(input.examplesPerCategory),
+        ORACLE_MODEL: input.oracleModel,
+        OUTPUT_PATH: outputPath,
+        VAL_PATH: outputPath.replace(".jsonl", "_validation.jsonl"),
+      };
+      try {
+        const jobId = await ctx.services.processManager.spawn({
+          type: "custom",
+          command: "python3",
+          args: ["server/python_bridges/valet_dataset_builder.py"],
+          env,
+          label: "Valet Router Dataset Builder",
+        });
+        return { jobId };
+      } catch (error) {
+        const message = (error as Error).message;
+        if (message.includes("Maximum concurrent")) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message });
+        }
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to start dataset builder: ${message}`,
         });
       }
     }),

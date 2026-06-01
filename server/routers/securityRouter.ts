@@ -229,4 +229,16 @@ export const securityRouter = router({
       await TokenRefreshService.getInstance().forceRefresh(input.provider);
       return { ok: true };
     }),
+
+  runVulnerabilityScan: protectedProcedure
+    .input(z.object({ targetPath: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      return ctx.services.security.runVulnerabilityScan(input.targetPath);
+    }),
+
+  getIoCFeed: protectedProcedure
+    .query(async () => {
+      const { ThreatIntelService } = await import("../phase2/services/ThreatIntelService.js");
+      return ThreatIntelService.getInstance().getIoCFeed();
+    }),
 });

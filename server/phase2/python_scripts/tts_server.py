@@ -46,6 +46,8 @@ log = logging.getLogger("omnecor.tts")
 # Configuration (override via environment variables)
 # ---------------------------------------------------------------------------
 
+SOVEREIGN_MODE = os.environ.get("SOVEREIGN_MODE", "false").lower() == "true"
+
 # Device: "cpu" or "cuda" — auto-detected if not set
 _default_device = "cuda" if torch.cuda.is_available() else "cpu"
 TTS_DEVICE: str = os.getenv("TTS_DEVICE", _default_device)
