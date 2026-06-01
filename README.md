@@ -162,5 +162,10 @@ Omnecor is released under the [MIT License](LICENSE).
 
 ---
 
+<div align="center">
+
 **Operational Memory Never Escapes Context Overview Remains**
+
+</div>
+
 ---
