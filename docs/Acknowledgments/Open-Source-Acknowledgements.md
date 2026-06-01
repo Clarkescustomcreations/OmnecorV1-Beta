@@ -1,6 +1,6 @@
 # Open Source Acknowledgements
 
-The Omnecor (CORTEX) Human-Machine Collaboration Interface leverages various open-source projects for reference, architectural inspiration, and core functionality. We are grateful to the following projects and their communities for their contributions to the field of AI and automation.
+The Omnecor HMCI (Human-Machine Collaboration Interface) leverages various open-source projects for reference, architectural inspiration, and core functionality. We are grateful to the following projects and their communities for their contributions to the field of AI and automation.
 
 ---
 
