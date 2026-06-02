@@ -3,6 +3,8 @@ import { router, protectedProcedure, adminProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { ENV } from "../_core/env.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
+import { createLogger } from "../_core/logger.js";
+const log = createLogger("ollama");
 
 const OLLAMA_BASE = () => ENV.ollamaUrl;
 
@@ -43,8 +45,65 @@ export const ollamaRouter = router({
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ name: input.name, stream: false }),
-      }).catch(() => {}); // background — don't await
+      }).catch((err: unknown) => {
+        log.error(`[Ollama] Model pull failed for "${input.name}":`, err);
+      });
       return { started: true, name: input.name };
+    }),
+
+  searchModels: protectedProcedure
+    .input(z.object({
+      query: z.string().max(128).default(""),
+      limit: z.number().int().min(1).max(100).default(20),
+    }))
+    .query(async ({ input }) => {
+      // Proxy to ollamadb.dev — a community API for the Ollama model library
+      // https://github.com/frefrik/ollama-models-api
+      const params = new URLSearchParams({
+        limit: String(input.limit),
+        sort_by: "pulls",
+        order: "desc",
+      });
+      if (input.query) params.set("search", input.query);
+
+      const res = await fetch(`https://ollamadb.dev/api/v1/models?${params}`, {
+        headers: { "Accept": "application/json" },
+        signal: AbortSignal.timeout(10_000),
+      });
+
+      if (!res.ok) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Model registry returned ${res.status}`,
+        });
+      }
+
+      const data = await res.json() as {
+        data: Array<{
+          model_identifier: string;
+          description: string;
+          labels: string[];
+          pulls: number;
+          tags: number;
+          last_updated: string;
+          url: string;
+        }>;
+        total_count: number;
+      };
+
+      return {
+        models: (data.data ?? []).map(m => ({
+          id: m.model_identifier,
+          name: m.model_identifier,
+          description: m.description,
+          tags: m.labels ?? [],
+          pulls: m.pulls ?? 0,
+          variantCount: m.tags ?? 0,
+          lastUpdated: m.last_updated,
+          url: m.url,
+        })),
+        total: data.total_count ?? 0,
+      };
     }),
 
   deleteModel: adminProcedure

@@ -47,9 +47,17 @@ export const auditRouter = router({
       const entries = await db.select().from(auditLog)
         .orderBy(desc(auditLog.createdAt))
         .limit(input.limit);
+      // Escape CSV fields: wrap in quotes and double any internal quotes.
+      // Also strip leading =,+,-,@ to prevent formula injection in Excel/Sheets.
+      const csvEscape = (val: unknown): string => {
+        const s = String(val ?? "").replace(/^[=+\-@\t]/, "'$&");
+        return `"${s.replace(/"/g, '""')}"`;
+      };
       const header = "id,eventType,actorId,actorType,procedure,ipAddress,createdAt\n";
       const rows = entries.map(e =>
-        `${e.id},${e.eventType},${e.actorId ?? ""},${e.actorType},${e.procedure ?? ""},${e.ipAddress ?? ""},${e.createdAt.toISOString()}`
+        [e.id, e.eventType, e.actorId ?? "", e.actorType, e.procedure ?? "", e.ipAddress ?? "", e.createdAt.toISOString()]
+          .map(csvEscape)
+          .join(",")
       ).join("\n");
       return { csv: header + rows };
     }),

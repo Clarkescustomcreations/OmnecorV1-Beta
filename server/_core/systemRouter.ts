@@ -4,12 +4,40 @@ import { notifyOwner } from "./notification.js";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc.js";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { homedir } from "os";
+import { homedir, platform, cpus, totalmem, freemem } from "os";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { getDb } from "../db.factory.js";
 import { users } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 import { ENV } from "./env.js";
 import { getPermissionsForRole, type Role } from "../phase2/config/rbac.js";
+
+const execFileAsync = promisify(execFile);
+
+async function findExecutable(candidates: string[]): Promise<string | null> {
+  for (const candidate of candidates) {
+    try {
+      await import("fs/promises").then(fs => fs.access(candidate));
+      return candidate;
+    } catch {
+      // not found at this path, try next
+    }
+  }
+  // Try PATH lookup on unix-like systems
+  if (platform() !== "win32") {
+    for (const name of candidates.map(c => c.split("/").pop()!)) {
+      try {
+        const { stdout } = await execFileAsync("which", [name]);
+        const path = stdout.trim();
+        if (path) return path;
+      } catch {
+        // not in PATH
+      }
+    }
+  }
+  return null;
+}
 
 const SETTINGS_PATH = join(homedir(), ".omnecor", "settings.json");
 
@@ -153,6 +181,67 @@ export const systemRouter = router({
       await db.update(users).set({ role: input.role }).where(eq(users.id, input.userId));
       return { ok: true };
     }),
+
+  detectHardware: protectedProcedure.mutation(async () => {
+    const blenderCandidates = [
+      "/usr/bin/blender",
+      "/usr/local/bin/blender",
+      "/Applications/Blender.app/Contents/MacOS/Blender",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe",
+      "C:\\Program Files\\Blender Foundation\\Blender 3.6\\blender.exe",
+    ];
+    const kicadCandidates = [
+      "/usr/bin/kicad-cli",
+      "/usr/local/bin/kicad-cli",
+      "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+      "C:\\Program Files\\KiCad\\8.0\\bin\\kicad-cli.exe",
+      "C:\\Program Files\\KiCad\\7.0\\bin\\kicad-cli.exe",
+    ];
+
+    const [blenderPath, kicadPath] = await Promise.all([
+      findExecutable(blenderCandidates),
+      findExecutable(kicadCandidates),
+    ]);
+
+    // GPU detection
+    let gpuInfo: string | null = null;
+    try {
+      if (platform() === "linux") {
+        const { stdout } = await execFileAsync("nvidia-smi", ["--query-gpu=name", "--format=csv,noheader"]);
+        gpuInfo = stdout.trim().split("\n").join(", ");
+      } else if (platform() === "darwin") {
+        const { stdout } = await execFileAsync("system_profiler", ["SPDisplaysDataType", "-json"]);
+        const data = JSON.parse(stdout);
+        gpuInfo = (data?.SPDisplaysDataType ?? []).map((d: Record<string, unknown>) => d["sppci_model"]).filter(Boolean).join(", ");
+      }
+    } catch {
+      // nvidia-smi not found or failed — not critical
+    }
+
+    // Ollama detection
+    let ollamaVersion: string | null = null;
+    try {
+      const res = await fetch(`${ENV.ollamaUrl}/api/version`);
+      if (res.ok) {
+        const data = await res.json() as { version?: string };
+        ollamaVersion = data.version ?? null;
+      }
+    } catch {
+      // Ollama not running
+    }
+
+    return {
+      blenderPath,
+      kicadPath,
+      gpuInfo,
+      ollamaVersion,
+      platform: platform(),
+      cpuCount: cpus().length,
+      cpuModel: cpus()[0]?.model ?? null,
+      totalMemoryGB: Math.round(totalmem() / 1024 / 1024 / 1024 * 10) / 10,
+      freeMemoryGB: Math.round(freemem() / 1024 / 1024 / 1024 * 10) / 10,
+    };
+  }),
 
   checkForUpdates: publicProcedure.query(async () => {
     const { UpdateCheckerService } = await import("../phase2/services/UpdateCheckerService.js");

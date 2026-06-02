@@ -4,17 +4,32 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from "../ui/table";
-import { Search, FileText, UploadCloud, Trash2, ExternalLink } from "lucide-react";
+import { Search, FileText, UploadCloud, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { ScrollArea } from "../ui/scroll-area";
+
+interface SearchResult {
+  content: string;
+  score: number;
+  metadata?: Record<string, unknown>;
+}
 
 export const DocumentLibrary: React.FC = () => {
   const [search, setSearch] = useState("");
-  
+  const [previewDoc, setPreviewDoc] = useState<SearchResult | null>(null);
+
   const docsQuery = trpc.knowledgeBase.ensureProject.useMutation({
+    onSuccess: () => toast.success("Knowledge base index refreshed"),
     onError: (err) => toast.error("Indexing failed: " + err.message),
   });
-  const searchMutation = trpc.knowledgeBase.search.useQuery({ projectId: "default", query: search }, { enabled: search.length > 2 });
+  const searchQuery = trpc.knowledgeBase.search.useQuery(
+    { projectId: "default", query: search },
+    { enabled: search.length > 2 }
+  );
+
+  const results = (searchQuery.data as unknown as SearchResult[] | undefined) ?? [];
 
   return (
     <div className="p-8 max-w-6xl mx-auto space-y-8">
@@ -26,15 +41,16 @@ export const DocumentLibrary: React.FC = () => {
         <div className="flex gap-3">
            <div className="relative w-72">
              <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-             <Input 
-               placeholder="Filter documents..." 
-               className="pl-9 h-10" 
+             <Input
+               placeholder="Filter documents..."
+               className="pl-9 h-10"
                value={search}
                onChange={(e) => setSearch(e.target.value)}
              />
            </div>
-           <Button onClick={() => docsQuery.mutate({ projectId: "default" })} className="shadow-md">
-             <UploadCloud className="w-4 h-4 mr-2" /> Refresh Index
+           <Button onClick={() => docsQuery.mutate({ projectId: "default" })} className="shadow-md" disabled={docsQuery.isPending}>
+             <UploadCloud className="w-4 h-4 mr-2" />
+             {docsQuery.isPending ? "Indexing..." : "Refresh Index"}
            </Button>
         </div>
       </div>
@@ -42,7 +58,9 @@ export const DocumentLibrary: React.FC = () => {
       <Card className="border-none shadow-xl bg-card/50 backdrop-blur">
         <CardHeader className="border-b pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="w-5 h-5 text-blue-500" /> Search Results
+            <FileText className="w-5 h-5 text-blue-500" />
+            Search Results
+            {searchQuery.isFetching && <span className="text-xs text-muted-foreground ml-2">Searching...</span>}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">
@@ -55,7 +73,7 @@ export const DocumentLibrary: React.FC = () => {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {(searchMutation.data as unknown as Array<{ content: string; score: number }>)?.map((res, i) => (
+              {results.map((res, i) => (
                 <TableRow key={i} className="group transition-colors hover:bg-muted/30">
                   <TableCell>
                     <div className="flex items-center gap-3">
@@ -67,14 +85,26 @@ export const DocumentLibrary: React.FC = () => {
                   </TableCell>
                   <TableCell><Badge variant="outline">{(res.score * 100).toFixed(1)}%</Badge></TableCell>
                   <TableCell className="text-right">
-                    <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100"><ExternalLink className="w-3.5 h-3.5" /></Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                      title="View full content"
+                      onClick={() => setPreviewDoc(res)}
+                    >
+                      <ExternalLink className="w-3.5 h-3.5" />
+                    </Button>
                   </TableCell>
                 </TableRow>
               ))}
-              {!searchMutation.data?.length && (
+              {!results.length && (
                 <TableRow>
                   <TableCell colSpan={3} className="py-20 text-center text-muted-foreground italic">
-                    Type more than 2 characters to search...
+                    {search.length > 2
+                      ? searchQuery.isLoading
+                        ? "Searching..."
+                        : "No results found."
+                      : "Type more than 2 characters to search..."}
                   </TableCell>
                 </TableRow>
               )}
@@ -82,6 +112,55 @@ export const DocumentLibrary: React.FC = () => {
           </Table>
         </CardContent>
       </Card>
+
+      {/* Document Preview Dialog */}
+      <Dialog open={!!previewDoc} onOpenChange={(open) => !open && setPreviewDoc(null)}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <FileText className="w-4 h-4 text-blue-500" />
+              Document Content
+              {previewDoc && (
+                <Badge variant="outline" className="ml-2">
+                  {(previewDoc.score * 100).toFixed(1)}% match
+                </Badge>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh]">
+            <pre className="whitespace-pre-wrap text-sm font-mono p-4 bg-muted/30 rounded-lg">
+              {previewDoc?.content ?? ""}
+            </pre>
+          </ScrollArea>
+          {previewDoc?.metadata && Object.keys(previewDoc.metadata).length > 0 && (
+            <div className="border-t pt-3">
+              <p className="text-xs font-semibold text-muted-foreground mb-2">Metadata</p>
+              <div className="space-y-1">
+                {Object.entries(previewDoc.metadata).map(([k, v]) => (
+                  <div key={k} className="flex gap-2 text-xs">
+                    <span className="text-muted-foreground font-mono">{k}:</span>
+                    <span className="font-mono">{String(v)}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => {
+                if (previewDoc) {
+                  navigator.clipboard.writeText(previewDoc.content);
+                  toast.success("Copied to clipboard");
+                }
+              }}
+            >
+              Copy Content
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

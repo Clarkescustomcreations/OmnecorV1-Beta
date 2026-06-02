@@ -62,7 +62,7 @@ export const ComfyPanel: React.FC = () => {
         <Card className="flex flex-col h-[400px]">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2 border-b">
             <CardTitle className="text-sm font-medium">Active Queue</CardTitle>
-            <Button variant="ghost" size="icon" className="h-8 w-8"><RefreshCw className="w-3 h-3" /></Button>
+            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => statusQuery.refetch()} title="Refresh queue"><RefreshCw className="w-3 h-3" /></Button>
           </CardHeader>
           <CardContent className="flex-1 p-0 overflow-y-auto bg-muted/20">
             <div className="p-4 text-center text-muted-foreground italic text-xs py-12">

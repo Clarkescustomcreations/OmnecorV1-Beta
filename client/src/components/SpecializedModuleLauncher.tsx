@@ -13,9 +13,6 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { Brain, Box, Zap, Play, Settings, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  createMockLLMBuilderSession,
-  createMockBlenderProject,
-  createMockPCBProject,
   getModuleInfo,
   type LLMBuilderSession,
   type BlenderProject,
@@ -38,17 +35,30 @@ export default function SpecializedModuleLauncher({
   className,
 }: SpecializedModuleLauncherProps) {
   const [activeTab, setActiveTab] = useState<"llm" | "3d" | "pcb">("llm");
-  const [llmSession, setLLMSession] = useState<LLMBuilderSession>(
-    createMockLLMBuilderSession()
-  );
-  const [blenderProject, setBlenderProject] = useState<BlenderProject>(
-    createMockBlenderProject()
-  );
-  const [pcbProject, setPCBProject] = useState<PCBProject>(
-    createMockPCBProject()
-  );
+  const [llmSession, setLLMSession] = useState<LLMBuilderSession | null>(null);
+  const [blenderProject, setBlenderProject] = useState<BlenderProject | null>(null);
+  const [pcbProject, setPCBProject] = useState<PCBProject | null>(null);
 
-  const getLLMBuilderContent = () => (
+  const getLLMBuilderContent = () => {
+    if (!llmSession) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <Brain className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <h3 className="font-semibold mb-2">No Active Session</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create a new LLM fine-tuning session to get started.
+            </p>
+            <Button size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              Create Session
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Session Info */}
@@ -179,19 +189,38 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1" aria-label="Start LLM training">
-          <Play className="w-4 h-4 mr-2" aria-hidden="true" />
+        <Button className=\"flex-1\" aria-label=\"Start LLM training\">
+          <Play className=\"w-4 h-4 mr-2\" aria-hidden=\"true\" />
           Start Training
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure LLM training">
-          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
+        <Button variant=\"outline\" className=\"flex-1\" aria-label=\"Configure LLM training\">
+          <Settings className=\"w-4 h-4 mr-2\" aria-hidden=\"true\" />
           Configure
         </Button>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const get3DModelerContent = () => (
+  const get3DModelerContent = () => {
+    if (!blenderProject) {
+      return (
+        <div className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <Box className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <h3 className="font-semibold mb-2">No Active Project</h3>
+            <p className="text-sm text-muted-foreground mb-4">
+              Create a new Blender project to start 3D modeling.
+            </p>
+            <Button size="sm">
+              <Plus className="w-4 h-4 mr-2" />
+              New Project
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
         {/* Project Info */}
@@ -289,10 +318,29 @@ export default function SpecializedModuleLauncher({
           Settings
         </Button>
       </div>
-    </div>
-  );
+    );
+  };
 
-  const getPCBDesignerContent = () => (
+  const getPCBDesignerContent = () => {
+    if (!pcbProject) {
+      return (
+        <div className=\"flex items-center justify-center p-8\">
+          <div className=\"text-center\">
+            <Zap className=\"w-12 h-12 mx-auto mb-4 opacity-50\" />
+            <h3 className=\"font-semibold mb-2\">No Active Project</h3>
+            <p className=\"text-sm text-muted-foreground mb-4\">
+              Create a new KiCad project to start PCB design.
+            </p>
+            <Button size=\"sm\">
+              <Plus className=\"w-4 h-4 mr-2\" />
+              New Project
+            </Button>
+          </div>
+        </div>
+      );
+    }
+
+    return (
     <div className="space-y-4">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Project Info */}
@@ -391,8 +439,8 @@ export default function SpecializedModuleLauncher({
           Settings
         </Button>
       </div>
-    </div>
-  );
+    );
+  };
 
   return (
     <div className={cn("space-y-4", className)}>

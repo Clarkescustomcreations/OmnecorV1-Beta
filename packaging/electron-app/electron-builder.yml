@@ -24,6 +24,8 @@ asarUnpack:
   - backend/**
   - node_modules/onnxruntime-node
   - node_modules/better-sqlite3
+  - node_modules/bindings
+  - node_modules/file-uri-to-path
 
 # Bundle the compiled Omnecor backend alongside the Electron app
 extraResources:
@@ -74,7 +76,10 @@ nsis:
   uninstallerIcon: build/icon.ico
   runAfterFinish: true
   shortcutName: Omnecor HMCI
-  include: ../windows/omnecor.nsh
+  warningsAsErrors: false
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
 
 # ─── Linux ──────────────────────────────────────────────────────────────────
 linux:
