@@ -85,6 +85,25 @@ cp "$PROJECT_ROOT/tsconfig.json" "$DEB_ROOT/opt/omnecor/backend/" 2>/dev/null ||
 # GPU detection script (used by postinst)
 cp "$SCRIPT_DIR/scripts/detect_gpu.py" "$DEB_ROOT/opt/omnecor/packaging/scripts/" 2>/dev/null || true
 
+# Install native Node.js modules that esbuild externalises (better-sqlite3,
+# onnxruntime-node, mysql2) — without these node_modules the server won't start.
+cat > "$DEB_ROOT/opt/omnecor/backend/package.json" << 'NATPKG'
+{
+  "name": "omnecor-backend-native",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "onnxruntime-node": "^1.26.0",
+    "mysql2": "^3.15.0"
+  }
+}
+NATPKG
+cd "$DEB_ROOT/opt/omnecor/backend"
+npm install --omit=dev --no-audit --no-fund 2>&1 | tail -5 || \
+  echo "  Warning: npm install failed — native modules must be present on target system"
+cd "$PROJECT_ROOT"
+
 # Systemd service
 cp "$SCRIPT_DIR/systemd/omnecor.service" "$DEB_ROOT/lib/systemd/system/"
 
