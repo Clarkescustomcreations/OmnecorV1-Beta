@@ -61,9 +61,20 @@ async function detectMlVenv(): Promise<{ installed: boolean; path: string }> {
 
 export const valetRouter = router({
   status: protectedProcedure.query(async () => {
-    const svc = ValetRouterService.getInstance();
-    const available = await svc.isAvailable();
-    return { available, url: process.env.VALET_ROUTER_URL ?? "http://127.0.0.1:8010" };
+    const url = process.env.VALET_ROUTER_URL ?? "http://127.0.0.1:8010";
+    try {
+      const res = await fetch(`${url}/health`, { signal: AbortSignal.timeout(2000) });
+      if (res.ok) {
+        const data = (await res.json()) as { model_loaded: boolean; backend?: string };
+        return {
+          available: true,
+          modelLoaded: data.model_loaded,
+          backend: data.backend ?? null,
+          url,
+        };
+      }
+    } catch { /* server offline */ }
+    return { available: false, modelLoaded: false, backend: null, url };
   }),
 
   getModes: protectedProcedure.query(async () => {

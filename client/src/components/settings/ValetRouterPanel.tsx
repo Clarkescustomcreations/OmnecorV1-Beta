@@ -64,15 +64,29 @@ export default function ValetRouterPanel() {
               <Badge variant="outline" className="text-muted-foreground">Offline (rule fallback active)</Badge>
             )}
           </div>
+          {valetStatus.data?.available && (
+            <div className="flex items-center justify-between">
+              <span className="text-sm text-muted-foreground">Model</span>
+              {valetStatus.data.modelLoaded ? (
+                <Badge className="bg-green-600 text-white border-transparent">
+                  Loaded{valetStatus.data.backend ? ` · ${valetStatus.data.backend}` : ""}
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-amber-600 dark:text-amber-400">
+                  Loading…
+                </Badge>
+              )}
+            </div>
+          )}
           {artifact?.status === "ready" && artifact.artifact_path && (
             <div className="flex items-center justify-between">
-              <span className="text-sm text-muted-foreground">Active model</span>
+              <span className="text-sm text-muted-foreground">Artifact</span>
               <span className="text-xs font-mono text-muted-foreground truncate max-w-[240px]">
                 {artifact.base_model ?? "unknown"} · {artifact.format}
               </span>
             </div>
           )}
-          {artifact?.status === "pending" && (
+          {artifact?.status === "pending" && !valetStatus.data?.available && (
             <p className="text-xs text-amber-600 dark:text-amber-400">
               No trained artifact registered. Use the controls below to build one, or run{" "}
               <code className="font-mono bg-muted px-1 rounded">pnpm valet:fetch --tag v1.0.0</code>.
