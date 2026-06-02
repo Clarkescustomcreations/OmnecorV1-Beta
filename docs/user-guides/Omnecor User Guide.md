@@ -10,23 +10,29 @@ Operational Memory Never Escapes. Context Overview Remains.
 2.  [Feature Overview](#2-feature-overview)
 3.  [System Requirements](#3-system-requirements)
 4.  [Installation Guide](#4-installation-guide)
+    -   4.1. [Linux Packages (.deb / AppImage / Flatpak)](#41-linux-packages)
+    -   4.2. [Windows Installer](#42-windows-installer)
+    -   4.3. [Android APK (Thin Client)](#43-android-apk-thin-client)
     -   4.4. [Zero-Login & Air-Gapped Operation](#44-zero-login--air-gapped-operation)
-5.  [First Launch Walkthrough](#5-first-launch-walkthrough)
+5.  [First Launch & Setup Wizard](#5-first-launch--setup-wizard)
 6.  [User Interface Guide](#6-user-interface-guide)
+    -   6.7. [Appearance & Light Mode](#67-appearance--light-mode)
 7.  [Core Workflows](#7-core-workflows)
 8.  [Configuration Guide](#8-configuration-guide)
 9.  [AI Systems Documentation](#9-ai-systems-documentation)
 10. [Agentic Wallet & Budgeting](#10-agentic-wallet--budgeting)
-11. [Networking & Multi-System Operation](#11-networking--multi-system-operation)
-12. [Security & Permissions](#12-security--permissions)
-13. [Backup, Recovery, and Migration](#13-backup-recovery-and-migration)
-14. [Troubleshooting Guide](#14-troubleshooting-guide)
-15. [Logs & Diagnostics](#15-logs--diagnostics)
-16. [Advanced Usage](#16-advanced-usage)
-17. [Performance Optimization](#17-performance-optimization)
-18. [FAQ](#18-faq)
-19. [Glossary](#19-glossary)
-20. [Appendix](#20-appendix)
+11. [Cloud Compute Rental](#11-cloud-compute-rental)
+12. [Persona & Agent Creation](#12-persona--agent-creation)
+13. [Networking & Multi-System Operation](#13-networking--multi-system-operation)
+14. [Security & Permissions](#14-security--permissions)
+15. [Backup, Recovery, and Migration](#15-backup-recovery-and-migration)
+16. [Troubleshooting Guide](#16-troubleshooting-guide)
+17. [Logs & Diagnostics](#17-logs--diagnostics)
+18. [Advanced Usage](#18-advanced-usage)
+19. [Performance Optimization](#19-performance-optimization)
+20. [FAQ](#20-faq)
+21. [Glossary](#21-glossary)
+22. [Appendix](#22-appendix)
 
 ---
 
@@ -215,19 +221,74 @@ While Omnecor is primarily developed for Linux, it may be possible to run it on 
 
 For detailed, step-by-step instructions on how to install Omnecor, including prerequisites and platform-specific considerations, please refer to the dedicated [INSTALL.md](../INSTALL.md) document.
 
-### 4.1. Beginner Installation Path
+### 4.1. Linux Packages
+
+Omnecor ships three native Linux package formats for production deployments:
+
+| Package | Command | Notes |
+|---|---|---|
+| **Debian (.deb)** | `sudo dpkg -i omnecor-hmci_2.3.0_amd64.deb` | Installs to `/opt/omnecor/`, creates a systemd unit and desktop entry. |
+| **AppImage** | `chmod +x Omnecor-2.3.0.AppImage && ./Omnecor-2.3.0.AppImage` | Portable — no install or root required. |
+| **Flatpak** | `flatpak install --user omnecor.flatpak` | Sandboxed. Note: hardware bridges (ESPTool, serial ports) require extra Flatpak permissions. |
+
+Build any package yourself from source using the scripts in `packaging/`:
+
+```bash
+./packaging/build-deb.sh          # → dist/omnecor-hmci_2.3.0_amd64.deb
+./packaging/build-appimage.sh     # → dist/Omnecor-2.3.0.AppImage
+./packaging/build-flatpak.sh      # → dist/omnecor.flatpak
+./packaging/build-all.sh          # → all Linux targets
+```
+
+Full reference: [INSTALL.md — Linux Packages](../INSTALL.md#4-platform-specific-packages)
+
+### 4.2. Windows Installer
+
+Omnecor ships a Windows installer built with NSIS via Electron.
+
+- **NSIS installer** (`Omnecor-Setup-2.3.0.exe`) — Installs per-user with no UAC required. Creates a desktop shortcut, Start Menu entry, and silently installs Ollama if absent.
+- **Portable EXE** (`Omnecor-2.3.0-portable.exe`) — Run anywhere with no installation.
+
+Build requirements: Windows 10/11 x64, Node.js v24.15.0, Visual Studio C++ Build Tools.
+
+Cross-compile from Linux: `./packaging/build-all.sh --target win`
+
+Full reference: [INSTALL.md — Windows](../INSTALL.md#45-windows--nsis-installer--portable-exe) · [packaging/windows/BUILD-WINDOWS.md](../packaging/windows/BUILD-WINDOWS.md)
+
+### 4.3. Android APK (Thin Client)
+
+The Omnecor Android app is a **thin client** that connects to a running desktop instance over your local Wi-Fi network. It delivers the full workstation UI on a mobile screen.
+
+**Sideload a pre-built APK:**
+
+```bash
+adb install app-debug.apk
+```
+
+**Build yourself:**
+
+```bash
+pnpm build:android
+cd packaging/electron-app/android && ./gradlew assembleDebug
+```
+
+**Connect to the desktop:** Launch the app → Setup Wizard → Local Network → enter your desktop's LAN IP.
+
+Full reference: [INSTALL.md — Android APK](../INSTALL.md#46-android--thin-client-apk) · [packaging/android/BUILD-ANDROID.md](../packaging/android/BUILD-ANDROID.md)
+
+### 4.4. Beginner Installation Path
 
 Follow the [QUICKSTART.md](../QUICKSTART.md) for the fastest way to get Omnecor running with default settings.
 
-### 4.2. Advanced Installation Path
+### 4.5. Advanced Installation Path
 
 For users requiring specific configurations or deeper control over the installation process, refer to the full [INSTALL.md](../INSTALL.md) guide, paying close attention to environment variable setup and database initialization.
 
-### 4.3. Developer Installation Path
+### 4.6. Developer Installation Path
 
 Developers should follow the [CONTRIBUTING.md](../CONTRIBUTING.md) guide, which covers setting up the development environment, running tests, and contributing code.
 
-### 4.4. Zero-Login & Air-Gapped Operation
+### 4.7. Zero-Login & Air-Gapped Operation
 
 For enterprise or high-security environments that prohibit external network calls during boot:
 
@@ -242,7 +303,28 @@ For enterprise or high-security environments that prohibit external network call
 
 ---
 
-## 5. First Launch Walkthrough
+## 5. First Launch & Setup Wizard
+
+Upon the very first launch of Omnecor, the system performs several initialization steps to prepare your workstation.
+
+### 5.0. Setup Wizard
+
+The **Setup Wizard** runs automatically on first launch and guides you through the essential configuration steps:
+
+1. **Mode Selection** — Choose Sovereign / Scrapper / Big Spender execution mode.
+2. **API Providers** — Enter cloud AI API keys (OpenAI, Anthropic, Gemini, etc.).
+3. **Local Model Setup** — Detect Ollama and pull models.
+4. **Database** — Confirm SQLite or configure MySQL/MariaDB.
+5. **Voice Pipeline** — Configure Whisper STT and XTTS-v2 TTS endpoints.
+6. **Hardware Bridges** — Auto-detect Blender, KiCad, ESPTool paths.
+7. **Appearance** — Choose light or dark theme.
+8. **Local Network** — Set LAN IP for Android thin client connectivity.
+
+Re-open the wizard at any time: **Settings → System → Re-run Setup Wizard**.
+
+Full reference: [docs/setup/SETUP_WIZARD.md](../setup/SETUP_WIZARD.md)
+
+---
 
 Upon the very first launch of Omnecor, the system performs several initialization steps to prepare your workstation.
 
@@ -298,6 +380,17 @@ Omnecor's UI is designed for intuitive navigation and efficient workflow managem
 ### 6.6. Status Indicators
 
 -   Various UI elements (e.g., in the Header or specific panels) display real-time status indicators for AI model connections, OMMESH network status, and ongoing tasks.
+
+### 6.7. Appearance & Light Mode
+
+Omnecor supports **Light** and **Dark** themes. Your preference is stored locally and applied without a page reload.
+
+- Navigate to **Settings → Appearance** and click the **Light** or **Dark** tile.
+- The `ThemeProvider` toggles the `.dark` CSS class on `<html>`, which TailwindCSS's `darkMode: "class"` strategy picks up across the entire component tree.
+- Preference is persisted in `localStorage` key `"theme"`.
+- Both themes are WCAG 2.1 AA compliant.
+
+Full reference: [docs/user-guides/LIGHT_MODE.md](LIGHT_MODE.md)
 
 ---
 
@@ -433,7 +526,61 @@ See [Section 2.10](#210-agentic-wallet) for a full feature overview. This sectio
 
 ---
 
-## 11. Networking & Multi-System Operation
+## 11. Cloud Compute Rental
+
+Omnecor integrates with GPU cloud rental providers so you can run heavy inference workloads remotely without leaving the application.
+
+**Access:** Settings → Cloud Compute
+
+**Supported providers:**
+
+| Provider | API Key Variable | Description |
+|---|---|---|
+| **Vast.ai** | `VASTAI_API_KEY` | Consumer and enterprise GPU marketplace |
+| **RunPod** | `RUNPOD_API_KEY` | Serverless and on-demand pods |
+| **Lambda Labs** | `LAMBDA_API_KEY` | Datacenter A100 / H100 instances |
+
+**Quick start:**
+1. Add an API key to `.env` and restart.
+2. Go to **Settings → Cloud Compute → Start Session**.
+3. Select a provider, GPU tier, and billing unit.
+4. Click **Start Session** — cost is tracked in your Agentic Wallet.
+5. Stop the session when done; final cost is written to the wallet spend log.
+
+Sessions can be assigned as the model backend for always-on Persona agents (see section 12).
+
+Full reference: [docs/user-guides/CLOUD_COMPUTE.md](CLOUD_COMPUTE.md)
+
+---
+
+## 12. Persona & Agent Creation
+
+The **Character Persona Studio** lets you build a digital clone, a social media identity, or a fully autonomous AI agent.
+
+**Access:** Settings → Personas
+
+**Three persona types:**
+
+| Type | Description |
+|---|---|
+| **Self Clone** | Your digital replica — voice, face, and communication style. |
+| **Social Media Persona** | A crafted brand identity for content creation and automated posting. |
+| **Omnecor Agent** | A fully autonomous agent with a custom system prompt, tool permissions, always-on mode, and multi-channel messaging. |
+
+**Each persona includes:**
+- **Identity** — Name, bio, personality traits, Neural Brain Map binding
+- **Appearance** — Avatar upload or AI-generated portrait (Fal.ai / OpenArt / ComfyUI)
+- **Voice** — XTTS-v2 clone, RVC model, or ElevenLabs cloud voices
+- **Video Avatar** — Talking-head video generation (OpenArt / Fal.ai / D-ID)
+- **Agent Config** (agent type only) — System prompt, tool permissions, always-on toggle, model backend (Ollama / Omesh / Cloud Compute / External API), messaging channels (in-app chat, webhook, n8n, desktop notifications, email)
+
+Personas are stored locally in `localStorage` — no data leaves your machine.
+
+Full reference: [docs/user-guides/PERSONA_AGENT_GUIDE.md](PERSONA_AGENT_GUIDE.md)
+
+---
+
+## 13. Networking & Multi-System Operation
 
 Omnecor supports multi-system operation through its OMMESH distributed intelligence layer. For detailed information on how to set up and manage a mesh network of Omnecor instances, refer to:
 

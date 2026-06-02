@@ -195,4 +195,44 @@ export const valetRouter = router({
       });
       return { step: "training" as const, jobId };
     }),
+
+  /**
+   * Phase 7.3: Refresh the Valet knowledge base.
+   * Bumps knowledge_base_version in routing_manifest.json, signals the
+   * inference server to hot-reload, and optionally spawns valet_knowledge_refresh.py
+   * to re-embed KB chunks into ChromaDB.
+   */
+  refreshKnowledge: protectedProcedure.mutation(async ({ ctx }) => {
+    // Signal inference server to hot-reload (fast path — always attempted)
+    const valetUrl = process.env.VALET_ROUTER_URL ?? "http://127.0.0.1:8010";
+    let reloaded = false;
+    try {
+      const res = await fetch(`${valetUrl}/admin/reload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: "{}",
+        signal: AbortSignal.timeout(3000),
+      });
+      reloaded = res.ok;
+    } catch { /* inference server may be offline */ }
+
+    // Spawn valet_knowledge_refresh.py — it owns the version bump, ChromaDB
+    // re-embedding, and a second /admin/reload after writing the manifest.
+    const kbScript = path.resolve(
+      process.cwd(),
+      "server/python_bridges/valet_knowledge_refresh.py",
+    );
+    let embeddingJobId: string | undefined;
+    try {
+      await access(kbScript, constants.R_OK);
+      embeddingJobId = await ctx.services.processManager.spawn({
+        type: "custom",
+        command: "python3",
+        args: [kbScript],
+        label: "Valet KB Refresh (ChromaDB embedding)",
+      });
+    } catch { /* script absent or processManager unavailable */ }
+
+    return { reloaded, embeddingJobId };
+  }),
 });

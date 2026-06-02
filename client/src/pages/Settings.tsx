@@ -9,10 +9,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Key, Shield, HardDrive, Cpu, Bell, Lock, Zap, Flame, Activity, Users, Download, CheckCircle2, Circle, Route } from "lucide-react";
+import { Key, Shield, HardDrive, Cpu, Bell, Lock, Zap, Flame, Activity, Users, Download, CheckCircle2, Circle, Route, Sun, Moon, Monitor, Cloud, UserCircle2 } from "lucide-react";
+import { useTheme, type Theme } from "../contexts/ThemeContext";
+import CloudComputePanel from "../components/settings/CloudComputePanel";
 import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
 import ValetRouterPanel from "../components/settings/ValetRouterPanel";
+import PersonaCreationPanel from "../components/settings/PersonaCreationPanel";
 
 export const Settings: React.FC = () => {
   const saveKeysMutation = trpc.system.saveKeys.useMutation({
@@ -46,6 +49,9 @@ export const Settings: React.FC = () => {
           <TabsTrigger value="system" id="tab-system"><Cpu className="w-4 h-4 mr-2" aria-hidden="true" /> System</TabsTrigger>
           <TabsTrigger value="accounts" id="tab-accounts"><Users className="w-4 h-4 mr-2" aria-hidden="true" /> Accounts</TabsTrigger>
           <TabsTrigger value="valet" id="tab-valet"><Route className="w-4 h-4 mr-2" aria-hidden="true" /> Valet Router</TabsTrigger>
+          <TabsTrigger value="appearance" id="tab-appearance"><Sun className="w-4 h-4 mr-2" aria-hidden="true" /> Appearance</TabsTrigger>
+          <TabsTrigger value="cloud" id="tab-cloud"><Cloud className="w-4 h-4 mr-2" aria-hidden="true" /> Cloud Compute</TabsTrigger>
+          <TabsTrigger value="personas" id="tab-personas"><UserCircle2 className="w-4 h-4 mr-2" aria-hidden="true" /> Personas</TabsTrigger>
           {isAdmin && <TabsTrigger value="admin" id="tab-admin"><Activity className="w-4 h-4 mr-2" aria-hidden="true" /> Admin</TabsTrigger>}
         </TabsList>
 
@@ -153,6 +159,18 @@ export const Settings: React.FC = () => {
           <ValetRouterPanel />
         </TabsContent>
 
+        <TabsContent value="appearance" role="tabpanel" aria-labelledby="tab-appearance">
+          <AppearancePanel />
+        </TabsContent>
+
+        <TabsContent value="cloud" role="tabpanel" aria-labelledby="tab-cloud">
+          <CloudComputePanel />
+        </TabsContent>
+
+        <TabsContent value="personas" role="tabpanel" aria-labelledby="tab-personas">
+          <PersonaCreationPanel />
+        </TabsContent>
+
         {isAdmin && (
           <TabsContent value="admin" role="tabpanel" aria-labelledby="tab-admin">
             <div className="space-y-6">
@@ -162,6 +180,48 @@ export const Settings: React.FC = () => {
           </TabsContent>
         )}
       </Tabs>
+    </div>
+  );
+};
+
+const THEME_OPTIONS: { value: Theme; label: string; icon: React.ReactNode; description: string }[] = [
+  { value: "dark", label: "Dark", icon: <Moon className="h-5 w-5" />, description: "Dark background, optimized for low-light environments." },
+  { value: "light", label: "Light", icon: <Sun className="h-5 w-5" />, description: "Light background, best for bright environments." },
+];
+
+const AppearancePanel: React.FC = () => {
+  const { theme, setTheme } = useTheme();
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2"><Monitor className="w-4 h-4" /> Theme</CardTitle>
+          <CardDescription>Choose the color scheme for the Omnecor interface. Your preference is saved locally.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid grid-cols-2 gap-3 max-w-md">
+            {THEME_OPTIONS.map(opt => (
+              <button
+                key={opt.value}
+                onClick={() => setTheme(opt.value)}
+                aria-pressed={theme === opt.value}
+                className={`flex flex-col items-center gap-2 rounded-lg border-2 p-4 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                  ${theme === opt.value
+                    ? "border-primary bg-primary/10 text-primary"
+                    : "border-border bg-background hover:border-muted-foreground text-muted-foreground hover:text-foreground"
+                  }`}
+              >
+                {opt.icon}
+                <span>{opt.label}</span>
+              </button>
+            ))}
+          </div>
+          <p className="mt-3 text-xs text-muted-foreground">
+            Current theme: <span className="font-semibold capitalize">{theme}</span>
+          </p>
+        </CardContent>
+      </Card>
     </div>
   );
 };
