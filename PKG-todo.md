@@ -176,8 +176,17 @@ already exist.
       referenced in `electron-builder.yml`.
 - [x] **3.2.4** `requestedExecutionLevel: asInvoker` + `perMachine: false` → installs
       without admin; confirmed configured in `electron-builder.yml`.
+- [x] **3.2.5** Static installer smoke test suite committed
+      (`packaging/windows/installer.smoke.test.ts`, 30 tests, all green). Validates:
+      NSIS script structure (all 4 sections, balanced Section/SectionEnd, Ollama path,
+      registry key, HTTPS download URL), `electron-builder.yml` config (appId, both
+      targets, non-one-click/per-user flags, `omnecor.nsh` include resolves, shortcut
+      name, `runAfterFinish`), bundled scripts syntax (bash -n), and version consistency
+      across `package.json` / `omnecor.nsh` / `build-all.sh`. Also generated the
+      missing `build/icon.ico` from `resources/icon.png` (would have caused
+      `electron-builder --win` to fail). Runs in CI on every push/PR.
 
-### 3.3 — Runtime smoke on Windows
+### 3.3 — Runtime smoke on Windows *(requires Windows 10/11 hardware or VM)*
 - [ ] **3.3.1** Run the installer on a clean Windows 10/11 VM; app launches.
 - [ ] **3.3.2** Backend child process spawns on Windows (`process.platform === 'win32'`
       branch in `main/index.ts`); confirm the Node/backend path resolves under
