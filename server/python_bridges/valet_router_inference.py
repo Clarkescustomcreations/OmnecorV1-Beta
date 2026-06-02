@@ -102,7 +102,7 @@ def get_model():
         try:
             from transformers import AutoTokenizer, AutoModelForCausalLM
             import torch
-            model_name = os.environ.get("VALET_MODEL", "unsloth/Llama-3.2-1B-Instruct")
+            model_name = os.environ.get("VALET_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
             _tokenizer = AutoTokenizer.from_pretrained(model_name)
             _model = AutoModelForCausalLM.from_pretrained(
                 model_name,

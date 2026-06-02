@@ -14,7 +14,7 @@
     "build:web": "cd packaging/electron-app && pnpm build",
     "build:android": "pnpm build:web && cd packaging/electron-app && pnpm exec cap sync android",
     "valet:fetch": "bash scripts/fetch-valet-model.sh",
-    "valet:build": "echo 'Phase 1 orchestrator not yet implemented. Run training via the UI or trainingRouter.startTraining tRPC call.'",
+    "valet:build": "python3 server/python_bridges/valet_pipeline.py",
     "valet:setup-ml": "bash scripts/setup-valet-ml.sh"
   },
   "dependencies": {

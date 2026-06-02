@@ -142,7 +142,7 @@ interface ManagedProcess {
  * });
  *
  * const jobId = await pm.spawnLoRATraining({
- *   modelName: "unsloth/llama-3-8b-bnb-4bit",
+ *   modelName: "Qwen/Qwen2.5-1.5B-Instruct",
  *   datasetPath: "/data/train.jsonl",
  *   outputDir: "/models/my-lora",
  *   epochs: 3,
@@ -234,6 +234,35 @@ export class ProcessManagerService extends EventEmitter {
       args,
       label: `LoRA Training: ${modelName || "default"}`,
       // Training can take hours — no timeout by default
+      timeoutMs: 0,
+    });
+  }
+
+  /**
+   * Spawn the Valet Router build pipeline (dataset → validate → train → export).
+   * Progress is streamed as JSON lines on the `training:<jobId>` WebSocket channel.
+   *
+   * @param config.configPath - Path to valet.config.json (defaults to repo root)
+   * @param config.force      - Force rebuild even if artifact is already fresh
+   * @param config.requireGpu - Hard-fail if no GPU is detected (on-device mode B)
+   * @returns Job ID for tracking
+   */
+  async spawnValetPipeline(config: {
+    configPath?: string;
+    force?: boolean;
+    requireGpu?: boolean;
+  } = {}): Promise<string> {
+    const { configPath, force, requireGpu } = config;
+    const args = [PYTHON_SCRIPTS.valetPipeline];
+    if (configPath) args.push("--config", configPath);
+    if (force)      args.push("--force");
+    if (requireGpu) args.push("--require-gpu");
+
+    return this.spawn({
+      type: "lora_training",
+      command: PYTHON_SCRIPTS.pythonBin,
+      args,
+      label: "Valet Router Pipeline",
       timeoutMs: 0,
     });
   }

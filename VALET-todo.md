@@ -101,28 +101,25 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase 0 — Decisions, prerequisites, deps bootstrap
 
-- [ ] **0.1 Lock the base model.** Recommended: **`Qwen2.5-1.5B-Instruct`** (matches the
-      docs/branding and is the right size for a router). Set it as the single default in
-      `trainingRouter` schema, `ProcessManagerService`, and `valet_router_inference.py`
-      (`VALET_MODEL`). Eliminate the conflicting `llama-3-8b` / `Llama-3.2-1B` defaults.
-- [ ] **0.2 Choose the distribution model (the big fork):**
-      - **A — Maintainer-built, shipped (recommended for beta):** the pipeline runs once on
-        a GPU box / CI, produces a versioned artifact (gguf or Ollama model), which is
-        bundled or downloaded on demand. Users get a working router with no training.
-      - **B — On-device build (Sovereign power-users):** the app runs the pipeline locally
-        (needs GPU + heavy deps). Optional, gated behind a setting.
-      - **Default plan: A as the shipping path, B as an opt-in Phase 5.**
-- [ ] **0.3 Choose the export/runtime format.** Recommended **`--save_method gguf`** served
-      via **llama.cpp** (already integrated: `llamacpp_bridge.py`) **or** `--save_method
-      ollama` served via the existing Ollama integration. Avoid shipping raw torch+unsloth
-      to end users. Decide one; the inference server (Phase 3) must match.
-- [ ] **0.4 Python deps bootstrap.** Add a `scripts/setup-valet-ml.sh` (or extend
-      `packaging/scripts/install.sh`) that creates a venv and installs the ML stack
-      (`torch` per platform, `transformers`, `trl`, `datasets`, and—if GPU—`unsloth`).
-      Pin versions. Make it idempotent and skip on machines without a GPU when in mode A.
-- [ ] **0.5 GPU/CPU detection.** Reuse `packaging/scripts/detect_gpu.py` to decide
-      training feasibility and to pick `torch` dtype; fail fast with a clear message if
-      on-device training (mode B) is requested without a supported GPU.
+- [x] **0.1 Lock the base model.** **DECIDED: `Qwen/Qwen2.5-1.5B-Instruct`.**
+      Updated in `valet_router_inference.py` (`VALET_MODEL` default), `trainingRouter.ts`
+      schema comment, and `ProcessManagerService.ts` JSDoc example. Matches docs/branding;
+      right size for a router; Qwen2.5 ChatML is what the training `text` field targets.
+- [x] **0.2 Distribution model. DECIDED: Option A (maintainer-built, shipped).**
+      The pipeline runs once on a GPU box / CI, produces a versioned gguf artifact,
+      shipped as a GitHub release asset or bundled. Users get a working router with zero
+      training. On-device build (Option B) is Phase 5, opt-in, behind a setting.
+- [x] **0.3 Export/runtime format. DECIDED: `--save_method gguf` served via llama.cpp.**
+      `llamacpp_bridge.py` is already integrated. The inference server (Phase 3.1) will
+      resolve the model from `models/valet-router/current.json` and load via llama.cpp.
+      Raw torch+unsloth never ships to end users.
+- [x] **0.4 Python deps bootstrap.** `scripts/setup-valet-ml.sh` — creates `~/.omnecor/ml-venv`,
+      installs `torch`, `transformers`, `trl`, `datasets`, `accelerate`, `peft`, and (if GPU)
+      `unsloth`. Idempotent via `.setup-complete` marker; `FORCE=1` to reinstall. Invoked via
+      `pnpm valet:setup-ml`.
+- [x] **0.5 GPU/CPU detection.** `packaging/scripts/detect_gpu.py` detects NVIDIA/AMD GPU,
+      maps VRAM → Ollama GPU layers. `valet_pipeline.py` calls `nvidia-smi`/`rocm-smi` directly
+      for the training feasibility check (hard-fail with `--require-gpu` for on-device mode B).
 - **DoD:** base model + distribution + export format are decided and recorded here; a
   single bootstrap script installs the ML deps reproducibly on a target GPU box.
 
@@ -130,24 +127,25 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase 1 — Orchestrate the pipeline (one job: build → validate → train → export)
 
-- [ ] **1.1 Author an orchestrator** `server/python_bridges/valet_pipeline.py` (or a TS
-      coordinator) that runs, in order, with a single entrypoint:
-      1. dataset build (`valet_dataset_builder.py`)
-      2. dataset validation (reuse `trainingRouter.validateDataset` logic)
-      3. LoRA train (`localLLMfine-tuning.py`)
-      4. export (per 0.3) + register artifact (Phase 2)
-      Each step streams the existing JSON progress lines; the orchestrator aggregates them.
-- [ ] **1.2 Expose it as one tRPC procedure** `trainingRouter.buildValetRouter` that
-      spawns the orchestrator via `ProcessManager`, returns a `jobId`, and streams unified
-      progress on `training:${jobId}`. Add a CLI wrapper (`pnpm valet:build`) for headless/CI.
-- [ ] **1.3 Make it idempotent + resumable.** Skip dataset rebuild if a fresh dataset hash
-      exists; skip train if an artifact for the same (base model + dataset hash + config)
-      is already registered. Surface a `--force` flag.
-- [ ] **1.4 Config file** `valet.config.json` (base model, examples-per-category, epochs,
-      LoRA r/alpha, save_method, eval thresholds) so a run is fully declarative and
-      reproducible. Set a fixed seed.
-- [ ] **1.5 Preconditions check.** Before starting: Ollama reachable with the oracle model
-      pulled (dataset step), disk space, GPU present (mode B). Fail with actionable errors.
+- [x] **1.1 Author an orchestrator** `server/python_bridges/valet_pipeline.py`.
+      Steps: dataset build → inline validation → LoRA train (with `--registry_root`) →
+      artifact registered. Each step streams JSON progress lines; orchestrator relays them
+      with a `step` field so ProcessManager surfaces them on `training:<jobId>`.
+- [x] **1.2 Expose as `trainingRouter.buildValetRouter`** tRPC procedure (spawns the
+      orchestrator via `ProcessManagerService.spawnValetPipeline()`; returns `jobId`).
+      `pnpm valet:build` CLI wrapper now invokes `valet_pipeline.py` directly for CI/headless.
+      `PYTHON_SCRIPTS.valetPipeline` added to `server/phase2/config/index.ts`.
+- [x] **1.3 Idempotent + resumable.** Dataset step skipped when `data/valet/metadata.json`
+      shows the same `manifest_version` + `seed`. Train step skipped when `current.json`
+      already covers the same `base_model` + `dataset_hash` + `config_hash`. `--force` flag
+      overrides both. Config hash is SHA-256 of `valet.config.json` (sorted keys, first 16 hex).
+- [x] **1.4 Config file** `valet.config.json` at repo root. Fields: `base_model`,
+      `total_examples`, `epochs`, `r`, `lora_alpha`, `max_seq_length`, `save_method`,
+      `oracle_model`, `emit_text`, `seed`, `eval_thresholds`, `disk_space_gb_required`,
+      `dataset_out`, `val_out`, `eval_out`, `registry_root`.
+- [x] **1.5 Preconditions check.** Disk space (hard-fail). Ollama reachable + oracle model
+      tag present (warn, not fail — static fallbacks cover missing oracle). GPU check via
+      `nvidia-smi`/`rocm-smi` (hard-fail only when `--require-gpu` / mode B is requested).
 - **DoD:** `pnpm valet:build` (or the tRPC call) runs end-to-end on a GPU box and produces
   a trained, exported artifact from scratch, with streamed progress and no manual steps.
 
@@ -155,18 +153,28 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase 2 — Artifact: export, version, registry, distribution
 
-- [ ] **2.1 Deterministic output path** `models/valet-router/<base>-<datasetHash>-<date>/`
+- [x] **2.1 Deterministic output path** `models/valet-router/<base>-<datasetHash>-<date>/`
       containing the export (gguf/ollama/merged) + `metadata.json` (base model, dataset
       hash, config, eval scores, git SHA).
-- [ ] **2.2 Model registry / pointer.** Write a `models/valet-router/current.json` that
+      — `valet_pipeline.py` constructs `{model_slug}-{hash8}-{date}` artifact dir and passes
+      `--registry_root` + `--dataset_hash` to the trainer; `localLLMfine-tuning.py:_write_metadata()`
+      writes `metadata.json` into the dir.
+- [x] **2.2 Model registry / pointer.** Write a `models/valet-router/current.json` that
       names the active artifact. The inference server reads this (not a hardcoded HF stub).
-- [ ] **2.3 Distribution (mode A).** Decide bundle vs download:
+      — `localLLMfine-tuning.py:_write_current_json()` stamps `artifact_path`, `status: ready`,
+      `base_model`, `dataset_hash`, `git_sha` after each successful run.
+      `scripts/fetch-valet-model.sh` writes `current.json` after a download.
+      Inference side (Phase 3.1) reads it instead of the HF stub.
+- [x] **2.3 Distribution (mode A).** Decide bundle vs download:
       - small gguf (~1–1.5 GB for a 1.5B Q4) → host as a GitHub release asset; add a
         `scripts/fetch-valet-model.sh` that downloads + checksums into `models/valet-router/`.
       - Wire `packaging/models/` (already referenced in `electron-builder.yml extraResources`)
         so desktop builds can ship or fetch it.
-- [ ] **2.4 `.gitignore`** the `models/valet-router/` weights; commit only `current.json`
+      — `scripts/fetch-valet-model.sh` complete (download + checksum + writes current.json).
+      `electron-builder.yml` extraResources ships `current.json`, `**/metadata.json`, `**/*.gguf`.
+- [x] **2.4 `.gitignore`** the `models/valet-router/` weights; commit only `current.json`
       schema + metadata, never large binaries.
+      — `.gitignore` has `models/valet-router/*/` (ignores all artifact subdirs) + `*.gguf`.
 - **DoD:** a built artifact is versioned with metadata and resolvable via `current.json`;
   a fresh machine can obtain the model via one fetch script with checksum verification.
 
