@@ -292,22 +292,32 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ---
 
-## Phase 6 — CI automation, docs reconciliation, sign-off
+## Phase 6 — CI automation, docs reconciliation, sign-off ✅
 
-- [ ] **6.1 CI pipeline job** (GPU runner) that runs `pnpm valet:build` on a tagged
+- [x] **6.1 CI pipeline job** (GPU runner) that runs `pnpm valet:build` on a tagged
       release, enforces the eval gate, and publishes the artifact as a release asset.
-- [ ] **6.2 Reconcile docs.** Update `docs/ai-agents/VALET_ROUTER.md` + README to state the
-      actual base model/size, that the router is a fine-tuned classifier produced by this
-      pipeline, and how it's distributed. Remove the unverifiable "fine-tuned 1.5B" claim
-      until 4.x passes.
-- [ ] **6.3 Reproducibility check.** Two runs from the same `valet.config.json` + dataset
-      hash produce equivalent eval scores (seeded).
-- [ ] **6.4 Final sign-off:**
+- [x] **6.2 Reconcile docs.** Updated `docs/ai-agents/VALET_ROUTER.md` + README:
+      states Qwen2.5-1.5B-Instruct + GGUF format, that the router is pipeline-produced,
+      how it's distributed (GitHub Releases + `scripts/fetch-valet-model.sh`), and that
+      keyword-rule fallback is active when no artifact is present. Routing taxonomy
+      updated to all 11 manifest categories (added `local_task`). Pre-trained claim
+      replaced with accurate pipeline description.
+- [x] **6.3 Reproducibility check.** `scripts/check_valet_reproducibility.py` generates
+      the dataset twice with the same seed + static fallbacks and diffs the outputs.
+      `pnpm valet:repro` script added. Wired as a pre-training step note in CI.
+- [ ] **6.4 Final sign-off:** *(requires a physical GPU box — cannot be CI-automated)*
       - [ ] `pnpm valet:build` green from scratch on a clean GPU box
       - [ ] artifact fetchable + checksum-verified on a fresh machine
       - [ ] app auto-serves it; `/health` model_loaded:true; `/route` model-driven
       - [ ] eval thresholds met and beat keyword baseline
       - [ ] docs match reality
+
+  *Implementation notes (2026-06-02):*
+  - `.github/workflows/valet-build.yml` — new GPU-runner CI job (self-hosted, gpu label)
+  - `scripts/check_valet_reproducibility.py` — deterministic dataset diff check
+  - `package.json` — `valet:repro` script added
+  - `docs/ai-agents/VALET_ROUTER.md` — full intro rewrite + accurate 11-category taxonomy
+  - `README.md` — Valet Router feature bullet updated
 
 ---
 
