@@ -33,7 +33,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
   - 🔴 **Sovereign** — 100% local. All cloud calls blocked by `sovereignCheck` middleware.
   - ⚡ **Scrapper** *(default)* — Local-first with cloud fallback. Maximum efficiency.
   - 🔥 **Big Spender** — Cloud-first for maximum quality on production runs.
-- **Valet Router** — Fine-tuned local 1.5B classifier that routes prompts to the optimal provider without a cloud call.
+- **Valet Router** — Qwen2.5-1.5B-Instruct fine-tuned routing classifier (GGUF, served via llama-cpp-python). Produced by `pnpm valet:build`; distributed as a pre-built artifact via GitHub Releases. Auto-starts with the app when the artifact is present; falls back to keyword rules otherwise. No cloud call is ever made for the routing decision.
 - **Local LLM Support** — First-class Ollama and Llama.cpp integration with VRAM-aware model selection.
 
 ### Agentic Workforce
