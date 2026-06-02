@@ -95,140 +95,22 @@ export interface ModelMarketplaceItem {
 }
 
 /**
- * Mock marketplace data for demo purposes
+ * Marketplace models - loaded from API in production
+ * TODO: Fetch from real Ollama model registry or HuggingFace API
  */
-export const mockMarketplaceModels: ModelMarketplaceItem[] = [
-  {
-    id: "mistral-7b",
-    name: "Mistral 7B",
-    provider: "ollama",
-    description: "Fast and efficient 7B parameter model",
-    size: 4096,
-    quantizations: ["Q4_0", "Q5_0", "Q8_0"],
-    popularity: 95,
-    rating: 4.8,
-    downloads: 150000,
-    tags: ["fast", "efficient", "chat"],
-    releaseDate: new Date("2024-01-01"),
-    latestVersion: "0.3.0",
-  },
-  {
-    id: "llama2-13b",
-    name: "Llama 2 13B",
-    provider: "ollama",
-    description: "Meta's Llama 2 13B parameter model",
-    size: 7680,
-    quantizations: ["Q4_0", "Q5_0", "Q8_0"],
-    popularity: 92,
-    rating: 4.7,
-    downloads: 200000,
-    tags: ["chat", "instruction-tuned", "popular"],
-    releaseDate: new Date("2023-07-18"),
-    latestVersion: "1.0.0",
-  },
-  {
-    id: "neural-chat-7b",
-    name: "Neural Chat 7B",
-    provider: "ollama",
-    description: "Intel's optimized chat model",
-    size: 4096,
-    quantizations: ["Q4_0", "Q5_0"],
-    popularity: 78,
-    rating: 4.5,
-    downloads: 80000,
-    tags: ["chat", "optimized", "intel"],
-    releaseDate: new Date("2024-02-15"),
-    latestVersion: "1.3.0",
-  },
-  {
-    id: "phi-2",
-    name: "Phi 2",
-    provider: "ollama",
-    description: "Microsoft's efficient 2.7B model",
-    size: 1536,
-    quantizations: ["Q4_0", "Q5_0", "Q8_0"],
-    popularity: 85,
-    rating: 4.6,
-    downloads: 120000,
-    tags: ["small", "efficient", "fast"],
-    releaseDate: new Date("2023-12-12"),
-    latestVersion: "1.0.0",
-  },
-];
+export const mockMarketplaceModels: ModelMarketplaceItem[] = [];
 
 /**
- * Mock local models for demo
+ * Local models - discovered from Ollama/Llama.cpp at runtime
+ * TODO: Fetch from ollama.listModels or llamacpp endpoint
  */
-export const mockLocalModels: LocalModel[] = [
-  {
-    id: "mistral-7b-local",
-    name: "Mistral 7B",
-    source: "ollama",
-    size: 4096,
-    quantization: "Q4_0",
-    contextWindow: 8192,
-    maxTokens: 2048,
-    status: "available",
-    endpoint: "http://localhost:11434",
-  },
-  {
-    id: "llama2-13b-local",
-    name: "Llama 2 13B",
-    source: "ollama",
-    size: 7680,
-    quantization: "Q4_0",
-    contextWindow: 4096,
-    maxTokens: 2048,
-    status: "available",
-    endpoint: "http://localhost:11434",
-  },
-];
+export const mockLocalModels: LocalModel[] = [];
 
 /**
- * Mock API models for demo
+ * API models - configured by user in settings
+ * TODO: Load from user configuration and API health checks
  */
-export const mockAPIModels: APIModel[] = [
-  {
-    id: "gpt-4",
-    name: "GPT-4",
-    provider: "openai",
-    status: "available",
-    costPer1kTokens: {
-      input: 0.03,
-      output: 0.06,
-    },
-  },
-  {
-    id: "gpt-3.5-turbo",
-    name: "GPT-3.5 Turbo",
-    provider: "openai",
-    status: "available",
-    costPer1kTokens: {
-      input: 0.0015,
-      output: 0.002,
-    },
-  },
-  {
-    id: "claude-3-opus",
-    name: "Claude 3 Opus",
-    provider: "anthropic",
-    status: "available",
-    costPer1kTokens: {
-      input: 0.015,
-      output: 0.075,
-    },
-  },
-  {
-    id: "claude-3-sonnet",
-    name: "Claude 3 Sonnet",
-    provider: "anthropic",
-    status: "available",
-    costPer1kTokens: {
-      input: 0.003,
-      output: 0.015,
-    },
-  },
-];
+export const mockAPIModels: APIModel[] = [];
 
 /**
  * Convert local and API models to unified AIModel format

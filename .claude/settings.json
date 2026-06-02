@@ -1,0 +1,29 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(Get-Item \"C:\\\\Program Files\\\\nodejs\\\\node.exe\" -ErrorAction SilentlyContinue; Get-Item \"$env:ProgramFiles\\\\nodejs\" -ErrorAction SilentlyContinue; Get-ChildItem \"$env:LOCALAPPDATA\\\\Programs\" -ErrorAction SilentlyContinue | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"C:\\\\Program Files\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"node|npm|claude\" } | Select-Object Name; Get-ChildItem \"C:\\\\Program Files \\(x86\\)\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"node|npm|claude\" } | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"node|nvm|claude\" } | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.claude\" -ErrorAction SilentlyContinue | Select-Object Name, Length, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\AppData\\\\Local\\\\AnthropicClaude\" -ErrorAction SilentlyContinue | Select-Object Name, LastWriteTime; Get-ChildItem \"$env:USERPROFILE\\\\AppData\\\\Roaming\\\\Claude\" -ErrorAction SilentlyContinue | Select-Object Name, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"$env:LOCALAPPDATA\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"claude|anthropic\" } | Select-Object Name, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"$env:APPDATA\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"claude|anthropic|npm\" } | Select-Object Name, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\clark\\\\AppData\\\\Local\\\\Microsoft\\\\WindowsApps\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"claude|node|npm\" } | Select-Object Name)",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\clark\\\\AppData\\\\Local\\\\Programs\\\\Microsoft VS Code\\\\bin\" -ErrorAction SilentlyContinue | Select-Object Name | Where-Object { $_.Name -match \"claude\" })",
+      "PowerShell(Get-ChildItem \"C:\\\\Users\\\\clark\\\\AppData\\\\Local\\\\Programs\\\\Microsoft VS Code\" -Recurse -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"claude\" } | Select-Object FullName | Select-Object -First 10)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.vscode\\\\extensions\" -ErrorAction SilentlyContinue | Where-Object { $_.Name -match \"claude|anthropic\" } | Select-Object Name, LastWriteTime)",
+      "PowerShell($ext = \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\"; Get-ChildItem $ext | Select-Object Name, Length, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\\\\bin\" -ErrorAction SilentlyContinue | Select-Object Name, Length)",
+      "PowerShell($ext = \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\"; Get-ChildItem \"$ext\\\\resources\" | Select-Object Name, Length, LastWriteTime)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\\\\resources\\\\native-binary\" | Select-Object Name, Length, LastWriteTime)",
+      "PowerShell($claude = \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\\\\resources\\\\native-binary\\\\claude.exe\"; & $claude --version 2>&1)",
+      "PowerShell($claude = \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\\\\resources\\\\native-binary\\\\claude.exe\"; & $claude --help 2>&1 | Select-Object -First 30)",
+      "Read(//c/Users/clark/.claude/**)",
+      "PowerShell($claude = \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\\\\resources\\\\native-binary\\\\claude.exe\"; & $claude --help 2>&1 | Measure-Object -Line | Select-Object -ExpandProperty Lines)",
+      "PowerShell($creds = Get-Content \"$env:USERPROFILE\\\\.claude\\\\.credentials.json\" | ConvertFrom-Json; $oauth = $creds.claudeAiOauth; [PSCustomObject]@{ HasAccessToken = \\($null -ne $oauth.accessToken -and $oauth.accessToken.Length -gt 0\\); HasRefreshToken = \\($null -ne $oauth.refreshToken -and $oauth.refreshToken.Length -gt 0\\); SubscriptionType = $oauth.subscriptionType; RateLimitTier = $oauth.rateLimitTier; Scopes = \\($oauth.scopes -join \", \"\\); ExpiresAt = [DateTimeOffset]::FromUnixTimeMilliseconds\\($oauth.expiresAt\\).ToString\\(\"yyyy-MM-dd HH:mm:ss UTC\"\\); IsExpired = \\([DateTimeOffset]::FromUnixTimeMilliseconds\\($oauth.expiresAt\\) -lt [DateTimeOffset]::UtcNow\\) })",
+      "PowerShell($pkg = Get-Content \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\\\\package.json\" | ConvertFrom-Json; [PSCustomObject]@{ Name = $pkg.name; Version = $pkg.version; Publisher = $pkg.publisher; VSCodeEngine = $pkg.engines.vscode; Description = $pkg.description })",
+      "PowerShell($ext = \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\"; $pkg = Get-Content \"$ext\\\\package.json\" | ConvertFrom-Json; $pkg.contributes.commands | Select-Object -First 15 | Select-Object command, title)",
+      "PowerShell(Get-ChildItem \"$env:USERPROFILE\\\\.vscode\\\\extensions\\\\anthropic.claude-code-2.1.160-win32-x64\\\\resources\\\\audio-capture\" | Select-Object Name, Length)"
+    ]
+  }
+}

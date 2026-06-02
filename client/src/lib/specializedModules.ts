@@ -385,65 +385,27 @@ export function getModuleInfo(type: ModuleType) {
 
 /**
  * Mock LLM Builder session
+ * @deprecated - Use API endpoint to create real sessions
  */
-export function createMockLLMBuilderSession(): LLMBuilderSession {
-  let session = createLLMBuilderSession("Omnecor Fine-tuning", "mistral-7b");
-
-  const loraConfig = createLoRAConfig(
-    "Omnecor Adapter",
-    "mistral-7b",
-    "/data/omnecor-training-dataset"
-  );
-
-  session = addLoRAConfig(session, loraConfig);
-
-  // Add mock training metrics
-  for (let i = 1; i <= 3; i++) {
-    session = updateTrainingMetrics(session, {
-      epoch: i,
-      loss: 2.5 - i * 0.3,
-      valLoss: 2.6 - i * 0.25,
-      accuracy: 0.6 + i * 0.1,
-      timestamp: new Date(Date.now() - (3 - i) * 3600000),
-    });
-  }
-
-  return { ...session, status: "completed", progress: 100 };
+export function createMockLLMBuilderSession(): LLMBuilderSession | null {
+  // Mock data removed - use API to fetch real session data
+  return null;
 }
 
 /**
  * Mock Blender project
+ * @deprecated - Use API endpoint to create real projects
  */
-export function createMockBlenderProject(): BlenderProject {
-  let project = createBlenderProject(
-    "Omnecor Interface Design",
-    "/projects/omnecor-ui-3d.blend",
-    "3D visualization of Omnecor dashboard"
-  );
-
-  project = addBlenderObject(project, "Dashboard", "mesh", [0, 0, 0]);
-  project = addBlenderObject(project, "Camera", "camera", [5, 5, 5]);
-  project = addBlenderObject(project, "Light", "light", [3, 3, 3]);
-
-  return { ...project, status: "completed" };
+export function createMockBlenderProject(): BlenderProject | null {
+  // Mock data removed - use API to fetch real project data
+  return null;
 }
 
 /**
  * Mock PCB project
+ * @deprecated - Use API endpoint to create real projects
  */
-export function createMockPCBProject(): PCBProject {
-  let project = createPCBProject(
-    "Omnecor Control Board",
-    "/projects/omnecor-control.kicad_pcb",
-    "Main control board for Omnecor AI workstation"
-  );
-
-  project = addPCBComponent(project, "U1", "STM32H7", "LQFP144", [10, 10]);
-  project = addPCBComponent(project, "R1", "10k", "0805", [5, 5]);
-  project = addPCBComponent(project, "C1", "100uF", "1206", [15, 15]);
-
-  project = addPCBNet(project, "GND", ["U1.GND", "R1.2", "C1.2"]);
-  project = addPCBNet(project, "VCC", ["U1.VCC", "R1.1", "C1.1"]);
-
-  return { ...project, status: "completed" };
+export function createMockPCBProject(): PCBProject | null {
+  // Mock data removed - use API to fetch real project data
+  return null;
 }

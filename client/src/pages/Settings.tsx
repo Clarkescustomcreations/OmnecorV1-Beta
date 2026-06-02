@@ -129,22 +129,7 @@ export const Settings: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="hardware" role="tabpanel" aria-labelledby="tab-hardware">
-           <Card>
-            <CardHeader>
-              <CardTitle>Tool Paths</CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="space-y-2">
-                <Label htmlFor="blender-path">Blender Executable</Label>
-                <Input id="blender-path" defaultValue="/usr/bin/blender" />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="kicad-path">KiCad CLI Path</Label>
-                <Input id="kicad-path" defaultValue="/usr/bin/kicad-cli" />
-              </div>
-              <Button variant="outline">Detect Hardware</Button>
-            </CardContent>
-          </Card>
+          <HardwarePanel />
         </TabsContent>
 
         <TabsContent value="system" role="tabpanel" aria-labelledby="tab-system">
@@ -257,6 +242,110 @@ const HealthMetric = ({ label, value, status }: { label: string, value: string, 
     </div>
   </div>
 );
+
+const HardwarePanel: React.FC = () => {
+  const [blenderPath, setBlenderPath] = React.useState("/usr/bin/blender");
+  const [kicadPath, setKicadPath] = React.useState("/usr/bin/kicad-cli");
+
+  const detectMutation = trpc.system.detectHardware.useMutation({
+    onSuccess: (data) => {
+      if (data.blenderPath) setBlenderPath(data.blenderPath);
+      if (data.kicadPath) setKicadPath(data.kicadPath);
+      const found = [
+        data.blenderPath && `Blender: ${data.blenderPath}`,
+        data.kicadPath && `KiCad: ${data.kicadPath}`,
+        data.gpuInfo && `GPU: ${data.gpuInfo}`,
+        data.ollamaVersion && `Ollama: v${data.ollamaVersion}`,
+      ].filter(Boolean);
+      if (found.length > 0) {
+        toast.success(`Detected: ${found.join(" | ")}`);
+      } else {
+        toast.info("No additional tools auto-detected. Enter paths manually.");
+      }
+    },
+    onError: (err) => toast.error("Detection failed: " + err.message),
+  });
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <CardTitle>Tool Paths</CardTitle>
+          <CardDescription>Configure paths to external tools. Click "Detect Hardware" to auto-discover installed applications.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="blender-path">Blender Executable</Label>
+            <Input id="blender-path" value={blenderPath} onChange={e => setBlenderPath(e.target.value)} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="kicad-path">KiCad CLI Path</Label>
+            <Input id="kicad-path" value={kicadPath} onChange={e => setKicadPath(e.target.value)} />
+          </div>
+          <Button
+            variant="outline"
+            onClick={() => detectMutation.mutate()}
+            disabled={detectMutation.isPending}
+          >
+            {detectMutation.isPending ? "Detecting..." : "Detect Hardware"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      {detectMutation.data && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-sm">Detected System Info</CardTitle>
+          </CardHeader>
+          <CardContent className="grid grid-cols-2 gap-3 text-sm">
+            <div>
+              <p className="text-xs text-muted-foreground">Platform</p>
+              <p className="font-mono">{detectMutation.data.platform}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">CPU Cores</p>
+              <p className="font-mono">{detectMutation.data.cpuCount}</p>
+            </div>
+            {detectMutation.data.cpuModel && (
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground">CPU Model</p>
+                <p className="font-mono text-xs truncate">{detectMutation.data.cpuModel}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-muted-foreground">Total RAM</p>
+              <p className="font-mono">{detectMutation.data.totalMemoryGB} GB</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">Free RAM</p>
+              <p className="font-mono">{detectMutation.data.freeMemoryGB} GB</p>
+            </div>
+            {detectMutation.data.gpuInfo && (
+              <div className="col-span-2">
+                <p className="text-xs text-muted-foreground">GPU</p>
+                <p className="font-mono text-xs">{detectMutation.data.gpuInfo}</p>
+              </div>
+            )}
+            {detectMutation.data.ollamaVersion && (
+              <div>
+                <p className="text-xs text-muted-foreground">Ollama Version</p>
+                <p className="font-mono">v{detectMutation.data.ollamaVersion}</p>
+              </div>
+            )}
+            <div>
+              <p className="text-xs text-muted-foreground">Blender</p>
+              <p className="font-mono text-xs">{detectMutation.data.blenderPath ?? "Not found"}</p>
+            </div>
+            <div>
+              <p className="text-xs text-muted-foreground">KiCad CLI</p>
+              <p className="font-mono text-xs">{detectMutation.data.kicadPath ?? "Not found"}</p>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+    </div>
+  );
+};
 
 const ConnectedAccounts: React.FC<{ loginMethod: string | null }> = ({ loginMethod }) => {
   const { data: providers } = trpc.system.loginProviders.useQuery();

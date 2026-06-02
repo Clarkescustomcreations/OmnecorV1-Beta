@@ -1,10 +1,36 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
+import { randomBytes } from 'crypto'
+import { appendFileSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawn, ChildProcess, exec } from 'child_process'
 import os from 'os'
 import util from 'util'
 import icon from '../../resources/icon.png?asset'
+
+const LOG_FILE = join(
+  process.env.APPDATA || process.env.HOME || '.',
+  'omnecor-debug.log'
+)
+function log(msg: string): void {
+  try {
+    appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${msg}\n`)
+  } catch { /* ignore write errors */ }
+}
+
+log('=== Omnecor main process started ===')
+log(`PID: ${process.pid}  platform: ${process.platform}`)
+log(`__dirname: ${__dirname}`)
+log(`resourcesPath: ${(process as NodeJS.Process & { resourcesPath?: string }).resourcesPath}`)
+
+process.on('uncaughtException', (err: Error) => {
+  log(`UNCAUGHT EXCEPTION: ${err.message}\n${err.stack}`)
+  process.exit(1)
+})
+process.on('unhandledRejection', (reason: unknown) => {
+  log(`UNHANDLED REJECTION: ${String(reason)}`)
+  process.exit(1)
+})
 
 const execAsync = util.promisify(exec)
 
@@ -13,6 +39,7 @@ let isQuitting = false
 const BACKEND_PORT = process.env.PORT || 3000
 
 function startBackend(): void {
+  log('startBackend called')
   console.log('Starting Omnecor backend...')
 
   // In development: backend lives in the sibling project directory.
@@ -26,16 +53,33 @@ function startBackend(): void {
     ? join(__dirname, '../../../..') // project root in dev
     : join(process.resourcesPath, 'app.asar.unpacked', 'backend')
 
-  backendProcess = spawn('node', args, {
+  // Use Electron's own Node.js runtime (ELECTRON_RUN_AS_NODE) in production so
+  // native modules compiled by electron-builder (better-sqlite3, onnxruntime-node)
+  // match the ABI. System `node` has a different NODE_MODULE_VERSION.
+  const nodeExec = is.dev ? 'node' : process.execPath
+
+  log(`backend path: ${backendPath}`)
+  log(`backend args: ${JSON.stringify(args)}`)
+  log(`backend cwd: ${cwd}`)
+  log(`node exec: ${nodeExec}`)
+  backendProcess = spawn(nodeExec, args, {
     cwd,
-    env: { ...process.env, NODE_ENV: is.dev ? 'development' : 'production' },
+    env: {
+      ...process.env,
+      NODE_ENV: is.dev ? 'development' : 'production',
+      JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex'),
+      ZERO_LOGIN_MODE: 'true',
+      OMNECOR_DB: 'sqlite',
+      ...(is.dev ? {} : { ELECTRON_RUN_AS_NODE: '1' })
+    },
     stdio: 'pipe'
   })
 
-  backendProcess.stdout?.on('data', (data) => console.log(`[Backend]: ${data}`))
-  backendProcess.stderr?.on('data', (data) => console.error(`[Backend Error]: ${data}`))
+  backendProcess.stdout?.on('data', (data) => { log(`[Backend]: ${data}`); console.log(`[Backend]: ${data}`) })
+  backendProcess.stderr?.on('data', (data) => { log(`[Backend Error]: ${data}`); console.error(`[Backend Error]: ${data}`) })
 
   backendProcess.on('close', (code) => {
+    log(`Backend process exited with code ${code}`)
     console.log(`Backend process exited with code ${code}`)
     if (code !== 0 && !isQuitting) {
       dialog.showErrorBox(
@@ -90,6 +134,7 @@ function createWindow(): void {
 }
 
 app.whenReady().then(async () => {
+  log('app.whenReady fired')
   electronApp.setAppUserModelId('com.omnecor.workstation')
 
   startBackend()

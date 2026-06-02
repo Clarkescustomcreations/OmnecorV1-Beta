@@ -61,6 +61,7 @@ import { mcpRouter } from "./routers/mcpRouter.js";
 import { pipelineRouter } from "./routers/pipelineRouter.js";
 import { imageGenRouter } from "./routers/imageGenRouter.js";
 import { cloudComputeRouter } from "./routers/cloudComputeRouter.js";
+import { integrationsRouter } from "./routers/integrationsRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -145,6 +146,9 @@ export const appRouter = router({
 
   // ─── Cloud Compute Rental (Vast.ai / RunPod / Lambda Labs) ───────────────
   cloudCompute: cloudComputeRouter,
+
+  // ─── Third-Party Integrations (GitHub / Notion / Slack / Google Drive) ───
+  integrations: integrationsRouter,
 });
 
 export type AppRouter = typeof appRouter;

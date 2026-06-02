@@ -29,18 +29,44 @@ import { validatePath } from "../_core/security.js";
 
 const messageSchema = z.object({
   role: z.enum(["system", "user", "assistant", "tool", "function"]),
-  content: z.string(),
+  content: z.string().max(200_000),
 });
 
 const chatInputSchema = z.object({
-  providerId: z.string(),
-  modelId: z.string(),
-  messages: z.array(messageSchema),
-  apiKey: z.string().optional(),
-  baseUrl: z.string().optional(),
-  systemPrompt: z.string().optional(),
-  maxTokens: z.number().optional(),
-  temperature: z.number().optional(),
+  providerId: z.string()
+    .min(1, "Provider ID required")
+    .max(64, "Provider ID too long")
+    .regex(/^[a-zA-Z0-9_-]+$/, "Invalid provider ID format"),
+
+  modelId: z.string()
+    .min(1, "Model ID required")
+    .max(256, "Model ID too long"),
+
+  messages: z.array(messageSchema).min(1).max(500),
+
+  // Raw API keys from clients are accepted only for user-configured providers.
+  // They are never stored or logged (audit middleware redacts them).
+  apiKey: z.string().max(512).optional(),
+
+  baseUrl: z.string()
+    .url("Invalid URL format")
+    .startsWith("http", "Only http/https URLs allowed")
+    .max(256)
+    .optional(),
+
+  systemPrompt: z.string().max(32_000).optional(),
+
+  maxTokens: z.number()
+    .int("Must be integer")
+    .min(1)
+    .max(128_000)
+    .optional(),
+
+  temperature: z.number()
+    .min(0, "Temperature must be ≥ 0")
+    .max(2, "Temperature must be ≤ 2")
+    .optional(),
+
   isFictionMode: z.boolean().optional(),
 });
 

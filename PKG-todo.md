@@ -168,9 +168,9 @@ already exist.
       `onnxruntime-node` 1.20 for Windows x64.
 
 ### 3.2 — Build Windows artifacts
-- [ ] **3.2.1** On Windows: `pnpm install` (root + electron-app), `npm run build`
+- [x] **3.2.1** On Windows: `pnpm install` (root + electron-app), `npm run build`
       (backend), `cd packaging/electron-app && pnpm build && pnpm exec electron-builder --win`.
-- [ ] **3.2.2** Confirm `${productName}-Setup-${version}.exe` (NSIS) and the
+- [x] **3.2.2** Confirm `${productName}-Setup-${version}.exe` (NSIS) and the
       `portable` artifact are produced.
 - [x] **3.2.3** Verify `nsis.include: ../windows/omnecor.nsh` is found and correctly
       referenced in `electron-builder.yml`.
@@ -187,13 +187,28 @@ already exist.
       `electron-builder --win` to fail). Runs in CI on every push/PR.
 
 ### 3.3 — Runtime smoke on Windows *(requires Windows 10/11 hardware or VM)*
-- [ ] **3.3.1** Run the installer on a clean Windows 10/11 VM; app launches.
-- [ ] **3.3.2** Backend child process spawns on Windows (`process.platform === 'win32'`
-      branch in `main/index.ts`); confirm the Node/backend path resolves under
-      `resources/app.asar.unpacked/backend`.
-- [ ] **3.3.3** Confirm DB + a chat round-trip works.
-- [ ] **3.3.4** Uninstall via the generated uninstaller leaves no orphaned process
-      (the app kills the backend on quit — verify `Killing backend process` fires).
+- [x] **3.3.1** Run the installer on a clean Windows 10/11 VM; app launches.
+      Verified: NSIS installer runs, files land in `%LOCALAPPDATA%\Programs\Omnecor\`,
+      shortcut created. App must be launched via Explorer (double-click / `explorer.exe`
+      path) — PowerShell Start-Process without -NoNewWindow exits in 100ms due to
+      detached GUI process context (not a real user issue).
+- [x] **3.3.2** Backend child process spawns on Windows. **Fixes required:**
+      - `--external:mysql2` removed (static drizzle-orm/mysql2 import; bundle inline).
+      - `vite` import extracted to `static.ts`; dead-code-eliminated via `--define:NODE_ENV`.
+      - `JWT_SECRET` generated in main process; `ZERO_LOGIN_MODE=true`, `OMNECOR_DB=sqlite` passed.
+      - Backend spawned via `process.execPath` (Electron binary) + `ELECTRON_RUN_AS_NODE=1`
+        instead of system `node` — ensures native module ABI (NMV 125) matches Electron v31.
+      - `bindings` + `file-uri-to-path` added to `asarUnpack` (pnpm virtual store
+        doesn't hoist them; backend (plain node child) can't read inside ASAR).
+      Verified: `GET /health` → `{"status":"healthy","uptime":...}` ✓
+- [x] **3.3.3** DB + chat round-trip verified on Windows with SQLite:
+      - `POST /api/trpc/ai.createSession?batch=1` → `{"sessionId":"dadc8ed0-..."}` ✓
+      - `POST /api/trpc/ai.saveMessage?batch=1` → `{"messageId":"331905a0-..."}` ✓
+      - `GET /api/trpc/ai.getSession?batch=1&input=...` → `[user] Hello from smoke test` ✓
+- [x] **3.3.4** Uninstaller verified: registry + Add/Remove Programs entries removed ✓.
+      Added `taskkill /F /IM Omnecor.exe /T` to `customUnInstall` macro in
+      `build/installer.nsh` so the app is killed before file deletion (previously
+      failed to delete locked files when app was running during uninstall).
 - **DoD:** NSIS installer + portable build on Windows; clean-VM install launches the
   app and bundled backend with a working DB; uninstall is clean.
 
@@ -256,7 +271,7 @@ desktop backend over LAN (IP set in `StepNetwork.tsx`).
 - [x] **5.6** Final matrix sign-off — DoDs verified where possible:
       - [x] Web UI installs & runs (verified via `npm run build` + `tsx smoke-test.js`)
       - [x] Linux artifact runs (verified `linux-unpacked` binary in sandbox)
-      - [ ] Windows installer (groundwork laid in `BUILD-WINDOWS.md` + `omnecor.nsh`)
+      - [x] Windows installer (smoke tested on Windows 11 hardware — 3.3.1–3.3.4 all pass)
       - [ ] Android APK (groundwork laid in `capacitor.config.ts` + `SetupWizard.tsx`)
 - [ ] **5.7** 💡 Re-run `/code-review` on the full diff once changes land.
 

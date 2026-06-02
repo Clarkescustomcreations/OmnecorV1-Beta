@@ -141,6 +141,11 @@ export function useOmnecorSocket(
         }
       };
 
+      socketRef.current.onerror = (event) => {
+        console.error("[OmnecorSocket] WebSocket error", event);
+        setConnected(false);
+      };
+
       socketRef.current.onclose = () => {
         setConnected(false);
         if (pingIntervalRef.current) clearInterval(pingIntervalRef.current);

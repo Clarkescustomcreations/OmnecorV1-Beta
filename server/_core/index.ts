@@ -28,7 +28,7 @@ import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthR
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
-import { serveStatic, setupVite } from "./vite";
+import { serveStatic } from "./static";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 import { createLogger, closeAuditLog } from "./logger.js";
 import { SERVER_CONFIG } from "../phase2/config/index.js";
@@ -185,6 +185,7 @@ async function startServer() {
 
   // ─── Frontend (Vite dev or static production) ───────────────────────────
   if (process.env.NODE_ENV === "development") {
+    const { setupVite } = await import("./vite.js");
     await setupVite(app, server);
   } else {
     serveStatic(app);
