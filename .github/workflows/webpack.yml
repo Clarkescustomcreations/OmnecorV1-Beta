@@ -44,3 +44,6 @@ jobs:
 
     - name: Build
       run: pnpm run build
+
+    - name: Run smoke tests (includes Windows installer checks)
+      run: pnpm test
