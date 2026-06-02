@@ -1,6 +1,6 @@
 app-id: org.omnecor.HMCI
 runtime: org.freedesktop.Platform
-runtime-version: '23.08'
+runtime-version: '24.08'
 sdk: org.freedesktop.Sdk
 command: omnecor
 
@@ -30,6 +30,8 @@ sdk-extensions:
 
 build-options:
   append-path: /usr/lib/sdk/node20/bin:/usr/lib/sdk/python311/bin
+  build-args:
+    - --share=network
 
 modules:
   - name: omnecor

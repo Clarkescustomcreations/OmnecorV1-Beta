@@ -26,7 +26,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VERSION="${1:-2.0.0}"
+VERSION="${1:-2.3.0}"
 APP_NAME="Omnecor"
 ARCH="x86_64"
 
@@ -100,61 +100,42 @@ tar -xJf "$NODE_ARCHIVE" -C "$APP_DIR/usr/lib/omnecor/node" --strip-components=1
 
 echo "[6/8] Copying application files..."
 
-# Backend source
-cp -r "$PROJECT_ROOT/src" "$APP_DIR/usr/lib/omnecor/backend/"
-cp -f "$PROJECT_ROOT/package.json" "$APP_DIR/usr/lib/omnecor/backend/" 2>/dev/null || true
-cp -f "$PROJECT_ROOT/tsconfig.json" "$APP_DIR/usr/lib/omnecor/backend/" 2>/dev/null || true
+# Backend dist — must be pre-built (run 'pnpm build' from the project root)
+if [ ! -d "$PROJECT_ROOT/dist" ]; then
+  echo ""
+  echo "ERROR: $PROJECT_ROOT/dist not found."
+  echo "  Run 'pnpm build' (or 'npm run build') from the project root first."
+  exit 1
+fi
+cp -r "$PROJECT_ROOT/dist/"* "$APP_DIR/usr/lib/omnecor/backend/"
 
-# Python scripts
-for pyfile in whisper_server.py tts_server.py localLLMfine-tuning.py; do
-  if [ -f "$PROJECT_ROOT/../upload/$pyfile" ]; then
-    cp "$PROJECT_ROOT/../upload/$pyfile" "$APP_DIR/usr/lib/omnecor/python/"
-  fi
-done
+# Minimal package.json for native modules that esbuild externalises
+cat > "$APP_DIR/usr/lib/omnecor/backend/package.json" << 'NATPKG'
+{
+  "name": "omnecor-backend-native",
+  "version": "1.0.0",
+  "type": "module",
+  "dependencies": {
+    "better-sqlite3": "^12.10.0",
+    "onnxruntime-node": "^1.26.0",
+    "mysql2": "^3.15.0"
+  }
+}
+NATPKG
 
-# Install Node.js dependencies
+# Install native modules using the bundled Node.js
 cd "$APP_DIR/usr/lib/omnecor/backend"
 "$APP_DIR/usr/lib/omnecor/node/bin/node" \
-  "$APP_DIR/usr/lib/omnecor/node/bin/npm" install --production 2>/dev/null || true
+  "$APP_DIR/usr/lib/omnecor/node/bin/npm" install --omit=dev --no-audit 2>/dev/null || \
+  echo "  Warning: native module install failed — better-sqlite3/onnxruntime-node/mysql2 must be available on target"
 cd "$PROJECT_ROOT"
 
 # ---------------------------------------------------------------------------
 # Create AppRun Entry Point
 # ---------------------------------------------------------------------------
 
-cat > "$APP_DIR/AppRun" << 'APPRUN'
-#!/usr/bin/env bash
-# Omnecor AppImage Entry Point
-# This script sets up the environment and launches the application
-
-SELF_DIR="$(dirname "$(readlink -f "$0")")"
-
-# Set up paths
-export PATH="$SELF_DIR/usr/lib/omnecor/node/bin:$PATH"
-export OMNECOR_HOME="$SELF_DIR/usr/lib/omnecor"
-export OMNECOR_DATA="${XDG_DATA_HOME:-$HOME/.local/share}/omnecor"
-export OMNECOR_CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/omnecor"
-
-# Create user data directories
-mkdir -p "$OMNECOR_DATA"/{vectordb,backups,models,projects}
-mkdir -p "$OMNECOR_CONFIG"
-
-# Copy default config if not exists
-if [ ! -f "$OMNECOR_CONFIG/omnecor.conf" ]; then
-  cp "$SELF_DIR/usr/lib/omnecor/backend/config/omnecor.conf.default" \
-     "$OMNECOR_CONFIG/omnecor.conf" 2>/dev/null || true
-fi
-
-echo "═══════════════════════════════════════════════════════════════"
-echo "  Omnecor HMCI — AppImage Mode"
-echo "  Data:   $OMNECOR_DATA"
-echo "  Config: $OMNECOR_CONFIG"
-echo "═══════════════════════════════════════════════════════════════"
-
-# Start the backend
-cd "$SELF_DIR/usr/lib/omnecor/backend"
-exec node --experimental-specifier-resolution=node src/app.js "$@"
-APPRUN
+# Use the canonical AppRun from the source tree (packaging/appimage/AppRun)
+cp "$SCRIPT_DIR/appimage/AppRun" "$APP_DIR/AppRun"
 chmod +x "$APP_DIR/AppRun"
 
 # ---------------------------------------------------------------------------
