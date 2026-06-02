@@ -35,6 +35,13 @@ _MANIFEST_PATH = _TRAINING_DIR / "routing_manifest.json"
 _CURRENT_JSON = _PROJECT_ROOT / "models" / "valet-router" / "current.json"
 
 # ─── Prompts & manifest (loaded once at module import) ────────────────────────
+_FALLBACK_PROMPT = "You are the Omnecor Valet — a local routing assistant."
+_STOPWORDS = frozenset({
+    "the", "and", "for", "are", "was", "its", "that", "this",
+    "with", "from", "how", "what", "does", "can", "will", "you",
+    "your", "not", "but", "they", "have", "has", "also",
+})
+
 def _load_system_prompt() -> str:
     try:
         text = _SYSTEM_PROMPT_PATH.read_text()
@@ -43,7 +50,7 @@ def _load_system_prompt() -> str:
             return match.group(1).strip()
     except Exception as e:
         print(f"[ValetRouter] Could not load system prompt: {e}")
-    return "You are the Omnecor Valet — a local routing assistant."
+    return _FALLBACK_PROMPT
 
 def _load_manifest() -> str:
     try:
@@ -53,8 +60,60 @@ def _load_manifest() -> str:
         print(f"[ValetRouter] Could not load routing manifest: {e}")
     return "{}"
 
-_SYSTEM_PROMPT_TEMPLATE = _load_system_prompt()
-_ROUTING_MANIFEST = _load_manifest()
+# Hot-reload caches — mtime-checked on each inference call (negligible I/O overhead)
+_prompt_cache: dict = {"text": "", "mtime": 0.0}
+_manifest_cache: dict = {"json": "", "mtime": 0.0}
+_kb_cache: dict = {"text": "", "mtime": 0.0}
+
+# Eager-load so first request is never slow; also seed mtime so the first
+# _get_* call does not unconditionally re-read the file.
+_prompt_cache["text"] = _load_system_prompt()
+try:
+    _prompt_cache["mtime"] = _SYSTEM_PROMPT_PATH.stat().st_mtime
+except Exception:
+    pass
+
+_manifest_cache["json"] = _load_manifest()
+try:
+    _manifest_cache["mtime"] = _MANIFEST_PATH.stat().st_mtime
+except Exception:
+    pass
+
+
+def _get_system_prompt() -> str:
+    try:
+        mtime = _SYSTEM_PROMPT_PATH.stat().st_mtime
+        if mtime != _prompt_cache["mtime"]:
+            _prompt_cache["text"] = _load_system_prompt()
+            _prompt_cache["mtime"] = mtime
+            print("[ValetRouter] System prompt reloaded from disk.")
+    except Exception:
+        pass
+    return _prompt_cache["text"] or _FALLBACK_PROMPT
+
+
+def _get_manifest_json() -> str:
+    try:
+        mtime = _MANIFEST_PATH.stat().st_mtime
+        if mtime != _manifest_cache["mtime"]:
+            _manifest_cache["json"] = _load_manifest()
+            _manifest_cache["mtime"] = mtime
+            print("[ValetRouter] Routing manifest reloaded from disk.")
+    except Exception:
+        pass
+    return _manifest_cache["json"] or "{}"
+
+
+def _get_kb_text() -> str:
+    kb_path = _TRAINING_DIR / "OMNECOR_KNOWLEDGE_BASE.md"
+    try:
+        mtime = kb_path.stat().st_mtime
+        if mtime != _kb_cache["mtime"]:
+            _kb_cache["text"] = kb_path.read_text()
+            _kb_cache["mtime"] = mtime
+    except Exception:
+        pass
+    return _kb_cache["text"]
 
 # ─── Registry reader ──────────────────────────────────────────────────────────
 def _read_registry() -> dict:
@@ -173,10 +232,79 @@ def _load_transformers(artifact_path: str) -> bool:
 # ─── Prompt construction ──────────────────────────────────────────────────────
 def _build_system_content(rag_context: str) -> str:
     return (
-        _SYSTEM_PROMPT_TEMPLATE
+        _get_system_prompt()
         .replace("{{RAG_CONTEXT}}", rag_context)
-        .replace("{{ROUTING_MANIFEST}}", _ROUTING_MANIFEST)
+        .replace("{{ROUTING_MANIFEST}}", _get_manifest_json())
     )
+
+
+def _kb_keyword_search(query: str, n: int = 3) -> str:
+    """Score KB sections by word overlap and return top-n as a context string."""
+    text = _get_kb_text()
+    if not text:
+        return ""
+    parts = re.split(r"\n(?=## )", text)
+    query_words = set(re.findall(r"\b\w{3,}\b", query.lower())) - _STOPWORDS
+    if not query_words:
+        return ""
+    scored: list[tuple[int, str]] = []
+    for part in parts:
+        words = set(re.findall(r"\b\w{3,}\b", part.lower()))
+        score = len(query_words & words)
+        if score:
+            scored.append((score, part.strip()))
+    scored.sort(key=lambda x: x[0], reverse=True)
+    return "\n\n---\n\n".join(s for _, s in scored[:n])
+
+
+def _rag_query_blocking(task: str, n: int, chroma_url: str) -> str:
+    """Blocking ChromaDB lookup — always call via asyncio.to_thread."""
+    req = urllib.request.Request(
+        f"{chroma_url}/api/v1/collections/omnecor_valet_kb",
+        headers={"Content-Type": "application/json"},
+    )
+    with urllib.request.urlopen(req, timeout=2) as resp:
+        coll = json.loads(resp.read())
+    payload = json.dumps({
+        "query_texts": [task[:400]],
+        "n_results": n,
+        "include": ["documents"],
+    }).encode()
+    req = urllib.request.Request(
+        f"{chroma_url}/api/v1/collections/{coll['id']}/query",
+        data=payload,
+        headers={"Content-Type": "application/json"},
+        method="POST",
+    )
+    with urllib.request.urlopen(req, timeout=4) as resp:
+        data = json.loads(resp.read())
+    docs = data.get("documents", [[]])[0]
+    return "\n\n---\n\n".join(str(d) for d in docs if d) if docs else ""
+
+
+async def _rag_query(task: str, n: int = 3) -> str:
+    """Query ChromaDB omnecor_valet_kb; fall back to keyword search of the KB file."""
+    chroma_url = os.environ.get("CHROMA_URL", "http://localhost:8000")
+    try:
+        result = await asyncio.to_thread(_rag_query_blocking, task, n, chroma_url)
+        if result:
+            return result
+    except Exception:
+        pass  # fall through to keyword fallback
+    return _kb_keyword_search(task, n)
+
+
+def _should_rag(task: str, task_type: Optional[str]) -> bool:
+    """Return True when RAG context should be auto-injected for this request."""
+    if task_type == "qa":
+        return True
+    tl = task.lower()
+    return any(kw in tl for kw in (
+        "omnecor", "valet", "routing mode", "what is", "how does",
+        "explain", "how to use", "tell me about", "sovereign", "scrapper",
+        "execution mode", "knowledge", "brain map",
+    ))
+
 
 def _parse_decision(text: str) -> Optional[dict]:
     json_start = text.find("{")
@@ -333,6 +461,11 @@ class HealthResponse(BaseModel):
     backend: Optional[str] = None
 
 
+class RagRequest(BaseModel):
+    query: str
+    n_results: int = 3
+
+
 # ─── Rule-based fallback ──────────────────────────────────────────────────────
 def rule_based_route(request: RouteRequest) -> RouteDecision:
     task_lower = request.task.lower()
@@ -392,6 +525,8 @@ async def route_task(request: RouteRequest):
         get_model()
 
     rag_context = request.context or ""
+    if not rag_context and _should_rag(request.task, request.task_type):
+        rag_context = await _rag_query(request.task)
     data: Optional[dict] = None
 
     if _backend_type == "gguf":
@@ -428,6 +563,25 @@ async def list_modes():
             {"id": "multi_task", "label": "Multi Task", "description": "High-spec: run multiple models simultaneously"},
         ]
     }
+
+
+@app.post("/rag")
+async def rag_query_endpoint(req: RagRequest):
+    """Retrieve relevant KB chunks (ChromaDB → keyword fallback)."""
+    chunks = await _rag_query(req.query, req.n_results)
+    return {"chunks": chunks, "query": req.query}
+
+
+@app.post("/admin/reload")
+async def admin_reload():
+    """Force-reload manifest, system prompt, and KB cache from disk."""
+    _prompt_cache["mtime"] = 0.0
+    _manifest_cache["mtime"] = 0.0
+    _kb_cache["mtime"] = 0.0
+    _get_system_prompt()
+    _get_manifest_json()
+    _get_kb_text()
+    return {"reloaded": True}
 
 
 if __name__ == "__main__":
