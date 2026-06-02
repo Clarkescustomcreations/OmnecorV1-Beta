@@ -9,12 +9,13 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Key, Shield, HardDrive, Cpu, Bell, Lock, Zap, Flame, Activity, Users, Download, CheckCircle2, Circle, Route, Sun, Moon, Monitor, Cloud } from "lucide-react";
+import { Key, Shield, HardDrive, Cpu, Bell, Lock, Zap, Flame, Activity, Users, Download, CheckCircle2, Circle, Route, Sun, Moon, Monitor, Cloud, UserCircle2 } from "lucide-react";
 import { useTheme, type Theme } from "../contexts/ThemeContext";
 import CloudComputePanel from "../components/settings/CloudComputePanel";
 import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
 import ValetRouterPanel from "../components/settings/ValetRouterPanel";
+import PersonaCreationPanel from "../components/settings/PersonaCreationPanel";
 
 export const Settings: React.FC = () => {
   const saveKeysMutation = trpc.system.saveKeys.useMutation({
@@ -50,6 +51,7 @@ export const Settings: React.FC = () => {
           <TabsTrigger value="valet" id="tab-valet"><Route className="w-4 h-4 mr-2" aria-hidden="true" /> Valet Router</TabsTrigger>
           <TabsTrigger value="appearance" id="tab-appearance"><Sun className="w-4 h-4 mr-2" aria-hidden="true" /> Appearance</TabsTrigger>
           <TabsTrigger value="cloud" id="tab-cloud"><Cloud className="w-4 h-4 mr-2" aria-hidden="true" /> Cloud Compute</TabsTrigger>
+          <TabsTrigger value="personas" id="tab-personas"><UserCircle2 className="w-4 h-4 mr-2" aria-hidden="true" /> Personas</TabsTrigger>
           {isAdmin && <TabsTrigger value="admin" id="tab-admin"><Activity className="w-4 h-4 mr-2" aria-hidden="true" /> Admin</TabsTrigger>}
         </TabsList>
 
@@ -163,6 +165,10 @@ export const Settings: React.FC = () => {
 
         <TabsContent value="cloud" role="tabpanel" aria-labelledby="tab-cloud">
           <CloudComputePanel />
+        </TabsContent>
+
+        <TabsContent value="personas" role="tabpanel" aria-labelledby="tab-personas">
+          <PersonaCreationPanel />
         </TabsContent>
 
         {isAdmin && (
