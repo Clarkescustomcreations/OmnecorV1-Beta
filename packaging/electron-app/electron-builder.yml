@@ -38,11 +38,20 @@ extraResources:
     to: scripts
     filter:
       - "**/*"
-  # Model recommendation metadata
+  # Model recommendation metadata (packaging/models/)
   - from: ../models
     to: models
     filter:
       - "**/*"
+  # Valet Router artifact registry — current.json + any gguf weights placed here by
+  # `pnpm valet:fetch` before a desktop build. Weights are gitignored; only current.json
+  # and metadata.json are committed.
+  - from: ../../models/valet-router
+    to: models/valet-router
+    filter:
+      - "current.json"
+      - "**/metadata.json"
+      - "**/*.gguf"
 
 # ─── Windows ────────────────────────────────────────────────────────────────
 win:
