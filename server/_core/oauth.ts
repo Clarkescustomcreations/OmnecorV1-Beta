@@ -27,8 +27,8 @@ export function registerOAuthRoutes(app: Express) {
 
     // Redirect to OAuth provider with state
     const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/callback`;
-    const oauthUrl = new URL(`${process.env.OAUTH_SERVER_URL}/app-auth`);
-    oauthUrl.searchParams.set("appId", process.env.APP_ID || "");
+    const oauthUrl = new URL(`${ENV.oAuthServerUrl}/app-auth`);
+    oauthUrl.searchParams.set("appId", ENV.appId);
     oauthUrl.searchParams.set("redirectUri", redirectUri);
     oauthUrl.searchParams.set("state", state);
     oauthUrl.searchParams.set("type", "signIn");

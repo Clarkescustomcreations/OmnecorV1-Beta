@@ -20,7 +20,10 @@ const __dirname = path.dirname(__filename);
 
 export const SERVER_CONFIG = {
   /** Express HTTP port */
-  port: parseInt(process.env.OMNECOR_PORT || "3000", 10),
+  port: parseInt(
+    process.env.OMNECOR_PORT || process.env.PORT || "3000",
+    10
+  ),
   /** WebSocket port — shares the HTTP server port via upgrade */
   wsPort: parseInt(process.env.OMNECOR_WS_PORT || "3000", 10),
   /** Host binding address */

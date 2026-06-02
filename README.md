@@ -24,7 +24,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 ### Core Infrastructure
 - **Unified Backend** — Centralized Express.js/tRPC engine with real-time UI/data state synchronization via WebSockets.
 - **End-to-End Type Safety** — tRPC + Drizzle ORM + Zod across the full stack. No runtime type surprises.
-- **MySQL/TiDB Persistence** — Chat history, session state, budgets, audit logs, and pipeline records stored in a relational DB.
+- **Flexible Persistence** — Support for **SQLite** (zero-infra default) and **MySQL/TiDB** (multi-user / production). Chat history, session state, budgets, and logs are stored reliably.
 - **Real-Time WebSocket Layer** — Live event streaming for AI responses, training progress, hardware jobs, budget alerts, and mesh topology.
 
 ### AI & Model Hub

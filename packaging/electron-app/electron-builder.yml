@@ -23,6 +23,7 @@ asarUnpack:
   - resources/**
   - backend/**
   - node_modules/onnxruntime-node
+  - node_modules/better-sqlite3
 
 # Bundle the compiled Omnecor backend alongside the Electron app
 extraResources:
@@ -30,9 +31,10 @@ extraResources:
   - from: ../../dist
     to: app.asar.unpacked/backend
     filter:
-      - "**/*.js"
-      - "**/*.mjs"
+      - "**/*"
       - "!**/*.map"
+      - "!**/*.ts"
+      - "!**/*.tsx"
   # Packaging scripts (install.sh, ollama_install.sh, post-install.sh)
   - from: ../scripts
     to: scripts

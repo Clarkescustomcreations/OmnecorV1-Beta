@@ -17,7 +17,7 @@ const log = createLogger("AiProvider");
 // PromptSanitizer imported dynamically to avoid hard dep (Phase 22 parallel work)
 import { meshNode } from "../../ommesh/core/MeshNode.js";
 import { v4 as uuidv4 } from "uuid";
-import { getDb } from "../../db.js";
+import { getDb } from "../../db.factory.js";
 import { spendLog, projectBudgets } from "../../../drizzle/schema.js";
 import { calculateCostMicrocents } from "../config/providerPricing.js";
 

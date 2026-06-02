@@ -12,7 +12,7 @@ import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { v4 as uuidv4 } from "uuid";
 import { eq, sum, desc } from "drizzle-orm";
-import { getDb } from "../db.js";
+import { getDb } from "../db.factory.js";
 import {
   projectBudgets,
   spendLog,

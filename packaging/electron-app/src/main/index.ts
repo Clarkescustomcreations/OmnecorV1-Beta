@@ -1,8 +1,12 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { spawn, ChildProcess } from 'child_process'
+import { spawn, ChildProcess, exec } from 'child_process'
+import os from 'os'
+import util from 'util'
 import icon from '../../resources/icon.png?asset'
+
+const execAsync = util.promisify(exec)
 
 let backendProcess: ChildProcess | null = null
 let isQuitting = false
@@ -107,11 +111,6 @@ app.whenReady().then(async () => {
 
   // --- IPC: system hardware info for the Setup Wizard ---
   ipcMain.handle('get-system-info', async () => {
-    const os = await import('os')
-    const { exec } = await import('child_process')
-    const util = await import('util')
-    const execAsync = util.promisify(exec)
-
     const info = {
       cpu: os.cpus()[0].model,
       cores: os.cpus().length,

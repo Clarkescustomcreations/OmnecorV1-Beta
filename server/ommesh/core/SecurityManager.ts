@@ -24,6 +24,7 @@ export class SecurityManager extends EventEmitter {
 
   constructor() {
     super();
+    this.initializeIdentityFallback();
     try {
       this.loadOrCreateIdentity();
       this.scheduleAutoRotation();
@@ -32,10 +33,31 @@ export class SecurityManager extends EventEmitter {
     }
   }
 
+  private initializeIdentityFallback() {
+    const id = `omnecor-${crypto.randomUUID().slice(0, 8)}`;
+    this.identity = {
+      id,
+      fingerprint: '',
+      publicKey: '',
+      hostname: os.hostname(),
+      version: '1.0.0',
+      capabilities: {
+        models: [],
+        gpu: { vram: 0, utilization: 0, temperature: 0 },
+        cpu: 0, ram: 0,
+        roles: ['peer']
+      },
+      lastSeen: new Date()
+    };
+    log.info("OMMESH identity fallback initialized", { nodeId: this.identity.id });
+  }
+
   private loadOrCreateIdentity() {
-    const keyPath = path.join(CERTS_DIR, 'node-key.pem');
-    const certPath = path.join(CERTS_DIR, 'node-cert.pem');
-    const caPath = path.join(CERTS_DIR, 'ca-cert.pem');
+    // ESM compatibility: using process.cwd() for reliable root-relative paths
+    const certsDir = path.join(process.cwd(), 'server/ommesh/certs');
+    const keyPath = path.join(certsDir, 'node-key.pem');
+    const certPath = path.join(certsDir, 'node-cert.pem');
+    const caPath = path.join(certsDir, 'ca-cert.pem');
 
     if (!fs.existsSync(keyPath) || !fs.existsSync(certPath)) {
       throw new Error('Missing mTLS certificates');
@@ -48,8 +70,10 @@ export class SecurityManager extends EventEmitter {
     const certObj = new crypto.X509Certificate(this.cert);
     const fingerprint = certObj.fingerprint256.replace(/:/g, '');
 
+    const nodeId = certObj.subject.match(/OU=([^/]+)/)?.[1] || 'unknown';
+
     this.identity = {
-      id: certObj.subject.match(/OU=([^/]+)/)?.[1] || 'unknown',
+      id: nodeId,
       fingerprint,
       publicKey: certObj.publicKey.export({ type: 'spki', format: 'pem' }) as string,
       hostname: os.hostname(),
@@ -64,7 +88,7 @@ export class SecurityManager extends EventEmitter {
       lastSeen: new Date()
     };
 
-    log.info("OMMESH Security loaded", { nodeId: this.identity.id, fingerprint: fingerprint.slice(0, 16) });
+    log.info("OMMESH Security loaded identity", { nodeId: this.identity.id, fingerprint: fingerprint.slice(0, 16) });
     this.checkExpiration();
   }
 
@@ -100,12 +124,13 @@ export class SecurityManager extends EventEmitter {
     const oldFingerprint = this.identity.fingerprint;
 
     try {
-      const backupDir = path.join(CERTS_DIR, `backup-${Date.now()}`);
+      const certsDir = path.join(process.cwd(), 'server/ommesh/certs');
+      const backupDir = path.join(certsDir, `backup-${Date.now()}`);
       fs.mkdirSync(backupDir, { recursive: true });
 
       // Backup current certs
-      fs.copyFileSync(path.join(CERTS_DIR, 'node-key.pem'), path.join(backupDir, 'node-key.pem'));
-      fs.copyFileSync(path.join(CERTS_DIR, 'node-cert.pem'), path.join(backupDir, 'node-cert.pem'));
+      fs.copyFileSync(path.join(certsDir, 'node-key.pem'), path.join(backupDir, 'node-key.pem'));
+      fs.copyFileSync(path.join(certsDir, 'node-cert.pem'), path.join(backupDir, 'node-cert.pem'));
 
       log.info("Certificates backed up", { backupDir });
 
@@ -114,24 +139,24 @@ export class SecurityManager extends EventEmitter {
       const nodeId = this.identity.id;
 
       const opensslCmds = [
-        `openssl genrsa -out ${path.join(CERTS_DIR, 'node-key.pem.new')} 4096`,
-        `openssl req -new -key ${path.join(CERTS_DIR, 'node-key.pem.new')} -out ${path.join(CERTS_DIR, 'node.csr')} ` +
+        `openssl genrsa -out ${path.join(certsDir, 'node-key.pem.new')} 4096`,
+        `openssl req -new -key ${path.join(certsDir, 'node-key.pem.new')} -out ${path.join(certsDir, 'node.csr')} ` +
         `-subj "/C=CA/ST=NovaScotia/L=Halifax/O=Omnecor/CN=${hostname}/OU=${nodeId}"`,
-        `openssl x509 -req -in ${path.join(CERTS_DIR, 'node.csr')} -CA ${path.join(CERTS_DIR, 'ca-cert.pem')} ` +
-        `-CAkey ${path.join(CERTS_DIR, 'ca-key.pem')} -CAcreateserial -out ${path.join(CERTS_DIR, 'node-cert.pem.new')} -days 730`
+        `openssl x509 -req -in ${path.join(certsDir, 'node.csr')} -CA ${path.join(certsDir, 'ca-cert.pem')} ` +
+        `-CAkey ${path.join(certsDir, 'ca-key.pem')} -CAcreateserial -out ${path.join(certsDir, 'node-cert.pem.new')} -days 730`
       ];
 
       for (const cmd of opensslCmds) {
-        execSync(cmd, { stdio: 'inherit', cwd: CERTS_DIR });
+        execSync(cmd, { stdio: 'inherit', cwd: certsDir });
       }
 
       // Atomic swap
-      fs.renameSync(path.join(CERTS_DIR, 'node-key.pem.new'), path.join(CERTS_DIR, 'node-key.pem'));
-      fs.renameSync(path.join(CERTS_DIR, 'node-cert.pem.new'), path.join(CERTS_DIR, 'node-cert.pem'));
+      fs.renameSync(path.join(certsDir, 'node-key.pem.new'), path.join(certsDir, 'node-key.pem'));
+      fs.renameSync(path.join(certsDir, 'node-cert.pem.new'), path.join(certsDir, 'node-cert.pem'));
 
       // Reload certificates
-      this.privateKey = fs.readFileSync(path.join(CERTS_DIR, 'node-key.pem'), 'utf8');
-      this.cert = fs.readFileSync(path.join(CERTS_DIR, 'node-cert.pem'), 'utf8');
+      this.privateKey = fs.readFileSync(path.join(certsDir, 'node-key.pem'), 'utf8');
+      this.cert = fs.readFileSync(path.join(certsDir, 'node-cert.pem'), 'utf8');
 
       const newCertObj = new crypto.X509Certificate(this.cert);
       const newFingerprint = newCertObj.fingerprint256.replace(/:/g, '');
@@ -252,6 +277,9 @@ export class SecurityManager extends EventEmitter {
   }
 
   getIdentity(): NodeIdentity {
+    if (!this.identity || !this.identity.id) {
+       log.warn("getIdentity called before identity fully initialized, returning current state");
+    }
     return { ...this.identity };
   }
 
@@ -262,3 +290,4 @@ export class SecurityManager extends EventEmitter {
 
 // Singleton
 export const securityManager = new SecurityManager();
+

@@ -61,20 +61,24 @@ pnpm --version
 
 **Prevention**: Always ensure your development environment matches the prerequisites specified in [INSTALL.md](INSTALL.md).
 
-### Issue: Build Failures
+### Issue: SQLite Database Failures (better-sqlite3)
 
-**Symptoms**: `npm run build` command fails with compilation errors.
+**Symptoms**: The application fails to start or crashes with an error like `Cannot find module 'better_sqlite3.node'` or `The module ... was compiled against a different Node.js version`.
 
-**Causes**: TypeScript errors, misconfigured `vite.config.ts`, or issues with static assets.
-
-**Diagnostics**: The build output will show specific error messages from TypeScript or Vite.
+**Causes**: `better-sqlite3` is a native C++ module that must be compiled for your specific OS and Node.js version. If you recently updated Node.js or changed platforms, the binary binding might be missing or incompatible.
 
 **Fixes**:
 
-1.  **Check TypeScript Errors**: Run `pnpm run check` to identify and fix any TypeScript compilation errors.
-2.  **Review Configuration**: Ensure `vite.config.ts` and `tsconfig.json` are correctly configured.
+1.  **Rebuild Native Modules**: Run `pnpm install` again. Omnecor's `pnpm-workspace.yaml` is configured to automatically fetch or build the correct binary.
+2.  **Manual Rebuild**: If the automatic install fails, you can force a rebuild:
+    ```bash
+    cd node_modules/better-sqlite3
+    pnpm install
+    ```
+    *Note: This requires a C++ compiler (like `gcc`, `clang`, or MSVC on Windows) and Python installed on your system.*
+3.  **Prebuilt Binaries**: Omnecor attempts to use prebuilt binaries to sidestep compilation issues (especially on systems with spaces or special characters in the project path). Ensure your internet connection is active during `pnpm install`.
 
-**Prevention**: Regularly run `pnpm run check` during development to catch type errors early.
+**Prevention**: Use the pinned versions of Node.js and pnpm specified in [INSTALL.md](INSTALL.md). Avoid moving the project directory after installation, as some native modules use absolute paths in their bindings.
 
 ## 3. Runtime and Operational Issues
 

@@ -11,18 +11,32 @@ export type RoutingMode =
   | "multi_api" | "main_api_omesh" | "multi_api_omesh" | "moe_chain"
   | "moe_chain_omesh" | "multi_task";
 
+export type ExecutionMode = "sovereign" | "scrapper" | "big_spender";
+
+export type TaskCategory =
+  | "code_generation" | "code_review" | "research" | "synthesis"
+  | "media_generation" | "knowledge_retrieval" | "instruction_writing"
+  | "integration" | "hardware" | "reporting" | "local_task";
+
+export type CostTier = "free" | "low" | "medium" | "high";
+
 export interface RouteRequest {
   task: string;
   context?: string;
   preferredMode?: RoutingMode;
   availableProviders?: string[];
+  executionMode?: ExecutionMode;
   taskType?: "chat" | "code" | "research" | "router";
 }
 
 export interface RouteDecision {
+  category: TaskCategory;
   mode: RoutingMode;
   primaryProvider: string;
+  primaryModel: string;
   secondaryProviders: string[];
+  costTier: CostTier;
+  localCapable: boolean;
   reasoning: string;
   confidence: number;
   requiresTodoMd: boolean;
@@ -34,7 +48,7 @@ export const HARDCODED_RULE = {
   requireTodoMd: true,
   requireStatusMd: true,
   planModeFolder: "project-docs",
-  planModeDocs: ["PRD.md", "Feature-Plan.md", "Voice-Tone.md", "Design-Preferences.md", "Rules-Standards.md"],
+  planModeDocs: ["PRD.md", "Feature-Plan.md", "Voice-Tone.md", "Design-Preferences.md", "Rules/standards.md"],
 } as const;
 
 export class ValetRouterService {
@@ -78,19 +92,27 @@ export class ValetRouterService {
           context: request.context,
           preferred_mode: request.preferredMode ?? "main_api",
           available_providers: request.availableProviders ?? [],
+          execution_mode: request.executionMode ?? "scrapper",
           task_type: request.taskType ?? "chat",
         }),
         signal: AbortSignal.timeout(5000),
       });
       if (!res.ok) throw new Error(`Valet Router HTTP ${res.status}`);
       const data = await res.json() as {
-        mode: RoutingMode; primary_provider: string; secondary_providers: string[];
-        reasoning: string; confidence: number; requires_todo_md: boolean; requires_status_md: boolean;
+        category: TaskCategory; mode: RoutingMode;
+        primary_provider: string; primary_model: string; secondary_providers: string[];
+        cost_tier: CostTier; local_capable: boolean;
+        reasoning: string; confidence: number;
+        requires_todo_md: boolean; requires_status_md: boolean;
       };
       return {
+        category: data.category ?? "local_task",
         mode: data.mode,
         primaryProvider: data.primary_provider,
+        primaryModel: data.primary_model ?? "",
         secondaryProviders: data.secondary_providers ?? [],
+        costTier: data.cost_tier ?? "free",
+        localCapable: data.local_capable ?? true,
         reasoning: data.reasoning,
         confidence: data.confidence,
         requiresTodoMd: data.requires_todo_md,
@@ -104,12 +126,27 @@ export class ValetRouterService {
   private ruleFallback(request: RouteRequest): RouteDecision {
     const taskLower = request.task.toLowerCase();
     const isProject = /project|plan|build|create app|create system/.test(taskLower);
+    const isCode = /code|function|implement|debug|script/.test(taskLower);
+    const isResearch = /research|analyze|compare|summarize/.test(taskLower);
+    const isMedia = /image|video|audio|generate picture/.test(taskLower);
+
+    let category: TaskCategory = "local_task";
+    let costTier: CostTier = "free";
+    let localCapable = true;
+    if (isMedia) { category = "media_generation"; costTier = "medium"; }
+    else if (isCode) { category = "code_generation"; costTier = "medium"; localCapable = false; }
+    else if (isResearch) { category = "research"; costTier = "low"; localCapable = false; }
+
     const mode = request.preferredMode ?? "main_api";
     const primary = request.availableProviders?.[0] ?? "ollama";
     return {
+      category,
       mode,
       primaryProvider: primary,
+      primaryModel: "",
       secondaryProviders: request.availableProviders?.slice(1, 3) ?? [],
+      costTier,
+      localCapable,
       reasoning: "Rule-based fallback (Valet Router offline)",
       confidence: 0.5,
       requiresTodoMd: isProject,

@@ -1,6 +1,4 @@
-import React from 'react'
-
-export const Badge = ({ children, variant, className }: any) => {
+export const Badge = ({ children, variant = 'default', className }: any) => {
   const variants: any = {
     secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
     destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/80',

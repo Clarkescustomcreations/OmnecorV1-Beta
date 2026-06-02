@@ -1,5 +1,3 @@
-import React from 'react'
-
 export const Slider = ({ defaultValue, max, step, className }: any) => (
   <input
     type="range"

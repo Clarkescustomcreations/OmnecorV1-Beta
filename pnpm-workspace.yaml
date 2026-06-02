@@ -1,5 +1,6 @@
 packages:
   - "."
+  - "packaging/electron-app"
 
 overrides:
   # Existing overrides (migrated from package.json#pnpm.overrides — no longer read in pnpm v10)
@@ -30,6 +31,8 @@ patchedDependencies:
 # with no native binding and the SQLite DB layer fails to load at runtime.
 onlyBuiltDependencies:
   - "better-sqlite3"
+  - "electron"
+  - "onnxruntime-node"
 
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"

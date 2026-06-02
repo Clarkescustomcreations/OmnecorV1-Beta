@@ -1,6 +1,6 @@
 import { randomUUID } from "crypto";
 import { eq, and, asc } from "drizzle-orm";
-import { getDb } from "../../db.js";
+import { getDb } from "../../db.factory.js";
 import { pipelines, pipelinePhases, type Pipeline, type PipelinePhase } from "../../../drizzle/schema.js";
 import { PromptSanitizer } from "./PromptSanitizer.js";
 import { AuditLogService } from "./AuditLogService.js";

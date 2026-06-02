@@ -18,9 +18,9 @@ let _db: ReturnType<typeof drizzle> | null = null;
 // domain functions route through db.factory to the SQLite store instead.
 export async function getDb() {
   if (ENV.dbMode === "sqlite") return null;
-  if (!_db && process.env.DATABASE_URL) {
+  if (!_db && ENV.databaseUrl) {
     try {
-      _db = drizzle(process.env.DATABASE_URL);
+      _db = drizzle(ENV.databaseUrl);
     } catch (error) {
       console.warn("[Database] Failed to connect:", error);
       _db = null;

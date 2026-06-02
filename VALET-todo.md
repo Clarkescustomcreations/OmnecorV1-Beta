@@ -53,19 +53,19 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase A — Schema unification & code convergence (do FIRST — unblocks everything)
 
-- [ ] **A.1** Adopt the canonical I/O contract (`valet-training/IO_CONTRACT.md`) as the
+- [x] **A.1** Adopt the canonical I/O contract (`valet-training/IO_CONTRACT.md`) as the
       one schema. Update the inference server's `RouteDecision` pydantic model and the TS
       `RouteDecision` interface (`ValetRouterService.ts`) to the extended schema
       (`category`, `primary_model`, `cost_tier`, `local_capable` added). Additive/back-compat.
-- [ ] **A.2** Make the system prompt (`valet-training/VALET_SYSTEM_PROMPT.md`) the shared
+- [x] **A.2** Make the system prompt (`valet-training/VALET_SYSTEM_PROMPT.md`) the shared
       source used by generation, training, and inference — load it from disk in
       `valet_router_inference.py` instead of the inline prompt (kills train/inference skew).
-- [ ] **A.3** Inference builds the prompt via `tokenizer.apply_chat_template` and injects
+- [x] **A.3** Inference builds the prompt via `tokenizer.apply_chat_template` and injects
       the live `routing_manifest.json` + RAG context (IO_CONTRACT §6).
-- [ ] **A.4** Reconcile the `/plan` docs filename: code says `Rules-Standards.md`, docs say
+- [x] **A.4** Reconcile the `/plan` docs filename: code says `Rules-Standards.md`, docs say
       `Rules/standards.md`. Pick `Rules/standards.md` in `ValetRouterService.HARDCODED_RULE`,
       the system prompt, and seeds so all three agree (HARDCODED_RULES.md note).
-- [ ] **A.5** Unify the routing taxonomy on the manifest categories (replace the builder's
+- [x] **A.5** Unify the routing taxonomy on the manifest categories (replace the builder's
       ad-hoc list and the doc's separate list with the manifest as the single taxonomy).
 - **DoD:** the schema a trained model emits is exactly what the server parses; the same
   system prompt + chat template are used in generation, training, and inference.
@@ -74,16 +74,16 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase B — Dataset generator upgrade (expertise + rules + RAG, not just routing)
 
-- [ ] **B.1** Extend `valet_dataset_builder.py` per `valet-training/DATASET_GENERATION.md`:
+- [x] **B.1** Extend `valet_dataset_builder.py` per `valet-training/DATASET_GENERATION.md`:
       load the `seed/*.jsonl`, read `routing_manifest.json` + `OMNECOR_KNOWLEDGE_BASE.md`,
       and generate **all five classes** (route / qa / rules / plan / skill) at the target mix.
-- [ ] **B.2** Emit the canonical response schema (A.1) for `route` rows, with labels looked
+- [x] **B.2** Emit the canonical response schema (A.1) for `route` rows, with labels looked
       up from the manifest (not guessed by the oracle), plus 10% hard negatives.
-- [ ] **B.3** Write the ChatML **`text`** field per row (`--emit-text`) so the trainer
+- [x] **B.3** Write the ChatML **`text`** field per row (`--emit-text`) so the trainer
       works unmodified (fixes M3).
-- [ ] **B.4** Generate `qa` pairs from the knowledge base and repo docs so the model learns
+- [x] **B.4** Generate `qa` pairs from the knowledge base and repo docs so the model learns
       to **use retrieved context** — the basis for the runtime RAG ("pull and update").
-- [ ] **B.5** Emit `metadata.json` (per-class counts, manifest_version, oracle model, seed)
+- [x] **B.5** Emit `metadata.json` (per-class counts, manifest_version, oracle model, seed)
       + a stratified holdout eval set for Phase 4.
 - **DoD:** one `valet_dataset_builder.py` run produces a balanced, `text`-formatted dataset
   covering routing **and** Omnecor expertise **and** the hardcoded-rule behaviors, derived
