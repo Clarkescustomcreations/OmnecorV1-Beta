@@ -1,36 +1,41 @@
 """
 valet_router_inference.py — Valet Router Inference Server
-Hosts the 1.5B local model for intelligent multi-API task routing.
-Port: 8010 (configured via ENV.valetRouterUrl)
+Hosts the trained Valet Router model for intelligent multi-API task routing.
+Port: 8010 (configured via VALET_ROUTER_PORT or ENV.valetRouterUrl)
+
+Artifact loading priority (from models/valet-router/current.json):
+  gguf         → llama-cpp-python Llama()
+  ollama       → local Ollama REST API (no weights loaded here)
+  lora /
+  merged_16bit /
+  merged_4bit  → transformers AutoModelForCausalLM.from_pretrained(path)
+  absent       → rule-based keyword fallback (clearly logged)
 """
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import Optional, Literal
 from pathlib import Path
+from contextlib import asynccontextmanager
+import asyncio
+import threading
 import uvicorn
 import json
 import os
 import re
+import urllib.request
 
-app = FastAPI(title="Omnecor Valet Router", version="1.0.0")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-# Resolve the canonical training package relative to this file
-# server/python_bridges/ → project root → docs/ai-agents/valet-training/
-_TRAINING_DIR = Path(__file__).parent.parent.parent / "docs" / "ai-agents" / "valet-training"
+# ─── Paths ────────────────────────────────────────────────────────────────────
+_BRIDGES_DIR = Path(__file__).parent
+_PROJECT_ROOT = _BRIDGES_DIR.parent.parent
+_TRAINING_DIR = _PROJECT_ROOT / "docs" / "ai-agents" / "valet-training"
 _SYSTEM_PROMPT_PATH = _TRAINING_DIR / "VALET_SYSTEM_PROMPT.md"
 _MANIFEST_PATH = _TRAINING_DIR / "routing_manifest.json"
+_CURRENT_JSON = _PROJECT_ROOT / "models" / "valet-router" / "current.json"
 
+# ─── Prompts & manifest (loaded once at module import) ────────────────────────
 def _load_system_prompt() -> str:
-    """Extract canonical prompt text from VALET_SYSTEM_PROMPT.md (between code fences)."""
     try:
         text = _SYSTEM_PROMPT_PATH.read_text()
         match = re.search(r"```\n(.*?)```", text, re.DOTALL)
@@ -41,7 +46,6 @@ def _load_system_prompt() -> str:
     return "You are the Omnecor Valet — a local routing assistant."
 
 def _load_manifest() -> str:
-    """Load routing_manifest.json as compact JSON string."""
     try:
         data = json.loads(_MANIFEST_PATH.read_text())
         return json.dumps(data, separators=(",", ":"))
@@ -52,6 +56,239 @@ def _load_manifest() -> str:
 _SYSTEM_PROMPT_TEMPLATE = _load_system_prompt()
 _ROUTING_MANIFEST = _load_manifest()
 
+# ─── Registry reader ──────────────────────────────────────────────────────────
+def _read_registry() -> dict:
+    try:
+        return json.loads(_CURRENT_JSON.read_text())
+    except Exception:
+        return {"artifact_path": None, "status": "pending"}
+
+# ─── Backend state ────────────────────────────────────────────────────────────
+_backend_type: Optional[str] = None   # "gguf" | "ollama" | "transformers"
+_model = None                          # Llama (gguf) or HF model (transformers)
+_tokenizer = None                      # HF tokenizer (transformers only)
+_ollama_model: Optional[str] = None   # model name for Ollama backend
+_load_attempted = False
+
+# ─── Model loading ────────────────────────────────────────────────────────────
+def get_model() -> bool:
+    """
+    Read models/valet-router/current.json and load the registered artifact.
+    Returns True when a model backend is ready, False when using rule-based fallback.
+    Idempotent: only attempts load once per process lifetime.
+    """
+    global _backend_type, _model, _tokenizer, _ollama_model, _load_attempted
+
+    if _load_attempted:
+        return _backend_type is not None
+    _load_attempted = True
+
+    registry = _read_registry()
+    if registry.get("status") != "ready":
+        print("[ValetRouter] No registered artifact (status != ready) — rule-based fallback active.")
+        return False
+
+    artifact_path = registry.get("artifact_path")
+    if not artifact_path:
+        print("[ValetRouter] Registry has no artifact_path — rule-based fallback active.")
+        return False
+
+    fmt = registry.get("format", "")
+    print(f"[ValetRouter] Loading artifact: format={fmt!r} path={artifact_path!r}")
+
+    if fmt == "gguf":
+        return _load_gguf(artifact_path, registry)
+    elif fmt == "ollama":
+        return _load_ollama(registry)
+    else:
+        # lora, merged_16bit, merged_4bit, or unrecognised → try transformers
+        return _load_transformers(artifact_path)
+
+
+def _load_gguf(artifact_path: str, registry: dict) -> bool:
+    global _backend_type, _model
+    try:
+        from llama_cpp import Llama  # type: ignore
+    except ImportError:
+        print(
+            "[ValetRouter] llama-cpp-python not installed — rule-based fallback active. "
+            "Install: pip install llama-cpp-python"
+        )
+        return False
+
+    gguf_file = registry.get("gguf_file")
+    p = Path(artifact_path)
+    if gguf_file:
+        model_path = str(p / gguf_file)
+    elif p.is_file() and p.suffix == ".gguf":
+        model_path = str(p)
+    else:
+        candidates = sorted(p.glob("*.gguf")) if p.is_dir() else []
+        if not candidates:
+            print(f"[ValetRouter] No .gguf file found in {artifact_path} — rule-based fallback active.")
+            return False
+        model_path = str(candidates[0])
+
+    try:
+        _model = Llama(model_path=model_path, n_ctx=2048, verbose=False)
+        _backend_type = "gguf"
+        print(f"[ValetRouter] GGUF model loaded: {model_path}")
+        return True
+    except Exception as e:
+        print(f"[ValetRouter] Could not load GGUF model: {e} — rule-based fallback active.")
+        return False
+
+
+def _load_ollama(registry: dict) -> bool:
+    global _backend_type, _ollama_model
+    model_name = registry.get("base_model", "")
+    if not model_name:
+        print("[ValetRouter] Ollama format but registry has no base_model — rule-based fallback active.")
+        return False
+    _ollama_model = model_name
+    _backend_type = "ollama"
+    print(f"[ValetRouter] Ollama backend configured: model={model_name}")
+    return True
+
+
+def _load_transformers(artifact_path: str) -> bool:
+    global _backend_type, _model, _tokenizer
+    try:
+        from transformers import AutoTokenizer, AutoModelForCausalLM  # type: ignore
+        import torch  # type: ignore
+        _tokenizer = AutoTokenizer.from_pretrained(artifact_path)
+        _model = AutoModelForCausalLM.from_pretrained(
+            artifact_path,
+            torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
+            device_map="auto",
+        )
+        _backend_type = "transformers"
+        print(f"[ValetRouter] Transformers model loaded from: {artifact_path}")
+        return True
+    except Exception as e:
+        print(f"[ValetRouter] Could not load transformers model: {e} — rule-based fallback active.")
+        return False
+
+
+# ─── Prompt construction ──────────────────────────────────────────────────────
+def _build_system_content(rag_context: str) -> str:
+    return (
+        _SYSTEM_PROMPT_TEMPLATE
+        .replace("{{RAG_CONTEXT}}", rag_context)
+        .replace("{{ROUTING_MANIFEST}}", _ROUTING_MANIFEST)
+    )
+
+def _parse_decision(text: str) -> Optional[dict]:
+    json_start = text.find("{")
+    json_end = text.rfind("}") + 1
+    if json_start >= 0 and json_end > json_start:
+        try:
+            return json.loads(text[json_start:json_end])
+        except json.JSONDecodeError:
+            pass
+    return None
+
+# ─── Backend-specific inference (all async-safe via asyncio.to_thread) ────────
+async def _route_via_gguf(task: str, rag_context: str) -> Optional[dict]:
+    system_content = _build_system_content(rag_context)
+
+    def _infer():
+        return _model.create_chat_completion(  # type: ignore[union-attr]
+            messages=[
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": task[:500]},
+            ],
+            max_tokens=220,
+            temperature=0,
+        )
+
+    try:
+        response = await asyncio.to_thread(_infer)
+        return _parse_decision(response["choices"][0]["message"]["content"])
+    except Exception as e:
+        print(f"[ValetRouter] GGUF inference error: {e}")
+        return None
+
+
+async def _route_via_ollama(task: str, rag_context: str) -> Optional[dict]:
+    system_content = _build_system_content(rag_context)
+    ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+
+    def _call():
+        payload = json.dumps({
+            "model": _ollama_model,
+            "messages": [
+                {"role": "system", "content": system_content},
+                {"role": "user", "content": task[:500]},
+            ],
+            "stream": False,
+            "options": {"temperature": 0},
+        }).encode()
+        req = urllib.request.Request(
+            f"{ollama_url}/api/chat",
+            data=payload,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        with urllib.request.urlopen(req, timeout=10) as resp:
+            return json.loads(resp.read())
+
+    try:
+        data = await asyncio.to_thread(_call)
+        return _parse_decision(data["message"]["content"])
+    except Exception as e:
+        print(f"[ValetRouter] Ollama inference error: {e}")
+        return None
+
+
+async def _route_via_transformers(task: str, rag_context: str) -> Optional[dict]:
+    system_content = _build_system_content(rag_context)
+
+    def _infer():
+        import torch  # type: ignore
+        messages = [
+            {"role": "system", "content": system_content},
+            {"role": "user", "content": task[:500]},
+        ]
+        prompt = _tokenizer.apply_chat_template(  # type: ignore[union-attr]
+            messages, tokenize=False, add_generation_prompt=True
+        )
+        inputs = _tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
+        with torch.no_grad():
+            outputs = _model.generate(  # type: ignore[union-attr]
+                **inputs, max_new_tokens=220, temperature=0, do_sample=False
+            )
+        return _tokenizer.decode(
+            outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
+        )
+
+    try:
+        text = await asyncio.to_thread(_infer)
+        return _parse_decision(text)
+    except Exception as e:
+        print(f"[ValetRouter] Transformers inference error: {e}")
+        return None
+
+
+# ─── FastAPI setup ────────────────────────────────────────────────────────────
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Kick off model loading in a background thread so the server starts
+    # accepting requests immediately while the (potentially slow) load runs.
+    threading.Thread(target=get_model, daemon=True, name="valet-model-loader").start()
+    yield
+
+
+app = FastAPI(title="Omnecor Valet Router", version="1.0.0", lifespan=lifespan)
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
+# ─── Pydantic models ──────────────────────────────────────────────────────────
 RoutingMode = Literal[
     "api_direct", "valet_background", "local_omesh", "main_api",
     "multi_api", "main_api_omesh", "multi_api_omesh", "moe_chain",
@@ -65,6 +302,7 @@ TaskCategory = Literal[
 ]
 CostTier = Literal["free", "low", "medium", "high"]
 
+
 class RouteRequest(BaseModel):
     task: str
     context: Optional[str] = None
@@ -72,6 +310,7 @@ class RouteRequest(BaseModel):
     available_providers: list[str] = []
     execution_mode: Optional[ExecutionMode] = "scrapper"
     task_type: Optional[str] = None  # "chat", "code", "research", "router"
+
 
 class RouteDecision(BaseModel):
     category: TaskCategory = "local_task"
@@ -86,36 +325,16 @@ class RouteDecision(BaseModel):
     requires_todo_md: bool
     requires_status_md: bool
 
+
 class HealthResponse(BaseModel):
     status: str
     model_loaded: bool
     version: str
+    backend: Optional[str] = None
 
-# Model state
-_model = None
-_tokenizer = None
 
-def get_model():
-    """Lazy-load the 1.5B router model. Falls back to rule-based routing if unavailable."""
-    global _model, _tokenizer
-    if _model is None:
-        try:
-            from transformers import AutoTokenizer, AutoModelForCausalLM
-            import torch
-            model_name = os.environ.get("VALET_MODEL", "Qwen/Qwen2.5-1.5B-Instruct")
-            _tokenizer = AutoTokenizer.from_pretrained(model_name)
-            _model = AutoModelForCausalLM.from_pretrained(
-                model_name,
-                torch_dtype=torch.float16 if torch.cuda.is_available() else torch.float32,
-                device_map="auto",
-            )
-        except Exception as e:
-            print(f"[ValetRouter] Could not load model: {e}. Using rule-based routing.")
-            _model = None
-    return _model
-
+# ─── Rule-based fallback ──────────────────────────────────────────────────────
 def rule_based_route(request: RouteRequest) -> RouteDecision:
-    """Fallback rule-based routing when model is unavailable."""
     task_lower = request.task.lower()
     providers = request.available_providers or ["ollama"]
 
@@ -146,62 +365,51 @@ def rule_based_route(request: RouteRequest) -> RouteDecision:
         secondary_providers=providers[1:3] if len(providers) > 1 else [],
         cost_tier=cost_tier,
         local_capable=local_capable,
-        reasoning=f"Rule-based routing: task_type={request.task_type}, is_code={is_code}",
+        reasoning="Rule-based fallback — Valet Router model not loaded",
         confidence=0.6,
         requires_todo_md=requires_docs,
         requires_status_md=requires_docs,
     )
 
+
+# ─── API endpoints ────────────────────────────────────────────────────────────
 @app.get("/health", response_model=HealthResponse)
 async def health():
     return HealthResponse(
         status="ok",
-        model_loaded=_model is not None,
+        model_loaded=_backend_type is not None,
         version="1.0.0",
+        backend=_backend_type,
     )
+
 
 @app.post("/route", response_model=RouteDecision)
 async def route_task(request: RouteRequest):
     """Route a task to the appropriate provider(s)."""
-    model = get_model()
+    # If load hasn't been attempted yet (e.g. lifespan thread hasn't run),
+    # do a synchronous attempt now so the first request isn't always rule-based.
+    if not _load_attempted:
+        get_model()
 
-    if model is None:
-        # Rule-based fallback
+    rag_context = request.context or ""
+    data: Optional[dict] = None
+
+    if _backend_type == "gguf":
+        data = await _route_via_gguf(request.task, rag_context)
+    elif _backend_type == "ollama":
+        data = await _route_via_ollama(request.task, rag_context)
+    elif _backend_type == "transformers":
+        data = await _route_via_transformers(request.task, rag_context)
+
+    if data is None:
         return rule_based_route(request)
 
     try:
-        # Build the filled system prompt (A.2 + A.3): same template used in training
-        rag_context = request.context or ""
-        system_content = (
-            _SYSTEM_PROMPT_TEMPLATE
-            .replace("{{RAG_CONTEXT}}", rag_context)
-            .replace("{{ROUTING_MANIFEST}}", _ROUTING_MANIFEST)
-        )
-
-        # Apply the tokenizer's chat template (fixes train/inference skew)
-        messages = [
-            {"role": "system", "content": system_content},
-            {"role": "user", "content": request.task[:500]},
-        ]
-        prompt = _tokenizer.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
-        inputs = _tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
-
-        with __import__("torch").no_grad():
-            outputs = model.generate(
-                **inputs, max_new_tokens=220, temperature=0, do_sample=False
-            )
-        response_text = _tokenizer.decode(outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True)
-
-        # Extract the first balanced JSON object from the response
-        json_start = response_text.find("{")
-        json_end = response_text.rfind("}") + 1
-        if json_start >= 0 and json_end > json_start:
-            data = json.loads(response_text[json_start:json_end])
-            return RouteDecision(**data)
+        return RouteDecision(**data)
     except Exception as e:
-        print(f"[ValetRouter] Model inference error: {e}. Falling back to rule-based.")
+        print(f"[ValetRouter] Decision parse error: {e}. Falling back to rules.")
+        return rule_based_route(request)
 
-    return rule_based_route(request)
 
 @app.get("/modes")
 async def list_modes():
@@ -220,6 +428,7 @@ async def list_modes():
             {"id": "multi_task", "label": "Multi Task", "description": "High-spec: run multiple models simultaneously"},
         ]
     }
+
 
 if __name__ == "__main__":
     port = int(os.environ.get("VALET_ROUTER_PORT", "8010"))

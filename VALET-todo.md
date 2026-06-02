@@ -180,23 +180,35 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ---
 
-## Phase 3 — Serve the trained model + auto-start 🔴
+## Phase 3 — Serve the trained model + auto-start ✅
 
-- [ ] **3.1 Load the real artifact.** Rewrite `valet_router_inference.py:get_model()` to
-      resolve the model from `current.json` (Phase 2.2) instead of the HF stub. For gguf →
-      use `llamacpp_bridge.py`; for ollama → call the local Ollama model; for merged HF →
-      `from_pretrained(local_path)`. Set `health.model_loaded` truthfully.
-- [ ] **3.2 Auto-start the server with the app.** Have the Node backend spawn the FastAPI
-      router (via `ProcessManager`) on boot when an artifact is present and the active
-      routing mode needs it; health-check on `:8010/health`; restart on crash.
-- [ ] **3.3 Graceful degradation.** Keep the `ruleFallback` path, but log clearly when the
-      model is absent so the keyword fallback is observable (today it's silent — see
-      `ValetRouterService.route`). Surface model status in Settings → Valet Router.
-- [ ] **3.4 Resource guardrails.** Respect VRAM/CPU limits; don't auto-start the model
-      server in `api_direct` mode where it isn't used.
+- [x] **3.1 Load the real artifact.** Rewrote `valet_router_inference.py:get_model()` to
+      resolve the model from `current.json`. Format dispatch:
+      `gguf` → llama-cpp-python `Llama()` (via `asyncio.to_thread`);
+      `ollama` → local Ollama REST API (urllib, non-blocking);
+      `lora`/`merged_*` → `AutoModelForCausalLM.from_pretrained(artifact_path)`.
+      `/health` returns `model_loaded` + `backend` truthfully.
+      Model loads in a background thread at startup via FastAPI `lifespan`.
+- [x] **3.2 Auto-start the server with the app.** `ValetServerService` (new singleton)
+      reads `current.json` at Node boot — if `status=ready` and `VALET_AUTO_START!=false`,
+      spawns `valet_router_inference.py` directly (not via ProcessManager's concurrency
+      limiter). Health-checks on `:8010/health`; auto-restarts on crash up to 5× with
+      exponential back-off. Shutdown wired into `index.ts` graceful shutdown handler.
+- [x] **3.3 Graceful degradation.** `ValetRouterService.ruleFallback()` now logs a warning
+      so the keyword fallback is always observable in the server logs. `valetRouter.status`
+      query returns `{ available, modelLoaded, backend, url }` — Settings → Valet Router
+      shows distinct badges for "Online/Loaded", "Online/Loading…", and "Offline".
+- [x] **3.4 Resource guardrails.** `VALET_AUTO_START=false` env var opts out of auto-start
+      without removing the artifact. Server is not started when artifact is absent.
 - **DoD:** with an artifact present, starting the app auto-launches the router server,
   `/health` reports `model_loaded: true`, and `/route` returns model-driven decisions; with
   no artifact, the app still runs on the documented keyword fallback.
+  
+  *Implementation notes (2026-06-02):*
+  - `ValetServerService.ts` at `server/phase2/services/`
+  - Startup wired in `server/_core/index.ts` between OMMESH init and Express boot
+  - `valetRouter.status` now calls `/health` directly for the richer response
+  - `ValetRouterPanel.tsx` Model badge shows backend type (gguf/ollama/transformers)
 
 ---
 

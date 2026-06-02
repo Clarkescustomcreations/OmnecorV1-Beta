@@ -5,6 +5,9 @@
  * that every project must create todo.md + status.md.
  */
 import { ENV } from "../../_core/env.js";
+import { createLogger } from "../../_core/logger.js";
+
+const log = createLogger("ValetRouter");
 
 export type RoutingMode =
   | "api_direct" | "valet_background" | "local_omesh" | "main_api"
@@ -124,6 +127,10 @@ export class ValetRouterService {
   }
 
   private ruleFallback(request: RouteRequest): RouteDecision {
+    log.warn(
+      "[ValetRouter] Inference server offline — using keyword rule fallback. " +
+        "Run 'pnpm valet:fetch' or check Settings → Valet Router to load a model."
+    );
     const taskLower = request.task.toLowerCase();
     const isProject = /project|plan|build|create app|create system/.test(taskLower);
     const isCode = /code|function|implement|debug|script/.test(taskLower);
