@@ -189,15 +189,16 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className=\"flex-1\" aria-label=\"Start LLM training\">
-          <Play className=\"w-4 h-4 mr-2\" aria-hidden=\"true\" />
+        <Button className="flex-1" aria-label="Start LLM training">
+          <Play className="w-4 h-4 mr-2" aria-hidden="true" />
           Start Training
         </Button>
-        <Button variant=\"outline\" className=\"flex-1\" aria-label=\"Configure LLM training\">
-          <Settings className=\"w-4 h-4 mr-2\" aria-hidden=\"true\" />
+        <Button variant="outline" className="flex-1" aria-label="Configure LLM training">
+          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Configure
         </Button>
       </div>
+    </div>
     );
   };
 
@@ -318,21 +319,22 @@ export default function SpecializedModuleLauncher({
           Settings
         </Button>
       </div>
+    </div>
     );
   };
 
   const getPCBDesignerContent = () => {
     if (!pcbProject) {
       return (
-        <div className=\"flex items-center justify-center p-8\">
-          <div className=\"text-center\">
-            <Zap className=\"w-12 h-12 mx-auto mb-4 opacity-50\" />
-            <h3 className=\"font-semibold mb-2\">No Active Project</h3>
-            <p className=\"text-sm text-muted-foreground mb-4\">
+        <div className="flex items-center justify-center p-8">
+          <div className="text-center">
+            <Zap className="w-12 h-12 mx-auto mb-4 opacity-50" />
+            <h3 className="font-semibold mb-2">No Active Project</h3>
+            <p className="text-sm text-muted-foreground mb-4">
               Create a new KiCad project to start PCB design.
             </p>
-            <Button size=\"sm\">
-              <Plus className=\"w-4 h-4 mr-2\" />
+            <Button size="sm">
+              <Plus className="w-4 h-4 mr-2" />
               New Project
             </Button>
           </div>
@@ -439,6 +441,7 @@ export default function SpecializedModuleLauncher({
           Settings
         </Button>
       </div>
+    </div>
     );
   };
 

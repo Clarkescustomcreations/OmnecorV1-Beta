@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./notification.js";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc.js";
-import { readFileSync, writeFileSync, existsSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir, platform, cpus, totalmem, freemem } from "os";
 import { execFile } from "child_process";
@@ -80,7 +80,7 @@ export const systemRouter = router({
     .mutation(({ input }) => {
       const dir = join(homedir(), ".omnecor");
       if (!existsSync(dir)) {
-        import("fs").then(({ mkdirSync }) => mkdirSync(dir, { recursive: true }));
+        mkdirSync(dir, { recursive: true });
       }
       writeFileSync(SETTINGS_PATH, JSON.stringify(input.settings, null, 2), "utf-8");
       return { saved: true };
