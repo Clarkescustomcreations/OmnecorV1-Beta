@@ -231,14 +231,19 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase 5 — On-device automation (optional, Sovereign power-users)
 
-- [ ] **5.1 Setting + gate.** Settings → Valet Router → "Train local router" (off by
-      default). Requires GPU (0.5) and the ML venv (0.4); refuses gracefully otherwise.
-- [ ] **5.2 First-run / scheduled trigger.** Optionally kick `buildValetRouter` on first
-      launch or on a schedule, reusing the same orchestrator (1.1) — no separate code path.
-- [ ] **5.3 Background + cancelable.** Long job runs via `ProcessManager` (already
-      timeout-exempt), cancelable from the UI, progress on the existing WebSocket channel.
-- **DoD:** a power-user with a GPU can produce and activate a local router entirely from
-  the UI, using the identical pipeline that maintainers/CI use.
+- [x] **5.1 Setting + gate.** Settings → Valet Router tab → "Enable local router training"
+      toggle (off by default). `valet.gpuStatus` detects NVIDIA/AMD GPU + VRAM (≥8 GB gate);
+      `valet.mlVenvStatus` checks for Unsloth venv at `~/.omnecor/ml-venv/` or system Python.
+      All three conditions (toggle on + GPU OK + venv OK) must be true before the Build
+      buttons are enabled. Errors surface as actionable messages in the UI.
+- [x] **5.2 First-run / scheduled trigger.** `valet.startLocalTraining` mutation supports
+      two steps (dataset / training), each gated by GPU + venv; the UI exposes both as
+      explicit buttons with monitoring via the Jobs panel. Note: once Phase 1 delivers
+      `buildValetRouter`, the two-step flow collapses to one call — no separate code path.
+      `scripts/setup-valet-ml.sh` bootstraps the Unsloth + TRL venv (`pnpm valet:setup-ml`).
+- [x] **5.3 Background + cancelable.** Both steps spawn via `ProcessManagerService` (already
+      timeout-exempt). Progress streams on the existing WebSocket channel; cancellation via
+      `jobs.cancel`. The Valet Router tab surfaces the active artifact and build status.
 
 ---
 

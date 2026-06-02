@@ -12,7 +12,8 @@
     "test": "vitest run",
     "db:push": "drizzle-kit generate && drizzle-kit migrate",
     "valet:fetch": "bash scripts/fetch-valet-model.sh",
-    "valet:build": "echo 'Phase 1 orchestrator not yet implemented. Run training via the UI or trainingRouter.startTraining tRPC call.'"
+    "valet:build": "echo 'Phase 1 orchestrator not yet implemented. Run training via the UI or trainingRouter.startTraining tRPC call.'",
+    "valet:setup-ml": "bash scripts/setup-valet-ml.sh"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
