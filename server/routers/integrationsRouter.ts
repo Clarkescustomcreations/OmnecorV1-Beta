@@ -2,15 +2,16 @@
  * @file server/routers/integrationsRouter.ts
  * @description Omnecor — Third-Party Integrations Router
  *
- * Manages authentication tokens and live data sync for:
- *   - GitHub (Personal Access Tokens → /user, /user/repos)
- *   - Notion (Integration Tokens → /v1/search)
- *   - Slack (Bot Tokens → conversations.list, auth.test)
- *   - Google Drive (OAuth tokens → drive/v3/about, drive/v3/files)
+ * Stores integration tokens encrypted at rest using AES-256-GCM.
+ * Key is derived from JWT_SECRET (same secret used for session cookies).
+ * Concurrent mutations are serialized through a write lock to prevent
+ * read-modify-write races on the backing store.
  *
- * Tokens are stored in ~/.omnecor/integrations.json (never logged or returned raw).
- * All network calls are made server-side to avoid CORS issues and keep keys off
- * the client.
+ * Supported services:
+ *   GitHub   – Personal Access Token → GET /user, GET /user/repos
+ *   Notion   – Internal Integration Token → POST /v1/search
+ *   Slack    – Bot OAuth Token → auth.test, conversations.list
+ *   Google Drive – OAuth Access Token → GET /drive/v3/about
  */
 
 import { z } from "zod";
@@ -19,39 +20,103 @@ import { TRPCError } from "@trpc/server";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
+import {
+  createCipheriv,
+  createDecipheriv,
+  createHash,
+  randomBytes,
+} from "crypto";
+import { ENV } from "../_core/env.js";
 import { createLogger } from "../_core/logger.js";
+
 const log = createLogger("integrations");
 
 // ---------------------------------------------------------------------------
-// Storage helpers
+// Encryption — AES-256-GCM, key derived from JWT_SECRET
+// ---------------------------------------------------------------------------
+
+function deriveKey(): Buffer {
+  const secret = ENV.cookieSecret || "omnecor-local-dev-fallback-key-change-me";
+  return createHash("sha256").update(secret).digest();
+}
+
+function encryptToken(plaintext: string): { ciphertext: string; iv: string; tag: string } {
+  const iv = randomBytes(12);
+  const cipher = createCipheriv("aes-256-gcm", deriveKey(), iv);
+  const encrypted = Buffer.concat([cipher.update(plaintext, "utf8"), cipher.final()]);
+  return {
+    ciphertext: encrypted.toString("base64"),
+    iv: iv.toString("base64"),
+    tag: cipher.getAuthTag().toString("base64"),
+  };
+}
+
+function decryptToken(ciphertext: string, iv: string, tag: string): string {
+  const decipher = createDecipheriv("aes-256-gcm", deriveKey(), Buffer.from(iv, "base64"));
+  decipher.setAuthTag(Buffer.from(tag, "base64"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(ciphertext, "base64")),
+    decipher.final(),
+  ]).toString("utf8");
+}
+
+// ---------------------------------------------------------------------------
+// Store — ~/.omnecor/integrations.json  (tokens encrypted, metadata plain)
 // ---------------------------------------------------------------------------
 
 const INTEGRATIONS_PATH = join(homedir(), ".omnecor", "integrations.json");
 
-interface StoredToken {
+interface StoredEntry {
   type: string;
-  token: string;
-  metadata?: Record<string, unknown>;
+  /** AES-256-GCM ciphertext (base64) */
+  ciphertext: string;
+  iv: string;
+  tag: string;
+  metadata: Record<string, unknown>;
   connectedAt: string;
 }
 
-function readStore(): Record<string, StoredToken> {
+type Store = Record<string, StoredEntry>;
+
+function readStore(): Store {
   try {
     if (!existsSync(INTEGRATIONS_PATH)) return {};
-    return JSON.parse(readFileSync(INTEGRATIONS_PATH, "utf-8")) as Record<string, StoredToken>;
+    return JSON.parse(readFileSync(INTEGRATIONS_PATH, "utf-8")) as Store;
   } catch {
     return {};
   }
 }
 
-function writeStore(data: Record<string, StoredToken>): void {
+function writeStoreDirect(data: Store): void {
   const dir = join(homedir(), ".omnecor");
   if (!existsSync(dir)) mkdirSync(dir, { recursive: true });
-  writeFileSync(INTEGRATIONS_PATH, JSON.stringify(data, null, 2), "utf-8");
+  writeFileSync(INTEGRATIONS_PATH, JSON.stringify(data, null, 2), { encoding: "utf-8", mode: 0o600 });
+}
+
+// Serialise all writes through a promise queue so concurrent mutations never
+// interleave their read-modify-write cycles.
+let _writeLock: Promise<void> = Promise.resolve();
+
+async function withLock<T>(fn: () => Promise<T> | T): Promise<T> {
+  let release!: () => void;
+  const acquired = new Promise<void>(r => { release = r; });
+  const prev = _writeLock;
+  _writeLock = acquired;
+  await prev; // wait for previous holder
+  try {
+    return await fn();
+  } finally {
+    release();
+  }
+}
+
+// Convenience: read the plain token from a stored entry
+function readToken(entry: StoredEntry): string {
+  return decryptToken(entry.ciphertext, entry.iv, entry.tag);
 }
 
 // ---------------------------------------------------------------------------
-// GitHub helpers
+// External API helpers
 // ---------------------------------------------------------------------------
 
 async function githubFetch(path: string, token: string) {
@@ -65,16 +130,9 @@ async function githubFetch(path: string, token: string) {
     signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) throw new TRPCError({ code: "UNAUTHORIZED", message: "GitHub token invalid or expired." });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `GitHub API error ${res.status}: ${body}` });
-  }
+  if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `GitHub API ${res.status}` });
   return res.json();
 }
-
-// ---------------------------------------------------------------------------
-// Notion helpers
-// ---------------------------------------------------------------------------
 
 async function notionFetch(path: string, token: string, body?: unknown) {
   const res = await fetch(`https://api.notion.com/v1${path}`, {
@@ -88,37 +146,20 @@ async function notionFetch(path: string, token: string, body?: unknown) {
     signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) throw new TRPCError({ code: "UNAUTHORIZED", message: "Notion token invalid or expired." });
-  if (!res.ok) {
-    const body_text = await res.text().catch(() => "");
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Notion API error ${res.status}: ${body_text}` });
-  }
+  if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Notion API ${res.status}` });
   return res.json();
 }
 
-// ---------------------------------------------------------------------------
-// Slack helpers
-// ---------------------------------------------------------------------------
-
 async function slackFetch(method: string, token: string, params: Record<string, string> = {}) {
-  const query = new URLSearchParams({ ...params });
-  const res = await fetch(`https://slack.com/api/${method}?${query}`, {
-    headers: {
-      Authorization: `Bearer ${token}`,
-      "Content-Type": "application/json",
-    },
+  const res = await fetch(`https://slack.com/api/${method}?${new URLSearchParams(params)}`, {
+    headers: { Authorization: `Bearer ${token}` },
     signal: AbortSignal.timeout(10_000),
   });
-  if (!res.ok) {
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Slack API error ${res.status}` });
-  }
+  if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Slack HTTP ${res.status}` });
   const data = await res.json() as { ok: boolean; error?: string };
-  if (!data.ok) throw new TRPCError({ code: "UNAUTHORIZED", message: `Slack error: ${data.error ?? "unknown"}` });
+  if (!data.ok) throw new TRPCError({ code: "UNAUTHORIZED", message: `Slack: ${data.error ?? "unknown error"}` });
   return data;
 }
-
-// ---------------------------------------------------------------------------
-// Google Drive helpers
-// ---------------------------------------------------------------------------
 
 async function gdriveFetch(path: string, token: string) {
   const res = await fetch(`https://www.googleapis.com/drive/v3${path}`, {
@@ -126,10 +167,7 @@ async function gdriveFetch(path: string, token: string) {
     signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) throw new TRPCError({ code: "UNAUTHORIZED", message: "Google Drive token invalid or expired." });
-  if (!res.ok) {
-    const body = await res.text().catch(() => "");
-    throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Google Drive API error ${res.status}: ${body}` });
-  }
+  if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Google Drive API ${res.status}` });
   return res.json();
 }
 
@@ -142,173 +180,167 @@ type IntegrationType = typeof INTEGRATION_TYPES[number];
 
 export const integrationsRouter = router({
 
-  /** Return all configured integrations (status + sanitized account info, no raw tokens). */
-  getIntegrations: protectedProcedure.query(async () => {
+  /** Return all configured integration statuses (no raw tokens ever leave the server). */
+  getIntegrations: protectedProcedure.query(() => {
     const store = readStore();
     return INTEGRATION_TYPES.map(type => {
-      const stored = store[type];
+      const entry = store[type];
       return {
         type,
-        isConnected: !!stored,
-        connectedAt: stored?.connectedAt ?? null,
-        metadata: stored?.metadata ?? null,
+        isConnected: !!entry,
+        connectedAt: entry?.connectedAt ?? null,
+        metadata: entry?.metadata ?? null,
       };
     });
   }),
 
-  /** Connect an integration by storing and validating a token. */
+  /** Validate a token against the live service then store it encrypted. */
   connect: protectedProcedure
     .input(z.object({
       type: z.enum(INTEGRATION_TYPES),
       token: z.string().min(1).max(512),
     }))
-    .mutation(async ({ input }) => {
-      const store = readStore();
-      let metadata: Record<string, unknown> = {};
+    .mutation(({ input }) =>
+      withLock(async () => {
+        let metadata: Record<string, unknown> = {};
 
-      if (input.type === "github") {
-        const user = await githubFetch("/user", input.token) as {
-          login: string; name: string; email: string; avatar_url: string; id: number;
-        };
-        metadata = { username: user.login, name: user.name, email: user.email, avatarUrl: user.avatar_url };
+        if (input.type === "github") {
+          const user = await githubFetch("/user", input.token) as {
+            login: string; name?: string; email?: string; avatar_url?: string;
+          };
+          metadata = { username: user.login, name: user.name ?? null, email: user.email ?? null };
 
-      } else if (input.type === "notion") {
-        const me = await notionFetch("/users/me", input.token) as {
-          name: string; type: string; bot?: { owner?: { user?: { name: string; person?: { email: string } } } };
-        };
-        const ownerName = me.bot?.owner?.user?.name ?? me.name ?? "Notion User";
-        const ownerEmail = me.bot?.owner?.user?.person?.email ?? null;
-        metadata = { username: ownerName, email: ownerEmail };
+        } else if (input.type === "notion") {
+          const me = await notionFetch("/users/me", input.token) as {
+            name?: string;
+            bot?: { owner?: { user?: { name?: string; person?: { email?: string } } } };
+          };
+          const ownerName = me.bot?.owner?.user?.name ?? me.name ?? "Notion User";
+          const ownerEmail = me.bot?.owner?.user?.person?.email ?? null;
+          metadata = { username: ownerName, email: ownerEmail };
 
-      } else if (input.type === "slack") {
-        const auth = await slackFetch("auth.test", input.token) as {
-          user_id: string; user: string; team: string; team_id: string;
-        };
-        metadata = { username: auth.user, userId: auth.user_id, team: auth.team, teamId: auth.team_id };
+        } else if (input.type === "slack") {
+          const auth = await slackFetch("auth.test", input.token) as {
+            user: string; user_id: string; team: string; team_id: string;
+          };
+          metadata = { username: auth.user, userId: auth.user_id, team: auth.team };
 
-      } else if (input.type === "google-drive") {
-        const about = await gdriveFetch("/about?fields=user,storageQuota", input.token) as {
-          user?: { displayName: string; emailAddress: string };
-          storageQuota?: { limit: string; usage: string };
-        };
-        metadata = {
-          username: about.user?.displayName ?? "Drive User",
-          email: about.user?.emailAddress ?? null,
-          storageTotal: about.storageQuota?.limit ? Number(about.storageQuota.limit) : null,
-          storageUsed: about.storageQuota?.usage ? Number(about.storageQuota.usage) : null,
-        };
-      }
+        } else if (input.type === "google-drive") {
+          const about = await gdriveFetch("/about?fields=user,storageQuota", input.token) as {
+            user?: { displayName?: string; emailAddress?: string };
+            storageQuota?: { limit?: string; usage?: string };
+          };
+          metadata = {
+            username: about.user?.displayName ?? "Drive User",
+            email: about.user?.emailAddress ?? null,
+            storageTotal: about.storageQuota?.limit ? Number(about.storageQuota.limit) : null,
+            storageUsed: about.storageQuota?.usage ? Number(about.storageQuota.usage) : null,
+          };
+        }
 
-      store[input.type] = {
-        type: input.type,
-        token: input.token,
-        metadata,
-        connectedAt: new Date().toISOString(),
-      };
-      writeStore(store);
-      log.info(`[Integrations] Connected ${input.type} for user ${JSON.stringify(metadata.username ?? "")}`);
-      return { success: true, metadata };
-    }),
+        const { ciphertext, iv, tag } = encryptToken(input.token);
+        const store = readStore();
+        store[input.type] = { type: input.type, ciphertext, iv, tag, metadata, connectedAt: new Date().toISOString() };
+        writeStoreDirect(store);
+        log.info(`Connected ${input.type}: ${String(metadata.username ?? "")}`);
+        return { success: true, metadata };
+      })
+    ),
 
-  /** Disconnect (remove stored token). */
+  /** Remove a stored integration. */
   disconnect: protectedProcedure
     .input(z.object({ type: z.enum(INTEGRATION_TYPES) }))
-    .mutation(({ input }) => {
-      const store = readStore();
-      delete store[input.type];
-      writeStore(store);
-      log.info(`[Integrations] Disconnected ${input.type}`);
-      return { success: true };
-    }),
+    .mutation(({ input }) =>
+      withLock(async () => {
+        const store = readStore();
+        delete store[input.type];
+        writeStoreDirect(store);
+        log.info(`Disconnected ${input.type}`);
+        return { success: true };
+      })
+    ),
 
-  /** Sync live data from the connected service. */
+  /** Re-fetch live data from the connected service. */
   sync: protectedProcedure
     .input(z.object({ type: z.enum(INTEGRATION_TYPES) }))
-    .mutation(async ({ input }) => {
-      const store = readStore();
-      const stored = store[input.type];
-      if (!stored) {
-        throw new TRPCError({ code: "NOT_FOUND", message: `${input.type} is not connected.` });
-      }
+    .mutation(({ input }) =>
+      withLock(async () => {
+        const store = readStore();
+        const entry = store[input.type];
+        if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: `${input.type} is not connected.` });
 
-      let syncData: Record<string, unknown> = {};
+        const token = readToken(entry);
+        let syncData: Record<string, unknown> = {};
 
-      if (input.type === "github") {
-        const repos = await githubFetch("/user/repos?per_page=30&sort=pushed", stored.token) as Array<{
-          id: number; name: string; html_url: string; description: string | null;
-          private: boolean; pushed_at: string;
-        }>;
-        syncData = {
-          repositories: repos.map(r => ({
-            id: r.id,
-            name: r.name,
-            url: r.html_url,
-            description: r.description,
-            isPrivate: r.private,
-            lastPushed: r.pushed_at,
-          })),
-          repoCount: repos.length,
+        if (input.type === "github") {
+          const repos = await githubFetch("/user/repos?per_page=30&sort=pushed", token) as Array<{
+            id: number; name: string; html_url: string; description: string | null;
+            private: boolean; pushed_at: string;
+          }>;
+          syncData = {
+            repositories: repos.map(r => ({
+              id: r.id, name: r.name, url: r.html_url,
+              description: r.description ?? null, isPrivate: r.private, lastPushed: r.pushed_at,
+            })),
+            repoCount: repos.length,
+          };
+
+        } else if (input.type === "notion") {
+          const results = await notionFetch("/search", token, {
+            filter: { property: "object", value: "database" },
+            page_size: 20,
+          }) as { results: Array<{ id: string; title?: Array<{ plain_text: string }>; icon?: { emoji?: string } }> };
+          syncData = {
+            databases: results.results.map(db => ({
+              id: db.id,
+              title: db.title?.[0]?.plain_text ?? "Untitled",
+              icon: db.icon?.emoji ?? null,
+            })),
+            dbCount: results.results.length,
+          };
+
+        } else if (input.type === "slack") {
+          const data = await slackFetch("conversations.list", token, { limit: "20", types: "public_channel,private_channel" }) as {
+            channels: Array<{ id: string; name: string; is_private: boolean }>;
+          };
+          syncData = {
+            channels: data.channels.map(c => ({ id: c.id, name: c.name, isPrivate: c.is_private })),
+            channelCount: data.channels.length,
+          };
+
+        } else if (input.type === "google-drive") {
+          const about = await gdriveFetch("/about?fields=storageQuota", token) as {
+            storageQuota?: { limit?: string; usage?: string };
+          };
+          syncData = {
+            storageTotal: about.storageQuota?.limit ? Number(about.storageQuota.limit) : null,
+            storageUsed: about.storageQuota?.usage ? Number(about.storageQuota.usage) : null,
+          };
+        }
+
+        store[input.type] = {
+          ...entry,
+          metadata: { ...entry.metadata, ...syncData, lastSynced: new Date().toISOString() },
         };
+        writeStoreDirect(store);
+        return { success: true, type: input.type, data: syncData };
+      })
+    ),
 
-      } else if (input.type === "notion") {
-        const results = await notionFetch("/search", stored.token, {
-          filter: { property: "object", value: "database" },
-          page_size: 20,
-        }) as { results: Array<{ id: string; title?: Array<{ plain_text: string }>; icon?: { emoji?: string } }> };
-        syncData = {
-          databases: results.results.map(db => ({
-            id: db.id,
-            title: db.title?.[0]?.plain_text ?? "Untitled",
-            icon: db.icon?.emoji ?? null,
-          })),
-          dbCount: results.results.length,
-        };
-
-      } else if (input.type === "slack") {
-        const channels = await slackFetch("conversations.list", stored.token, { limit: "20", types: "public_channel,private_channel" }) as {
-          channels: Array<{ id: string; name: string; is_private: boolean }>;
-        };
-        syncData = {
-          channels: channels.channels.map(c => ({ id: c.id, name: c.name, isPrivate: c.is_private })),
-          channelCount: channels.channels.length,
-        };
-
-      } else if (input.type === "google-drive") {
-        const about = await gdriveFetch("/about?fields=storageQuota", stored.token) as {
-          storageQuota?: { limit: string; usage: string };
-        };
-        syncData = {
-          storageTotal: about.storageQuota?.limit ? Number(about.storageQuota.limit) : null,
-          storageUsed: about.storageQuota?.usage ? Number(about.storageQuota.usage) : null,
-        };
-      }
-
-      // Update metadata with fresh sync data
-      store[input.type] = {
-        ...stored,
-        metadata: { ...stored.metadata, ...syncData, lastSynced: new Date().toISOString() },
-      };
-      writeStore(store);
-      return { success: true, type: input.type, data: syncData };
-    }),
-
-  /** Update settings for a connected integration. */
+  /** Persist per-integration settings (non-sensitive config). */
   updateSettings: protectedProcedure
     .input(z.object({
       type: z.enum(INTEGRATION_TYPES),
       settings: z.record(z.string(), z.unknown()),
     }))
-    .mutation(({ input }) => {
-      const store = readStore();
-      const stored = store[input.type];
-      if (!stored) {
-        throw new TRPCError({ code: "NOT_FOUND", message: `${input.type} is not connected.` });
-      }
-      store[input.type] = {
-        ...stored,
-        metadata: { ...stored.metadata, settings: input.settings },
-      };
-      writeStore(store);
-      return { success: true };
-    }),
+    .mutation(({ input }) =>
+      withLock(async () => {
+        const store = readStore();
+        const entry = store[input.type];
+        if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: `${input.type} is not connected.` });
+        store[input.type] = { ...entry, metadata: { ...entry.metadata, settings: input.settings } };
+        writeStoreDirect(store);
+        return { success: true };
+      })
+    ),
 });

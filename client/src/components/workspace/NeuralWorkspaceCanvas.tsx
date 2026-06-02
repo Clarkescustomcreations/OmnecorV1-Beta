@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import ReactFlow, {
   Background,
   BackgroundVariant,
@@ -47,27 +47,34 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
 
   const workspaceQuery = trpc.project.getFileTree.useQuery({ projectId: workspaceId, rootDir: "." });
 
+  // Track whether we have already seeded nodes from the initial query result.
+  // Subsequent refetches must NOT replace the node list — user may have added
+  // nodes manually or received them via WebSocket.
+  const initialLoadDone = useRef(false);
+
   const onConnect = useCallback(
     (params: Connection | Edge) => setEdges((eds) => addEdge(params, eds)),
     [setEdges]
   );
 
   useEffect(() => {
-    if (workspaceQuery.data && Array.isArray(workspaceQuery.data)) {
-      const initialNodes = workspaceQuery.data.slice(0, 5).map((file, i) => ({
-        id: file.path || `file-${i}`,
-        type: 'file',
-        position: { x: 100 + (i * 200), y: 100 },
-        data: {
-          label: file.name,
-          path: file.path,
-          language: file.name.split('.').pop() || 'text',
-          size: file.size || 0,
-          modified: file.modifiedAt || new Date().toISOString()
-        },
-      }));
-      setNodes(initialNodes);
-    }
+    if (!workspaceQuery.data || !Array.isArray(workspaceQuery.data)) return;
+    if (initialLoadDone.current) return; // never overwrite after the first load
+
+    const queryNodes = workspaceQuery.data.slice(0, 5).map((file, i) => ({
+      id: file.path || `file-${i}`,
+      type: 'file',
+      position: { x: 100 + (i * 200), y: 100 },
+      data: {
+        label: file.name,
+        path: file.path,
+        language: file.name.split('.').pop() || 'text',
+        size: file.size || 0,
+        modified: file.modifiedAt || new Date().toISOString(),
+      },
+    }));
+    setNodes(queryNodes);
+    initialLoadDone.current = true;
   }, [workspaceQuery.data, setNodes]);
 
   useEffect(() => {

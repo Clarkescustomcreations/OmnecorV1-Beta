@@ -47,6 +47,10 @@ export default function ModelHubPanel({
   const [activeTab, setActiveTab] = useState<"models" | "marketplace">("models");
   const [marketplaceSearch, setMarketplaceSearch] = useState("");
 
+  // Role gate — deleteModel is admin-only on the server
+  const { data: me } = trpc.auth.me.useQuery();
+  const isAdmin = me?.role === "admin" || me?.role === "owner";
+
   // Real marketplace data from ollamadb.dev via server proxy
   const marketplaceQuery = trpc.ollama.searchModels.useQuery(
     { query: marketplaceSearch, limit: 30 },
@@ -244,7 +248,7 @@ export default function ModelHubPanel({
                           {getStatusIcon(model.status)}
                           <span className="text-xs font-medium">{getStatusLabel(model.status)}</span>
                         </div>
-                        {model.type === "local" && (
+                        {model.type === "local" && isAdmin && (
                           <Button
                             size="sm"
                             variant="ghost"

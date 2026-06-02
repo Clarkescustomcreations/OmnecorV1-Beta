@@ -203,19 +203,29 @@ export const systemRouter = router({
       findExecutable(kicadCandidates),
     ]);
 
-    // GPU detection
+    // GPU detection — each platform branch is in its own try/catch so a failure
+    // on one platform never suppresses detection on another.
     let gpuInfo: string | null = null;
-    try {
-      if (platform() === "linux") {
+    if (platform() === "linux") {
+      try {
         const { stdout } = await execFileAsync("nvidia-smi", ["--query-gpu=name", "--format=csv,noheader"]);
-        gpuInfo = stdout.trim().split("\n").join(", ");
-      } else if (platform() === "darwin") {
-        const { stdout } = await execFileAsync("system_profiler", ["SPDisplaysDataType", "-json"]);
-        const data = JSON.parse(stdout);
-        gpuInfo = (data?.SPDisplaysDataType ?? []).map((d: Record<string, unknown>) => d["sppci_model"]).filter(Boolean).join(", ");
+        // Filter blank lines so empty stdout → null, not ""
+        const names = stdout.trim().split("\n").map(s => s.trim()).filter(Boolean);
+        gpuInfo = names.length > 0 ? names.join(", ") : null;
+      } catch {
+        // nvidia-smi absent — not an error
       }
-    } catch {
-      // nvidia-smi not found or failed — not critical
+    } else if (platform() === "darwin") {
+      try {
+        const { stdout } = await execFileAsync("system_profiler", ["SPDisplaysDataType", "-json"]);
+        const data = JSON.parse(stdout) as { SPDisplaysDataType?: Array<Record<string, unknown>> };
+        const names = (data?.SPDisplaysDataType ?? [])
+          .map(d => d["sppci_model"])
+          .filter((v): v is string => typeof v === "string" && v.length > 0);
+        gpuInfo = names.length > 0 ? names.join(", ") : null;
+      } catch {
+        // system_profiler absent or JSON parse failed — not critical
+      }
     }
 
     // Ollama detection
