@@ -46,7 +46,7 @@ def parse_args():
     parser.add_argument(
         "--model_name",
         type=str,
-        default="unsloth/llama-3-8b-bnb-4bit",
+        default="Qwen/Qwen2.5-1.5B-Instruct",
         help="The Hugging Face stub or local path for an Unsloth-compatible 4-bit model."
     )
     parser.add_argument(

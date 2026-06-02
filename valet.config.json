@@ -1,0 +1,22 @@
+{
+  "_comment": "Valet Router build config — consumed by valet_pipeline.py and pnpm valet:build. Edit here; re-run the pipeline to apply.",
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "total_examples": 2000,
+  "epochs": 3,
+  "r": 16,
+  "lora_alpha": 32,
+  "max_seq_length": 2048,
+  "save_method": "gguf",
+  "oracle_model": "llama3.2:latest",
+  "emit_text": true,
+  "seed": 42,
+  "eval_thresholds": {
+    "overall": 0.85,
+    "per_category_min": 0.70
+  },
+  "disk_space_gb_required": 20,
+  "dataset_out": "data/valet/train.jsonl",
+  "val_out": "data/valet/val.jsonl",
+  "eval_out": "data/valet/eval.jsonl",
+  "registry_root": "models/valet-router"
+}

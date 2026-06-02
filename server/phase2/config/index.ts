@@ -90,6 +90,11 @@ export const PYTHON_SCRIPTS = {
     __dirname,
     "../python_scripts/localLLMfine-tuning.py"
   ),
+  /** Path to the Valet Router build pipeline orchestrator */
+  valetPipeline: path.resolve(
+    __dirname,
+    "../../python_bridges/valet_pipeline.py"
+  ),
   /** Path to the Blender headless executor bridge */
   blenderBridge: path.resolve(
     __dirname,
