@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 import argparse
+import datetime
+import hashlib
 import json
 import os
+import subprocess
 import sys
 from datasets import load_dataset
 from transformers import TrainerCallback, TrainingArguments
@@ -96,11 +99,97 @@ def parse_args():
         choices=["chat", "code", "research", "summarization", "router"],
         help="Task type for specialized fine-tuning (use 'router' to fine-tune the 1.5B Valet Router model)"
     )
+    parser.add_argument(
+        "--registry_root",
+        type=str,
+        default=None,
+        help="Path to models/valet-router/. When set, writes metadata.json into output_dir and updates current.json in registry_root after a successful run.",
+    )
+    parser.add_argument(
+        "--dataset_hash",
+        type=str,
+        default=None,
+        help="SHA-256 hex digest of the dataset file. Auto-computed from --dataset_path if not provided.",
+    )
+    parser.add_argument(
+        "--git_sha",
+        type=str,
+        default=None,
+        help="Git commit SHA to record in metadata.json. Auto-detected via 'git rev-parse HEAD' if not provided.",
+    )
     return parser.parse_args()
+
+
+def _sha256_file(path: str) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as f:
+        for chunk in iter(lambda: f.read(65536), b""):
+            h.update(chunk)
+    return h.hexdigest()
+
+
+def _git_sha() -> str:
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"], stderr=subprocess.DEVNULL).decode().strip()
+    except Exception:
+        return "unknown"
+
+
+def _write_metadata(output_dir: str, args, dataset_hash: str, git_sha: str) -> None:
+    meta = {
+        "base_model": args.model_name,
+        "dataset_path": args.dataset_path,
+        "dataset_hash": dataset_hash,
+        "format": args.save_method,
+        "config": {
+            "r": args.r,
+            "lora_alpha": args.lora_alpha,
+            "epochs": args.epochs,
+            "max_seq_length": args.max_seq_length,
+            "save_method": args.save_method,
+        },
+        "eval_scores": {},
+        "git_sha": git_sha,
+        "created_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": "trained",
+    }
+    os.makedirs(output_dir, exist_ok=True)
+    with open(os.path.join(output_dir, "metadata.json"), "w") as f:
+        json.dump(meta, f, indent=2)
+        f.write("\n")
+
+
+def _write_current_json(registry_root: str, output_dir: str, args, dataset_hash: str, git_sha: str) -> None:
+    record = {
+        "artifact_path": output_dir.rstrip("/") + "/",
+        "status": "ready",
+        "base_model": args.model_name,
+        "dataset_hash": dataset_hash,
+        "format": args.save_method,
+        "config": {
+            "r": args.r,
+            "lora_alpha": args.lora_alpha,
+            "epochs": args.epochs,
+            "max_seq_length": args.max_seq_length,
+            "save_method": args.save_method,
+        },
+        "eval_scores": {},
+        "git_sha": git_sha,
+        "created_at": datetime.datetime.utcnow().strftime("%Y-%m-%dT%H:%M:%SZ"),
+        "source": "trained",
+    }
+    os.makedirs(registry_root, exist_ok=True)
+    with open(os.path.join(registry_root, "current.json"), "w") as f:
+        json.dump(record, f, indent=2)
+        f.write("\n")
 
 
 def main():
     args = parse_args()
+
+    # Resolve dataset hash and git SHA early so they're available at completion
+    dataset_hash = args.dataset_hash or _sha256_file(args.dataset_path)
+    git_sha = args.git_sha or _git_sha()
 
     # Router fine-tuning mode: adjust LoRA rank for the 1.5B Valet Router model
     if args.task_type == "router":
@@ -191,14 +280,33 @@ def main():
         sys.stderr.write(json.dumps({"error": f"Exception encountered during trainer execution: {str(e)}"}) + "\n")
         sys.exit(1)
 
-    # 7. Save only the final LoRA adapters to output directory
+    # 7. Save the final adapters and register the artifact
     try:
         model.save_pretrained(args.output_dir)
         tokenizer.save_pretrained(args.output_dir)
-        sys.stdout.write(json.dumps({"status": "completed", "output_dir": args.output_dir}) + "\n")
     except Exception as e:
         sys.stderr.write(json.dumps({"error": f"Failed saving adapters to destination: {str(e)}"}) + "\n")
         sys.exit(1)
+
+    # Write metadata.json into the artifact directory
+    try:
+        _write_metadata(args.output_dir, args, dataset_hash, git_sha)
+    except Exception as e:
+        sys.stderr.write(json.dumps({"warning": f"metadata.json write failed: {str(e)}"}) + "\n")
+
+    # Update the model registry if --registry_root was provided
+    if args.registry_root:
+        try:
+            _write_current_json(args.registry_root, args.output_dir, args, dataset_hash, git_sha)
+        except Exception as e:
+            sys.stderr.write(json.dumps({"warning": f"current.json write failed: {str(e)}"}) + "\n")
+
+    sys.stdout.write(json.dumps({
+        "status": "completed",
+        "output_dir": args.output_dir,
+        "dataset_hash": dataset_hash,
+        "git_sha": git_sha,
+    }) + "\n")
 
 
 if __name__ == "__main__":

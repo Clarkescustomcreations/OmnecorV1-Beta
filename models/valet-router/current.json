@@ -1,0 +1,5 @@
+{
+  "artifact_path": null,
+  "status": "pending",
+  "note": "No trained artifact registered. Run 'pnpm valet:fetch' to download a pre-built model, or 'pnpm valet:build' to train one locally."
+}
