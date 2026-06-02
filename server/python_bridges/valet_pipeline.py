@@ -31,6 +31,7 @@ _DEFAULT_CONFIG = _REPO_ROOT / "valet.config.json"
 
 _DATASET_BUILDER = Path(__file__).parent / "valet_dataset_builder.py"
 _LORA_TRAINER = Path(__file__).parent.parent / "phase2" / "python_scripts" / "localLLMfine-tuning.py"
+_EVAL_SCRIPT = Path(__file__).parent / "valet_eval.py"
 _DETECT_GPU = _REPO_ROOT / "packaging" / "scripts" / "detect_gpu.py"
 
 OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
@@ -169,7 +170,8 @@ def _dataset_is_fresh(cfg: dict, config_hash: str) -> tuple[bool, str]:
 
 
 def _artifact_is_fresh(cfg: dict, dataset_hash: str, config_hash: str) -> bool:
-    """Return True if current.json already covers this (base_model, dataset_hash, config_hash)."""
+    """Return True if training is already done for this (base_model, dataset_hash, config_hash).
+    Accepts ready/eval_failed so a failed eval doesn't trigger a full retrain."""
     current_path = _REPO_ROOT / cfg.get("registry_root", "models/valet-router") / "current.json"
     if not current_path.exists():
         return False
@@ -179,7 +181,25 @@ def _artifact_is_fresh(cfg: dict, dataset_hash: str, config_hash: str) -> bool:
             cur.get("base_model") == cfg.get("base_model") and
             cur.get("dataset_hash") == dataset_hash and
             cur.get("config_hash") == config_hash and
-            cur.get("status") == "ready"
+            cur.get("status") in ("ready", "eval_failed", "trained")
+        )
+    except Exception:
+        return False
+
+
+def _eval_is_current(cfg: dict, dataset_hash: str, config_hash: str) -> bool:
+    """Return True if current.json already has passing eval scores for this build."""
+    current_path = _REPO_ROOT / cfg.get("registry_root", "models/valet-router") / "current.json"
+    if not current_path.exists():
+        return False
+    try:
+        cur = json.loads(current_path.read_text())
+        scores = cur.get("eval_scores", {})
+        return (
+            cur.get("status") == "ready" and
+            scores.get("passed") is True and
+            cur.get("dataset_hash") == dataset_hash and
+            cur.get("config_hash") == config_hash
         )
     except Exception:
         return False
@@ -328,6 +348,20 @@ def main() -> None:
                 current_path.write_text(json.dumps(cur, indent=2) + "\n")
             except Exception:
                 pass
+
+    # ── step 4: eval gate (4.1–4.5) ──────────────────────────────────────────
+    if _eval_is_current(cfg, dataset_hash, config_hash) and not force:
+        _emit({"type": "step_skip", "step": "eval",
+               "reason": "eval scores already current (passing) for this build"})
+    else:
+        eval_path = _REPO_ROOT / cfg.get("eval_out", "data/valet/eval.jsonl")
+        rc = _run_step("eval", [
+            PYTHON_BIN, str(_EVAL_SCRIPT),
+            "--config", str(config_path),
+            "--eval-path", str(eval_path),
+        ])
+        if rc != 0:
+            sys.exit(rc)
 
     _emit({
         "type": "pipeline_complete",
