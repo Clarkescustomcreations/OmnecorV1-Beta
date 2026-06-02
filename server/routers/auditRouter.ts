@@ -50,7 +50,9 @@ export const auditRouter = router({
       // Escape CSV fields: wrap in quotes and double any internal quotes.
       // Also strip leading =,+,-,@ to prevent formula injection in Excel/Sheets.
       const csvEscape = (val: unknown): string => {
-        const s = String(val ?? "").replace(/^[=+\-@\t]/, "'$&");
+        const s = String(val ?? "")
+          .replace(/[\r\n]+/g, " ")
+          .replace(/^[=+\-@\t]/, "'$&");
         return `"${s.replace(/"/g, '""')}"`;
       };
       const header = "id,eventType,actorId,actorType,procedure,ipAddress,createdAt\n";

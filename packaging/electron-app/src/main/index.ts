@@ -1,7 +1,7 @@
 import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
-import { appendFileSync } from 'fs'
+import { appendFile } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawn, ChildProcess, exec } from 'child_process'
 import os from 'os'
@@ -13,9 +13,7 @@ const LOG_FILE = join(
   'omnecor-debug.log'
 )
 function log(msg: string): void {
-  try {
-    appendFileSync(LOG_FILE, `[${new Date().toISOString()}] ${msg}\n`)
-  } catch { /* ignore write errors */ }
+  appendFile(LOG_FILE, `[${new Date().toISOString()}] ${msg}\n`, () => { /* ignore write errors */ })
 }
 
 log('=== Omnecor main process started ===')
@@ -29,7 +27,6 @@ process.on('uncaughtException', (err: Error) => {
 })
 process.on('unhandledRejection', (reason: unknown) => {
   log(`UNHANDLED REJECTION: ${String(reason)}`)
-  process.exit(1)
 })
 
 const execAsync = util.promisify(exec)
@@ -137,19 +134,6 @@ app.whenReady().then(async () => {
   log('app.whenReady fired')
   electronApp.setAppUserModelId('com.omnecor.workstation')
 
-  startBackend()
-
-  // In production wait for the backend to be healthy before showing the wizard
-  if (!is.dev) {
-    const ready = await waitForBackend(`http://localhost:${BACKEND_PORT}/health`)
-    if (!ready) {
-      dialog.showErrorBox(
-        'Connection Timeout',
-        'Could not connect to the Omnecor backend. Please check the logs.'
-      )
-    }
-  }
-
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
   })
@@ -225,7 +209,20 @@ app.whenReady().then(async () => {
     shell.openExternal(url)
   })
 
+  startBackend()
   createWindow()
+
+  // Wait for backend after the window is visible so the user sees the app rather than a blank screen
+  if (!is.dev) {
+    waitForBackend(`http://localhost:${BACKEND_PORT}/health`).then((ready) => {
+      if (!ready) {
+        dialog.showErrorBox(
+          'Connection Timeout',
+          'Could not connect to the Omnecor backend. Please check the logs.'
+        )
+      }
+    })
+  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

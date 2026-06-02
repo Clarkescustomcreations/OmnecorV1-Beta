@@ -50,8 +50,25 @@ const chatInputSchema = z.object({
 
   baseUrl: z.string()
     .url("Invalid URL format")
-    .startsWith("http", "Only http/https URLs allowed")
     .max(256)
+    .refine((url) => {
+      try {
+        const { protocol, hostname } = new URL(url);
+        if (protocol !== "http:" && protocol !== "https:") return false;
+        const h = hostname.toLowerCase().replace(/^\[|\]$/g, "");
+        if (h === "localhost") return false;
+        if (/^127\./.test(h)) return false;
+        if (/^10\./.test(h)) return false;
+        if (/^192\.168\./.test(h)) return false;
+        if (/^172\.(1[6-9]|2\d|3[01])\./.test(h)) return false;
+        if (/^169\.254\./.test(h)) return false;
+        if (h === "::1" || h === "0:0:0:0:0:0:0:1") return false;
+        if (/^f[cd][0-9a-f]{2}:/i.test(h)) return false;
+        return true;
+      } catch {
+        return false;
+      }
+    }, "URL must point to a public, non-private address")
     .optional(),
 
   systemPrompt: z.string().max(32_000).optional(),
