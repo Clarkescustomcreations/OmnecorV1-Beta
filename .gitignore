@@ -7,6 +7,11 @@ dist/
 build/
 *.dist
 
+# Exception: Windows installer build assets (static source files, not compile outputs)
+!packaging/electron-app/build/
+!packaging/electron-app/build/*.ico
+!packaging/electron-app/build/*.png
+
 # Environment variables
 .env
 .env.local

@@ -60,6 +60,7 @@ import { ollamaRouter } from "./routers/ollamaRouter.js";
 import { mcpRouter } from "./routers/mcpRouter.js";
 import { pipelineRouter } from "./routers/pipelineRouter.js";
 import { imageGenRouter } from "./routers/imageGenRouter.js";
+import { cloudComputeRouter } from "./routers/cloudComputeRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -141,6 +142,9 @@ export const appRouter = router({
 
   // ─── Image Generation (ComfyUI / Fal / OpenArt) (Phase 30) ───────────────
   imageGen: imageGenRouter,
+
+  // ─── Cloud Compute Rental (Vast.ai / RunPod / Lambda Labs) ───────────────
+  cloudCompute: cloudComputeRouter,
 });
 
 export type AppRouter = typeof appRouter;

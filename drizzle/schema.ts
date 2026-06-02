@@ -185,3 +185,49 @@ export const pipelinePhases = mysqlTable("pipeline_phases", {
 });
 export type PipelinePhase = typeof pipelinePhases.$inferSelect;
 export type InsertPipelinePhase = typeof pipelinePhases.$inferInsert;
+
+/**
+ * Cloud Compute Sessions — tracks rented GPU/compute sessions across providers.
+ * Integrates with the Agentic Wallet spend log on session stop.
+ */
+export const cloudComputeSessions = mysqlTable("cloud_compute_sessions", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: int("userId").notNull(),
+  projectId: varchar("projectId", { length: 64 }).notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(), // "vastai" | "runpod" | "lambda"
+  externalSessionId: varchar("externalSessionId", { length: 128 }),
+  planId: varchar("planId", { length: 64 }).notNull(),
+  instanceLabel: varchar("instanceLabel", { length: 128 }).notNull(),
+  billingUnit: mysqlEnum("billingUnit", ["minute", "hour"]).notNull().default("hour"),
+  ratePerUnitMicrocents: bigint("ratePerUnitMicrocents", { mode: "number" }).notNull(),
+  status: mysqlEnum("status", ["starting", "running", "stopped", "error"]).notNull().default("starting"),
+  startedAt: timestamp("startedAt").defaultNow().notNull(),
+  stoppedAt: timestamp("stoppedAt"),
+  totalCostMicrocents: bigint("totalCostMicrocents", { mode: "number" }).notNull().default(0),
+  metadata: json("metadata"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type CloudComputeSession = typeof cloudComputeSessions.$inferSelect;
+export type InsertCloudComputeSession = typeof cloudComputeSessions.$inferInsert;
+
+/**
+ * Cloud Compute Subscriptions — tracks monthly subscription plans a user has
+ * with cloud compute providers (e.g. a RunPod monthly credit pack).
+ */
+export const cloudComputeSubscriptions = mysqlTable("cloud_compute_subscriptions", {
+  id: varchar("id", { length: 36 }).primaryKey(),
+  userId: int("userId").notNull(),
+  provider: varchar("provider", { length: 64 }).notNull(),
+  planName: varchar("planName", { length: 128 }).notNull(),
+  monthlyCents: int("monthlyCents").notNull().default(0),
+  renewalDate: timestamp("renewalDate"),
+  isActive: int("isActive").notNull().default(1),
+  apiKeyHint: varchar("apiKeyHint", { length: 32 }),
+  notes: text("notes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CloudComputeSubscription = typeof cloudComputeSubscriptions.$inferSelect;
+export type InsertCloudComputeSubscription = typeof cloudComputeSubscriptions.$inferInsert;

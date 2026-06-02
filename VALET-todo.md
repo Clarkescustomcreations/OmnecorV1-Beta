@@ -214,40 +214,63 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase 4 — Evaluation gate (prove the router actually routes)
 
-- [ ] **4.1 Holdout eval set.** The dataset builder already writes a validation split
-      (`VAL_PATH`). Add `valet_eval.py` that runs the trained model over it and reports
-      per-category accuracy + confusion matrix + mean confidence.
-- [ ] **4.2 Acceptance thresholds** in `valet.config.json` (e.g. overall ≥ 0.85, no
-      category < 0.70). The pipeline (1.1) **fails the job** if thresholds aren't met, so a
-      bad model is never registered as `current`.
-- [ ] **4.3 Baseline comparison.** Compare model accuracy vs the keyword `rule_based_route`
-      on the same holdout — the model must beat rules, else the rule fallback is preferable.
-- [ ] **4.4 Record scores** into `metadata.json` (2.1) and print a summary at job end.
-- [ ] **4.5 Expertise + rules eval.** Beyond routing accuracy, score the `qa` class for
-      factual correctness against `OMNECOR_KNOWLEDGE_BASE.md` and assert the rule reflexes
-      fire (todo/status creation, `/plan` docs list, skill offer) on held-out `rules/plan/
-      skill` prompts.
+- [x] **4.1 Holdout eval set.** `valet_eval.py` — runs the trained model over the
+      stratified `eval.jsonl` holdout and reports per-category accuracy, confusion matrix,
+      and mean/std confidence for route tasks.
+- [x] **4.2 Acceptance thresholds** in `valet.config.json` (`overall ≥ 0.85`, `per_category_min ≥ 0.70`).
+      The pipeline (step 4) **fails the job** (`sys.exit(1)`) when thresholds are not met,
+      so a bad model is never registered as `current` (status stays `eval_failed`).
+- [x] **4.3 Baseline comparison.** `_rule_based_category()` mirrors `rule_based_route` from
+      the inference server. Both model and baseline are scored on the same route-class
+      holdout rows; pipeline fails if `model_route_accuracy <= baseline_route_accuracy`.
+- [x] **4.4 Record scores.** `eval_scores` dict written into the artifact's `metadata.json`
+      and into `models/valet-router/current.json`. Pipeline summary emits all key metrics.
+- [x] **4.5 Expertise + rules eval.** `qa` rows scored for factual correctness (≥50 %
+      content-word overlap with the KB ground truth). `rules`/`plan` rows assert
+      `requires_todo_md` / `requires_status_md` flags match ground truth. `skill` rows
+      check for skill-offer language. All five classes contribute to overall accuracy.
 - **DoD:** the pipeline emits accuracy numbers, gates registration on thresholds, and
   demonstrates the trained router beats the keyword baseline on the holdout set **and**
   answers Omnecor questions correctly while honoring the hardcoded rules.
 
+  *Implementation notes (2026-06-02):*
+  - `valet_eval.py` at `server/python_bridges/`
+  - Wired as step 4 in `valet_pipeline.py` (after training, before `pipeline_complete`)
+  - `_artifact_is_fresh()` updated to accept `eval_failed` status — failed eval does not
+    trigger a full retrain, only a re-eval
+  - `_eval_is_current()` added — skips eval when passing scores already match current build
+
 ---
 
-## Phase 7 — Runtime RAG + expertise upkeep ("pull and update")
+## Phase 7 — Runtime RAG + expertise upkeep ("pull and update") ✅
 
-- [ ] **7.1 Inject the live manifest.** The router server loads `routing_manifest.json`
-      at startup and injects it into the system prompt (A.3) so model names update without
-      retraining.
-- [ ] **7.2 Brain Map retrieval.** For `qa` / `knowledge_retrieval` tasks, retrieve
-      relevant chunks from the Neural Brain Map (ChromaDB) + `OMNECOR_KNOWLEDGE_BASE.md`
-      and pass them as `{{RAG_CONTEXT}}`. The model is already trained to use them (B.4).
-- [ ] **7.3 Knowledge refresh job.** A scheduled task re-embeds the knowledge base + repo
-      docs when they change (bump `knowledge_base_version`); optionally pull latest model
-      IDs per provider and open a manifest-update PR for review.
-- [ ] **7.4 Drift check.** CI fails if the system prompt / schema in code diverges from
-      `valet-training/` (single-source enforcement).
+- [x] **7.1 Inject the live manifest.** `_get_manifest_json()` + `_get_system_prompt()`
+      in `valet_router_inference.py` are mtime-checked on every inference call — manifest
+      and system prompt reload from disk the moment the file changes, no restart required.
+      `POST /admin/reload` forces an immediate cache invalidation from any caller.
+- [x] **7.2 Brain Map retrieval.** `_rag_query()` queries ChromaDB `omnecor_valet_kb`
+      collection via HTTP; falls back to `_kb_keyword_search()` (in-memory TF-IDF-style
+      scoring against `OMNECOR_KNOWLEDGE_BASE.md`). `_should_rag()` auto-injects context
+      for `task_type="qa"` and Omnecor-keyword tasks. New `POST /rag` endpoint exposes
+      retrieval directly.
+- [x] **7.3 Knowledge refresh job.** `server/python_bridges/valet_knowledge_refresh.py`
+      chunks the KB by `##` headings, upserts into ChromaDB (graceful degrade when
+      offline), bumps `knowledge_base_version` in `routing_manifest.json`, and calls
+      `/admin/reload`. Exposed as `valetRouter.refreshKnowledge` tRPC mutation; also
+      runnable standalone: `python3 server/python_bridges/valet_knowledge_refresh.py`.
+- [x] **7.4 Drift check.** `scripts/check_valet_drift.py` — exits 0 when all 11
+      `RouteDecision` fields match across IO_CONTRACT.md, Pydantic model, and TS
+      interface; exits 1 with findings on divergence. Also asserts Phase 7.1/7.2
+      structural invariants. Verified passing (11/11 fields consistent).
 - **DoD:** updating a fact in the knowledge base or a model name in the manifest changes
   the router's behavior **without retraining**; the router answers from current data.
+
+  *Implementation notes (2026-06-02):*
+  - `valet_router_inference.py` — hot-reload caches, `_rag_query`, `_should_rag`,
+    `/rag`, `/admin/reload` endpoints
+  - `server/python_bridges/valet_knowledge_refresh.py` — new KB refresh bridge
+  - `server/routers/valetRouter.ts` — `refreshKnowledge` mutation added
+  - `scripts/check_valet_drift.py` — new CI drift checker (run `python3 scripts/check_valet_drift.py`)
 
 ---
 
