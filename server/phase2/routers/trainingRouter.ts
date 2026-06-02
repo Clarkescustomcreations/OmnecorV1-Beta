@@ -30,7 +30,7 @@ import { TRPCError } from "@trpc/server";
 // ---------------------------------------------------------------------------
 
 const startTrainingSchema = z.object({
-  /** HuggingFace model stub or local path (default: unsloth/llama-3-8b-bnb-4bit) */
+  /** HuggingFace model stub or local path (default: Qwen/Qwen2.5-1.5B-Instruct) */
   modelName: z.string().optional(),
   /** Path to the local JSONL dataset file */
   datasetPath: z.string().min(1, "Dataset path is required"),
@@ -38,6 +38,15 @@ const startTrainingSchema = z.object({
   outputDir: z.string().optional(),
   /** Number of training epochs (default: 1) */
   epochs: z.number().int().min(1).max(100).optional(),
+});
+
+const buildValetRouterSchema = z.object({
+  /** Path to valet.config.json (defaults to repo root) */
+  configPath: z.string().optional(),
+  /** Force rebuild even if a fresh artifact is already registered */
+  force: z.boolean().optional(),
+  /** Hard-fail if no GPU is detected (on-device mode B) */
+  requireGpu: z.boolean().optional(),
 });
 
 const jobIdSchema = z.object({
@@ -78,21 +87,55 @@ export const trainingRouter = router({
         const message = (error as Error).message;
 
         if (message.includes("not found")) {
-          throw new TRPCError({
-            code: "NOT_FOUND",
-            message,
-          });
+          throw new TRPCError({ code: "NOT_FOUND", message });
         }
         if (message.includes("Maximum concurrent")) {
-          throw new TRPCError({
-            code: "TOO_MANY_REQUESTS",
-            message,
-          });
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message });
         }
 
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `Failed to start training: ${message}`,
+        });
+      }
+    }),
+
+  /**
+   * Run the full Valet Router build pipeline:
+   * dataset build → validate → LoRA train → gguf export → register artifact.
+   *
+   * Reads configuration from valet.config.json. Idempotent — skips steps
+   * whose outputs are already fresh unless `force` is true.
+   *
+   * Returns the job ID immediately. Subscribe to `training:${jobId}` for
+   * streamed step-level progress (step_start / step_complete / step_error /
+   * pipeline_complete events).
+   */
+  buildValetRouter: publicProcedure
+    .input(buildValetRouterSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const jobId = await ctx.services.processManager.spawnValetPipeline({
+          configPath: input.configPath,
+          force:      input.force ?? false,
+          requireGpu: input.requireGpu ?? false,
+        });
+
+        return {
+          success: true,
+          jobId,
+          message: `Valet Router pipeline started. Subscribe to "training:${jobId}" for progress.`,
+        };
+      } catch (error) {
+        const message = (error as Error).message;
+
+        if (message.includes("Maximum concurrent")) {
+          throw new TRPCError({ code: "TOO_MANY_REQUESTS", message });
+        }
+
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to start Valet Router pipeline: ${message}`,
         });
       }
     }),
