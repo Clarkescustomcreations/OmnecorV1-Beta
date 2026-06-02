@@ -31,6 +31,14 @@ OLLAMA_URL = os.environ.get("OLLAMA_URL", "http://localhost:11434")
 
 CLASS_MIX = {"route": 0.55, "qa": 0.20, "rules": 0.10, "plan": 0.10, "skill": 0.05}
 
+# ─── todo.md / status.md reflexes per category (matches the seed labels) ──────
+# Project-advancing categories require both files; reporting advances status only.
+# Everything else (synthesis, media, knowledge_retrieval, hardware, local_task,
+# instruction_writing) requires neither — so the model isn't taught to always set true.
+
+PROJECT_CATEGORIES = {"code_generation", "code_review", "integration", "research"}
+STATUS_ONLY_CATEGORIES = {"reporting"}
+
 # ─── seed file name per class ────────────────────────────────────────────────
 
 SEED_FILES = {
@@ -192,17 +200,30 @@ def manifest_decision(
     if provider not in available_providers:
         available_providers = [provider] + available_providers
 
+    # Sovereign mode never emits a cloud-implying routing mode: collapse to a local
+    # mode (matches the seed examples, e.g. sovereign no-keys synthesis → valet_background).
+    mode = default_mode
+    if execution_mode == "sovereign":
+        if "ommesh" in available_providers:
+            mode = "local_omesh"
+        elif default_mode in ("main_api", "multi_api", "moe_chain"):
+            mode = "valet_background"
+
+    # todo/status reflexes are category-derived, not always-on (matches the seeds).
+    requires_todo = category in PROJECT_CATEGORIES
+    requires_status = category in PROJECT_CATEGORIES or category in STATUS_ONLY_CATEGORIES
+
     return {
         "category": category,
-        "mode": default_mode,
+        "mode": mode,
         "primary_provider": provider,
         "primary_model": model,
         "secondary_providers": secondaries[:2],
         "cost_tier": used_cost,
         "local_capable": local_capable,
         "confidence": round(random.uniform(0.82, 0.97), 2),
-        "requires_todo_md": True,
-        "requires_status_md": True,
+        "requires_todo_md": requires_todo,
+        "requires_status_md": requires_status,
     }
 
 

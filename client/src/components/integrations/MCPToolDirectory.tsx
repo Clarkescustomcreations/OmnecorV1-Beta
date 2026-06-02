@@ -76,7 +76,9 @@ function ConnectServerForm() {
     url: "",
   });
 
-  const connectMutation = trpc.mcp.connectServer.useMutation();
+  const connectMutation = trpc.mcp.connectServer.useMutation({
+    onError: (err) => toast.error(`Connect failed: ${err.message}`),
+  });
 
   function handleConnect() {
     if (!connectMutation) return;
@@ -206,7 +208,9 @@ function ConnectServerForm() {
 // Connected server chip
 // ---------------------------------------------------------------------------
 function ServerChip({ server }: { server: MCPServerConfig }) {
-  const disconnectMutation = trpc.mcp.disconnectServer.useMutation();
+  const disconnectMutation = trpc.mcp.disconnectServer.useMutation({
+    onError: (err) => toast.error(`Disconnect failed: ${err.message}`),
+  });
 
   return (
     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium border border-border">
@@ -234,7 +238,9 @@ function ToolTestPanel({ tool }: { tool: MCPTool }) {
     jsonError: false,
   });
 
-  const callMutation = trpc.mcp.callTool.useMutation();
+  const callMutation = trpc.mcp.callTool.useMutation({
+    onError: (err) => toast.error(`Tool call failed: ${err.message}`),
+  });
 
   function handleRun() {
     let parsed: unknown;

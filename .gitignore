@@ -117,3 +117,11 @@ temp/
 
 # Manus version file (auto-generated, not part of source)
 client/public/__manus__/version.json
+
+# Debug artifacts
+tsc_output.txt
+
+# Valet Router trained / downloaded model weights (large binaries — never commit)
+# current.json and metadata.json are committed; *.gguf and adapter dirs are not.
+models/valet-router/*/
+*.gguf

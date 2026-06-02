@@ -9,9 +9,10 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs"
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Badge } from "../components/ui/badge";
 import { ScrollArea } from "../components/ui/scroll-area";
-import { Key, Shield, HardDrive, Cpu, Bell, Lock, Zap, Flame, Activity, Users, Download, CheckCircle2, Circle } from "lucide-react";
+import { Key, Shield, HardDrive, Cpu, Bell, Lock, Zap, Flame, Activity, Users, Download, CheckCircle2, Circle, Route } from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
+import ValetRouterPanel from "../components/settings/ValetRouterPanel";
 
 export const Settings: React.FC = () => {
   const saveKeysMutation = trpc.system.saveKeys.useMutation({
@@ -44,6 +45,7 @@ export const Settings: React.FC = () => {
           <TabsTrigger value="hardware" id="tab-hardware"><HardDrive className="w-4 h-4 mr-2" aria-hidden="true" /> Hardware</TabsTrigger>
           <TabsTrigger value="system" id="tab-system"><Cpu className="w-4 h-4 mr-2" aria-hidden="true" /> System</TabsTrigger>
           <TabsTrigger value="accounts" id="tab-accounts"><Users className="w-4 h-4 mr-2" aria-hidden="true" /> Accounts</TabsTrigger>
+          <TabsTrigger value="valet" id="tab-valet"><Route className="w-4 h-4 mr-2" aria-hidden="true" /> Valet Router</TabsTrigger>
           {isAdmin && <TabsTrigger value="admin" id="tab-admin"><Activity className="w-4 h-4 mr-2" aria-hidden="true" /> Admin</TabsTrigger>}
         </TabsList>
 
@@ -145,6 +147,10 @@ export const Settings: React.FC = () => {
 
         <TabsContent value="accounts" role="tabpanel" aria-labelledby="tab-accounts">
           <ConnectedAccounts loginMethod={me?.loginMethod ?? null} />
+        </TabsContent>
+
+        <TabsContent value="valet" role="tabpanel" aria-labelledby="tab-valet">
+          <ValetRouterPanel />
         </TabsContent>
 
         {isAdmin && (
