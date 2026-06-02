@@ -179,23 +179,36 @@ export const trainingRouter = router({
       z.object({
         examplesPerCategory: z.number().int().min(10).max(1000).default(400),
         oracleModel: z.string().default("llama3.2:latest"),
-        outputPath: z.string().default("data/valet_router_dataset.jsonl"),
+        outputPath: z.string().default("data/valet/train.jsonl"),
+        /** Write the Qwen2.5 ChatML `text` field per row so the trainer runs unmodified. */
+        emitText: z.boolean().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
       const outputPath = await validatePath(input.outputPath);
+      const dir = outputPath.replace(/\/[^/]*$/, "");
+      const valPath = `${dir}/val.jsonl`;
+      const evalPath = `${dir}/eval.jsonl`;
       const env: Record<string, string> = {
         OLLAMA_URL: process.env.OLLAMA_URL ?? "http://localhost:11434",
         EXAMPLES_PER_CATEGORY: String(input.examplesPerCategory),
         ORACLE_MODEL: input.oracleModel,
-        OUTPUT_PATH: outputPath,
-        VAL_PATH: outputPath.replace(".jsonl", "_validation.jsonl"),
       };
+      const args = [
+        "server/python_bridges/valet_dataset_builder.py",
+        "--out", outputPath,
+        "--val-out", valPath,
+        "--eval-out", evalPath,
+        "--oracle-model", input.oracleModel,
+      ];
+      if (input.emitText) {
+        args.push("--emit-text");
+      }
       try {
         const jobId = await ctx.services.processManager.spawn({
           type: "custom",
           command: "python3",
-          args: ["server/python_bridges/valet_dataset_builder.py"],
+          args,
           env,
           label: "Valet Router Dataset Builder",
         });
