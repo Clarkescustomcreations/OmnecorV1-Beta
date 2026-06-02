@@ -74,17 +74,23 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ## Phase B — Dataset generator upgrade (expertise + rules + RAG, not just routing)
 
-- [ ] **B.1** Extend `valet_dataset_builder.py` per `valet-training/DATASET_GENERATION.md`:
+- [x] **B.1** Extend `valet_dataset_builder.py` per `valet-training/DATASET_GENERATION.md`:
       load the `seed/*.jsonl`, read `routing_manifest.json` + `OMNECOR_KNOWLEDGE_BASE.md`,
       and generate **all five classes** (route / qa / rules / plan / skill) at the target mix.
-- [ ] **B.2** Emit the canonical response schema (A.1) for `route` rows, with labels looked
+      Taxonomy unified on manifest categories (A.5). Verified mix at target 2000: route 55%,
+      qa 20%, rules/plan 10%, skill 5%.
+- [x] **B.2** Emit the canonical response schema (A.1) for `route` rows, with labels looked
       up from the manifest (not guessed by the oracle), plus 10% hard negatives.
-- [ ] **B.3** Write the ChatML **`text`** field per row (`--emit-text`) so the trainer
-      works unmodified (fixes M3).
-- [ ] **B.4** Generate `qa` pairs from the knowledge base and repo docs so the model learns
+      `build_decision()` derives provider/model/mode/cost_tier from the manifest + execution
+      mode; verified 0 invalid categories/modes and 0 cost-tier contradictions over 1112 rows.
+- [x] **B.3** Write the ChatML **`text`** field per row (`--emit-text`) so the trainer
+      works unmodified (fixes M3). System turn embeds the canonical prompt + compact manifest
+      snapshot; verified 0 rows missing `text`, no unfilled `{{ROUTING_MANIFEST}}`/`{{RAG_CONTEXT}}`.
+- [x] **B.4** Generate `qa` pairs from the knowledge base and repo docs so the model learns
       to **use retrieved context** — the basis for the runtime RAG ("pull and update").
-- [ ] **B.5** Emit `metadata.json` (per-class counts, manifest_version, oracle model, seed)
-      + a stratified holdout eval set for Phase 4.
+      KB bullets → oracle-phrased questions; the source bullet is injected as `{{RAG_CONTEXT}}`.
+- [x] **B.5** Emit `metadata.json` (per-class counts, manifest_version, oracle model, seed)
+      + a stratified holdout eval set for Phase 4 (≥30 per route category → eval=330).
 - **DoD:** one `valet_dataset_builder.py` run produces a balanced, `text`-formatted dataset
   covering routing **and** Omnecor expertise **and** the hardcoded-rule behaviors, derived
   from the live manifest + knowledge base.
