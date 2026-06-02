@@ -42,6 +42,7 @@ import { ProcessManagerService } from "../phase2/services/ProcessManagerService"
 import { SecurityService } from "../phase2/services/SecurityService";
 import { VectorDBService } from "../phase2/services/VectorDBService";
 import { meshNode } from "../ommesh/core/MeshNode.js";
+import { ValetServerService } from "../phase2/services/ValetServerService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Port Discovery
@@ -104,6 +105,15 @@ async function startServer() {
     log.info("[Omnecor] OMMESH Node started and broadcasting");
   } catch (error) {
     log.warn("[Omnecor] OMMESH init warning:", (error as Error).message);
+  }
+
+  // ─── Auto-start Valet Router Inference Server ───────────────────────────
+  // Spawns valet_router_inference.py when models/valet-router/current.json
+  // reports status="ready". No-op when no artifact is registered.
+  try {
+    await ValetServerService.getInstance().start();
+  } catch (error) {
+    log.warn("[Omnecor] Valet Router Server init warning:", (error as Error).message);
   }
 
   // ─── Create Express App ─────────────────────────────────────────────────
@@ -260,6 +270,14 @@ async function startServer() {
     }
 
     TokenRefreshService.getInstance().stop();
+
+    // Stop the Valet Router inference server
+    try {
+      await ValetServerService.getInstance().stop();
+      log.info("[Omnecor] Valet Router Server shutdown complete");
+    } catch (error) {
+      log.warn("[Omnecor] Valet Router Server shutdown warning:", (error as Error).message);
+    }
 
     // Terminate all running child processes (training, Blender, ESP, etc.)
     try {
