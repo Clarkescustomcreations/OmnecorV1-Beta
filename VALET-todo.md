@@ -242,21 +242,35 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
 
 ---
 
-## Phase 7 — Runtime RAG + expertise upkeep ("pull and update")
+## Phase 7 — Runtime RAG + expertise upkeep ("pull and update") ✅
 
-- [ ] **7.1 Inject the live manifest.** The router server loads `routing_manifest.json`
-      at startup and injects it into the system prompt (A.3) so model names update without
-      retraining.
-- [ ] **7.2 Brain Map retrieval.** For `qa` / `knowledge_retrieval` tasks, retrieve
-      relevant chunks from the Neural Brain Map (ChromaDB) + `OMNECOR_KNOWLEDGE_BASE.md`
-      and pass them as `{{RAG_CONTEXT}}`. The model is already trained to use them (B.4).
-- [ ] **7.3 Knowledge refresh job.** A scheduled task re-embeds the knowledge base + repo
-      docs when they change (bump `knowledge_base_version`); optionally pull latest model
-      IDs per provider and open a manifest-update PR for review.
-- [ ] **7.4 Drift check.** CI fails if the system prompt / schema in code diverges from
-      `valet-training/` (single-source enforcement).
+- [x] **7.1 Inject the live manifest.** `_get_manifest_json()` + `_get_system_prompt()`
+      in `valet_router_inference.py` are mtime-checked on every inference call — manifest
+      and system prompt reload from disk the moment the file changes, no restart required.
+      `POST /admin/reload` forces an immediate cache invalidation from any caller.
+- [x] **7.2 Brain Map retrieval.** `_rag_query()` queries ChromaDB `omnecor_valet_kb`
+      collection via HTTP; falls back to `_kb_keyword_search()` (in-memory TF-IDF-style
+      scoring against `OMNECOR_KNOWLEDGE_BASE.md`). `_should_rag()` auto-injects context
+      for `task_type="qa"` and Omnecor-keyword tasks. New `POST /rag` endpoint exposes
+      retrieval directly.
+- [x] **7.3 Knowledge refresh job.** `server/python_bridges/valet_knowledge_refresh.py`
+      chunks the KB by `##` headings, upserts into ChromaDB (graceful degrade when
+      offline), bumps `knowledge_base_version` in `routing_manifest.json`, and calls
+      `/admin/reload`. Exposed as `valetRouter.refreshKnowledge` tRPC mutation; also
+      runnable standalone: `python3 server/python_bridges/valet_knowledge_refresh.py`.
+- [x] **7.4 Drift check.** `scripts/check_valet_drift.py` — exits 0 when all 11
+      `RouteDecision` fields match across IO_CONTRACT.md, Pydantic model, and TS
+      interface; exits 1 with findings on divergence. Also asserts Phase 7.1/7.2
+      structural invariants. Verified passing (11/11 fields consistent).
 - **DoD:** updating a fact in the knowledge base or a model name in the manifest changes
   the router's behavior **without retraining**; the router answers from current data.
+
+  *Implementation notes (2026-06-02):*
+  - `valet_router_inference.py` — hot-reload caches, `_rag_query`, `_should_rag`,
+    `/rag`, `/admin/reload` endpoints
+  - `server/python_bridges/valet_knowledge_refresh.py` — new KB refresh bridge
+  - `server/routers/valetRouter.ts` — `refreshKnowledge` mutation added
+  - `scripts/check_valet_drift.py` — new CI drift checker (run `python3 scripts/check_valet_drift.py`)
 
 ---
 
