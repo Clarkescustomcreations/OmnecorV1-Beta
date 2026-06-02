@@ -1,5 +1,3 @@
-import React from 'react'
-
 export const Switch = ({ checked, onChange, className }: any) => (
   <button
     type="button"

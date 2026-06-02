@@ -45,7 +45,7 @@ Section "-NodeJS Check" SecNodeJS
 
   NodeMissing:
     MessageBox MB_ICONINFORMATION \
-      "Node.js was not found on this system.$\n$\nOmnecor requires Node.js 20+.$\nDownload it from https://nodejs.org and re-run the installer." \
+      "Node.js was not found on this system.$\n$\nOmnecor requires Node.js 22+.$\nDownload it from https://nodejs.org and re-run the installer." \
       IDOK NodeFound
 
   NodeFound:

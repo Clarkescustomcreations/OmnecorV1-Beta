@@ -8,7 +8,7 @@
 
 import { z } from "zod";
 import { router, adminProcedure } from "../_core/trpc.js";
-import { getDb } from "../db.js";
+import { getDb } from "../db.factory.js";
 import { auditLog } from "../../drizzle/schema.js";
 import { desc, eq } from "drizzle-orm";
 

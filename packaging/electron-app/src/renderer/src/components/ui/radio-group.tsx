@@ -1,12 +1,10 @@
-import React from 'react'
-
-export const RadioGroup = ({ children, defaultValue, className, onChange }: any) => (
-  <div className={`grid gap-2 ${className}`} role="radiogroup">
+export const RadioGroup = ({ children, className }: any) => (
+  <div className={`grid gap-2 ${className}`}>
     {children}
   </div>
 )
 
-export const RadioGroupItem = ({ value, id, className }: any) => (
+export const RadioGroupItem = ({ id, value, className }: any) => (
   <input
     type="radio"
     id={id}

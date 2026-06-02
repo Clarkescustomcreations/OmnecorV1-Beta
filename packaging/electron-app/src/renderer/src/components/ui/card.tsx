@@ -1,5 +1,3 @@
-import React from 'react'
-
 export const Card = ({ children, className }: any) => (
   <div className={`rounded-lg border bg-card text-card-foreground shadow-sm ${className}`}>{children}</div>
 )

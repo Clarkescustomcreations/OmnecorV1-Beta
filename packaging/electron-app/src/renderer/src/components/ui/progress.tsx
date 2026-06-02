@@ -1,5 +1,3 @@
-import React from 'react'
-
 export const Progress = ({ value, className }: any) => (
   <div className={`relative h-4 w-full overflow-hidden rounded-full bg-secondary ${className}`}>
     <div

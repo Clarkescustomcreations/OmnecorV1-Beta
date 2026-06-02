@@ -4,9 +4,15 @@
 
 ### Prerequisites
 - Windows 10/11 (x64)
-- [Node.js 20 LTS](https://nodejs.org)
-- [pnpm](https://pnpm.io): `npm install -g pnpm`
+- [Node.js v24.15.0](https://nodejs.org) (pinned for beta)
+- [pnpm v10.4.1](https://pnpm.io): `npm install -g pnpm@10.4.1`
 - Git for Windows
+- **C++ Build Tools**: Required for compiling native modules like `better-sqlite3`. Install "Desktop development with C++" via the [Visual Studio Installer](https://visualstudio.microsoft.com/visual-cpp-build-tools/).
+
+### Important: Native Modules
+Omnecor uses native C++ modules (`better-sqlite3`, `onnxruntime-node`). While `pnpm install` attempts to fetch prebuilt binaries, it is **highly recommended** to build the production installer on a native Windows machine to ensure the correct ABI compatibility. 
+
+Cross-compiling from Linux using Wine is possible for the UI but often fails to package the correct Windows `.node` binaries for the backend.
 
 ### Steps
 

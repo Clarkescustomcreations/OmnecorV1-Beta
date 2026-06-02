@@ -13,19 +13,19 @@ To ensure optimal performance and compatibility, please ensure your system meets
 | **RAM** | 8GB | 16GB+ |
 | **Disk Space** | 20GB free space on NVMe SSD | 50GB+ free space on NVMe SSD |
 | **Network** | Stable connection for API provider calls | Stable connection |
-| **Node.js** | 22+ | 22+ |
-| **pnpm** | Latest stable version | Latest stable version |
+| **Node.js** | 22+ | 24.15.0 (pinned for beta) |
+| **pnpm** | 10.x | 10.4.1 (pinned for beta) |
 
 ## 2. Prerequisites
 
 Before proceeding with the installation, ensure you have the following installed on your system:
 
 - **Git**: For cloning the repository.
-- **Node.js (v22 or higher)**: Omnecor is built with Node.js. You can download it from the [official Node.js website](https://nodejs.org/en/download/).
-- **pnpm**: A fast, disk space efficient package manager. Install it globally using npm:
+- **Node.js (v24.15.0 pinned; v22 minimum)**: Omnecor is built with Node.js. You can download it from the [official Node.js website](https://nodejs.org/en/download/).
+- **pnpm (v10.4.1 pinned; v10.x minimum)**: A fast, disk space efficient package manager. Install it using:
 
   ```bash
-  npm install -g pnpm
+  npm install -g pnpm@10.4.1
   ```
 
 ## 3. Installation Steps
@@ -69,20 +69,23 @@ Omnecor supports two database backends, selected by the `OMNECOR_DB` environment
 
 - **SQLite (default, zero-infra)** — If you do **not** set `DATABASE_URL`, Omnecor uses a local SQLite database file (`./data/omnecor.db`). The schema is created automatically on first launch — **no setup command is required**. This is the recommended path for beta testing and Sovereign / offline operation. To force it explicitly, set `OMNECOR_DB=sqlite`.
 
-- **MySQL/MariaDB (optional, multi-user / production)** — Set `DATABASE_URL` to a valid MySQL connection string (see `.env.example`), then push the schema:
+- **MySQL/MariaDB (optional, multi-user / production)** — Requires a running MySQL/MariaDB instance (install via `apt install mariadb-server` on Linux or similar). Create a database and user, then set `DATABASE_URL` in your `.env` (matches `.env.example` format). Finally, push the schema:
 
   ```bash
   pnpm run db:push
   ```
 
-  This generates and applies any pending migrations. (Required only for the MySQL backend.)
+  Alternatively, use the provided `docker-compose.yml` to start a MySQL instance:
+  ```bash
+  docker compose up -d db
+  ```
 
 ### Step 5: Build the Application
 
 Build the Omnecor application for production:
 
 ```bash
-npm run build
+pnpm run build
 ```
 
 This command compiles the client-side assets and the server-side TypeScript code into JavaScript.
@@ -92,7 +95,7 @@ This command compiles the client-side assets and the server-side TypeScript code
 Finally, start the Omnecor application:
 
 ```bash
-npm run start
+pnpm run start
 ```
 
 Omnecor will attempt to start on `http://localhost:3000`. If this port is in use, it will automatically find and use the next available port. You will see the exact URL in your terminal output.

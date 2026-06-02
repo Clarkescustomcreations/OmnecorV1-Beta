@@ -5,7 +5,7 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "./t
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
 import { homedir } from "os";
-import { getDb } from "../db.js";
+import { getDb } from "../db.factory.js";
 import { users } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 import { ENV } from "./env.js";

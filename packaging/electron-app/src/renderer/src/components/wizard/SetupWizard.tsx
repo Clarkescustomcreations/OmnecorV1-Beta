@@ -4,21 +4,24 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { StepNetwork } from './steps/StepNetwork';
-import { StepModels } from './steps/StepModels';
-import { StepKnowledgeBase } from './steps/StepKnowledgeBase';
-import { StepPreferences } from './steps/StepPreferences';
+import { StepOmsh } from './steps/StepOmsh';
+import { StepValet } from './steps/StepValet';
 import { StepIntegrations } from './steps/StepIntegrations';
+import { StepKnowledgeBase } from './steps/StepKnowledgeBase';
+import { StepPreferredModels } from './steps/StepPreferredModels';
+import { StepPreferences } from './steps/StepPreferences';
 import type { SystemInfo } from '@/../../preload/index.d';
 
 const STEPS = [
-  { id: 'welcome',      title: 'Welcome',       description: 'Establishing secure local connectivity.' },
-  { id: 'omsh',         title: 'Model Server',  description: 'Configuring your local model backend.' },
-  { id: 'valet',        title: 'Local Valet',   description: 'Choosing your always-on assistant.' },
-  { id: 'integrations', title: 'Integrations',  description: 'Connecting cloud services (optional).' },
-  { id: 'brain',        title: 'Neural Map',    description: 'Building your personal knowledge base.' },
-  { id: 'creative',     title: 'Creative Map',  description: 'Specialized memory for storytelling.' },
-  { id: 'preferences',  title: 'Preferences',   description: 'Personalizing your AI experience.' },
-  { id: 'finish',       title: 'Ready!',        description: 'Your workstation is configured.' },
+  { id: 'network',      title: 'Local Network',   description: 'Establish secure local connectivity and AI mesh.' },
+  { id: 'omsh',         title: 'Model Server',    description: 'Configure your local model backends (Ollama, vLLM).' },
+  { id: 'valet',        title: 'Local Valet',     description: 'Select your primary assistant for orchestration.' },
+  { id: 'integrations', title: 'Integrations',    description: 'Connect to cloud APIs and external tools.' },
+  { id: 'brain',        title: 'Neural Brain',    description: 'Build your personal knowledge base / RAG.' },
+  { id: 'creative',     title: 'Creative Map',    description: 'Specialized memory for roleplay and storytelling.' },
+  { id: 'preferred',    title: 'Model Mappings',  description: 'Set defaults for different task categories.' },
+  { id: 'preferences',  title: 'Personalization', description: 'Configure AI personality and privacy settings.' },
+  { id: 'finish',       title: 'Ready!',          description: 'Your workstation is configured.' },
 ];
 
 export const SetupWizard: React.FC = () => {
@@ -41,22 +44,34 @@ export const SetupWizard: React.FC = () => {
   };
 
   const handleLaunch = () => {
-    // Signal Electron main process to swap the wizard view for the full app
-    window.api.setupComplete();
+    // Check if we're running in Electron or Capacitor
+    if (window.api?.setupComplete) {
+      // Signal Electron main process to swap the wizard view for the full app
+      window.api.setupComplete();
+    } else {
+      // Capacitor / Browser thin-client mode:
+      // Read the IP from localStorage (set in StepNetwork) and navigate.
+      const serverIP = localStorage.getItem('omnecor_server_ip') || 'localhost';
+      window.location.href = `http://${serverIP}:3000`;
+    }
   };
 
   const renderStep = () => {
     switch (STEPS[currentStep].id) {
-      case 'welcome':
-        return <StepNetwork />;
+      case 'network':
+        return <StepNetwork sysInfo={sysInfo} />;
       case 'omsh':
+        return <StepOmsh sysInfo={sysInfo} />;
       case 'valet':
-        return <StepModels step={STEPS[currentStep].id} sysInfo={sysInfo} />;
+        return <StepValet sysInfo={sysInfo} />;
       case 'integrations':
         return <StepIntegrations />;
       case 'brain':
+        return <StepKnowledgeBase type="brain" />;
       case 'creative':
-        return <StepKnowledgeBase type={STEPS[currentStep].id} />;
+        return <StepKnowledgeBase type="creative" />;
+      case 'preferred':
+        return <StepPreferredModels />;
       case 'preferences':
         return <StepPreferences sysInfo={sysInfo} />;
       default:

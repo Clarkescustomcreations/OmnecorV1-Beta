@@ -1,4 +1,4 @@
-import { getDb } from "../../db.js";
+import { getDb } from "../../db.factory.js";
 import { integrations } from "../../../drizzle/schema.js";
 import { SecurityService } from "./SecurityService.js";
 import { ENV } from "../../_core/env.js";
