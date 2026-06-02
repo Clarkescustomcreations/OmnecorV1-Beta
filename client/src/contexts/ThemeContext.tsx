@@ -1,9 +1,10 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
 
-type Theme = "light" | "dark";
+export type Theme = "light" | "dark";
 
 interface ThemeContextType {
   theme: Theme;
+  setTheme: (theme: Theme) => void;
   toggleTheme?: () => void;
   switchable: boolean;
 }
@@ -42,6 +43,11 @@ export function ThemeProvider({
     }
   }, [theme, switchable]);
 
+  const handleSetTheme = (t: Theme) => {
+    if (!switchable) return;
+    setTheme(t);
+  };
+
   const toggleTheme = switchable
     ? () => {
         setTheme(prev => (prev === "light" ? "dark" : "light"));
@@ -49,7 +55,7 @@ export function ThemeProvider({
     : undefined;
 
   return (
-    <ThemeContext.Provider value={{ theme, toggleTheme, switchable }}>
+    <ThemeContext.Provider value={{ theme, setTheme: handleSetTheme, toggleTheme, switchable }}>
       {children}
     </ThemeContext.Provider>
   );
