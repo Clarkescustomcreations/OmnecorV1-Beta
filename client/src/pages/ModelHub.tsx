@@ -119,9 +119,7 @@ export default function ModelHub() {
     source: "ollama" as const,
     status: "available" as const,
     size: m.size ?? 0,
-    contextWindow: m.details?.parameter_size
-      ? parseInt(m.details.parameter_size)
-      : undefined,
+    // context window is not available from /api/tags — omit rather than show wrong data
   }));
 
   const apiModels: AIModel[] = providerHealth

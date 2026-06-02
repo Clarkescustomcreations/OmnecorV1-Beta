@@ -314,7 +314,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {available.map(i => renderIntegrationCard(i))}
           </div>
-          {available.length === 0 && (
+          {available.length === 0 && !integrationsQuery.isLoading && (
             <Card>
               <CardContent className="flex items-center justify-center h-32">
                 <div className="text-center text-muted-foreground">
@@ -447,22 +447,28 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 <Button
                   variant="destructive"
                   size="sm"
+                  disabled={disconnectMutation.isPending}
                   onClick={() => {
-                    disconnectMutation.mutate({ type: settingsType });
-                    setSettingsType(null);
+                    disconnectMutation.mutate(
+                      { type: settingsType },
+                      { onSuccess: () => setSettingsType(null) }
+                    );
                   }}
                 >
-                  Disconnect
+                  {disconnectMutation.isPending ? "Disconnecting..." : "Disconnect"}
                 </Button>
                 <Button
                   variant="outline"
                   size="sm"
+                  disabled={syncMutation.isPending}
                   onClick={() => {
-                    syncMutation.mutate({ type: settingsType });
-                    setSettingsType(null);
+                    syncMutation.mutate(
+                      { type: settingsType },
+                      { onSuccess: () => setSettingsType(null) }
+                    );
                   }}
                 >
-                  Sync Now
+                  {syncMutation.isPending ? "Syncing..." : "Sync Now"}
                 </Button>
                 <Button size="sm" onClick={() => setSettingsType(null)}>Close</Button>
               </DialogFooter>
