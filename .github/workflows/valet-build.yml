@@ -1,0 +1,178 @@
+name: Valet Router — Build & Release
+
+# Runs on tagged releases (v*.*.*) only.
+# Requires a self-hosted runner with the "gpu" label (NVIDIA/AMD, ≥8 GB VRAM).
+# The eval gate (overall ≥ 0.85, per-category ≥ 0.70) must pass before the
+# artifact is uploaded.  Failed eval → workflow fails; no release asset is created.
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  valet-build:
+    name: Build Valet Router Model
+    runs-on: [self-hosted, gpu]
+    permissions:
+      contents: write   # required for gh release asset upload
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Get pnpm store directory
+        id: pnpm-cache
+        shell: bash
+        run: echo "STORE_PATH=$(pnpm store path)" >> $GITHUB_OUTPUT
+
+      - name: Cache pnpm store
+        uses: actions/cache@v4
+        with:
+          path: ${{ steps.pnpm-cache.outputs.STORE_PATH }}
+          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
+          restore-keys: ${{ runner.os }}-pnpm-store-
+
+      - name: Install Node dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Bootstrap ML venv (idempotent)
+        run: pnpm valet:setup-ml
+
+      # Full pipeline: dataset build → validate → LoRA train → export → eval gate → register
+      # --require-gpu: hard-fail when no GPU is detected (guards against misconfigured runners)
+      - name: Build Valet Router pipeline
+        run: pnpm valet:build --require-gpu
+        env:
+          VALET_REGISTRY_ROOT: models/valet-router
+          PYTHONUNBUFFERED: "1"
+
+      # Verify current.json shows status=ready (eval gate passed inside the pipeline).
+      # This is a belt-and-suspenders check — the pipeline already exits 1 on eval failure.
+      - name: Verify eval gate
+        run: |
+          python3 - <<'PYEOF'
+          import json, sys
+
+          try:
+              with open("models/valet-router/current.json") as f:
+                  current = json.load(f)
+          except FileNotFoundError:
+              print("ERROR: models/valet-router/current.json not found — pipeline did not complete")
+              sys.exit(1)
+
+          status = current.get("status")
+          if status != "ready":
+              print(f"ERROR: artifact status='{status}' — eval gate not passed")
+              sys.exit(1)
+
+          scores = current.get("eval_scores", {})
+          overall = scores.get("overall_accuracy", 0)
+          per_cat = scores.get("per_category_min", 0)
+
+          print("=== Eval scores ===")
+          print(json.dumps(scores, indent=2))
+
+          errors = []
+          if overall < 0.85:
+              errors.append(f"overall_accuracy={overall:.3f} < 0.85")
+          if per_cat < 0.70:
+              errors.append(f"per_category_min={per_cat:.3f} < 0.70")
+          if errors:
+              print("FAIL:", "; ".join(errors))
+              sys.exit(1)
+
+          baseline = scores.get("baseline_route_accuracy", 0)
+          model_acc = scores.get("model_route_accuracy", 0)
+          if model_acc <= baseline:
+              print(f"FAIL: model_route_accuracy={model_acc:.3f} <= baseline={baseline:.3f}")
+              sys.exit(1)
+
+          print(f"Eval gate: PASSED (overall={overall:.3f}, per_cat_min={per_cat:.3f}, beats_baseline={model_acc:.3f}>{baseline:.3f})")
+          PYEOF
+
+      - name: Locate GGUF artifact
+        id: find-gguf
+        run: |
+          GGUF=$(find models/valet-router -name "*.gguf" | head -1)
+          if [ -z "$GGUF" ]; then
+            echo "ERROR: no .gguf file found in models/valet-router"
+            exit 1
+          fi
+          echo "path=$GGUF" >> $GITHUB_OUTPUT
+          echo "name=$(basename $GGUF)" >> $GITHUB_OUTPUT
+          echo "Found: $GGUF"
+
+      - name: Compute SHA-256 checksum
+        id: checksum
+        run: |
+          GGUF="${{ steps.find-gguf.outputs.path }}"
+          sha256sum "$GGUF" > "${GGUF}.sha256"
+          SUM=$(sha256sum "$GGUF" | cut -d' ' -f1)
+          echo "sum=$SUM" >> $GITHUB_OUTPUT
+          echo "SHA-256: $SUM"
+
+      - name: Read eval scores for release notes
+        id: eval-scores
+        run: |
+          python3 - <<'PYEOF'
+          import json, os
+          with open("models/valet-router/current.json") as f:
+              c = json.load(f)
+          scores = c.get("eval_scores", {})
+          lines = []
+          for k, v in scores.items():
+              if isinstance(v, float):
+                  lines.append(f"- **{k}:** {v:.3f}")
+              elif isinstance(v, dict):
+                  lines.append(f"- **{k}:**")
+                  for ck, cv in v.items():
+                      if isinstance(cv, float):
+                          lines.append(f"  - {ck}: {cv:.3f}")
+          with open(os.environ["GITHUB_OUTPUT"], "a") as fh:
+              fh.write("scores<<EOF\n")
+              fh.write("\n".join(lines))
+              fh.write("\nEOF\n")
+          PYEOF
+
+      - name: Upload artifact to GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            ${{ steps.find-gguf.outputs.path }}
+            ${{ steps.find-gguf.outputs.path }}.sha256
+            models/valet-router/current.json
+          body: |
+            ## Valet Router Model — ${{ github.ref_name }}
+
+            **Base model:** Qwen/Qwen2.5-1.5B-Instruct
+            **Format:** GGUF (Q4_K_M via llama-cpp-python)
+            **SHA-256:** `${{ steps.checksum.outputs.sum }}`
+
+            ### Eval scores
+            ${{ steps.eval-scores.outputs.scores }}
+
+            ### Installation
+
+            Download this model on a target machine by running:
+
+            ```bash
+            bash scripts/fetch-valet-model.sh ${{ github.ref_name }}
+            ```
+
+            The fetch script verifies the SHA-256 checksum and writes `models/valet-router/current.json`
+            so the app auto-serves the model on next launch.
+
+            ### Build reproducibility
+
+            Re-run the pipeline from the same `valet.config.json` + seed to get equivalent
+            eval scores. Use `scripts/check_valet_reproducibility.py` to verify dataset
+            determinism before training.
