@@ -2,6 +2,9 @@
 **/node_modules
 .pnpm-store/
 
+# Node.js compile cache (generated at runtime)
+**/node-compile-cache/
+
 # Build outputs
 dist/
 build/
