@@ -4,7 +4,18 @@ import { electronAPI } from '@electron-toolkit/preload'
 const api = {
   getSystemInfo: (): Promise<SystemInfo> => ipcRenderer.invoke('get-system-info'),
   setupComplete: (): void => ipcRenderer.send('setup-complete'),
-  openExternal: (url: string): void => ipcRenderer.send('open-external', url)
+  openExternal: (url: string): void => {
+    // Validate at the renderer boundary too: only forward safe schemes. The
+    // main process re-validates (defence in depth).
+    try {
+      const { protocol } = new URL(url)
+      if (protocol === 'https:' || protocol === 'mailto:') {
+        ipcRenderer.send('open-external', url)
+      }
+    } catch {
+      /* invalid URL — ignore */
+    }
+  }
 }
 
 if (process.contextIsolated) {

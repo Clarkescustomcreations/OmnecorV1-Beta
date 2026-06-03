@@ -34,11 +34,9 @@ interface SelectedModel {
  */
 export default function Dashboard() {
   const [selectedModel] = useState<SelectedModel | undefined>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("omnecor:selectedModel") ?? "");
-    } catch {
-      return undefined;
-    }
+    let model: SelectedModel | undefined;
+    try { model = JSON.parse(localStorage.getItem("omnecor:selectedModel") ?? "null") as SelectedModel | undefined ?? undefined; } catch { model = undefined; }
+    return model;
   });
 
   const { data: watcherStatus } = trpc.project.getWatcherStatus.useQuery();

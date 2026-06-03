@@ -4,6 +4,9 @@ import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { hasPermission, type Role } from "../phase2/config/rbac.js";
+import { createLogger } from "./logger.js";
+
+const log = createLogger("trpc-audit");
 
 const t = initTRPC.context<TrpcContext>().meta<{ cloud?: boolean }>().create({
   transformer: superjson,
@@ -45,7 +48,8 @@ const auditMiddleware = t.middleware(async (opts) => {
   const { ctx, next, path } = opts;
   const result = await next();
   if (ctx.user) {
-    // Fire-and-forget — never awaited, never throws
+    // Fire-and-forget — never awaited so it can't block the response, but a
+    // failure to persist a security audit event must NOT be silently dropped.
     AuditLogService.getInstance().log({
       eventType: "trpc_call",
       actorId: ctx.user.id,
@@ -55,7 +59,9 @@ const auditMiddleware = t.middleware(async (opts) => {
       result: result.ok ? null : { error: true },
       ipAddress: ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? null,
       sessionId: null,
-    }).catch(() => {});
+    }).catch((err: unknown) => {
+      log.error(`Failed to persist audit log for procedure "${path}"`, err);
+    });
   }
   return result;
 });

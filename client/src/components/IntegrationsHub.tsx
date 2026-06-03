@@ -136,7 +136,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 <CheckCircle2 className="w-4 h-4 text-accent" />
                 <span className="text-sm font-semibold">{String(meta.username ?? "")}</span>
               </div>
-              {meta.email && (
+              {!!meta.email && (
                 <p className="text-xs text-muted-foreground">{String(meta.email)}</p>
               )}
               {item.connectedAt && (
@@ -144,7 +144,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                   Connected: {new Date(item.connectedAt).toLocaleString()}
                 </p>
               )}
-              {meta.lastSynced && (
+              {!!meta.lastSynced && (
                 <p className="text-xs text-muted-foreground">
                   Last synced: {new Date(String(meta.lastSynced)).toLocaleString()}
                 </p>
@@ -153,7 +153,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
           )}
 
           {/* GitHub repos summary */}
-          {item.type === "github" && meta?.repositories && Array.isArray(meta.repositories) && (
+          {item.type === "github" && !!meta?.repositories && Array.isArray(meta.repositories) && (
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">
                 {meta.repoCount as number} Repositories (last 30)
@@ -174,7 +174,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
           )}
 
           {/* Notion databases summary */}
-          {item.type === "notion" && meta?.databases && Array.isArray(meta.databases) && (
+          {(item.type === "notion" && Array.isArray(meta?.databases)) ? (
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">
                 {meta.dbCount as number} Databases
@@ -187,10 +187,10 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 ))}
               </ScrollArea>
             </div>
-          )}
+          ) : null}
 
           {/* Slack channels summary */}
-          {item.type === "slack" && meta?.channels && Array.isArray(meta.channels) && (
+          {(item.type === "slack" && Array.isArray(meta?.channels)) ? (
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">
                 {meta.channelCount as number} Channels
@@ -203,10 +203,10 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 ))}
               </ScrollArea>
             </div>
-          )}
+          ) : null}
 
           {/* Google Drive storage */}
-          {item.type === "google-drive" && meta?.storageTotal && (
+          {(item.type === "google-drive" && !!meta?.storageTotal) ? (
             <div className="space-y-1">
               <p className="text-xs font-semibold text-muted-foreground">Storage</p>
               <div className="flex justify-between text-xs">
@@ -224,7 +224,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 />
               </div>
             </div>
-          )}
+          ) : null}
 
           {/* Actions */}
           <div className="flex gap-2 pt-2">
@@ -413,13 +413,13 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 <DialogDescription>Manage your {info.title} connection.</DialogDescription>
               </DialogHeader>
               <div className="space-y-4 py-2 text-sm">
-                {meta?.username && (
+                {!!meta?.username && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Account</span>
                     <span className="font-semibold">{String(meta.username)}</span>
                   </div>
                 )}
-                {meta?.email && (
+                {!!meta?.email && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Email</span>
                     <span>{String(meta.email)}</span>
@@ -431,7 +431,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                     <span>{new Date(integration.connectedAt).toLocaleDateString()}</span>
                   </div>
                 )}
-                {meta?.lastSynced && (
+                {!!meta?.lastSynced && (
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Last Synced</span>
                     <span>{new Date(String(meta.lastSynced)).toLocaleString()}</span>

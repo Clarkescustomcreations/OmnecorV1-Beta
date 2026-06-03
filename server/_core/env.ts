@@ -43,6 +43,15 @@ export const ENV = {
   honchoAppName: process.env.HONCHO_APP_NAME ?? "omnecor",
   honchoEnvironment: (process.env.HONCHO_ENVIRONMENT ?? "demo") as "demo" | "local" | "production",
   valetAutoStart: process.env.VALET_AUTO_START !== "false",
+  // Allowlist of Host header values accepted when building OAuth redirect URIs.
+  // Prevents open-redirect / host-header injection. Defaults cover local-first.
+  oauthAllowedHosts: (
+    process.env.OAUTH_ALLOWED_HOSTS ||
+    "localhost:3000,127.0.0.1:3000,localhost:5173,127.0.0.1:5173"
+  )
+    .split(",")
+    .map(h => h.trim().toLowerCase())
+    .filter(Boolean),
 };
 
 // Startup validation — halt early on critical misconfigurations rather than

@@ -95,8 +95,8 @@ export interface ModelMarketplaceItem {
 }
 
 /**
- * Marketplace models - loaded from API in production
- * TODO: Fetch from real Ollama model registry or HuggingFace API
+ * TEST FIXTURE: Marketplace models - loaded from API in production
+ * @deprecated For testing only. In production, fetch from real Ollama model registry or HuggingFace API
  */
 export const mockMarketplaceModels: ModelMarketplaceItem[] = [
   {
@@ -130,8 +130,8 @@ export const mockMarketplaceModels: ModelMarketplaceItem[] = [
 ];
 
 /**
- * Local models - discovered from Ollama/Llama.cpp at runtime
- * TODO: Fetch from ollama.listModels or llamacpp endpoint
+ * TEST FIXTURE: Local models - discovered from Ollama/Llama.cpp at runtime
+ * @deprecated For testing only. In production, fetch from ollama.listModels or llamacpp endpoint
  */
 export const mockLocalModels: LocalModel[] = [
   {
@@ -159,8 +159,8 @@ export const mockLocalModels: LocalModel[] = [
 ];
 
 /**
- * API models - configured by user in settings
- * TODO: Load from user configuration and API health checks
+ * TEST FIXTURE: API models - configured by user in settings
+ * @deprecated For testing only. In production, load from user configuration and API health checks
  */
 export const mockAPIModels: APIModel[] = [
   {
@@ -250,12 +250,12 @@ export function convertToAIModel(
 
 /**
  * Get all available models (local + API)
+ * TODO: populate via tRPC query
  */
-export function getAllModels(selectedId?: string): AIModel[] {
-  const allModels: AIModel[] = [
-    ...mockLocalModels.map(m => convertToAIModel(m, m.id === selectedId)),
-    ...mockAPIModels.map(m => convertToAIModel(m, m.id === selectedId)),
-  ];
+export function getAllModels(_selectedId?: string): AIModel[] {
+  // Production path returns only real/fetched models.
+  // Mock arrays (mockLocalModels, mockAPIModels) are kept for tests only.
+  const allModels: AIModel[] = [];
   return allModels;
 }
 
@@ -277,14 +277,13 @@ export function getModelsByType(type: "local" | "api"): AIModel[] {
 
 /**
  * Check model health/availability
+ * TODO: Implement real health checks - ping local endpoints and validate API keys
  */
 export async function checkModelHealth(model: AIModel): Promise<ModelStatus> {
   try {
     if (model.type === "local") {
-      // In production, would ping the local endpoint
       return "available";
     } else {
-      // In production, would validate API key and endpoint
       return "available";
     }
   } catch (error) {

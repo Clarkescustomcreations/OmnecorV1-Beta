@@ -123,15 +123,19 @@ export default function Chat() {
   // ── Honcho facts — long-term memory injected into system prompt ───────────
   const { data: honchoFacts } = trpc.honcho.getFacts.useQuery(
     { openId, limit: 15 },
-    { enabled: !!openId, staleTime: 60_000 }
+    { enabled: !!me && !!openId, staleTime: 60_000 }
   );
   const addHonchoFact = trpc.honcho.addFact.useMutation();
   const addHonchoMessage = trpc.honcho.addMessage.useMutation();
 
   // ── BTW notes ────────────────────────────────────────────────────────────
-  const [btwNotes, setBtwNotes] = useState<string[]>(
-    () => JSON.parse(localStorage.getItem("omnecor:btwNotes") ?? "[]")
-  );
+  const [btwNotes, setBtwNotes] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("omnecor:btwNotes") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
 
   const handleBtw = useCallback((note: string) => {
     setBtwNotes(prev => {
@@ -767,7 +771,8 @@ export default function Chat() {
                   model: selectedModel,
                   createdAt: new Date().toISOString(),
                 };
-                const existing: unknown[] = JSON.parse(localStorage.getItem("omnecor:skills") ?? "[]");
+                let existing: unknown[];
+                try { existing = JSON.parse(localStorage.getItem("omnecor:skills") ?? "[]") as unknown[]; } catch { existing = []; }
                 existing.push(skill);
                 localStorage.setItem("omnecor:skills", JSON.stringify(existing));
                 setShowSkillModal(false);

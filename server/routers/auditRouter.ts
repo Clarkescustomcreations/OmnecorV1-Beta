@@ -10,7 +10,7 @@ import { z } from "zod";
 import { router, adminProcedure } from "../_core/trpc.js";
 import { getDb } from "../db.factory.js";
 import { auditLog } from "../../drizzle/schema.js";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, sql } from "drizzle-orm";
 
 export const auditRouter = router({
   getAuditLog: adminProcedure
@@ -22,9 +22,12 @@ export const auditRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
       if (!db) return { entries: [], total: 0 };
-      const query = db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(input.limit).offset(input.offset);
-      const entries = await query;
-      return { entries };
+      const [entries, countResult] = await Promise.all([
+        db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(input.limit).offset(input.offset),
+        db.select({ count: sql<number>`count(*)` }).from(auditLog),
+      ]);
+      const total = Number(countResult[0]?.count ?? 0);
+      return { entries, total };
     }),
 
   getAuditLogByActor: adminProcedure

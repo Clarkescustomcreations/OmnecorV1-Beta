@@ -9,6 +9,18 @@ export function registerStorageProxy(app: Express) {
       return;
     }
 
+    // Reject path-traversal / absolute-path / null-byte attempts before
+    // forwarding the key to the storage backend.
+    if (
+      key.includes("..") ||
+      key.startsWith("/") ||
+      key.includes("\\") ||
+      key.includes("\0")
+    ) {
+      res.status(400).send("Invalid storage key");
+      return;
+    }
+
     if (!ENV.forgeApiUrl || !ENV.forgeApiKey) {
       res.status(500).send("Storage proxy not configured");
       return;

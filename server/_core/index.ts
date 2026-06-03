@@ -121,8 +121,23 @@ async function startServer() {
   const server = createServer(app);
 
   app.use(helmet({
-    // Allow inline styles needed by shadcn/ui and Recharts
-    contentSecurityPolicy: false,
+    contentSecurityPolicy: {
+      directives: {
+        defaultSrc: ["'self'"],
+        // shadcn/ui and Recharts inject inline <style> and style attributes
+        styleSrc: ["'self'", "'unsafe-inline'"],
+        // 'unsafe-inline' is required by the Vite runtime / inline bootstrap
+        scriptSrc: ["'self'", "'unsafe-inline'"],
+        imgSrc: ["'self'", "data:", "blob:"],
+        // data: covers inline/base64 web fonts
+        fontSrc: ["'self'", "data:"],
+        // allow same-origin API + WebSocket (ws:/wss:) connections
+        connectSrc: ["'self'", "ws:", "wss:"],
+        workerSrc: ["'self'", "blob:"],
+        objectSrc: ["'none'"],
+        frameAncestors: ["'self'"],
+      },
+    },
   }));
 
   const limiter = rateLimit({

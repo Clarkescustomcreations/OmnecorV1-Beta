@@ -11,6 +11,20 @@ function getQueryParam(req: Request, key: string): string | undefined {
   return typeof value === "string" ? value : undefined;
 }
 
+/**
+ * Returns a Host header value that is safe to use when constructing OAuth
+ * redirect URIs. The raw `req.get("host")` is attacker-controlled and must be
+ * validated against an allowlist to prevent open-redirect / host-header
+ * injection. Falls back to the first configured allowed host.
+ */
+function getValidatedHost(req: Request): string {
+  const host = (req.get("host") ?? "").toLowerCase();
+  if (host && ENV.oauthAllowedHosts.includes(host)) {
+    return host;
+  }
+  return ENV.oauthAllowedHosts[0] ?? "localhost:3000";
+}
+
 export function registerOAuthRoutes(app: Express) {
   // Login route initiates the flow, generating the state and setting the cookie
   app.get("/api/oauth/login", (req: Request, res: Response) => {
@@ -26,7 +40,7 @@ export function registerOAuthRoutes(app: Express) {
     });
 
     // Redirect to OAuth provider with state
-    const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/callback`;
+    const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/callback`;
     const oauthUrl = new URL(`${ENV.oAuthServerUrl}/app-auth`);
     oauthUrl.searchParams.set("appId", ENV.appId);
     oauthUrl.searchParams.set("redirectUri", redirectUri);
@@ -103,7 +117,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
     const cookieOptions = getSessionCookieOptions(req);
     res.cookie("google_oauth_state", state, { ...cookieOptions, maxAge: 10 * 60 * 1000, httpOnly: true });
 
-    const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/google/callback`;
+    const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/google/callback`;
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
     url.searchParams.set("client_id", ENV.googleClientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -128,7 +142,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
     pendingVerifiers.delete(state);
 
     try {
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/google/callback`;
+      const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/google/callback`;
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
@@ -192,7 +206,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
     const cookieOptions = getSessionCookieOptions(req);
     res.cookie("ms_oauth_state", state, { ...cookieOptions, maxAge: 10 * 60 * 1000, httpOnly: true });
 
-    const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/microsoft/callback`;
+    const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/microsoft/callback`;
     const url = new URL("https://login.microsoftonline.com/common/v2.0/oauth2/authorize");
     url.searchParams.set("client_id", ENV.microsoftClientId);
     url.searchParams.set("redirect_uri", redirectUri);
@@ -217,7 +231,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
     pendingVerifiers.delete(state);
 
     try {
-      const redirectUri = `${req.protocol}://${req.get("host")}/api/oauth/microsoft/callback`;
+      const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/microsoft/callback`;
       const tokenRes = await fetch("https://login.microsoftonline.com/common/v2.0/oauth2/token", {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },

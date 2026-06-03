@@ -31,7 +31,6 @@ export class WebSocketManager {
     }
 
     this.ws.onopen = () => {
-      console.log('[WS] Connected to', url);
       this.reconnectAttempts = 0;
       useAppStore.getState().setWsStatus('connected');
       this.flushQueue();
@@ -42,7 +41,6 @@ export class WebSocketManager {
     };
 
     this.ws.onclose = () => {
-      console.log('[WS] Disconnected');
       this.ws = null;
       useAppStore.getState().setWsStatus('offline');
       this.handleReconnect();
@@ -67,7 +65,6 @@ export class WebSocketManager {
     if (this.ws && this.ws.readyState === WebSocket.OPEN) {
       this.ws.send(message);
     } else {
-      console.log('[WS] Queuing message:', type);
       this.messageQueue.push(message);
     }
   }
@@ -91,15 +88,11 @@ export class WebSocketManager {
 
   private handleReconnect(): void {
     if (!this.url || this.reconnectAttempts >= 5) {
-      if (this.reconnectAttempts >= 5) {
-        console.error('[WS] Max reconnect attempts reached');
-      }
       return;
     }
 
     const delay = Math.min(Math.pow(2, this.reconnectAttempts) * 1000, 16000);
     this.reconnectAttempts++;
-    console.log(`[WS] Reconnecting in ${delay}ms (attempt ${this.reconnectAttempts})`);
     
     setTimeout(() => {
       if (this.url) {

@@ -2,25 +2,31 @@ packages:
   - "."
   - "packaging/electron-app"
 
+# Dependency `overrides` MUST live here, not in the root package.json's `pnpm`
+# field. In a pnpm workspace (this repo has a pnpm-workspace.yaml) pnpm 10.x
+# reads settings from this file and IGNORES the `pnpm` field in package.json —
+# pnpm prints "The 'pnpm' field in package.json is no longer read by pnpm" and
+# silently drops it. Keeping overrides here is what makes the tar/rollup/etc.
+# security pins actually apply.
 overrides:
-  # Existing overrides (migrated from package.json#pnpm.overrides — no longer read in pnpm v10)
+  # Build/tooling pins
   "tailwindcss>nanoid": "3.3.7"
   "@builder.io/vite-plugin-jsx-loc": "0.1.1"
-
-  # Security: esbuild dev-server advisory (GHSA-67mh-4wv8-2f99) in drizzle-kit transitive dep
   "@esbuild-kit/core-utils>esbuild": ">=0.25.0"
-
-  # Security: fast-xml-parser critical + high CVEs via @aws-sdk (GHSA-m7jm-9gc2-mpf2, GHSA-fj3w-jwp8-x2g3, etc.)
+  # Security pins (CVE / GHSA remediation — keep floors, allow forward patches)
   "fast-xml-parser": ">=5.5.6"
-
-  # Security: tar arbitrary file overwrite/traversal chain of CVEs (GHSA-* multiple)
   "tar": ">=7.5.11"
-
-  # Security: rollup path traversal (GHSA-*) via vite
   "rollup": ">=4.59.0"
-
-  # Security: path-to-regexp ReDoS
   "path-to-regexp": ">=0.1.13"
+  "dompurify": ">=3.4.0"
+  "lodash": ">=4.18.0"
+  "lodash-es": ">=4.18.0"
+  "mermaid": ">=11.15.0"
+  "mdast-util-to-hast": ">=13.2.1"
+  # Dev-tree advisories (build tooling): ReDoS, CSS-stringify XSS, pnpm lockfile/script bypass
+  "picomatch": ">=4.0.4"
+  "postcss": ">=8.5.10"
+  "pnpm": ">=10.28.2"
 
 patchedDependencies:
   "wouter@3.7.1": patches/wouter@3.7.1.patch
