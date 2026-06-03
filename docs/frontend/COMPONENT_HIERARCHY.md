@@ -43,10 +43,16 @@ This directory contains highly reusable, atomic UI components built using `shadc
 These are higher-level components that compose UI primitives to form specific parts of the application interface.
 
 **Examples**:
--   `Header.tsx`: The application header, often containing navigation, search, and user controls.
--   `Sidebar.tsx`: The main navigation sidebar.
+-   `Header.tsx`: The application header, containing navigation, search, user controls, and execution mode badge.
+-   `Sidebar.tsx`: The main navigation sidebar with PeerCard footer.
 -   `CommandPalette.tsx`: A global command palette for quick actions.
 -   `FloatingWindow.tsx`: Manages detachable, floating UI panels.
+
+**Shell Components** (`client/src/components/shell/`):
+-   `PeerCard.tsx`: Persistent OMMESH peer-status indicator in sidebar footer; polls `mesh.discover` every 10s and displays peer count, latency, and model availability.
+-   `ExecutionModeBadge.tsx`: Live header chip reflecting `executionMode` (Sovereign=red lock, Scrapper=green zap, Big Spender=amber flame).
+-   `ZeroLoginBanner.tsx`: Dismissible yellow top banner warning when ZERO_LOGIN_MODE=true.
+-   `UpdateBanner.tsx`: Update notification banner.
 
 ### 2.3. Feature-Specific Components
 
@@ -54,8 +60,9 @@ These components are tailored to specific features or modules of Omnecor and res
 
 -   **`client/src/components/chat/`**:
     -   `ChatPanel.tsx`: The main chat interface component.
-    -   `ChatInput.tsx`: Input area for sending messages.
-    -   `MessageDisplay.tsx`: Renders individual chat messages.
+    -   `ChatInput.tsx`: Input area for sending messages with slash commands, @-mention context files, and a live token-budget bar (amber >=70%, red >=90%).
+    -   `MessageDisplay.tsx`: Renders individual chat messages with per-message context exclusion toggles.
+    -   `ConversationList.tsx`: Sidebar list of saved conversations.
 
 -   **`client/src/components/model-hub/`**:
     -   `ModelCard.tsx`: Displays information about an AI model.
@@ -69,6 +76,10 @@ These components are tailored to specific features or modules of Omnecor and res
 -   **`client/src/components/workspace/`**:
     -   `NeuralWorkspaceCanvas.tsx`: The canvas for the neural workspace.
     -   `nodes/FileNode.tsx`: Represents a file within the neural graph.
+
+-   **`client/src/components/`** (Root-level features):
+    -   `HITLAlertPanel.tsx`: Floating bottom-right overlay for autonomous agent loop detection; displays Retry/Modify/Abort actions and also renders "Budget Spend" cards for API cost events.
+    -   `neural/FictionModePanel.tsx`: Per-Brain-Map sandboxed creative workspace with Lore/Cast/Timeline tabs.
 
 -   **`client/src/components/media/`**:
     -   `ComfyPanel.tsx`: UI for ComfyUI integration.

@@ -12,23 +12,24 @@ skills).
 
 ---
 
-## ⚠️ Why this package exists — three blocking mismatches in the current code
+## ✅ Why this package exists — three pipeline mismatches (now resolved)
 
-Before any training can "just work," three incompatibilities in the existing
-pipeline must be resolved. This package defines the **single canonical contract**
-([IO_CONTRACT.md](IO_CONTRACT.md)) that all three components must converge on.
+This package was authored because three incompatibilities in the original pipeline
+would have made training silently fail. They are **fixed** as of Phase A/B (verified
+2026-06-03 — `git` shows the code now matches the contract). This package remains the
+**single canonical contract** ([IO_CONTRACT.md](IO_CONTRACT.md)) that all three
+components are kept converged on; the drift checker (`scripts/check_valet_drift.py`)
+enforces it in CI.
 
-| # | Component | Today | Problem |
-|---|-----------|-------|---------|
-| M1 | `server/python_bridges/valet_dataset_builder.py` | emits `{provider, model, local_capable, cost_tier, reasoning}` | Not the schema the server reads |
-| M2 | `server/python_bridges/valet_router_inference.py` `/route` | parses `{mode, primary_provider, secondary_providers, reasoning, confidence, requires_todo_md, requires_status_md}` | A model trained on M1's data can never produce these → always falls back |
-| M3 | `server/phase2/python_scripts/localLLMfine-tuning.py` | trains on `dataset_text_field="text"` | The builder never writes a `text` field → SFT trains on nothing |
+| # | Component | Was | Now (fixed) |
+|---|-----------|-----|-------------|
+| M1 | `server/python_bridges/valet_dataset_builder.py` | emitted `{provider, model, local_capable, cost_tier, reasoning}` | emits the canonical 11-field Routing Decision schema (`manifest_decision()`) |
+| M2 | `server/python_bridges/valet_router_inference.py` `/route` | parsed a narrower schema → model output never matched | `RouteDecision` pydantic model matches the contract exactly (drift check: 11/11 fields) |
+| M3 | `server/phase2/python_scripts/localLLMfine-tuning.py` | trained on `dataset_text_field="text"` with no `text` field written | builder writes the ChatML `text` field via `--emit-text` |
 
-**Fixes** (tracked in [`../../../VALET-todo.md`](../../../VALET-todo.md)):
-- The dataset generator writes the **canonical response schema** *and* a preformatted
-  **`text`** field (ChatML) so the trainer works unmodified (resolves M1 + M3).
-- The inference `/route` prompt is aligned to the **same** system prompt + schema used
-  in training (resolves M2 + train/inference skew).
+> **Trainer takeaway:** you do **not** need to fix M1/M2/M3 before training — they are
+> done. Your job is to keep the seeds, knowledge base, and manifest accurate and current
+> (the rest of this package), then run the pipeline in [BUILD_INSTRUCTIONS.md](BUILD_INSTRUCTIONS.md).
 
 ---
 

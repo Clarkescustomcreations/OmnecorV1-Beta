@@ -62,6 +62,8 @@ PROMPT_SEEDS = {
     "integration":        ["Merge these AI outputs:", "Integrate the results of", "Resolve conflicts between", "Combine these responses into"],
     "hardware":           ["Run the Blender operation:", "Execute a KiCad task:", "Flash firmware with ESPTool:", "Run a ComfyUI workflow:"],
     "reporting":          ["Summarize the results of", "Report on the outcome of", "Give me a status update on", "What happened with"],
+    "context_management": ["Compress the conversation history", "We're running low on context tokens —", "Summarize this chat so far to save tokens", "Trim the older messages but keep the goal"],
+    "memory_operations":  ["Remember that", "By the way,", "What do you know about my preferences?", "Save this note for later:"],
     "local_task":         ["List the files in", "Check system status", "What is the current time in", "Run a quick calculation:"],
 }
 

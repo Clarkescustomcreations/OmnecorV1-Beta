@@ -75,6 +75,14 @@ Create a `.env` file in the project root (copy from `.env.example`):
 PORT=3000
 # OLLAMA_ENDPOINT=http://localhost:11434
 # DATABASE_URL=mysql://user:pass@localhost:3306/omnecor
+
+# Optional: Enable cross-session memory persistence
+# HONCHO_API_KEY=your_honcho_api_key
+# HONCHO_APP_NAME=omnecor
+# HONCHO_ENVIRONMENT=demo
+
+# Optional: Disable Valet Router auto-start if a trained artifact is present
+# VALET_AUTO_START=false
 ```
 
 Refer to `server/_core/env.ts` for the complete list of supported environment variables.

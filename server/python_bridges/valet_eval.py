@@ -227,7 +227,12 @@ def _infer(user_input: str, rag_context: str = "") -> str | None:
 
 # ─── Rule-based baseline (mirrors valet_router_inference.rule_based_route) ───
 def _rule_based_category(task: str) -> str:
+    # Mirrors rule_based_route() in valet_router_inference.py — keep in sync.
     t = task.lower()
+    if any(kw in t for kw in ["remember", "/btw", "by the way", "keep in mind", "recall", "what do you know about me", "my preference"]):
+        return "memory_operations"
+    if any(kw in t for kw in ["/compress", "compress the context", "summarize the conversation", "token budget", "prune the history", "trim the context"]):
+        return "context_management"
     if any(kw in t for kw in ["image", "video", "audio", "generate picture"]):
         return "media_generation"
     if any(kw in t for kw in ["code", "function", "implement", "debug", "script"]):

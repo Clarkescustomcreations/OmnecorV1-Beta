@@ -59,11 +59,22 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **Text-to-Speech (TTS)** — XTTS-v2 synthesis with optional ElevenLabs cloud enhancement.
 - **Voice Cloning (RVC)** — Real-time voice conversion for generating speech in any cloned voice.
 
+### Persistent Memory Layer
+- **Honcho Cross-Session Memory** — External memory service that remembers durable facts about the user across sessions and projects.
+- **Background Notes** — Use `/btw <note>` command to save persistent notes that are auto-injected into the chat system prompt.
+- **Optional Configuration** — Enabled via `HONCHO_API_KEY` environment variable; gracefully disabled if not set (nothing breaks).
+
+### Conversation Context Management
+- **Token Budget Bar** — Visual indicator under chat input showing context usage (amber at ~70%, red at ~90% of model window).
+- **Compress Command** — Use `/compress` to summarize conversation history and reclaim tokens; Goal & Plan buffer is never pruned.
+- **Per-Message Exclusion** — Toggle individual messages out of context sent to the model without deleting them.
+
 ### OMMESH Distributed Intelligence
 - **LAN Mesh Discovery** — mDNS/Bonjour auto-discovery of other Omnecor nodes on the local network.
 - **Secure Federation** — mTLS mutual authentication between all mesh nodes.
 - **VRAM-Weighted Routing** — Inference requests delegated to the mesh node with the most available VRAM.
 - **Real-Time Topology** — `mesh:node_joined` / `mesh:node_left` WebSocket events keep the UI in sync.
+- **Peer Indicators** — Sidebar footer shows discovered peers with hostname, latency, and available model counts; updates every 10 seconds.
 
 ### Agentic Wallet & Budgeting
 - **Per-Project Budgets** — Set hard or soft spend limits (in cents) per project.
@@ -115,7 +126,7 @@ To get Omnecor up and running quickly, follow the steps outlined in the [QUICKST
 
 ## Configuration
 
-Omnecor's configuration is managed through environment variables (e.g., `.env` file) and granular UI settings. For comprehensive details on available configuration options and their impact, consult the [Configuration Guide](docs/user-guides/USER_GUIDE.md#8-configuration-guide).
+Omnecor's configuration is managed through environment variables (e.g., `.env` file) and granular UI settings. For comprehensive details on available configuration options and their impact, consult the [Configuration Guide](docs/user-guides/Omnecor User Guide.md#8-configuration-guide).
 
 ---
 

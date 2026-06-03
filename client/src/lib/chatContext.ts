@@ -5,6 +5,8 @@
  * and Visual Context Map for the AI chat interface.
  */
 
+import { countTokens } from "@anthropic-ai/tokenizer";
+
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 
 export interface ChatMessage {
@@ -59,7 +61,11 @@ export interface ConversationContext {
  * Rule of thumb: ~1 token per 4 characters for English
  */
 export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  try {
+    return countTokens(text);
+  } catch {
+    return Math.ceil(text.length / 4);
+  }
 }
 
 /**

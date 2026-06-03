@@ -4,7 +4,7 @@ import ChatInterface from "@/components/ChatInterface";
 import ContextTransparencyIndicator from "@/components/ContextTransparencyIndicator";
 import VisualContextMap from "@/components/VisualContextMap";
 import ConversationList from "@/components/chat/ConversationList";
-import { vanillaTrpc } from "@/lib/trpc";
+import { vanillaTrpc, trpc } from "@/lib/trpc";
 import {
   ChatMessage,
   ContextFile,
@@ -116,6 +116,18 @@ export default function Chat() {
   );
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
 
+  // ── Identity (for Honcho memory sync) ────────────────────────────────────
+  const { data: me } = trpc.auth.me.useQuery();
+  const openId = me?.openId ?? "local-anonymous";
+
+  // ── Honcho facts — long-term memory injected into system prompt ───────────
+  const { data: honchoFacts } = trpc.honcho.getFacts.useQuery(
+    { openId, limit: 15 },
+    { enabled: !!openId, staleTime: 60_000 }
+  );
+  const addHonchoFact = trpc.honcho.addFact.useMutation();
+  const addHonchoMessage = trpc.honcho.addMessage.useMutation();
+
   // ── BTW notes ────────────────────────────────────────────────────────────
   const [btwNotes, setBtwNotes] = useState<string[]>(
     () => JSON.parse(localStorage.getItem("omnecor:btwNotes") ?? "[]")
@@ -127,14 +139,27 @@ export default function Chat() {
       localStorage.setItem("omnecor:btwNotes", JSON.stringify(updated));
       return updated;
     });
+    // Also persist to Honcho for cross-session retention
+    addHonchoFact.mutate({ openId, content: note });
     toast.success("Context note added — Valet will keep this in mind");
-  }, []);
+  }, [openId, addHonchoFact]);
 
   const removeBtwNote = useCallback((idx: number) => {
     setBtwNotes(prev => {
       const updated = prev.filter((_, i) => i !== idx);
       localStorage.setItem("omnecor:btwNotes", JSON.stringify(updated));
       return updated;
+    });
+  }, []);
+
+  // ── Per-message context exclusion ────────────────────────────────────────
+  const [excludedMessageIds, setExcludedMessageIds] = useState<Set<string>>(new Set());
+
+  const handleToggleExclusion = useCallback((id: string) => {
+    setExcludedMessageIds(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
     });
   }, []);
 
@@ -326,12 +351,15 @@ export default function Chat() {
 
       const apiMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [];
       const btwContext = btwNotes.map(n => `[Background context: ${n}]`).join("\n");
-      const fullSystem = [systemPrompt.trim(), btwContext].filter(Boolean).join("\n\n");
+      const honchoContext = honchoFacts?.length
+        ? honchoFacts.map(f => `[Long-term memory: ${f.content}]`).join("\n")
+        : "";
+      const fullSystem = [systemPrompt.trim(), btwContext, honchoContext].filter(Boolean).join("\n\n");
       if (fullSystem) {
         apiMessages.push({ role: "system", content: fullSystem });
       }
       priorMessages.forEach(m => {
-        if (m.role === "user" || m.role === "assistant") {
+        if ((m.role === "user" || m.role === "assistant") && !excludedMessageIds.has(m.id)) {
           apiMessages.push({ role: m.role, content: m.content });
         }
       });
@@ -365,6 +393,10 @@ export default function Chat() {
             if (chunk.done) {
               setIsStreaming(false);
               streamRef.current = null;
+              // Sync both sides of the exchange to Honcho (background, non-blocking)
+              const sid = conversation.id;
+              addHonchoMessage.mutate({ openId, sessionId: sid, role: "user", content: userMsg.content });
+              addHonchoMessage.mutate({ openId, sessionId: sid, role: "ai", content: assistantContent });
             }
           },
           onError(err) {
@@ -389,7 +421,7 @@ export default function Chat() {
 
       streamRef.current = sub;
     },
-    [selectedModel, systemPrompt, btwNotes]
+    [selectedModel, systemPrompt, btwNotes, honchoFacts, openId, addHonchoMessage, conversation.id, excludedMessageIds]
   );
 
   // ── Send message ─────────────────────────────────────────────────────────
@@ -476,7 +508,7 @@ export default function Chat() {
 
   // ── Slash commands ───────────────────────────────────────────────────────
   const handleCommand = useCallback(
-    (cmd: SlashCommand) => {
+    async (cmd: SlashCommand) => {
       switch (cmd) {
         case "clear":
           handleClearHistory();
@@ -502,24 +534,61 @@ export default function Chat() {
             toast.info("Not enough history to compress — need more than 6 messages");
             break;
           }
+          if (!selectedModel) {
+            // Fallback: dumb truncation when no model is configured
+            const toCompress = msgs.slice(0, -6);
+            const kept = msgs.slice(-6);
+            const summaryLines = toCompress
+              .map(m => `[${m.role}]: ${m.content.slice(0, 140).replace(/\n/g, " ")}${m.content.length > 140 ? "…" : ""}`)
+              .join("\n");
+            const summaryMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              role: "system" as const,
+              content: `[Compressed — ${toCompress.length} messages]\n\n${summaryLines}`,
+              timestamp: new Date(),
+              tokens: estimateTokens(summaryLines),
+            };
+            setConversation(prev => ({
+              ...prev,
+              messages: [summaryMsg, ...kept],
+              updatedAt: new Date(),
+            }));
+            toast.success(`Compressed ${toCompress.length} messages (no model — try /compress after selecting one for AI summarization)`);
+            break;
+          }
           const toCompress = msgs.slice(0, -6);
           const kept = msgs.slice(-6);
-          const summaryLines = toCompress
-            .map(m => `[${m.role}]: ${m.content.slice(0, 140).replace(/\n/g, " ")}${m.content.length > 140 ? "…" : ""}`)
-            .join("\n");
-          const summaryMsg: ChatMessage = {
-            id: crypto.randomUUID(),
-            role: "system" as const,
-            content: `[Compressed — ${toCompress.length} messages summarized]\n\n${summaryLines}`,
-            timestamp: new Date(),
-            tokens: Math.ceil(summaryLines.length / 4),
-          };
-          setConversation(prev => ({
-            ...prev,
-            messages: [summaryMsg, ...kept],
-            updatedAt: new Date(),
-          }));
-          toast.success(`Compressed ${toCompress.length} messages → 1 summary block`);
+          toast.info("Summarizing with AI…", { duration: 10_000 });
+          try {
+            const transcript = toCompress
+              .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
+              .join("\n\n");
+            const result = await vanillaTrpc.ai.chat.mutate({
+              providerId: selectedModel.providerId,
+              modelId: selectedModel.modelId,
+              apiKey: selectedModel.apiKey,
+              baseUrl: selectedModel.baseUrl,
+              messages: [{
+                role: "user",
+                content: `Summarize the following conversation history into a single concise paragraph. Preserve all key facts, decisions, file names, and context. Be complete — nothing important should be lost:\n\n${transcript}`,
+              }],
+            });
+            const summaryMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              role: "system" as const,
+              content: `[AI Summary of ${toCompress.length} messages]\n\n${result.content}`,
+              timestamp: new Date(),
+              tokens: estimateTokens(result.content),
+            };
+            setConversation(prev => ({
+              ...prev,
+              messages: [summaryMsg, ...kept],
+              updatedAt: new Date(),
+            }));
+            toast.success(`Compressed ${toCompress.length} messages into AI summary`);
+          } catch (err) {
+            toast.error(`Compress failed: ${(err as Error).message}`);
+          }
           break;
         }
 
@@ -540,11 +609,18 @@ export default function Chat() {
           );
           break;
 
+        case "help":
+          toast.info(
+            "Slash commands: /new · /clear · /compress · /btw <note> · /plan · /skill · /system · /export · /help",
+            { duration: 8000 }
+          );
+          break;
+
         default:
           break;
       }
     },
-    [handleClearHistory, handleNewConversation, conversation, setConversation]
+    [handleClearHistory, handleNewConversation, conversation, setConversation, selectedModel]
   );
 
   // ── Context panel ────────────────────────────────────────────────────────
@@ -624,6 +700,10 @@ export default function Chat() {
             onStop={handleStop}
             onCommand={handleCommand}
             onBtw={handleBtw}
+            tokenCount={transparency.totalTokens}
+            maxTokens={transparency.maxTokens}
+            excludedMessageIds={excludedMessageIds}
+            onToggleExclusion={handleToggleExclusion}
           />
           </div>
 

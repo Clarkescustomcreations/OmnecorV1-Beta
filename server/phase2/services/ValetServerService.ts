@@ -52,7 +52,7 @@ export class ValetServerService {
     if (this._started) return;
     this._started = true;
 
-    if (process.env.VALET_AUTO_START === "false") {
+    if (!ENV.valetAutoStart) {
       log.info("[ValetServer] Auto-start disabled via VALET_AUTO_START=false");
       return;
     }
