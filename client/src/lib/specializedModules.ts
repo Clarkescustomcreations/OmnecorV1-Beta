@@ -384,28 +384,97 @@ export function getModuleInfo(type: ModuleType) {
 }
 
 /**
- * Mock LLM Builder session
- * @deprecated - Use API endpoint to create real sessions
+ * Mock LLM Builder session for development and testing.
  */
-export function createMockLLMBuilderSession(): LLMBuilderSession | null {
-  // Mock data removed - use API to fetch real session data
-  return null;
+export function createMockLLMBuilderSession(): LLMBuilderSession {
+  const loraConfig = createLoRAConfig(
+    "instruction-tuning-v1",
+    "llama3:8b",
+    "/data/datasets/instruction_tuning.jsonl",
+    { rank: 16, alpha: 32, epochs: 3 }
+  );
+  const trainingMetric: TrainingMetrics = {
+    epoch: 3,
+    loss: 0.42,
+    valLoss: 0.45,
+    accuracy: 0.87,
+    timestamp: new Date(),
+  };
+  return {
+    id: "mock_llm_session_1",
+    name: "Mock Fine-Tuning Session",
+    baseModel: "llama3:8b",
+    loraConfigs: [loraConfig],
+    trainingMetrics: [trainingMetric],
+    status: "completed",
+    progress: 100,
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 }
 
 /**
- * Mock Blender project
- * @deprecated - Use API endpoint to create real projects
+ * Mock Blender project for development and testing.
  */
-export function createMockBlenderProject(): BlenderProject | null {
-  // Mock data removed - use API to fetch real project data
-  return null;
+export function createMockBlenderProject(): BlenderProject {
+  return {
+    id: "mock_blend_project_1",
+    name: "Mock 3D Scene",
+    filePath: "/projects/mock_scene.blend",
+    description: "A sample Blender scene with basic geometry",
+    objects: [
+      {
+        name: "Cube",
+        type: "mesh",
+        position: [0, 0, 0],
+        rotation: [0, 0, 0],
+        scale: [1, 1, 1],
+      },
+      {
+        name: "Camera",
+        type: "camera",
+        position: [7, -7, 5],
+        rotation: [63, 0, 47],
+        scale: [1, 1, 1],
+      },
+    ],
+    status: "completed",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 }
 
 /**
- * Mock PCB project
- * @deprecated - Use API endpoint to create real projects
+ * Mock PCB project for development and testing.
  */
-export function createMockPCBProject(): PCBProject | null {
-  // Mock data removed - use API to fetch real project data
-  return null;
+export function createMockPCBProject(): PCBProject {
+  return {
+    id: "mock_pcb_project_1",
+    name: "Mock PCB Design",
+    filePath: "/projects/mock_board.kicad_pcb",
+    description: "A sample PCB with basic components",
+    components: [
+      {
+        reference: "R1",
+        value: "10k",
+        footprint: "Resistor_SMD:R_0402_1005Metric",
+        position: [10, 20],
+        rotation: 0,
+      },
+      {
+        reference: "C1",
+        value: "100nF",
+        footprint: "Capacitor_SMD:C_0402_1005Metric",
+        position: [15, 20],
+        rotation: 90,
+      },
+    ],
+    nets: [
+      { name: "GND", connections: ["R1", "C1"] },
+      { name: "VCC", connections: ["R1"] },
+    ],
+    status: "completed",
+    createdAt: new Date(),
+    updatedAt: new Date(),
+  };
 }

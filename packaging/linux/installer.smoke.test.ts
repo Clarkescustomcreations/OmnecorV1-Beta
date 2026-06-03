@@ -81,7 +81,7 @@ describe('canonical AppRun (packaging/appimage/AppRun)', () => {
     expect(existsSync(APPRUN), `Missing: ${APPRUN}`).toBe(true);
   });
 
-  it('is executable', () => {
+  it.skipIf(process.platform === 'win32')('is executable', () => {
     const mode = statSync(APPRUN).mode;
     expect(mode & 0o111, `${APPRUN} is not executable — run: chmod +x ${APPRUN}`).toBeGreaterThan(0);
   });
