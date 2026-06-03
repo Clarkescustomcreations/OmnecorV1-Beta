@@ -1,6 +1,19 @@
-# Omnecor 1.5B Valet Router
+# Omnecor Valet Router
 
-The Valet Router is a locally-running fine-tuned 1.5B parameter model (based on Qwen2.5-1.5B) that serves as the intelligent dispatch layer for all tasks in Omnecor. It runs entirely on the user's machine — no cloud call is ever made for the routing decision itself. Every incoming user request passes through the Valet first; it classifies the task, selects the optimal model or chain, and dispatches accordingly.
+The Valet Router is the intelligent dispatch layer for all tasks in Omnecor. It runs entirely on the user's machine — no cloud call is ever made for the routing decision itself. Every incoming user request passes through the Valet first; it classifies the task, selects the optimal model or chain, and dispatches accordingly.
+
+**How it works:** The router is powered by a **Qwen2.5-1.5B-Instruct** model fine-tuned as a routing classifier using the `pnpm valet:build` pipeline (dataset generation → LoRA training → GGUF export → eval gate). The trained model is distributed as a pre-built GGUF artifact via GitHub Releases and served locally via llama-cpp-python on port 8010. The app auto-starts the inference server on launch when an artifact is present.
+
+**Fallback behavior:** When no trained artifact is present (first install before running `scripts/fetch-valet-model.sh`, or when `VALET_AUTO_START=false`), the router falls back to keyword-rule-based routing. This is fully documented and observable — the server logs mark every fallback call. The Settings → Valet Router panel shows distinct status badges for Online/Loaded, Online/Loading, and Offline states.
+
+**Obtaining the model:**
+```bash
+# Download the pre-built artifact for the current release (recommended)
+bash scripts/fetch-valet-model.sh
+
+# Or build from scratch on a GPU box (≥8 GB VRAM)
+pnpm valet:build
+```
 
 > **Note:** All model names used in this document (Grok, Gemini, Claude, GPT-4o, etc.) are illustrative examples. Omnecor is provider-agnostic — you bring your own API keys or subscriptions.
 
@@ -222,20 +235,23 @@ User Input: "Research and implement a new authentication flow"
 
 ## 6. Valet Router — Routing Taxonomy
 
-The Valet classifies incoming tasks into 10 categories that determine routing decisions:
+The Valet classifies incoming tasks into 11 categories (sourced from `docs/ai-agents/valet-training/routing_manifest.json`) that determine routing decisions. Actual routing targets depend on the active execution mode (Sovereign / Scrapper / Big Spender).
 
-| Category | Description | Default Routing Target |
-|---|---|---|
-| `research` | Fact-finding, web search, current events | Research-specialized providers |
-| `synthesis` | Summarizing, comparing, merging information | Writing-specialized providers |
-| `code_generation` | Writing new code from specifications | Code-specialized providers (Claude, GPT) |
-| `code_review` | Reviewing, debugging, auditing existing code | Code-specialized providers |
-| `media_generation` | Images, video, audio creation | Media providers (Fal.ai, ComfyUI) |
-| `knowledge_retrieval` | Querying the Neural Brain Map / vector DB | Local 1.5B Valet or OMMESH |
-| `instruction_writing` | Creating step-by-step guides or prompt sets | 1.5B Valet or general API |
-| `integration` | Merging AI output into the project | 1.5B Valet or OMMESH |
-| `hardware` | Blender, KiCad, ESPTool operations | Local bridge (no AI routing) |
-| `reporting` | Summarizing results for the user | 1.5B Valet or lightweight model |
+| Category | Description |
+|---|---|
+| `code_generation` | Write new code from a specification |
+| `code_review` | Review, debug, audit existing code |
+| `research` | Fact-finding, web search, current events |
+| `synthesis` | Summarize, compare, merge information; write documents |
+| `media_generation` | Images, video, audio creation |
+| `knowledge_retrieval` | Query the Neural Brain Map / vector DB |
+| `instruction_writing` | Create step-by-step guides or prompt sets |
+| `integration` | Merge AI output into the project; resolve conflicts |
+| `hardware` | Blender, KiCad, ESPTool, ComfyUI operations |
+| `reporting` | Summarize results back to the user |
+| `local_task` | Simple local utility tasks (list files, status, quick calc) |
+
+> The taxonomy is the canonical source — update `routing_manifest.json` to add or rename categories; the dataset builder, trainer, and inference server all load from it.
 
 ---
 

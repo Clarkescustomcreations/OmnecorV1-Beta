@@ -15,7 +15,8 @@
     "build:android": "pnpm build:web && cd packaging/electron-app && pnpm exec cap sync android",
     "valet:fetch": "bash scripts/fetch-valet-model.sh",
     "valet:build": "python3 server/python_bridges/valet_pipeline.py",
-    "valet:setup-ml": "bash scripts/setup-valet-ml.sh"
+    "valet:setup-ml": "bash scripts/setup-valet-ml.sh",
+    "valet:repro": "python3 scripts/check_valet_reproducibility.py"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1056.0",
