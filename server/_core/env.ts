@@ -39,6 +39,10 @@ export const ENV = {
   pcbwayPartnerId: process.env.PCBWAY_PARTNER_ID ?? "",
   openArtApiKey: process.env.OPENART_API_KEY ?? "",
   updateCheckRepo: process.env.UPDATE_CHECK_REPO ?? "Omnecor/omnecor-hmci",
+  honchoApiKey: process.env.HONCHO_API_KEY ?? "",
+  honchoAppName: process.env.HONCHO_APP_NAME ?? "omnecor",
+  honchoEnvironment: (process.env.HONCHO_ENVIRONMENT ?? "demo") as "demo" | "local" | "production",
+  valetAutoStart: process.env.VALET_AUTO_START !== "false",
 };
 
 // Startup validation — halt early on critical misconfigurations rather than

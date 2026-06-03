@@ -1,6 +1,6 @@
 # Frequently Asked Questions (FAQ)
 
-This document addresses common questions about Omnecor, its functionality, and usage. If you have a question not covered here, please refer to the comprehensive [User Guide](docs/user-guides/USER_GUIDE.md) or open an issue on our GitHub repository.
+This document addresses common questions about Omnecor, its functionality, and usage. If you have a question not covered here, please refer to the comprehensive [User Guide](docs/user-guides/Omnecor User Guide.md) or open an issue on our GitHub repository.
 
 ## General Questions
 
@@ -41,3 +41,23 @@ A: Omnecor implements several security measures, including local-first data stor
 ### Q: Where can I find logs for troubleshooting?
 
 A: Backend runtime logs are managed by `server/_core/logs`. Process-specific logs (e.g., for Blender, ESPTool integrations) are streamed as JSON for backend parsing. For more troubleshooting tips, consult the [Troubleshooting Guide](TROUBLESHOOTING.md).
+
+### Q: How do I save background notes that persist across sessions?
+
+A: Use the `/btw <note>` command in the chat interface to save a persistent background note. These notes are stored in the Honcho memory layer and are automatically injected into the chat system prompt. To enable this feature, set the `HONCHO_API_KEY` environment variable in your `.env` file. If `HONCHO_API_KEY` is not set, the feature is disabled but nothing breaks.
+
+### Q: Why isn't the assistant remembering my /btw notes?
+
+A: The Honcho memory layer must be configured to persist notes. Check that `HONCHO_API_KEY` is set in your `.env` file. If not configured, notes are stored locally in your browser but won't persist across sessions. See the [INSTALL.md](INSTALL.md) guide for configuration details.
+
+### Q: How do I check if there are other Omnecor nodes on my network?
+
+A: Look at the sidebar footer for the "Peer Card" indicator. It shows other Omnecor nodes discovered on your local network, including hostname, latency (ms), and available model count. The card updates every 10 seconds. If no peers are found, ensure another Omnecor instance is running on the same network and that mDNS/Bonjour is not blocked by your firewall.
+
+### Q: My chat is running out of context tokens — what can I do?
+
+A: Use the `/compress` command to summarize your conversation history and reclaim tokens. The Goal & Plan buffer is never pruned during compression. You can also toggle individual messages out of the context sent to the model (without deleting them) by clicking the context menu on each message.
+
+### Q: What is the Valet Router and when is it running?
+
+A: The Valet Router is a locally-running ~1.5B model that routes each task to the best provider/model and enforces project rules. It auto-starts when a trained artifact is present (`models/valet-router/current.json` with status=ready). If no artifact is present, the app falls back to keyword-based routing rules. You can disable auto-start by setting `VALET_AUTO_START=false` in your `.env` file.

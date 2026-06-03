@@ -426,7 +426,8 @@ ExecutionMode = Literal["sovereign", "scrapper", "big_spender"]
 TaskCategory = Literal[
     "code_generation", "code_review", "research", "synthesis",
     "media_generation", "knowledge_retrieval", "instruction_writing",
-    "integration", "hardware", "reporting", "local_task"
+    "integration", "hardware", "reporting", "context_management",
+    "memory_operations", "local_task"
 ]
 CostTier = Literal["free", "low", "medium", "high"]
 
@@ -471,12 +472,18 @@ def rule_based_route(request: RouteRequest) -> RouteDecision:
     task_lower = request.task.lower()
     providers = request.available_providers or ["ollama"]
 
+    is_memory = any(kw in task_lower for kw in ["remember", "/btw", "by the way", "keep in mind", "recall", "what do you know about me", "my preference"])
+    is_context = any(kw in task_lower for kw in ["/compress", "compress the context", "summarize the conversation", "token budget", "prune the history", "trim the context"])
     is_code = any(kw in task_lower for kw in ["code", "function", "implement", "debug", "script"])
     is_research = any(kw in task_lower for kw in ["research", "analyze", "compare", "summarize"])
     is_project = any(kw in task_lower for kw in ["project", "plan", "build", "create app", "create system"])
     is_media = any(kw in task_lower for kw in ["image", "video", "audio", "generate picture"])
 
-    if is_media:
+    if is_memory:
+        category, cost_tier, local_capable = "memory_operations", "free", True
+    elif is_context:
+        category, cost_tier, local_capable = "context_management", "free", True
+    elif is_media:
         category, cost_tier, local_capable = "media_generation", "medium", True
     elif is_code:
         category, cost_tier, local_capable = "code_generation", "medium", False

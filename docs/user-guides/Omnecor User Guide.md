@@ -414,6 +414,27 @@ Neural Brain Map icon in the Navigation Sidebar.
 4.  **Contextual Responses**: The AI will generate responses, leveraging the knowledge base (if configured) for contextual awareness.
 5.  **Human-In-The-Loop**: For critical actions suggested by the AI, you may be prompted for approval via the `HITLApprovalService`.
 
+#### Chat Features:
+
+**Background Notes (`/btw` command)**
+
+Save persistent background notes that are automatically injected into the chat system prompt:
+
+1. Type `/btw <your note>` in the chat input (e.g., `/btw I prefer concise responses`).
+2. The note is saved and will appear as a chip in the chat interface.
+3. When `HONCHO_API_KEY` is configured, these notes persist across sessions and projects. Without it, notes are local to the current browser session.
+
+**Context Management and Token Budget**
+
+Monitor and manage your conversation's token usage:
+
+1. Look at the **Token Budget Bar** under the chat input:
+   - Green: Plenty of context available
+   - Amber (~70%): Approaching limit
+   - Red (~90%): Context nearly full
+2. Use the `/compress` command to summarize and shrink conversation history. The Goal & Plan buffer is never pruned.
+3. Hover over individual messages and click the context menu to **toggle per-message exclusion** — remove messages from what the model sees without deleting them locally.
+
 ### 7.3. Hardware Automation: Flashing Firmware with ESPTool
 
 1.  **Prepare Firmware**: Ensure you have the `.bin` or `.elf` firmware file ready.
@@ -484,6 +505,10 @@ The `.env` file, located in the root of your Omnecor installation, contains crit
 | `MICROSOFT_CLIENT_ID` | Microsoft Entra (Azure AD) Application Client ID. | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | Optional, enables Microsoft login. |
 | `MICROSOFT_CLIENT_SECRET` | Microsoft Entra Client Secret. | `xxxxxxxxxxxxxxxxxxxxxxxx` | Required if `MICROSOFT_CLIENT_ID` is set. |
 | `OLLAMA_PROXY_TOKEN` | Shared bearer token for the Ollama reverse proxy (Dockerfile.ollama-proxy). | `a_strong_random_secret` | Required if using the Ollama proxy container. |
+| `HONCHO_API_KEY` | API key for Honcho cross-session memory service. | `honcho_pk_xxxxx` | Optional. Enables persistent background notes across sessions and projects. Without it, notes are local to browser. |
+| `HONCHO_APP_NAME` | Application name in Honcho service. | `omnecor` | Default `omnecor`. Only required if `HONCHO_API_KEY` is set. |
+| `HONCHO_ENVIRONMENT` | Honcho environment (demo, local, or production). | `demo` | Default `demo`. Only required if `HONCHO_API_KEY` is set. |
+| `VALET_AUTO_START` | Auto-start Valet Router when a trained artifact is present. | `true` or `false` | Default `true`. Set to `false` to disable auto-start while keeping artifact. |
 
 ### 8.2. In-Application Settings
 

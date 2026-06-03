@@ -62,6 +62,7 @@ import { pipelineRouter } from "./routers/pipelineRouter.js";
 import { imageGenRouter } from "./routers/imageGenRouter.js";
 import { cloudComputeRouter } from "./routers/cloudComputeRouter.js";
 import { integrationsRouter } from "./routers/integrationsRouter.js";
+import { honchoRouter } from "./routers/honchoRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -149,6 +150,9 @@ export const appRouter = router({
 
   // ─── Third-Party Integrations (GitHub / Notion / Slack / Google Drive) ───
   integrations: integrationsRouter,
+
+  // ─── Honcho Memory Layer (User facts, long-term session memory) ───────────
+  honcho: honchoRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -5,6 +5,7 @@ import { Label } from "../components/ui/label";
 import { Input } from "../components/ui/input";
 import { Button } from "../components/ui/button";
 import { Switch } from "../components/ui/switch";
+import { Slider } from "../components/ui/slider";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../components/ui/tabs";
 import { RadioGroup, RadioGroupItem } from "../components/ui/radio-group";
 import { Badge } from "../components/ui/badge";
@@ -16,6 +17,7 @@ import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
 import ValetRouterPanel from "../components/settings/ValetRouterPanel";
 import PersonaCreationPanel from "../components/settings/PersonaCreationPanel";
+import { advancedSettings } from "../lib/advancedSettings";
 
 export const Settings: React.FC = () => {
   const saveKeysMutation = trpc.system.saveKeys.useMutation({
@@ -133,7 +135,10 @@ export const Settings: React.FC = () => {
         </TabsContent>
 
         <TabsContent value="system" role="tabpanel" aria-labelledby="tab-system">
-          <SystemHealth />
+          <div className="space-y-6">
+            <ContextSettingsPanel />
+            <SystemHealth />
+          </div>
         </TabsContent>
 
         <TabsContent value="accounts" role="tabpanel" aria-labelledby="tab-accounts">
@@ -208,6 +213,106 @@ const AppearancePanel: React.FC = () => {
         </CardContent>
       </Card>
     </div>
+  );
+};
+
+const ContextSettingsPanel: React.FC = () => {
+  const [ctxSettings, setCtxSettings] = useState(
+    () => advancedSettings.getSettings().contextLimit
+  );
+
+  const apply = (patch: Partial<typeof ctxSettings>) => {
+    const updated = { ...ctxSettings, ...patch };
+    setCtxSettings(updated);
+    advancedSettings.updateSettings({ contextLimit: updated });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Zap className="w-4 h-4" /> Context Window Controls
+        </CardTitle>
+        <CardDescription>
+          Configure how the AI context window is managed. These settings affect token limits and auto-compression behavior.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {/* Max context tokens slider */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Max Context Tokens</Label>
+            <span className="text-sm font-mono text-muted-foreground">
+              {ctxSettings.maxContextTokens.toLocaleString()}
+            </span>
+          </div>
+          <Slider
+            min={4000}
+            max={128000}
+            step={1000}
+            value={[ctxSettings.maxContextTokens]}
+            onValueChange={([v]) => apply({ maxContextTokens: v })}
+            className="w-full"
+          />
+          <p className="text-xs text-muted-foreground">
+            Controls when the context warning indicator turns yellow (70%) and red (90%).
+          </p>
+        </div>
+
+        {/* Max request tokens slider */}
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Label>Max Request Tokens (per message)</Label>
+            <span className="text-sm font-mono text-muted-foreground">
+              {ctxSettings.maxRequestTokens.toLocaleString()}
+            </span>
+          </div>
+          <Slider
+            min={500}
+            max={32000}
+            step={500}
+            value={[ctxSettings.maxRequestTokens]}
+            onValueChange={([v]) => apply({ maxRequestTokens: v })}
+            className="w-full"
+          />
+        </div>
+
+        {/* Auto-compress toggle */}
+        <div className="flex items-center justify-between">
+          <div>
+            <Label htmlFor="auto-compress">Auto-compress when context is full</Label>
+            <p className="text-xs text-muted-foreground mt-0.5">
+              Automatically runs AI summarization when usage exceeds 90%
+            </p>
+          </div>
+          <Switch
+            id="auto-compress"
+            checked={ctxSettings.autoTruncate}
+            onCheckedChange={checked => apply({ autoTruncate: checked })}
+          />
+        </div>
+
+        {/* Truncation strategy */}
+        <div className="space-y-2">
+          <Label>Truncation Strategy</Label>
+          <RadioGroup
+            value={ctxSettings.truncationStrategy}
+            onValueChange={(v: "recent" | "important" | "hybrid") => apply({ truncationStrategy: v })}
+            className="flex gap-4"
+          >
+            {(["recent", "hybrid", "important"] as const).map(s => (
+              <div key={s} className="flex items-center gap-2">
+                <RadioGroupItem value={s} id={`trunc-${s}`} />
+                <Label htmlFor={`trunc-${s}`} className="capitalize cursor-pointer">{s}</Label>
+              </div>
+            ))}
+          </RadioGroup>
+          <p className="text-xs text-muted-foreground">
+            Recent: keep newest messages · Hybrid: keep recent + important · Important: semantic scoring
+          </p>
+        </div>
+      </CardContent>
+    </Card>
   );
 };
 

@@ -196,3 +196,20 @@ System-wide configuration procedures.
 | Procedure | Type | Description |
 |---|---|---|
 | `training.generateValetDataset` | Mutation | Triggers the Valet Router dataset builder. Samples recent `audit_log` + `spend_log` entries and generates labeled JSONL training examples across the 10-category routing taxonomy. Output is saved locally for fine-tuning. |
+
+### 7.6. `honcho` Router
+Manages user facts and persistent session memory via the Honcho service. All procedures use `publicProcedure` so they work in zero-login mode (the `openId` is provided by the client). When `HONCHO_API_KEY` is unset, writes are no-ops and reads return empty arrays.
+
+| Procedure | Type | Input | Output | Description |
+|---|---|---|---|---|
+| `honcho.addMessage` | Mutation | `{ openId: string, sessionId: string, role: "user"\|"ai", content: string }` | `{ ok: true }` | Fire-and-forget sync of a chat message to Honcho session memory. |
+| `honcho.addFact` | Mutation | `{ openId: string, content: string (1..2000 chars) }` | `{ ok: true }` | Persists a `/btw` note as a long-term fact (metamessage with label `omnecor_fact`). |
+| `honcho.getFacts` | Query | `{ openId: string, limit?: number (1..50, default 20) }` | `Array<{ id: string, content: string, created_at: string }>` | Retrieve recent facts ordered newest-first; used to inject long-term preferences into the system prompt. |
+
+### 7.7. `valet` Router (Additions)
+
+The `valet` router includes the following additional procedure not previously documented:
+
+| Procedure | Type | Input | Output | Description |
+|---|---|---|---|---|
+| `valet.refreshKnowledge` | Mutation | (none) | `{ reloaded: boolean, embeddingJobId?: string }` | Triggers a hot-reload of the Valet knowledge base. Calls `/admin/reload` on the inference server and spawns `valet_knowledge_refresh.py` to bump `knowledge_base_version`, re-embed KB chunks into ChromaDB, and perform a second reload. |

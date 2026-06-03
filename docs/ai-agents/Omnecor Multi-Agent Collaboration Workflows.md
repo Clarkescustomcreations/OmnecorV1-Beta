@@ -29,7 +29,8 @@ The `AgentService` and `WorkflowSequencing` mechanisms (as described in `WORKFLO
 Agents leverage Omnecor's shared memory systems to maintain a consistent view of the project and collaborate effectively:
 
 -   **VectorDBService**: Agents can query the `VectorDBService` to retrieve semantically relevant information from the project's knowledge base, ensuring they have access to the necessary context for their tasks.
--   **Context Manager**: The `MemoryArchitectService` ensures that the collective context of the project is available to all relevant agents, allowing them to build upon each other's work.
+-   **MemoryArchitectService**: Manages hierarchical context with three levels: permanent Goal & Plan buffer (never pruned), conversation history (pruned by token limits), and rolling terminal log (auto-summarized at 50 entries). Ensures collective project context is available across all agents.
+-   **HonchoService**: Cross-session memory layer persisting user facts and preferences. Recent facts are injected into the system prompt on new sessions, allowing agents to build upon historical context and user preferences across disconnected conversations.
 
 ### 2.3. Communication and Hand-offs
 

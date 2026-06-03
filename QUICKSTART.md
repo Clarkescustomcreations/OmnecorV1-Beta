@@ -75,5 +75,10 @@ Upon first launch, Omnecor will perform an inventory of locally available AI mod
 -   **Explore the Dashboard**: Familiarize yourself with the main interface.
 -   **Import a Project Folder**: Begin by importing a folder to leverage Omnecor's semantic indexing capabilities.
 -   **Interact with the Chat Interface**: Start a conversation with the integrated AI.
+-   **Check Local Network Peers**: Look at the sidebar footer to see if any other Omnecor nodes are on your network (requires OMMESH discovery enabled).
 
-For more detailed usage instructions, refer to the [User Guide](docs/user-guides/USER_GUIDE.md).
+## Optional Configuration
+
+For cross-session memory persistence, set the `HONCHO_API_KEY` environment variable in your `.env` file to enable the Honcho memory layer. This allows you to save background notes with `/btw <note>` that persist across sessions.
+
+For more detailed usage instructions, refer to the [User Guide](docs/user-guides/Omnecor User Guide.md).

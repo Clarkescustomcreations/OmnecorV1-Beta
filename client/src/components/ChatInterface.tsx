@@ -353,8 +353,14 @@ export interface ChatInterfaceProps {
   onToggleSystemPrompt?: () => void;
   onExport?: () => void;
   onStop?: () => void;
-  onCommand?: (cmd: SlashCommand) => void;
+  onCommand?: (cmd: SlashCommand) => void | Promise<void>;
   onBtw?: (note: string) => void;
+
+  tokenCount?: number;
+  maxTokens?: number;
+
+  excludedMessageIds?: Set<string>;
+  onToggleExclusion?: (id: string) => void;
 
   className?: string;
 }
@@ -385,6 +391,10 @@ export default function ChatInterface({
   onStop,
   onCommand,
   onBtw,
+  tokenCount,
+  maxTokens,
+  excludedMessageIds,
+  onToggleExclusion,
   className,
 }: ChatInterfaceProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -560,28 +570,44 @@ export default function ChatInterface({
               </div>
             </div>
           ) : (
-            messages.map((msg, idx) =>
-              msg.role === "assistant" ? (
-                <AssistantBubble
+            messages.map((msg, idx) => {
+              if (msg.role !== "assistant" && msg.role !== "user") return null;
+              const excluded = excludedMessageIds?.has(msg.id) ?? false;
+              return (
+                <div
                   key={msg.id}
-                  message={msg}
-                  copied={copiedId === msg.id}
-                  isLast={idx === lastAssistantIdx}
-                  onCopy={() => handleCopy(msg.content, msg.id)}
-                  onRetry={() => onRetry?.()}
-                  onDelete={() => onDeleteMessage?.(msg.id)}
-                />
-              ) : msg.role === "user" ? (
-                <UserBubble
-                  key={msg.id}
-                  message={msg}
-                  copied={copiedId === msg.id}
-                  onCopy={() => handleCopy(msg.content, msg.id)}
-                  onEdit={newContent => onEditMessage?.(msg.id, newContent)}
-                  onDelete={() => onDeleteMessage?.(msg.id)}
-                />
-              ) : null
-            )
+                  className={cn("group relative", excluded && "opacity-40")}
+                >
+                  {msg.role === "assistant" ? (
+                    <AssistantBubble
+                      message={msg}
+                      copied={copiedId === msg.id}
+                      isLast={idx === lastAssistantIdx}
+                      onCopy={() => handleCopy(msg.content, msg.id)}
+                      onRetry={() => onRetry?.()}
+                      onDelete={() => onDeleteMessage?.(msg.id)}
+                    />
+                  ) : (
+                    <UserBubble
+                      message={msg}
+                      copied={copiedId === msg.id}
+                      onCopy={() => handleCopy(msg.content, msg.id)}
+                      onEdit={newContent => onEditMessage?.(msg.id, newContent)}
+                      onDelete={() => onDeleteMessage?.(msg.id)}
+                    />
+                  )}
+                  {onToggleExclusion && (
+                    <button
+                      onClick={() => onToggleExclusion(msg.id)}
+                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-foreground bg-background/80 rounded px-1 py-0.5 border border-border/50"
+                      title={excluded ? "Include in context" : "Exclude from context"}
+                    >
+                      {excluded ? "⊕ include" : "⊖ exclude"}
+                    </button>
+                  )}
+                </div>
+              );
+            })
           )}
           <div ref={scrollRef} />
         </div>
@@ -598,6 +624,8 @@ export default function ChatInterface({
           onBtw={onBtw}
           contextFiles={contextFiles}
           isLoading={isLoading}
+          tokenCount={tokenCount}
+          maxTokens={maxTokens}
         />
       </div>
     </Card>

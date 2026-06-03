@@ -97,6 +97,34 @@ graph TD
     -   Detecting changes in content by comparing hashes.
     -   Optimizing operations by avoiding reprocessing unchanged data.
 
+### 2.10. `HonchoService` (`server/phase2/services/HonchoService.ts`)
+
+-   **Purpose**: Integrates Honcho (Plastic Labs) for cross-session, cloud-backed user and session memory. Complements the local ChromaDB/MemoryArchitectService with persistent external memory.
+-   **Key Responsibilities**:
+    -   Managing per-user facts and conversation history across sessions using Honcho's API.
+    -   Storing metamessages labeled `omnecor_fact` for long-term user preferences and knowledge.
+    -   Gracefully degrading when `HONCHO_API_KEY` is unset — all read/write methods become no-ops and the rest of the system continues unchanged.
+    -   Maintaining a hierarchy: app → user → session → messages + metamessages.
+-   **Configuration**: Controlled by `HONCHO_API_KEY` (enable/disable), `HONCHO_APP_NAME` (default `"omnecor"`), and `HONCHO_ENVIRONMENT` (`"demo"`, `"local"`, or `"production"`, default `"demo"`).
+
+### 2.11. `ValetRouterService` (`server/phase2/services/ValetRouterService.ts`)
+
+-   **Purpose**: TypeScript bridge to the Python Valet Router inference server (:8010). Routes tasks to appropriate providers/models based on task category, execution mode, and available resources.
+-   **Key Responsibilities**:
+    -   Sending routing requests to POST `/route` on the inference server.
+    -   Falling back to rule-based keyword routing when the server is unavailable (logs a warning).
+    -   Enforcing the HARDCODED_RULE: every task/project must create `todo.md` and `status.md`.
+    -   Supporting 13 task categories and 10 routing modes; provider and model names are runtime-updatable via `routing_manifest.json`.
+
+### 2.12. `ValetServerService` (`server/phase2/services/ValetServerService.ts`)
+
+-   **Purpose**: Manages the lifecycle of the Valet Router inference server (`valet_router_inference.py` on :8010).
+-   **Key Responsibilities**:
+    -   Reading `models/valet-router/current.json` at boot and spawning the inference server when an artifact is registered.
+    -   Performing health checks on `/health` and auto-restarting on crash (up to 5 times with exponential backoff).
+    -   Wiring the server shutdown into the application's graceful shutdown process.
+    -   Respecting `VALET_AUTO_START` environment variable (set to `"false"` to disable auto-start without removing the artifact).
+
 ## 3. Service Interaction
 
 Services primarily interact with each other by calling methods on their singleton instances. This allows for a clean, dependency-injected architecture where services can collaborate to fulfill complex requests. The tRPC context factory (`server/_core/context.ts`) plays a crucial role in making these service instances available to every tRPC procedure.

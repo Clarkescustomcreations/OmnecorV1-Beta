@@ -22,6 +22,7 @@ import HITLAlertPanel from "./HITLAlertPanel";
 import { useFictionMode } from "@/contexts/FictionModeContext";
 import ExecutionModeBadge from "@/components/shell/ExecutionModeBadge";
 import ZeroLoginBanner from "@/components/shell/ZeroLoginBanner";
+import PeerCard from "@/components/shell/PeerCard";
 import { useAppStore } from "@/lib/store/app.store";
 import { trpc } from "@/lib/trpc";
 
@@ -163,6 +164,9 @@ export default function OmnecorDashboardLayout({
 
           {/* User Profile & Logout */}
           <div className="border-t border-sidebar-border p-4 space-y-3">
+            {/* Ommesh Peer Status — persistent across all views */}
+            <PeerCard />
+
             {user && (
               <div className="px-3 py-2 rounded-lg bg-sidebar-hover">
                 <p className="text-xs text-sidebar-foreground/70">
