@@ -11,7 +11,11 @@ requests>=2.31.0
 # Audio / Voice bridges (tts_server.py, whisper_server.py, rvc_server.py):
 # torch is a heavy install; install the CPU or CUDA variant from https://pytorch.org/
 torch>=2.2.0
-TTS>=0.22.0
+# coqui-tts is the maintained fork of the (now-abandoned) Coqui "TTS" package.
+# It is a drop-in replacement — same `from TTS.api import TTS` import — and,
+# unlike the original (capped at 0.22.0, Requires-Python <3.12), it ships
+# wheels for Python 3.12+. The old `TTS>=0.22.0` was unresolvable on modern runners.
+coqui-tts>=0.25.0
 faster-whisper>=1.0.0
 numpy>=1.26.0
 soundfile>=0.12.1
