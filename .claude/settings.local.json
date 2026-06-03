@@ -1,0 +1,30 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(nvidia-smi *)",
+      "Bash(python3.11 --version)",
+      "Bash(pip3 install *)",
+      "Bash(python3 -m pip --version)",
+      "Read(//usr/bin/**)",
+      "Read(//usr/local/bin/**)",
+      "Bash(apt list *)",
+      "Bash(dpkg -l)",
+      "Bash(apt-cache show *)",
+      "Bash(python3 *)",
+      "Bash(apt-get install *)",
+      "Bash(/home/clarke/.local/bin/pip install *)",
+      "Bash(ip addr *)",
+      "Bash(sudo -n true)",
+      "Bash(curl -sL https://repo.anaconda.com/miniconda/Miniconda3-py311_24.5.0-0-Linux-x86_64.sh -o /tmp/miniconda.sh)",
+      "Bash(bash /tmp/miniconda.sh -b -p /home/clarke/miniconda3)",
+      "Bash(/home/clarke/miniconda3/bin/python *)",
+      "Bash(/home/clarke/miniconda3/bin/pip install *)",
+      "Bash(gh repo *)",
+      "Bash(gh api *)",
+      "Bash(curl -s https://api.github.com/repos/Clarkescustomcreations/OmnecorV1-Beta/branches)",
+      "Bash(curl -s \"https://api.github.com/repos/Clarkescustomcreations/OmnecorV1-Beta/git/trees/valet-updates?recursive=1\")",
+      "Bash(git config *)",
+      "Bash(git -C /mnt/c/Claude-Code remote -v)"
+    ]
+  }
+}
