@@ -13,16 +13,16 @@ The Omnecor UI adopts a flexible, workspace-centric design, allowing users to ma
 Located on the left side of the application, the **Navigation Sidebar** provides global access to core Omnecor functionalities and modules.
 
 -   **Purpose**: Global navigation, quick access to main sections, and session management.
--   **Contents**: Icons and labels for sections such as Dashboard, Chat, Model Hub, Neural Brain Map, Pipelines, Integrations, and Settings.
--   **Interaction**: Clickable icons/labels to switch between main views. May include collapsible sections for sub-features.
+-   **Contents**: Icons and labels for sections such as Dashboard, Chat, Model Hub, Neural Brain Map, Pipelines, Integrations, and Settings. Includes a persistent OMMESH peer-status indicator (PeerCard) in the sidebar footer showing online peers, latency, and model availability.
+-   **Interaction**: Clickable icons/labels to switch between main views. May include collapsible sections for sub-features. The PeerCard footer shows a status dot (green for online, grey for none, pulsing for loading), expands to show per-peer details on click, and polls every 10 seconds.
 
 ### 2.2. Header
 
 The **Header** spans the top of the application, offering quick access to common actions and system status indicators.
 
 -   **Purpose**: Application-wide controls, notifications, and user profile access.
--   **Contents**: Application logo, search bar (Command Palette trigger), notifications, user avatar/profile, and potentially system status indicators (e.g., OMMESH connection status).
--   **Interaction**: Clickable elements for opening menus, triggering searches, or accessing user-specific settings.
+-   **Contents**: Application logo, search bar (Command Palette trigger), notifications, user avatar/profile, system status indicators (e.g., OMMESH connection status), and a live execution mode badge (Sovereign/Scrapper/Big Spender).
+-   **Interaction**: Clickable elements for opening menus, triggering searches, or accessing user-specific settings. A dismissible yellow banner appears when Zero-Login Mode is enabled.
 
 ### 2.3. Main Content Area (Workspaces)
 
@@ -58,6 +58,14 @@ Right-click context menus and dropdowns provide quick access to relevant actions
 ### 3.3. Notifications (Sonner)
 
 System notifications are handled by `sonner`, providing clear and non-intrusive feedback to the user about background processes, task completions, or errors.
+
+### 3.3.1. Token Budget Bar
+
+In the Chat interface, a token-count indicator appears below the input field, showing `tokenCount / maxTokens`. The text color changes dynamically: amber at >=70% of capacity, red at >=90%, to warn users of approaching context limits.
+
+### 3.3.2. HITL Alert Panel & Budget Spend Cards
+
+When an autonomous agent loop is detected, a floating card appears in the bottom-right corner with Retry/Modify/Abort actions and loop metadata. When the agent incurs API costs, a separate "Budget Spend Event" card shows provider, model, and cost in USD.
 
 ### 3.4. Modals and Dialogs
 

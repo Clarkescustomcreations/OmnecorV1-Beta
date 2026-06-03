@@ -71,7 +71,10 @@ These are singleton classes that encapsulate specific business logic and resourc
 -   **`MeshDiscoveryService`**: Part of OMMESH, responsible for discovering and managing other Omnecor nodes.
 -   **`AiProviderService`**: Manages connections and routing to various local and cloud AI models.
 -   **`FileSystemWatcherService`**: Monitors specified directories for changes.
--   **`MemoryArchitectService`**: Manages AI context and memory layers.
+-   **`MemoryArchitectService`**: Manages AI context and memory layers (local ChromaDB-backed).
+-   **`HonchoService`**: Manages cloud-backed cross-session user and session memory (Plastic Labs Honcho integration).
+-   **`ValetRouterService`**: Routes tasks to appropriate providers based on task category and execution mode.
+-   **`ValetServerService`**: Manages the Valet Router inference server lifecycle.
 -   **`HITLApprovalService`**: Handles Human-In-The-Loop approval workflows.
 -   **`HashTrackerService`**: Tracks content hashes for data integrity.
 

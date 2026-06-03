@@ -5,6 +5,8 @@
  * and Visual Context Map for the AI chat interface.
  */
 
+import { countTokens } from "@anthropic-ai/tokenizer";
+
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 
 export interface ChatMessage {
@@ -59,21 +61,34 @@ export interface ConversationContext {
  * Rule of thumb: ~1 token per 4 characters for English
  */
 export function estimateTokens(text: string): number {
-  return Math.ceil(text.length / 4);
+  try {
+    return countTokens(text);
+  } catch {
+    return Math.ceil(text.length / 4);
+  }
+}
+
+/**
+ * Generate a cryptographically secure random ID segment.
+ */
+function secureRandomIdPart(byteLength = 8): string {
+  const bytes = new Uint8Array(byteLength);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
 }
 
 /**
  * Generate unique message ID
  */
 export function generateMessageId(): string {
-  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `msg_${Date.now()}_${secureRandomIdPart()}`;
 }
 
 /**
  * Generate unique conversation ID
  */
 export function generateConversationId(): string {
-  return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `conv_${Date.now()}_${secureRandomIdPart()}`;
 }
 
 /**

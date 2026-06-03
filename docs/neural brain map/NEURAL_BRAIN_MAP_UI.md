@@ -87,4 +87,16 @@ Omnecor supports various node types, each with specific visual representations a
 
 -   **Automatic Saving**: Changes made to the Neural Brain Map are automatically saved to the backend, ensuring that the workspace state is preserved across sessions.
 -   **Workspace Management**: Users can create, load, and manage multiple neural workspaces, each representing a different project or area of focus.
+
+## 6. Fiction Mode: Sandboxed Creative Workspace
+
+Each Neural Brain Map can include an optional **Fiction Mode** workspace for creative, non-factual content. This is a separate creative sandbox where users manage worldbuilding, character development, and narrative timelines for projects like games, novels, or collaborative fiction.
+
+-   **Purpose**: Keep speculative/creative content (lore, characters, plot timelines) separate from factual project knowledge.
+-   **State Storage**: Fiction Mode state is scoped per Brain Map and persisted independently, preventing contamination of the factual knowledge graph.
+-   **UI Components** (`FictionModePanel.tsx`):
+    -   **Lore Tab**: Add and view worldbuilding facts (key-value pairs).
+    -   **Cast Tab**: Create and manage character entries with descriptions.
+    -   **Timeline Tab**: Build narrative sequences with ordered events.
+-   **Access**: Accessed via the main Brain Map UI; clearly marked as "Sandboxed" to distinguish from factual content.
  

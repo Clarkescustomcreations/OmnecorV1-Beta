@@ -235,7 +235,7 @@ User Input: "Research and implement a new authentication flow"
 
 ## 6. Valet Router — Routing Taxonomy
 
-The Valet classifies incoming tasks into 11 categories (sourced from `docs/ai-agents/valet-training/routing_manifest.json`) that determine routing decisions. Actual routing targets depend on the active execution mode (Sovereign / Scrapper / Big Spender).
+The Valet classifies incoming tasks into 13 categories (sourced from `docs/ai-agents/valet-training/routing_manifest.json`) that determine routing decisions. Actual routing targets depend on the active execution mode (Sovereign / Scrapper / Big Spender).
 
 | Category | Description |
 |---|---|
@@ -249,6 +249,8 @@ The Valet classifies incoming tasks into 11 categories (sourced from `docs/ai-ag
 | `integration` | Merge AI output into the project; resolve conflicts |
 | `hardware` | Blender, KiCad, ESPTool, ComfyUI operations |
 | `reporting` | Summarize results back to the user |
+| `context_management` | Compress/summarize context, manage the token budget (/compress) |
+| `memory_operations` | Store/retrieve durable memory — Honcho facts, /btw notes, Brain Map recall |
 | `local_task` | Simple local utility tasks (list files, status, quick calc) |
 
 > The taxonomy is the canonical source — update `routing_manifest.json` to add or rename categories; the dataset builder, trainer, and inference server all load from it.

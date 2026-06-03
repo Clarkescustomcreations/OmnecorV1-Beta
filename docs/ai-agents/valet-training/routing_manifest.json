@@ -1,8 +1,8 @@
 {
-  "manifest_version": "1.0.0",
-  "knowledge_base_version": "1.0.0",
-  "updated": "2026-06-01",
-  "notes": "Authoritative best-model-per-task map. Read by the dataset generator AND the live router. Update model names here as providers release new models — no retraining required. Models are DEFAULTS; the user's configured providers/keys always take precedence, and Sovereign mode forces local.",
+  "manifest_version": "1.1.0",
+  "knowledge_base_version": "1.2.0",
+  "updated": "2026-06-03",
+  "notes": "Authoritative best-model-per-task map. Read by the dataset generator AND the live router. Update model names here as providers release new models — no retraining required. Models are DEFAULTS; the user's configured providers/keys always take precedence, and Sovereign mode forces local. Cloud model IDs are point-in-time defaults (verified 2026-06) and go stale fast — the knowledge-refresh job (MODEL_ROUTING_GUIDE.md §3) should periodically pull each provider's current model list and propose updates here for review.",
   "cost_tiers": ["free", "low", "medium", "high"],
   "providers": {
     "ollama":    { "kind": "local", "cost_tier": "free", "notes": "VRAM-aware local inference; honors Sovereign mode." },
@@ -18,28 +18,28 @@
     "code_generation": {
       "description": "Write new code from a specification.",
       "primary":   { "provider": "anthropic", "model": "claude-opus-4-8" },
-      "secondary": [{ "provider": "openai", "model": "gpt-4o" }],
+      "secondary": [{ "provider": "openai", "model": "gpt-5.5" }],
       "local":     { "provider": "ollama", "model": "qwen2.5-coder:latest" },
       "local_capable": true, "cost_tier": "medium", "default_mode": "main_api"
     },
     "code_review": {
       "description": "Review, debug, audit existing code.",
       "primary":   { "provider": "anthropic", "model": "claude-opus-4-8" },
-      "secondary": [{ "provider": "xai", "model": "grok-latest" }],
+      "secondary": [{ "provider": "xai", "model": "grok-4.3" }],
       "local":     { "provider": "ollama", "model": "qwen2.5-coder:latest" },
       "local_capable": true, "cost_tier": "medium", "default_mode": "main_api"
     },
     "research": {
       "description": "Fact-finding, web search, current events.",
-      "primary":   { "provider": "gemini", "model": "gemini-1.5-pro" },
-      "secondary": [{ "provider": "xai", "model": "grok-latest" }],
+      "primary":   { "provider": "gemini", "model": "gemini-3.1-pro" },
+      "secondary": [{ "provider": "xai", "model": "grok-4.3" }],
       "local":     { "provider": "ollama", "model": "llama3.2:latest" },
       "local_capable": false, "cost_tier": "low", "default_mode": "multi_api"
     },
     "synthesis": {
       "description": "Summarize, compare, merge information; write documents.",
-      "primary":   { "provider": "openai", "model": "gpt-4o" },
-      "secondary": [{ "provider": "gemini", "model": "gemini-1.5-pro" }],
+      "primary":   { "provider": "openai", "model": "gpt-5.5" },
+      "secondary": [{ "provider": "gemini", "model": "gemini-3.1-pro" }],
       "local":     { "provider": "ollama", "model": "llama3.2:latest" },
       "local_capable": true, "cost_tier": "medium", "default_mode": "main_api"
     },
@@ -59,16 +59,16 @@
     },
     "instruction_writing": {
       "description": "Create step-by-step guides or prompt sets.",
-      "primary":   { "provider": "ollama", "model": "valet-router" },
+      "primary":   { "provider": "ollama", "model": "llama3.2:latest" },
       "secondary": [{ "provider": "anthropic", "model": "claude-sonnet-4-6" }],
       "local":     { "provider": "ollama", "model": "llama3.2:latest" },
       "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
     },
     "integration": {
       "description": "Merge AI output into the project; resolve conflicts.",
-      "primary":   { "provider": "ollama", "model": "valet-router" },
+      "primary":   { "provider": "ollama", "model": "llama3.2:latest" },
       "secondary": [{ "provider": "anthropic", "model": "claude-sonnet-4-6" }],
-      "local":     { "provider": "ollama", "model": "valet-router" },
+      "local":     { "provider": "ollama", "model": "llama3.2:latest" },
       "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
     },
     "hardware": {
@@ -80,8 +80,22 @@
     },
     "reporting": {
       "description": "Summarize results back to the user.",
+      "primary":   { "provider": "ollama", "model": "llama3.2:latest" },
+      "secondary": [{ "provider": "ollama", "model": "valet-router" }],
+      "local":     { "provider": "ollama", "model": "llama3.2:latest" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
+    },
+    "context_management": {
+      "description": "Compress/summarize the conversation context, manage the token budget, prune or exclude history (the chat /compress command and the token-budget bar).",
+      "primary":   { "provider": "ollama", "model": "llama3.2:latest" },
+      "secondary": [{ "provider": "openai", "model": "gpt-5.5" }],
+      "local":     { "provider": "ollama", "model": "llama3.2:latest" },
+      "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
+    },
+    "memory_operations": {
+      "description": "Store or retrieve durable user/session memory — Honcho facts, /btw notes, and Neural Brain Map fact recall. Lightweight; never needs a large model.",
       "primary":   { "provider": "ollama", "model": "valet-router" },
-      "secondary": [{ "provider": "ollama", "model": "llama3.2:latest" }],
+      "secondary": [{ "provider": "ommesh", "model": "peer-best-vram" }],
       "local":     { "provider": "ollama", "model": "valet-router" },
       "local_capable": true, "cost_tier": "free", "default_mode": "valet_background"
     },

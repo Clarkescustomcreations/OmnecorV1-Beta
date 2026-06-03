@@ -21,6 +21,7 @@ For state that is only relevant to a single component or a small, isolated part 
 -   Input field values within a form.
 -   Toggle states for UI elements (e.g., a dropdown being open or closed).
 -   Temporary loading indicators.
+-   Per-message context exclusion: `excludedMessageIds` (a Set of message IDs toggled out of the context sent to the model without deletion, managed in Chat.tsx).
 
 ### 2.2. React Context API
 
@@ -29,7 +30,7 @@ The React Context API is used for managing state that needs to be accessible by 
 **Key Contexts in Omnecor** (`client/src/contexts/`):
 -   **`ThemeContext.tsx`**: Manages the application's visual theme (e.g., dark mode, light mode).
 -   **`NeuralMapContext.tsx`**: Provides state and functions related to the interactive Neural Brain Map, allowing various components to interact with the map's state.
--   **`FictionModeContext.tsx`**: Manages state specific to the Fiction Mode feature.
+-   **`FictionModeContext.tsx`**: Manages state specific to the Fiction Mode feature. State is per-Brain-Map and kept separate from factual project knowledge.
 
 ### 2.3. Zustand for Global State
 
@@ -54,10 +55,15 @@ Zustand is chosen for managing complex global application state due to its simpl
 -   Retrieving project configurations or user settings.
 -   Mutating data (e.g., saving changes to a neural node, triggering a backend process).
 
+### 2.5. Honcho Long-Term Memory Integration
+
+Cross-session memory is stored and retrieved via `trpc.honcho.getFacts` and `trpc.honcho.addFact` mutations. Recent Honcho facts (up to 15) are automatically injected into the chat system prompt, allowing the assistant to "remember" facts and context across conversation sessions. The `/btw` slash command stores a note both locally (in localStorage) and to Honcho for persistent cross-session retention.
+
 ## 3. Data Flow and Synchronization
 
 -   **Frontend-Initiated Actions**: User interactions trigger actions that might update local state, dispatch to Zustand stores, or initiate tRPC calls to the backend.
 -   **Backend Responses**: tRPC responses update the React Query cache, which in turn re-renders components subscribed to that data. WebSocket messages directly update relevant Zustand stores or React Contexts for real-time UI changes.
 -   **Real-time Updates**: The `useOmnecorSocket.ts` hook (`client/src/hooks/`) plays a crucial role in listening to WebSocket events from the backend and dispatching updates to the appropriate frontend state managers, ensuring the UI reflects the latest server-side changes (e.g., progress of a long-running AI task).
+-   **Context Compression**: The `/compress` slash command saves tokens by summarizing conversation history. History pruning respects the permanent "Goal & Plan" buffer (never pruned) and uses a rolling terminal log that auto-summarizes at 50 entries, keeping the last 25 and replacing older ones with a summary record.
 
 This combination of state management tools allows Omnecor to handle a wide range of data types and interaction patterns efficiently, providing a fluid and responsive user experience.

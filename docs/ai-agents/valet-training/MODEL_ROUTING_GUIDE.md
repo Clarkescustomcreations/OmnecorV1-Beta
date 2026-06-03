@@ -25,21 +25,26 @@ For every task the Valet:
 
 ## 2. Category → default target (snapshot)
 
-| Category | Primary (cloud) | Local option | Cost | Local-capable |
+| Category | Primary | Local option | Cost | Local-capable |
 |---|---|---|---|---|
 | code_generation | anthropic / claude-opus-4-8 | ollama / qwen2.5-coder | medium | yes |
 | code_review | anthropic / claude-opus-4-8 | ollama / qwen2.5-coder | medium | yes |
-| research | gemini / gemini-1.5-pro | ollama / llama3.2 | low | no |
-| synthesis | openai / gpt-4o | ollama / llama3.2 | medium | yes |
+| research | gemini / gemini-3.1-pro | ollama / llama3.2 | low | no |
+| synthesis | openai / gpt-5.5 | ollama / llama3.2 | medium | yes |
 | media_generation | fal / flux | comfyui-local | medium | yes |
 | knowledge_retrieval | ollama / valet-router | ollama / valet-router | free | yes |
-| instruction_writing | ollama / valet-router | ollama / llama3.2 | free | yes |
-| integration | ollama / valet-router | ollama / valet-router | free | yes |
+| instruction_writing | ollama / llama3.2 | ollama / llama3.2 | free | yes |
+| integration | ollama / llama3.2 | ollama / llama3.2 | free | yes |
 | hardware | local_bridge (no AI) | local_bridge | free | yes |
-| reporting | ollama / valet-router | ollama / llama3.2 | free | yes |
+| reporting | ollama / llama3.2 | ollama / llama3.2 | free | yes |
+| context_management | ollama / llama3.2 | ollama / llama3.2 | free | yes |
+| memory_operations | ollama / valet-router | ollama / valet-router | free | yes |
 | local_task | ollama / llama3.2 | ollama / llama3.2 | free | yes |
 
-(Always defer to the manifest; this table is illustrative and may lag it.)
+(Always defer to the manifest; this table is illustrative and may lag it. Note the
+local-worker categories use `llama3.2`/`valet-router` as the *worker* model while the
+Valet orchestrates them in `valet_background` mode — the Valet never names itself as the
+worker for a category that produces generated content.)
 
 ## 3. Keeping routing knowledge current ("pull and update")
 
@@ -51,9 +56,16 @@ so the router never goes stale:
   and injects it into the system prompt; **no retraining needed**.
 - **Add/repurpose a category** → edit the manifest + add seed examples + regenerate the
   dataset (this *does* change behavior, so retrain).
-- **Automated refresh (optional)** — a scheduled job can pull the latest available
-  model IDs per provider (from each provider's models API) and propose manifest updates
-  for human review. Tracked as VALET-todo Phase 6.
+- **Automated refresh (recommended)** — cloud model IDs change *fast* (e.g. as of
+  2026-06 the defaults are `gpt-5.5`, `gemini-3.1-pro`/`gemini-3.5-flash`, `grok-4.3`,
+  `claude-opus-4-8`/`claude-sonnet-4-6`; these will be stale within months). A scheduled
+  job should pull each provider's current model list (from its models API) and propose
+  manifest updates for human review, bumping `manifest_version`. Because the router reads
+  the manifest at inference and never bakes model strings into weights, refreshed IDs take
+  effect with **no retraining**. The hooks already exist: `valet_knowledge_refresh.py`
+  bumps versions and calls `/admin/reload`, and `_get_manifest_json()` hot-reloads the
+  manifest on mtime change. Wiring the provider-model pull into that job is VALET-todo
+  Phase 6 (model-name auto-update).
 - The router is fine-tuned to **read and obey the injected manifest**, not to memorize
   specific model strings — so manifest edits take effect immediately.
 

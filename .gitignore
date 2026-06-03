@@ -133,3 +133,4 @@ tsc_output.txt
 # current.json and metadata.json are committed; *.gguf and adapter dirs are not.
 models/valet-router/*/
 *.gguf
+_refs/

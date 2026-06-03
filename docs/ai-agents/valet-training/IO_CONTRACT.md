@@ -1,8 +1,10 @@
 # Valet Router — Canonical I/O Contract
 
-This contract is the fix for mismatches **M1/M2/M3** (see [README](README.md)). Every
-component — dataset generator, trainer, inference server — MUST use these exact
-shapes and the exact [system prompt](VALET_SYSTEM_PROMPT.md).
+This contract resolved mismatches **M1/M2/M3** (see [README](README.md)); they are now
+fixed in code. Every component — dataset generator, trainer, inference server — MUST use
+these exact shapes and the exact [system prompt](VALET_SYSTEM_PROMPT.md).
+`scripts/check_valet_drift.py` asserts the schema stays consistent across the contract,
+the pydantic model, and the TS interface (currently 11/11 fields).
 
 ---
 
@@ -37,7 +39,7 @@ This is the schema the live server parses (`RouteDecision(**data)` in
 
 ```json
 {
-  "category": "code_generation | code_review | research | synthesis | media_generation | knowledge_retrieval | instruction_writing | integration | hardware | reporting | local_task",
+  "category": "code_generation | code_review | research | synthesis | media_generation | knowledge_retrieval | instruction_writing | integration | hardware | reporting | context_management | memory_operations | local_task",
   "mode": "api_direct | valet_background | local_omesh | main_api | multi_api | main_api_omesh | multi_api_omesh | moe_chain | moe_chain_omesh | multi_task",
   "primary_provider": "string — must be in available_providers",
   "primary_model": "string — must come from the routing manifest",
@@ -51,10 +53,12 @@ This is the schema the live server parses (`RouteDecision(**data)` in
 }
 ```
 
-> **Note:** this **extends** the server's current parse target with `category`,
-> `primary_model`, `cost_tier`, and `local_capable`. Update the server's `RouteDecision`
-> pydantic model + the TS `RouteDecision` interface to match (VALET-todo Phase A).
-> Extra keys are additive and backward-compatible with the existing consumers.
+> **Note:** the server's `RouteDecision` pydantic model and the TS `RouteDecision`
+> interface already match this schema (Phase A complete). The 13-value `category` enum —
+> the 11 original categories plus `context_management` and `memory_operations` (added in
+> manifest v1.1.0) — is mirrored in `valet_router_inference.py` (`TaskCategory` Literal)
+> and `ValetRouterService.ts` (`TaskCategory` union). If you add a category, update both
+> code sites and this list together.
 
 ## 4. Assist request/response
 

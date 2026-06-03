@@ -218,6 +218,44 @@ All messages exchanged over the WebSocket connection are JSON objects. While spe
     }
     ```
 
+### 4.10. `training:<jobId>`
+
+-   **Description**: Emitted by the Valet Router during local model training (LoRA fine-tuning). Carries real-time progress metrics including epoch, step, and loss for dataset generation and training phases.
+-   **Payload Example**:
+
+    ```json
+    {
+      "type": "training:job-abc-123",
+      "payload": {
+        "jobId": "job-abc-123",
+        "phase": "dataset",
+        "step": 450,
+        "totalSteps": 1000,
+        "loss": 0.245,
+        "eta": "2m 30s",
+        "status": "in_progress"
+      }
+    }
+    ```
+
+    During the training phase (LoRA fine-tuning), the payload may include:
+
+    ```json
+    {
+      "type": "training:job-abc-123",
+      "payload": {
+        "jobId": "job-abc-123",
+        "phase": "training",
+        "epoch": 2,
+        "totalEpochs": 3,
+        "step": 150,
+        "totalSteps": 300,
+        "loss": 0.112,
+        "status": "in_progress"
+      }
+    }
+    ```
+
 ## 5. Client-Side Handling
 
 The frontend uses the `useOmnecorSocket.ts` hook (`client/src/hooks/`) to manage the WebSocket connection and dispatch incoming messages to the appropriate state managers (e.g., Zustand stores, React Contexts). This ensures that the UI is always up-to-date with the latest backend events.

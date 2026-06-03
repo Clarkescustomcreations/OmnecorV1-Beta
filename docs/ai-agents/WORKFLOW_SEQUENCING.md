@@ -40,6 +40,7 @@ Each step in the workflow involves an agent performing a specific action. This c
 -   Executing external tools (via `ProcessManagerService` and Python bridges).
 -   Generating content or code.
 -   Communicating with other Omnecor nodes (via OMMESH).
+-   Managing context and memory (via `MemoryArchitectService` and `HonchoService`); context_management and memory_operations routing categories trigger these steps.
 
 ### 3.4. Action Hashing and Caching
 
@@ -66,6 +67,15 @@ Robust error handling is built into the workflow sequencing:
 -   **State Preservation**: The state of ongoing workflows is preserved, allowing for recovery from application restarts or unexpected interruptions.
 -   **Logging**: Detailed logs are generated for each step, aiding in diagnosis and debugging of workflow failures.
 
-## 5. Multi-Agent Collaboration
+## 5. Context and Memory Management in Workflows
+
+Workflows maintain continuity and efficiency through dedicated context and memory management:
+
+-   **Hierarchical Context Maintenance**: The `MemoryArchitectService` ensures the Goal & Plan buffer persists across all workflow steps (never pruned), conversation history is pruned only when token limits are exceeded, and rolling terminal logs are auto-summarized at 50 entries. The Valet Router dispatches `context_management` tasks to handle summarization and `/compress` requests.
+-   **Cross-Session Memory Persistence**: The `HonchoService` persists user facts and preferences across sessions. At the start of a new workflow or session, recent facts are retrieved and injected into the system prompt, providing continuity even across disconnected sessions.
+-   **Token Budget Monitoring**: The frontend visualizes token usage with an amber warning at 70% and red alert at 90%, allowing proactive context management before hard limits are reached.
+-   **Memory Operations Routing**: The Valet Router identifies and dispatches `memory_operations` tasks (fact storage via `/btw`, fact retrieval, preference updates) to the appropriate agent or model.
+
+## 6. Multi-Agent Collaboration
 
 Workflows often involve multiple agents collaborating. The sequencing mechanisms ensure that agents can hand off tasks, share context, and synchronize their efforts effectively. For more details, refer to `MULTI_AGENT_COLLABORATION.md`.
