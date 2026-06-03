@@ -69,17 +69,26 @@ export function estimateTokens(text: string): number {
 }
 
 /**
+ * Generate a cryptographically secure random ID segment.
+ */
+function secureRandomIdPart(byteLength = 8): string {
+  const bytes = new Uint8Array(byteLength);
+  globalThis.crypto.getRandomValues(bytes);
+  return Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("");
+}
+
+/**
  * Generate unique message ID
  */
 export function generateMessageId(): string {
-  return `msg_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `msg_${Date.now()}_${secureRandomIdPart()}`;
 }
 
 /**
  * Generate unique conversation ID
  */
 export function generateConversationId(): string {
-  return `conv_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+  return `conv_${Date.now()}_${secureRandomIdPart()}`;
 }
 
 /**
