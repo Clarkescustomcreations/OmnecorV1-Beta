@@ -1,6 +1,6 @@
 # Troubleshooting Guide for Omnecor
 
-This guide provides solutions to common issues you might encounter while installing, configuring, or operating Omnecor. For more in-depth information, please refer to the [User Guide](docs/user-guides/USER_GUIDE.md) and the [Installation Guide](INSTALL.md).
+This guide provides solutions to common issues you might encounter while installing, configuring, or operating Omnecor. For more in-depth information, please refer to the [User Guide](docs/user-guides/Omnecor User Guide.md) and the [Installation Guide](INSTALL.md).
 
 ## 1. General Troubleshooting Steps
 
@@ -10,7 +10,7 @@ Before diving into specific issues, consider these general troubleshooting steps
 2.  **Review Logs**: Examine the backend runtime logs located in `server/_core/logs` for any error messages or warnings. Process-specific logs are streamed as JSON for backend parsing.
 3.  **Restart Omnecor**: Sometimes, simply restarting the Omnecor application can resolve transient issues.
 4.  **Update Dependencies**: Ensure all project dependencies are up-to-date by running `pnpm install`.
-5.  **Consult Documentation**: Refer to the relevant sections of the [User Guide](docs/user-guides/USER_GUIDE.md) or other documentation files for detailed explanations of features and configurations.
+5.  **Consult Documentation**: Refer to the relevant sections of the [User Guide](docs/user-guides/Omnecor User Guide.md) or other documentation files for detailed explanations of features and configurations.
 
 ## 2. Common Installation Issues
 
@@ -113,7 +113,7 @@ pnpm --version
 2.  **Close Unused Workspaces**: Free up system memory.
 3.  **Reduce Model Size**: Use smaller AI models or quantizations if VRAM is limited.
 4.  **Update Drivers**: Ensure your GPU drivers are up-to-date.
-5.  **Zram**: For memory-constrained Linux systems, ensure Zram is enabled to prevent Out-Of-Memory (OOM) terminations. Refer to [User Guide](docs/user-guides/USER_GUIDE.md#16-performance-optimization) for details.
+5.  **Zram**: For memory-constrained Linux systems, ensure Zram is enabled to prevent Out-Of-Memory (OOM) terminations. Refer to [User Guide](docs/user-guides/Omnecor User Guide.md#16-performance-optimization) for details.
 6.  **Configure Ollama for GPU**: Ensure Ollama is correctly detecting and utilizing your hardware.
 
 **Prevention**: Monitor GPU usage during heavy AI tasks. Allocate sufficient resources for your intended AI workloads.
@@ -149,7 +149,7 @@ pnpm --version
 1.  **Install Python Dependencies**: Ensure all required Python packages for the specific bridge are installed.
 2.  **Verify Python Path**: Confirm that Omnecor is configured to use the correct Python interpreter and environment.
 
-**Prevention**: Follow the specific setup instructions for each hardware integration in the [User Guide](docs/user-guides/USER_GUIDE.md).
+**Prevention**: Follow the specific setup instructions for each hardware integration in the [User Guide](docs/user-guides/Omnecor User Guide.md).
 
 ### Issue: Knowledge Base Not Indexed
 
@@ -168,6 +168,65 @@ pnpm --version
 2.  **Verify Configuration**: Ensure the `VectorDBService` is correctly configured and initialized.
 
 **Prevention**: Grant appropriate file system permissions and monitor the indexing process for large datasets.
+
+### Issue: Background Notes (/btw) Not Persisting Across Sessions
+
+**Symptoms**: Notes saved with `/btw <note>` in the chat appear locally but are lost when you restart Omnecor or open a new project.
+
+**Causes**: The Honcho memory layer is not configured. The feature requires an API key to enable cross-session persistence.
+
+**Diagnostics**: Check whether `HONCHO_API_KEY` is set in your `.env` file. Without it, notes are stored only in browser localStorage and won't survive restarts.
+
+**Fixes**:
+
+1. **Set HONCHO_API_KEY**: In your `.env` file, add your Honcho API key:
+   ```env
+   HONCHO_API_KEY=your_honcho_api_key
+   HONCHO_APP_NAME=omnecor
+   HONCHO_ENVIRONMENT=demo
+   ```
+2. **Restart Omnecor**: Ensure the new environment variables are loaded by restarting the application.
+
+**Prevention**: Configure `HONCHO_API_KEY` during initial setup (see [INSTALL.md](INSTALL.md)) if you need persistent cross-session memory.
+
+### Issue: No Other Omnecor Nodes Appearing in Peer Card
+
+**Symptoms**: The sidebar footer Peer Card shows "No peers on local network" even though you have other Omnecor instances running.
+
+**Causes**: Another instance not running, different subnet/VLAN, or mDNS discovery blocked by firewall.
+
+**Diagnostics**:
+
+1. **Verify Other Instance Running**: Confirm another Omnecor instance is actually running and accessible.
+2. **Check Network Configuration**: Ensure all Omnecor nodes are on the same Wi-Fi network or LAN.
+3. **Firewall Rules**: Check whether mDNS (port 5353, UDP) is blocked by your firewall or network security appliance.
+
+**Fixes**:
+
+1. **Enable mDNS**: Ensure mDNS is enabled and not blocked by network security tools.
+2. **Same Subnet**: Verify all nodes are on the same subnet; discovery does not cross VLAN boundaries.
+3. **Check Logs**: Review the OMMESH/discovery logs in `server/_core/logs` for discovery errors.
+
+**Prevention**: Maintain a stable, mDNS-enabled local network; use `settings > OMMESH` to monitor mesh status in real-time.
+
+### Issue: Chat Running Out of Context Tokens
+
+**Symptoms**: The token budget bar under the chat input turns red (~90% full); the AI starts refusing to process new messages.
+
+**Causes**: The conversation history has grown too large for the selected model's context window.
+
+**Diagnostics**: Look at the token budget bar color:
+- Amber (~70%) = approaching limit
+- Red (~90%) = nearing maximum
+
+**Fixes**:
+
+1. **Use /compress**: Type `/compress` in the chat to summarize and shrink the conversation history. The Goal & Plan buffer is never pruned.
+2. **Exclude Messages**: Click the context menu on individual messages to toggle them out of the context sent to the model (they remain visible locally).
+3. **Switch to Larger Model**: Select a model with a larger context window in the model selector.
+4. **Start Fresh**: Create a new chat session if the current one is too large to recover.
+
+**Prevention**: Monitor token usage and compress regularly. Use `Settings > Advanced` to adjust initial context limits if needed.
 
 ## 4. Getting Help
 

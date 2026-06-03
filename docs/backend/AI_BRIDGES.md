@@ -75,6 +75,23 @@ The actual integration logic resides in Python scripts located in the `server/py
     -   Voice conversion and cloning for audio generation.
 -   **Execution**: Runs as a local server providing an API for voice processing tasks.
 
+### 2.6. Valet Router Inference Server (`valet_router_inference.py`)
+
+-   **Purpose**: AI-driven multi-API task routing engine that intelligently selects providers, models, and execution modes based on task characteristics. Complements the `ValetRouterService` TypeScript bridge.
+-   **Architecture**:
+    -   FastAPI server on port :8010 (configurable via `VALET_ROUTER_PORT` env var).
+    -   Loads trained model artifact from `models/valet-router/current.json` (supports GGUF, Ollama, or Hugging Face transformers formats).
+    -   When no artifact is registered, uses rule-based keyword fallback (clearly logged).
+    -   Hot-reloads system prompt (`valet-training/VALET_SYSTEM_PROMPT.md`), routing manifest (`valet-training/routing_manifest.json`), and knowledge base (`valet-training/OMNECOR_KNOWLEDGE_BASE.md`) on mtime change.
+-   **Endpoints**:
+    -   `GET /health` — Returns server status, model load state, and backend type (gguf|ollama|transformers).
+    -   `POST /route` — Routes a task by accepting task description, context, execution mode, and preferred routing mode; returns category, chosen provider/model, secondary providers, cost tier, confidence, and requirements for `todo.md`/`status.md`.
+    -   `GET /modes` — Lists all 10 supported routing modes (api_direct, valet_background, local_omesh, main_api, multi_api, main_api_omesh, multi_api_omesh, moe_chain, moe_chain_omesh, multi_task).
+    -   `POST /rag` — Retrieves relevant knowledge base chunks via ChromaDB (with keyword search fallback) for context injection during routing.
+    -   `POST /admin/reload` — Force-reloads prompt, manifest, and KB cache from disk.
+-   **Inference Backends**: Supports GGUF (llama-cpp-python), Ollama REST API, and Hugging Face transformers, each using async-safe threading for non-blocking inference.
+-   **Rule-Based Fallback**: When the model is unavailable, classifies tasks by keyword heuristics (memory, context, code, research, media, project) and returns a default routing decision with confidence=0.6.
+
 ## 3. Communication Protocol
 
 Communication between the `ProcessManagerService` and the Python bridges relies on standard input/output streams.

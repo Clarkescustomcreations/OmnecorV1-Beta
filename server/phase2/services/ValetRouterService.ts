@@ -19,7 +19,8 @@ export type ExecutionMode = "sovereign" | "scrapper" | "big_spender";
 export type TaskCategory =
   | "code_generation" | "code_review" | "research" | "synthesis"
   | "media_generation" | "knowledge_retrieval" | "instruction_writing"
-  | "integration" | "hardware" | "reporting" | "local_task";
+  | "integration" | "hardware" | "reporting" | "context_management"
+  | "memory_operations" | "local_task";
 
 export type CostTier = "free" | "low" | "medium" | "high";
 

@@ -15,7 +15,13 @@ current `valet_dataset_builder.py` (which must be upgraded — VALET-todo Phase 
 | `seed/hardcoded_rules.seed.jsonl` + `HARDCODED_RULES.md` | rule enforcement | `rules` |
 | `seed/plan_mode.seed.jsonl` | /plan interviews | `plan` |
 | `seed/skills.seed.jsonl` | skill offers | `skill` |
-| Repo docs (`docs/**`, `README.md`) | extra `qa` pairs | `qa` |
+
+> **KB is the single QA source.** The builder generates `qa` pairs **only** from
+> `OMNECOR_KNOWLEDGE_BASE.md` (`extract_kb_bullets` → `make_qa_from_bullet`). It does **not**
+> crawl `docs/**` or `README.md`. So anything you want the Valet to answer must be distilled
+> into the knowledge base — that's why the wider product docs are kept current and then
+> hand-distilled into `OMNECOR_KNOWLEDGE_BASE.md` (setup, navigation, troubleshooting,
+> features). *(Auto-ingesting `docs/**` is possible future work; it is not implemented today.)*
 
 > **"Pull and update"**: the generator reads the **live** manifest and knowledge base
 > at build time. When you update a model name or a feature fact, the next dataset build
@@ -31,8 +37,17 @@ current `valet_dataset_builder.py` (which must be upgraded — VALET-todo Phase 
 | `plan` | 10% | /plan interview behavior. |
 | `skill` | 5% | skill-offer reflex. |
 
-Balance `route` examples across all manifest categories **and** all three execution
-modes (include Sovereign-forces-local and no-keys→Guided-Walk-Through cases).
+Balance `route` examples across **all 13 manifest categories** (including the new
+`context_management` and `memory_operations`) **and** all three execution modes (include
+Sovereign-forces-local, no-keys→Guided-Walk-Through, and no-provider-available cases where
+the requested provider is absent from `available_providers`).
+
+> **Verify, don't assume:** percentages on a 10k build look fine on paper but a category
+> can still come out thin. After generation, read `metadata.json` per-class/per-category
+> counts and **flag any behavior class or route category below ~500 absolute examples**
+> (especially the boundary-ambiguous pairs: synthesis vs. knowledge_retrieval,
+> local_task vs. integration, context_management vs. synthesis, memory_operations vs.
+> knowledge_retrieval). Top up seeds for any thin category and regenerate.
 
 ## 3. Augmentation (multiply the seeds)
 
@@ -44,7 +59,13 @@ existing `ollama_generate()` helper):
   pick the model — look it up in `routing_manifest.json` so labels are correct and
   consistent). Add 10% hard negatives (near-miss category, corrected label).
 - **qa**: for each knowledge-base bullet, have the oracle phrase 2–4 natural questions;
-  the answer is the bullet text (lightly rewritten). This keeps answers factual.
+  the answer is the bullet text (lightly rewritten). This keeps answers factual. Cover
+  **two tiers**: (1) *system knowledge* (execution modes, Brain Map, OMMESH, database,
+  Honcho, security) and (2) *user-workflow / UI / troubleshooting* ("how do I switch to
+  Sovereign mode?", "where's the Fiction Mode toggle?", "what is the yellow banner?",
+  "my PeerCard shows no peers — why?", "how do I free up context tokens?"). The original
+  seeds were system-only; the second tier must be seeded explicitly (see
+  `omnecor_qa.seed.jsonl`).
 - **rules / plan / skill**: paraphrase the seed user turns; keep assistant outputs
   faithful to the seed behavior (don't let the oracle invent — use it only to vary the
   user phrasing).

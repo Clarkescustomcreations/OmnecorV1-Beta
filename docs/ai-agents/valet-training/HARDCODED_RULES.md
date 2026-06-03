@@ -65,6 +65,8 @@ context and the **Neural Brain Map** — to help the user build a `project-docs/
    keyword-fallback. The model and the code must agree on this list:
    `["PRD.md", "Feature-Plan.md", "Voice-Tone.md", "Design-Preferences.md", "Rules/standards.md"]`.
 
-> **Code note:** `ValetRouterService.ts` currently lists `Rules-Standards.md` while the
-> docs say `Rules/standards.md`. Pick one (the docs use `Rules/standards.md`) and make
-> the code, system prompt, and seeds match. Tracked in VALET-todo Phase A.
+> **Code note (resolved):** `ValetRouterService.HARDCODED_RULE.planModeDocs` now uses
+> `Rules/standards.md`, matching this doc, the system prompt, and the seeds (VALET-todo
+> Phase A.4, done). The canonical list is
+> `["PRD.md", "Feature-Plan.md", "Voice-Tone.md", "Design-Preferences.md", "Rules/standards.md"]`
+> in all four places — keep them in lockstep if you ever rename one.

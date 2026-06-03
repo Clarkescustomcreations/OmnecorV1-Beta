@@ -50,6 +50,8 @@ Key services include:
 -   **`MeshDiscoveryService`**: Part of OMMESH, responsible for discovering other Omnecor nodes on the network.
 -   **`AiProviderService`**: Manages connections and routing to various local and cloud AI models.
 -   **`FileSystemWatcherService`**: Monitors file system changes to trigger indexing or other automated workflows.
+-   **`HonchoService`**: Cross-session memory layer persisting user facts, preferences, and conversation history via Honcho (Plastic Labs). Complements local ChromaDB with cloud-backed external memory; degrades silently when `HONCHO_API_KEY` is not configured.
+-   **`MemoryArchitectService`**: Manages hierarchical context with three levels: permanent Goal & Plan buffer (never pruned), conversation history (pruned by token limits), and rolling terminal log (auto-summarized at 50 entries). Integrates token-budget visualization and `/compress` command for manual pruning.
 
 ### 2.4. OMMESH (Distributed Mesh Intelligence Layer)
 

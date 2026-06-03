@@ -95,7 +95,25 @@ The `VectorDBService` stores and retrieves embeddings for RAG across all routing
 -   **Secure Communication**: All inter-node communication is secured via mTLS, ensuring data integrity and confidentiality.
 -   **Distributed Inference**: When a task requires distributed processing, the `RoutingEngine` determines the optimal node based on available resources (e.g., VRAM) and routes the inference request appropriately.
 
-### 2.6. Backend to Frontend Updates
+### 2.6. Cross-Session Memory (Honcho)
+
+The `HonchoService` persists user facts, conversation history, and preferences across sessions:
+
+-   **User Facts**: Commands like `/btw` store durable user facts as Honcho metamessages (labeled `omnecor_fact`). Recent facts are injected into the chat system prompt on each new session.
+-   **Session History**: Conversation messages are synced to Honcho for long-term memory retrieval and context enrichment.
+-   **Graceful Degradation**: If `HONCHO_API_KEY` is not set, all Honcho operations become no-ops (no writes, empty reads), and the system continues with local memory only (VectorDB + MemoryArchitectService).
+-   **API Hierarchy**: Honcho uses app → user → session → messages + metamessages structure, enabling multi-session, per-user fact tracking.
+
+### 2.7. Context Management
+
+The `MemoryArchitectService` and frontend context controls ensure efficient token usage:
+
+-   **Hierarchical Context**: Three-tier system with permanent Goal & Plan buffer (never pruned), conversation history (pruned when over token limits), and rolling terminal log (auto-summarized after 50 entries).
+-   **Token Budget Visualization**: Client-side token-usage bar shows amber at 70% capacity and red at 90%, allowing users to monitor and preemptively manage context.
+-   **Manual Pruning**: `/compress` command summarizes old entries; per-message exclusion toggles allow selective context inclusion.
+-   **Routing Categories**: The Valet Router dispatches `context_management` and `memory_operations` tasks to manage these systems; see [VALET_ROUTER.md](../ai-agents/VALET_ROUTER.md).
+
+### 2.8. Backend to Frontend Updates
 
 -   **WebSocket Broadcasts**: After processing, the backend broadcasts real-time updates and results back to connected frontend clients via WebSockets. This includes task progress, chat responses, and hardware events.
 -   **tRPC Responses**: Synchronous tRPC requests receive their responses directly, updating the UI state accordingly.
@@ -105,3 +123,4 @@ The `VectorDBService` stores and retrieves embeddings for RAG across all routing
 -   **Database**: Structured data (e.g., user preferences, project configurations, task queues) is persisted in the database via Drizzle ORM.
 -   **File System**: Unstructured data, such as project files, AI model weights, generated media, and log files, are stored directly on the local file system. The `FileSystemWatcherService` monitors changes to project files and triggers appropriate backend events.
 -   **Context Persistence**: The `MemoryArchitectService` and `VectorDBService` ensure that AI context and semantic memory are persistently stored and available across sessions.
+-   **Cross-Session Memory**: The `HonchoService` persists user facts and preferences across sessions via the Honcho external memory service. When enabled, these are queried and injected into the system prompt on each new conversation.

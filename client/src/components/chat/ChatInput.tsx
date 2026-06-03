@@ -18,11 +18,13 @@ interface ChatInputProps {
   onAddFile: (file: File) => void;
   onAddImage: (file: File) => void;
   onStop: () => void;
-  onCommand: (cmd: SlashCommand) => void;
+  onCommand: (cmd: SlashCommand) => void | Promise<void>;
   onBtw?: (note: string) => void;
   contextFiles: ContextFile[];
   isLoading: boolean;
   disabled?: boolean;
+  tokenCount?: number;
+  maxTokens?: number;
 }
 
 const COMMANDS: { cmd: SlashCommand; label: string; description: string }[] = [
@@ -47,6 +49,8 @@ export default function ChatInput({
   contextFiles,
   isLoading,
   disabled,
+  tokenCount,
+  maxTokens,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
@@ -366,11 +370,27 @@ export default function ChatInput({
       </div>
 
       {/* Hint line */}
-      <p className="text-[10px] text-muted-foreground mt-1 pl-1">
-        {isLoading
-          ? "Generating response…"
-          : "Enter ↵ send · Shift+Enter new line · / commands · @ mention files · paste image"}
-      </p>
+      <div className="flex items-center justify-between mt-1 pl-1">
+        <p className="text-[10px] text-muted-foreground">
+          {isLoading
+            ? "Generating response…"
+            : "Enter ↵ send · Shift+Enter new line · / commands · @ mention files · paste image"}
+        </p>
+        {tokenCount !== undefined && maxTokens !== undefined && (
+          <span
+            className={cn(
+              "text-[10px] tabular-nums ml-2 flex-shrink-0",
+              tokenCount / maxTokens >= 0.9
+                ? "text-red-500"
+                : tokenCount / maxTokens >= 0.7
+                ? "text-yellow-500"
+                : "text-muted-foreground"
+            )}
+          >
+            {tokenCount.toLocaleString()} / {maxTokens.toLocaleString()} tokens
+          </span>
+        )}
+      </div>
     </div>
   );
 }

@@ -134,9 +134,32 @@ This step is especially relevant when completing setup via the Android APK:
 
 ---
 
-## Step 9 — Summary & Finish
+## Step 9 — Cross-Session Memory (Optional)
+
+**What it does:** Optionally configures Honcho external memory service for persistent background notes across sessions and projects.
+
+**Configuration:**
+
+1. If you have a **Honcho API key** from Plastic Labs, enter it here. (Optional — the feature is entirely optional and skippable.)
+2. Set the application name (default: `omnecor`) and environment (default: `demo`).
+3. Once configured, you can save background notes using `/btw <note>` in the chat, and they will persist across restarts and projects.
+
+**Skip if:**
+- You don't have or don't need a Honcho account.
+- You prefer to keep background notes local to your current session only (stored in browser localStorage).
+
+**Note:** If `HONCHO_API_KEY` is not set later, the feature is silently disabled — nothing breaks, and the app continues to work normally.
+
+---
+
+## Step 10 — Summary & Finish
 
 The final step displays a checklist of configured items and any pending warnings (e.g., missing API keys, unreachable services). Click **Finish Setup** to dismiss the wizard and open the main Omnecor dashboard.
+
+**Quick Tips:**
+- **Peer Discovery**: Once you finish, the sidebar footer will show any other Omnecor nodes discovered on your local network (if OMMESH is enabled).
+- **Token Budget**: In the chat, monitor the token budget bar under the input field to track context usage.
+- **Valet Router**: If a trained Valet Router artifact is present, it will auto-start and intelligently route tasks. Otherwise, keyword-based routing is used as a fallback.
 
 ---
 
