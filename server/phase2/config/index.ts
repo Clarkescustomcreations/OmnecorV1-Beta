@@ -31,7 +31,10 @@ export const SERVER_CONFIG = {
   /** CORS allowed origins */
   corsOrigins: (
     process.env.OMNECOR_CORS_ORIGINS || "http://localhost:5173"
-  ).split(","),
+  )
+    .split(",")
+    .map(o => o.trim())
+    .filter(Boolean),
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -521,22 +521,36 @@ export class OmnecorWebSocketServer {
     secure: boolean;
     req: IncomingMessage;
   }): boolean {
-    // In development/local mode, allow all connections
     const origin = info.origin || info.req.headers.origin || "";
 
-    // Allow localhost connections
-    if (
-      !origin ||
-      origin.includes("localhost") ||
-      origin.includes("127.0.0.1")
-    ) {
+    // No Origin header (e.g. native/non-browser clients) — allow.
+    if (!origin) {
       return true;
     }
 
-    // Check against configured CORS origins
-    return SERVER_CONFIG.corsOrigins.some(allowed =>
-      origin.startsWith(allowed)
-    );
+    // Parse the Origin and validate the hostname by *exact* match. Substring
+    // checks like origin.includes("localhost") are bypassable via hostnames
+    // such as "attacker.com-localhost.evil.com".
+    let hostname: string;
+    try {
+      hostname = new URL(origin).hostname;
+    } catch {
+      return false;
+    }
+
+    const LOCAL_HOSTNAMES = new Set(["localhost", "127.0.0.1", "::1"]);
+    if (LOCAL_HOSTNAMES.has(hostname)) {
+      return true;
+    }
+
+    // Check against configured CORS origins by exact origin match.
+    return SERVER_CONFIG.corsOrigins.some(allowed => {
+      try {
+        return new URL(allowed).origin === new URL(origin).origin;
+      } catch {
+        return allowed === origin;
+      }
+    });
   }
 
   // -------------------------------------------------------------------------

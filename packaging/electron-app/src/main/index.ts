@@ -35,6 +35,21 @@ let backendProcess: ChildProcess | null = null
 let isQuitting = false
 const BACKEND_PORT = process.env.PORT || 3000
 
+/**
+ * Only allow opening external URLs with safe schemes. Restricting to https/mailto
+ * neutralises the real `shell.openExternal` threat: launching arbitrary protocol
+ * handlers (file:, smb:, custom app: schemes) that can execute code or exfiltrate
+ * data. A host allowlist can be layered on top later if desired.
+ */
+function isSafeExternalUrl(urlString: string): boolean {
+  try {
+    const { protocol } = new URL(urlString)
+    return protocol === 'https:' || protocol === 'mailto:'
+  } catch {
+    return false
+  }
+}
+
 function startBackend(): void {
   log('startBackend called')
   console.log('Starting Omnecor backend...')
@@ -110,7 +125,13 @@ function createWindow(): void {
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      // Secure baseline (Electron security checklist): sandboxed renderer,
+      // isolated context, no Node in the renderer, same-origin policy enforced.
+      sandbox: true,
+      contextIsolation: true,
+      nodeIntegration: false,
+      webSecurity: true,
+      allowRunningInsecureContent: false
     }
   })
 
@@ -118,9 +139,32 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  // window.open / target=_blank: never open a sub-window; hand safe URLs to the
+  // OS browser and drop everything else.
   mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
+    if (isSafeExternalUrl(details.url)) {
+      shell.openExternal(details.url)
+    } else {
+      log(`Blocked window.open to unsafe URL: ${details.url}`)
+    }
     return { action: 'deny' }
+  })
+
+  // Block in-page navigation away from the app's own content. The window only
+  // ever legitimately shows the local setup wizard (file://), the dev renderer,
+  // or the local backend. Anything else is prevented (and opened externally if
+  // it's a safe scheme).
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    const devUrl = process.env['ELECTRON_RENDERER_URL']
+    const allowed =
+      url.startsWith('file://') ||
+      url.startsWith(`http://localhost:${BACKEND_PORT}`) ||
+      (!!devUrl && url.startsWith(devUrl))
+    if (!allowed) {
+      event.preventDefault()
+      log(`Blocked navigation to: ${url}`)
+      if (isSafeExternalUrl(url)) shell.openExternal(url)
+    }
   })
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -204,9 +248,13 @@ app.whenReady().then(async () => {
     }
   })
 
-  // --- IPC: open external URL ---
+  // --- IPC: open external URL (validated — defence in depth with preload) ---
   ipcMain.on('open-external', (_, url: string) => {
-    shell.openExternal(url)
+    if (isSafeExternalUrl(url)) {
+      shell.openExternal(url)
+    } else {
+      log(`Rejected unsafe external URL from renderer: ${url}`)
+    }
   })
 
   startBackend()

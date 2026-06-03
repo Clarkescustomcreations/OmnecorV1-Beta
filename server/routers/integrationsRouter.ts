@@ -175,7 +175,7 @@ async function gdriveFetch(path: string, token: string) {
 // Router
 // ---------------------------------------------------------------------------
 
-const INTEGRATION_TYPES = ["github", "notion", "slack", "google-drive"] as const;
+const INTEGRATION_TYPES = ["github", "notion", "slack", "google-drive", "dropbox", "onedrive", "generic"] as const;
 type IntegrationType = typeof INTEGRATION_TYPES[number];
 
 export const integrationsRouter = router({
@@ -220,9 +220,9 @@ export const integrationsRouter = router({
           metadata = { username: ownerName, email: ownerEmail };
 
         } else if (input.type === "slack") {
-          const auth = await slackFetch("auth.test", input.token) as {
-            user: string; user_id: string; team: string; team_id: string;
-          };
+          const authResult = await slackFetch("auth.test", input.token);
+          if (!authResult.ok) throw new TRPCError({ code: "UNAUTHORIZED", message: authResult.error ?? "Slack auth failed" });
+          const auth = authResult as { ok: boolean; user: string; user_id: string; team: string; team_id: string };
           metadata = { username: auth.user, userId: auth.user_id, team: auth.team };
 
         } else if (input.type === "google-drive") {
@@ -300,9 +300,9 @@ export const integrationsRouter = router({
           };
 
         } else if (input.type === "slack") {
-          const data = await slackFetch("conversations.list", token, { limit: "20", types: "public_channel,private_channel" }) as {
-            channels: Array<{ id: string; name: string; is_private: boolean }>;
-          };
+          const listResult = await slackFetch("conversations.list", token, { limit: "20", types: "public_channel,private_channel" });
+          if (!listResult.ok) throw new TRPCError({ code: "UNAUTHORIZED", message: listResult.error ?? "Slack conversations.list failed" });
+          const data = listResult as { ok: boolean; channels: Array<{ id: string; name: string; is_private: boolean }> };
           syncData = {
             channels: data.channels.map(c => ({ id: c.id, name: c.name, isPrivate: c.is_private })),
             channelCount: data.channels.length,

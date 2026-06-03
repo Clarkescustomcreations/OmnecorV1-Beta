@@ -35,7 +35,7 @@ import {
   Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { createMockSettings, type AppSettings } from "@/lib/settings";
+import { getDefaultSettings, type AppSettings } from "@/lib/settings";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
@@ -62,7 +62,7 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
     onError: (err) => toast.error("Failed to save: " + err.message),
   });
 
-  const [settings, setSettings] = useState<AppSettings>(createMockSettings());
+  const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
   const [activeTab, setActiveTab] = useState<string>("general");
   const [hasChanges, setHasChanges] = useState(false);
 

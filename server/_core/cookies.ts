@@ -42,7 +42,10 @@ export function getSessionCookieOptions(
   return {
     httpOnly: true,
     path: "/",
-    sameSite: "none",
+    // "strict" prevents the session cookie from being sent on cross-site
+    // requests, mitigating CSRF. This local-first app has no cross-origin
+    // flows that require the cookie, so "strict" is safe.
+    sameSite: "strict",
     secure: isSecureRequest(req),
   };
 }
