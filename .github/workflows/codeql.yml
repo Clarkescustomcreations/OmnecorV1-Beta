@@ -8,6 +8,11 @@ on:
   schedule:
     - cron: '38 2 * * 0'
 
+# Run any actions still bundling the Node.js 20 runtime on Node.js 24 instead,
+# silencing the deprecation warning ahead of GitHub's June 16, 2026 cutover.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   analyze:
     name: Analyze
@@ -25,7 +30,7 @@ jobs:
 
     steps:
     - name: Checkout repository
-      uses: actions/checkout@v4
+      uses: actions/checkout@v5
 
     - name: Initialize CodeQL
       uses: github/codeql-action/init@v3
