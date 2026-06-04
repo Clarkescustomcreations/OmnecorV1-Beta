@@ -277,3 +277,467 @@ None. This is a pure addition. Existing functionality remains unchanged.
 - [OAuth 2.0 RFC](https://tools.ietf.org/html/rfc6749)
 - [simple-oauth2 Documentation](https://github.com/lelylan/simple-oauth2)
 - Platform-specific OAuth docs in `/docs/OAUTH_SETUP.md`
+
+---
+
+# APPENDIX: Full Documentation & Features Coverage Audit
+
+## Executive Summary
+
+A comprehensive audit of the codebase reveals **Omnecor has significantly more implemented functionality than is currently documented in the README and main user guides**. This section catalogs:
+
+1. **12 Major Systems Not Documented** in README but fully implemented
+2. **8 Systems Documented but Incomplete/Experimental**
+3. **Critical documentation gaps** for production deployment
+
+**Total Features Audited:** 35+ routers, 8 client pages, 40+ documentation files
+
+---
+
+## PART 1: Features Fully Implemented But UNDERDOCUMENTED
+
+### These systems exist in code, work, but aren't explained in README.md or QUICKSTART.md
+
+#### 1. **Agent Networking & Social Media Automation** ⭐ MAJOR OMISSION
+**Status:** Fully implemented, actively used
+**What it does:**
+- Multi-platform post scheduling across Twitter/X, LinkedIn, Instagram, TikTok, Facebook, YouTube
+- Content discovery engine with keyword filtering and source ranking
+- AI-powered content curation from RSS feeds, search results, trending topics
+- Character persona profiles with custom bio, tone, hashtags, and posting schedule
+- Real-time analytics dashboard (engagement metrics, reach, impressions)
+- Platform account management with OAuth2 connection
+- Draft review and approval workflows before publishing
+
+**Where in code:**
+- UI: `/client/src/pages/AgentNetworking.tsx` (443 lines)
+- API: `schedulingRouter`, `curatorRouter`, `discoveryRouter`, `platformsRouter`, `analyticsRouter`, `agentSettingsRouter`, `oauthRouter`
+- Database: `platformAccounts`, `schedules`, `content_drafts`, `personas`, `analytics`
+
+**Why missing from docs:** Agent Networking is listed in README as a vague "beta" feature without explanation of its full capability
+
+**What users need to know:**
+- How to set up OAuth for each platform
+- How to create and manage personas
+- How to configure content discovery (keywords, sources, refresh rates)
+- How to publish to multiple platforms
+- How to view engagement analytics
+
+---
+
+#### 2. **Model Context Protocol (MCP) Integration** 
+**Status:** Fully implemented via `mcpRouter`
+**What it does:**
+- Connects external MCP servers as tool providers
+- Auto-discovers tool schemas from connected servers
+- Forwards tool calls from agents to MCP servers with proper serialization
+- Caches tool schemas to reduce latency
+- Supports multiple concurrent MCP server connections
+
+**Where in code:**
+- API: `/server/routers/mcpRouter.ts`
+- Procedures: `listServers`, `connectServer`, `disconnectServer`, `listTools`, `executeTool`
+
+**Why missing from docs:** No mention in README or user guide despite being production-ready
+
+**What users need to know:**
+- How to find and install MCP servers
+- How to connect them to Omnecor
+- Which servers are recommended
+- How agents automatically use MCP tools
+
+---
+
+#### 3. **Cloud Compute Rental & GPU Scaling**
+**Status:** Fully implemented via `cloudComputeRouter`
+**What it does:**
+- Integration with Vast.ai, RunPod, Lambda Labs for on-demand GPU rental
+- Cost estimation before spinning up instances
+- Session lifecycle management (provision, monitor, terminate)
+- Docker image management and upload to registries
+- Direct SSH access to rented instances
+- Automatic cleanup of expired sessions
+
+**Where in code:**
+- API: `/server/routers/cloudComputeRouter.ts`
+- Procedures: `listProviders`, `estimateCost`, `provisionInstance`, `getSessionStatus`, `terminateSession`, `uploadDockerImage`
+
+**Why missing from docs:** Zero documentation despite being a major feature for ML/training workflows
+
+**What users need to know:**
+- How to get API keys from each provider
+- Cost estimation workflow
+- How to use rented compute for training
+- How instances are billed and cleaned up
+
+---
+
+#### 4. **Loop Detection & Agent Safety**
+**Status:** Fully implemented in `projectRouter`
+**What it does:**
+- Detects infinite loops in agent task execution
+- Prevents runaway agent spawns
+- Monitors execution graph for circular dependencies
+- Generates alerts when loops detected
+- Allows admin override with confirmation
+
+**Where in code:**
+- Detection logic in `/server/routers/projectRouter.ts`
+- Graph analysis in `detectLoops()` function
+
+**Why missing from docs:** Security feature that users should understand
+
+**What users need to know:**
+- How loops are detected
+- What happens when a loop is found
+- How to safely override if needed
+
+---
+
+#### 5. **File Encryption System**
+**Status:** Fully implemented via `securityRouter`
+**What it does:**
+- AES-256-GCM encryption for individual files
+- Encryption metadata stored in database
+- Per-file key derivation
+- Transparent decryption on read
+
+**Where in code:**
+- API: `/server/routers/securityRouter.ts`
+- Procedures: `encryptFile`, `decryptFile`, `getEncryptionStatus`
+- Implementation: `_core/security.ts`
+
+**Why missing from docs:** Security feature users should understand
+
+---
+
+#### 6. **System Backup & Recovery**
+**Status:** Fully implemented via `securityRouter`
+**What it does:**
+- Full system backup (database + user files + configuration)
+- Incremental backups
+- Backup restoration with rollback option
+- Backup scheduling and retention policies
+
+**Where in code:**
+- API: `/server/routers/securityRouter.ts`
+- Procedures: `createBackup`, `restoreBackup`, `listBackups`, `deleteBackup`
+
+**Why missing from docs:** Critical for production deployments
+
+---
+
+#### 7. **Vulnerability Scanning & IoC Detection**
+**Status:** Fully implemented via `securityRouter`
+**What it does:**
+- Scans uploaded files against IoC (Indicators of Compromise) feeds
+- Pattern matching for known malware signatures
+- Integration with threat intelligence feeds
+- Real-time file scanning before processing
+
+**Where in code:**
+- API: `/server/routers/securityRouter.ts`
+- Procedures: `scanFile`, `updateThreatFeeds`, `getThreatReport`
+
+**Why missing from docs:** Security feature for safe file handling
+
+---
+
+#### 8. **Generic Image Generation**
+**Status:** Fully implemented via `imageGenRouter`
+**What it does:**
+- Unified interface for multiple image generation backends
+- Supports ComfyUI, Fal.ai, OpenArt, Replicate
+- Batch generation support
+- Model selection and parameter control
+- Image history and version control
+
+**Where in code:**
+- API: `/server/routers/imageGenRouter.ts`
+- Procedures: `generateImage`, `listModels`, `getHistory`, `compareVersions`
+
+**Why missing from docs:** Separate from ComfyUI, not documented
+
+---
+
+#### 9. **Artifact Management & Versioning**
+**Status:** Fully implemented
+**What it does:**
+- Registers training artifacts (models, datasets, checkpoints)
+- Version tracking and metadata
+- Artifact comparison and diff
+- Integration with training workflows
+
+**Where in code:**
+- Integrated with `trainingRouter.ts`
+
+**Why missing from docs:** Advanced ML feature
+
+---
+
+#### 10. **Agent Personas & Character Customization**
+**Status:** Fully implemented, moved to Agent Networking
+**What it does:**
+- Create character profiles with name, description, personality
+- Configure tone, vocabulary, communication style
+- Set platform-specific bios and hashtags
+- Schedule customization per persona
+
+**Where in code:**
+- UI: Extracted to `AgentNetworking.tsx` from Settings
+- Database: `personas` table
+- Procedures in `agentSettingsRouter`
+
+**Why missing from docs:** Documented existence but workflow unclear
+
+---
+
+#### 11. **Specialized Module Launcher**
+**Status:** Fully implemented in pipeline system
+**What it does:**
+- Extensible module system for running specialized tools within pipelines
+- Per-module configuration
+- Module chaining and composition
+- Result passing between modules
+
+**Where in code:**
+- `/server/routers/pipelineRouter.ts` - GodMode Pipeline implementation
+- Module system in phase 2
+
+**Why missing from docs:** Advanced feature
+
+---
+
+#### 12. **Real-Time File Watching & Project Synchronization**
+**Status:** Fully implemented via `projectRouter`
+**What it does:**
+- Monitors file system changes in real-time
+- Auto-updates Neural Brain Map when files change
+- Detects file deletions, renames, modifications
+- Synchronizes with WebSocket clients
+- Configurable watch patterns
+
+**Where in code:**
+- API: `/server/routers/projectRouter.ts`
+- Implementation: File watcher service
+- Procedures: `watchDirectory`, `stopWatching`, `getWatchStatus`
+
+**Why missing from docs:** Users don't know they can rely on real-time sync
+
+---
+
+## PART 2: Features Documented But INCOMPLETE or EXPERIMENTAL
+
+### These are mentioned in README, ROADMAP, or docs, but implementation is partial or unclear
+
+#### 1. **Extended OAuth (Manus Provider)**
+**Status:** Mentioned in README but not found in code
+**README claim:** "Extended OAuth — Manus, Google, and Microsoft identity providers supported out of the box"
+**Reality:** Google and Microsoft OAuth exist, but **Manus provider not found** in `oauthClients.ts` or auth system
+**Action needed:** Either implement Manus or remove from README
+
+---
+
+#### 2. **Windows & macOS Native Support**
+**Status:** Documented as experimental
+**README claim:** "Packaging — AppImage, `.deb`, Flatpak, and systemd service targets included"
+**Reality:** Linux-first implementation, Windows/macOS marked as "secondary"
+**Action needed:** Clarify platform support tier in docs
+
+---
+
+#### 3. **Android Thin Client**
+**Status:** Documented but unclear production status
+**Files:** `/packaging/android/BUILD-ANDROID.md` exists
+**Reality:** Android app appears experimental, not mentioned in main README
+**Action needed:** Move to roadmap section or clarify status
+
+---
+
+#### 4. **Light Mode**
+**Status:** Partially implemented
+**Files:** `/docs/user-guides/LIGHT_MODE.md` exists
+**Reality:** Full light mode theme appears incomplete in UI
+**Action needed:** Complete or move to beta section
+
+---
+
+#### 5. **Plugin Marketplace**
+**Status:** Mentioned in roadmap, not implemented
+**ROADMAP.md:** Lists plugin marketplace as future feature
+**Reality:** No marketplace infrastructure in code
+**Status:** Correct (roadmap feature)
+
+---
+
+#### 6. **Custom Workflow Builder**
+**Status:** Partially implemented (only GodMode 5-phase available)
+**README claim:** "Complex projects, and orchestrates multi-step workflows"
+**Reality:** Only predefined 5-phase GodMode (DEFINE→PLAN→EXECUTE→REVIEW→SHIP)
+**What's missing:** No visual workflow builder; can't create custom phases
+**Action needed:** Clarify that workflows are pre-configured, not customizable yet
+
+---
+
+#### 7. **Persona Agent Guidance**
+**Status:** Feature exists but documentation vague
+**File:** `/docs/user-guides/PERSONA_AGENT_GUIDE.md` exists but brief
+**What users need:** How to actually use persona agents in workflows
+
+---
+
+#### 8. **Light Mode Implementation**
+**Status:** Partial; toggle exists but theme incomplete
+**File:** `/docs/user-guides/LIGHT_MODE.md`
+**Reality:** Dark mode dominant, light mode has visual gaps
+**Action needed:** Complete theme or deprecate
+
+---
+
+## PART 3: Critical Documentation Gaps
+
+### High-priority docs that are missing entirely:
+
+| Feature | Why Critical | Where in Code | Estimated Docs Needed |
+|---------|-------------|---------------|----------------------|
+| **Agent Networking** | Primary content automation feature | `agentNetworking.tsx`, 7 routers | 4-6 pages |
+| **Cloud Compute Integration** | Needed for production GPU scaling | `cloudComputeRouter.ts` | 2-3 pages |
+| **MCP Server Setup** | Unlocks tool extensibility | `mcpRouter.ts` | 2 pages |
+| **File Encryption** | Security feature | `securityRouter.ts` | 1 page |
+| **Backup/Recovery** | Production necessity | `securityRouter.ts` | 2 pages |
+| **Vulnerability Scanning** | Security feature | `securityRouter.ts` | 1 page |
+| **Loop Detection** | Safety system | `projectRouter.ts` | 1 page |
+
+---
+
+## PART 4: Documentation Status Summary
+
+### What's WELL DOCUMENTED:
+✅ Core architecture and infrastructure
+✅ Chat interface and basic usage
+✅ Hardware bridges (Blender, KiCad, ESP)
+✅ Voice pipeline
+✅ OMMESH mesh networking
+✅ OAuth setup (new as of June 3)
+✅ Wallet and budget system
+
+### What's MISSING ENTIRELY:
+❌ Agent Networking full workflow
+❌ Cloud compute rental guide
+❌ MCP server connections
+❌ Advanced security features (encryption, scanning, backup)
+❌ Loop detection and safety
+❌ Artifact management
+❌ Image generation (generic)
+❌ Real-time file watching
+
+### What's PARTIALLY DOCUMENTED:
+⚠️ Persona creation (exists but workflow unclear)
+⚠️ Custom workflows (only GodMode 5-phase)
+⚠️ Light mode (incomplete implementation)
+⚠️ Android support (experimental, unclear status)
+⚠️ Extended OAuth (Manus provider missing)
+
+---
+
+## PART 5: Recommended Documentation Priority
+
+### Priority 1 (CRITICAL):
+1. **Agent Networking Complete Guide** (4-6 pages)
+   - Persona creation and management
+   - Platform connection (OAuth flow)
+   - Content discovery and curation
+   - Scheduling and publishing
+   - Analytics and reporting
+
+2. **Cloud Compute Integration** (2-3 pages)
+   - Provider setup (Vast.ai, RunPod, Lambda)
+   - Cost estimation workflow
+   - Instance provisioning and lifecycle
+   - Integration with training pipelines
+
+3. **Security Features Overview** (2 pages)
+   - File encryption
+   - System backup/recovery
+   - Vulnerability scanning
+   - Immutable audit logs
+
+### Priority 2 (IMPORTANT):
+4. **MCP Server Setup & Usage** (2 pages)
+5. **Advanced Features Reference** (2 pages)
+   - Loop detection
+   - Real-time file watching
+   - Artifact management
+   - Custom modules in pipelines
+
+### Priority 3 (NICE-TO-HAVE):
+6. **Image Generation Guide** (1 page)
+7. **Loop Detection & Safety** (1 page)
+
+---
+
+## PART 6: Codebase Statistics
+
+| Category | Count | Status |
+|----------|-------|--------|
+| **Client Pages** | 8 | All implemented |
+| **API Routers** | 31+ | All active |
+| **Database Tables** | 50+ | Schema complete |
+| **Documentation Files** | 40+ | Incomplete coverage |
+| **Features in Code** | 35+ | Majority underdocumented |
+| **OAuth Platforms** | 6 | Full implementation |
+| **AI Providers** | 5+ | Fully supported |
+
+---
+
+## PART 7: Consistency Issues
+
+### README vs. Reality:
+- ❌ README claims "Extended OAuth" with Manus but code lacks Manus provider
+- ✅ README accurately describes architecture, wallet, security
+- ⚠️ README omits Agent Networking details despite being fully implemented
+- ⚠️ README omits Cloud Compute feature entirely
+- ❌ README claims "custom workflows" but only 5-phase GodMode exists
+
+### Users Will Discover Features They Don't Expect:
+- Cloud Compute rental (surprise feature)
+- MCP tool integration (undocumented)
+- File encryption (security feature users should know about)
+- Content curation engine (integrated into Agent Networking)
+- Real-time file synchronization (in Brain Map)
+
+---
+
+## PART 8: Actionable Recommendations
+
+### IMMEDIATE (Before release):
+1. ✅ Keep OAuth section in docs (already done June 3)
+2. ❌ **Remove "Manus" from README or implement it**
+3. ❌ **Add Agent Networking section to README** (currently invisible)
+4. ❌ **Add Cloud Compute section to README** (currently invisible)
+
+### SHORT-TERM (Next 2 weeks):
+5. Create Agent Networking comprehensive guide
+6. Create Cloud Compute setup guide
+7. Create MCP server integration guide
+8. Document security features (encryption, backup, scanning)
+9. Clarify light mode and platform support status
+
+### MEDIUM-TERM (Next month):
+10. Complete light mode implementation or deprecate
+11. Implement Manus OAuth or remove from claims
+12. Build custom workflow builder or clarify GodMode limitation
+13. Comprehensive artifact management guide
+
+---
+
+## CONCLUSION
+
+Omnecor's implementation significantly exceeds its documentation. The product is production-ready with many advanced features (cloud compute, content automation, security), but users won't discover them without better docs. **Priority:** Update README with Agent Networking, Cloud Compute, and MCP, then create detailed guides for each system.
+
+**Total documentation work estimated:** 12-15 pages of new guides + README updates
+
+---
+
+*Audit completed: June 4, 2025*
+*Audit scope: Full codebase scan + all documentation + comparison analysis*
