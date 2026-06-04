@@ -197,13 +197,35 @@ app.whenReady().then(async () => {
 
     try {
       if (process.platform === 'win32') {
-        const { stdout } = await execAsync(
-          'wmic path win32_VideoController get name,AdapterRAM /format:list'
-        )
-        const nameMatch = stdout.match(/Name=(.*)/)
-        const ramMatch = stdout.match(/AdapterRAM=(.*)/)
-        if (nameMatch) info.gpu = nameMatch[1].trim()
-        if (ramMatch) info.vram = Math.round(parseInt(ramMatch[1]) / (1024 * 1024))
+        try {
+          const { stdout } = await execAsync(
+            'powershell -Command "Get-WmiObject Win32_VideoController | Select-Object Name,AdapterRAM | Format-List"'
+          )
+          const nameMatch = stdout.match(/Name\s*:\s*(.*)/)
+          const ramMatch = stdout.match(/AdapterRAM\s*:\s*(.*)/)
+          if (nameMatch) info.gpu = nameMatch[1].trim()
+          if (ramMatch) info.vram = Math.round(parseInt(ramMatch[1]) / (1024 * 1024))
+        } catch {
+          // Fall back to wmic if PowerShell unavailable
+          try {
+            const { stdout } = await execAsync(
+              'wmic path win32_VideoController get name,AdapterRAM /format:list'
+            )
+            const nameMatch = stdout.match(/Name=(.*)/)
+            const ramMatch = stdout.match(/AdapterRAM=(.*)/)
+            if (nameMatch) info.gpu = nameMatch[1].trim()
+            if (ramMatch) info.vram = Math.round(parseInt(ramMatch[1]) / (1024 * 1024))
+          } catch {
+            info.gpu = 'GPU detection unavailable on Windows'
+          }
+        }
+      } else if (process.platform === 'darwin') {
+        try {
+          const { stdout } = await execAsync('system_profiler SPDisplaysDataType | grep -E "Chipset|VRAM"')
+          info.gpu = stdout.trim() || 'Apple GPU'
+        } catch {
+          info.gpu = 'GPU detection unavailable on macOS'
+        }
       } else if (process.platform === 'linux') {
         const { stdout } = await execAsync('lspci | grep -i vga')
         info.gpu = stdout.split(':').pop()?.trim() || 'Unknown'

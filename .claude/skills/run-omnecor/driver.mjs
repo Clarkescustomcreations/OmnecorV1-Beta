@@ -9,24 +9,68 @@
  *   OMNECOR_URL   base URL (default: http://localhost:3000)
  *   SHOT_DIR      screenshot output dir (default: /tmp/omnecor-shots)
  */
-import { chromium } from "/usr/share/code/resources/app/node_modules/playwright-core/index.mjs";
 import { execSync } from "child_process";
-import fs from "fs";
-import path from "path";
+import fs, { existsSync } from "fs";
+import path, { join } from "path";
+import { tmpdir, homedir } from "os";
+
+// Try to import playwright from npm package or common locations
+let chromium;
+try {
+  const pw = await import("playwright-core");
+  chromium = pw.chromium;
+} catch {
+  try {
+    const pw = await import("playwright");
+    chromium = pw.chromium;
+  } catch {
+    throw new Error("playwright or playwright-core not found. Run: npm install -g playwright");
+  }
+}
 
 const BASE_URL = process.env.OMNECOR_URL ?? "http://localhost:3000";
-const SHOT_DIR = process.env.SHOT_DIR ?? "/tmp/omnecor-shots";
+const SHOT_DIR = process.env.SHOT_DIR ?? join(tmpdir(), "omnecor-shots");
+
+// Cross-platform Playwright cache path detection
+function findChromiumPlaywrightDir() {
+  const candidates = process.platform === "win32"
+    ? [join(process.env.LOCALAPPDATA || "", "ms-playwright")]
+    : process.platform === "darwin"
+    ? [join(homedir(), "Library", "Caches", "ms-playwright")]
+    : [join(homedir(), ".cache", "ms-playwright")];
+
+  for (const dir of candidates) {
+    if (existsSync(dir)) return dir;
+  }
+  return null;
+}
 
 // Resolve Chromium: prefer CHROMIUM env var, then search the Playwright cache,
 // then fall back to any system chrome/chromium binary.
 function findChromium() {
   if (process.env.CHROMIUM) return process.env.CHROMIUM;
   try {
-    const found = execSync("find ~/.cache/ms-playwright -name chrome -type f 2>/dev/null | head -1", { encoding: "utf8" }).trim();
-    if (found) return found;
+    const playwrightDir = findChromiumPlaywrightDir();
+    if (playwrightDir) {
+      // Walk one level deep to find a chrome/chrome.exe binary
+      const chromeName = process.platform === "win32" ? "chrome.exe" : "chrome";
+      for (const entry of fs.readdirSync(playwrightDir)) {
+        const candidate = join(playwrightDir, entry, "chrome-" + (process.platform === "win32" ? "win" : process.platform === "darwin" ? "mac" : "linux"), chromeName);
+        if (existsSync(candidate)) return candidate;
+        // Also try a flat path inside the versioned dir
+        const flat = join(playwrightDir, entry, chromeName);
+        if (existsSync(flat)) return flat;
+      }
+    }
   } catch { /* ignore */ }
-  for (const bin of ["chromium-browser", "chromium", "google-chrome"]) {
-    try { return execSync(`which ${bin}`, { encoding: "utf8" }).trim(); } catch { /* ignore */ }
+  if (process.platform === "win32") {
+    for (const bin of ["chrome.exe", "chromium.exe"]) {
+      try { return execSync(`where ${bin}`, { encoding: "utf8" }).trim().split("\n")[0]; } catch { /* ignore */ }
+    }
+  } else {
+    for (const bin of ["chromium-browser", "chromium", "google-chrome"]) {
+      try { return execSync(`which ${bin}`, { encoding: "utf8" }).trim(); } catch { /* ignore */ }
+    }
   }
   throw new Error("No Chromium binary found. Set CHROMIUM env var or install chromium.");
 }
