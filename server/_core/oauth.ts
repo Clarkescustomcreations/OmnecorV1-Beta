@@ -12,6 +12,72 @@ import { eq, lt } from "drizzle-orm";
 
 export const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
 
+// Treat a token as expired this many ms before its real expiry so an in-flight
+// request never races the expiry boundary.
+const TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
+
+/**
+ * Returns true if a token whose expiry is `expiresAt` should be considered
+ * expired (or expiring within the skew window) right now. A null/undefined
+ * expiry is treated as "not known to be expired" (caller decides).
+ */
+export function isTokenExpired(expiresAt: Date | number | null | undefined): boolean {
+  if (expiresAt == null) return false;
+  const ms = typeof expiresAt === "number" ? expiresAt : expiresAt.getTime();
+  return Number.isFinite(ms) && ms - TOKEN_EXPIRY_SKEW_MS <= Date.now();
+}
+
+/**
+ * Perform an OAuth-authenticated request with automatic single-retry refresh.
+ *
+ * 1. If `expiresAt` indicates the token is expired, refresh BEFORE the call.
+ * 2. Make the request with the (possibly refreshed) Bearer token.
+ * 3. If the response is 401, refresh once and retry exactly one more time.
+ *
+ * `refresh` must return a fresh access token (or null when refresh is
+ * impossible — e.g. no refresh token), in which case the original 401 is
+ * returned to the caller. This bounds retries to a single attempt and ensures
+ * a silently-expired token surfaces as a refreshed success or a real error,
+ * never as a hung/silently-failing request.
+ */
+export async function fetchWithOAuthRetry(
+  url: string,
+  accessToken: string,
+  refresh: () => Promise<string | null>,
+  options: { expiresAt?: Date | number | null; init?: RequestInit; timeoutMs?: number } = {}
+): Promise<globalThis.Response> {
+  const { expiresAt, init = {}, timeoutMs = 30_000 } = options;
+
+  let token = accessToken;
+  if (isTokenExpired(expiresAt)) {
+    const refreshed = await refresh().catch(() => null);
+    if (refreshed) token = refreshed;
+  }
+
+  const doFetch = async (bearer: string): Promise<globalThis.Response> => {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await fetch(url, {
+        ...init,
+        signal: controller.signal,
+        headers: { ...(init.headers ?? {}), Authorization: `Bearer ${bearer}` },
+      });
+    } finally {
+      clearTimeout(timer);
+    }
+  };
+
+  let res = await doFetch(token);
+  if (res.status === 401) {
+    const refreshed = await refresh().catch(() => null);
+    if (refreshed) {
+      res = await doFetch(refreshed);
+    }
+  }
+  return res;
+}
+
 export interface OAuthStateData {
   platform: string;
   userId: number;

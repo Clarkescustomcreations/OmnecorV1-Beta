@@ -12,7 +12,8 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { VirtualCardService } from "../phase2/services/VirtualCardService.js";
+import { VirtualCardService, CardOperationError } from "../phase2/services/VirtualCardService.js";
+import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { createLogger } from "../_core/logger.js";
 
 const log = createLogger("VirtualCard");
@@ -58,16 +59,58 @@ export const virtualCardRouter = router({
         };
       }
 
-      // TODO: Wire HITLApprovalService here when the approval flow is integrated in Phase 28 (GodMode)
-      // For now, log the action for audit trail
-      log.info(`User ${userId} issuing card — $${input.spendLimitDollars} limit`);
+      // HITL approval gate — suspend until a human approves or rejects.
+      // The procedure blocks here until an administrator responds, or until the
+      // 5-minute timeout fires (auto-reject). No card is issued without approval.
+      log.info(`User ${userId} requesting card issuance approval — $${input.spendLimitDollars} limit`);
+
+      const hitl = HITLApprovalService.getInstance();
+      const approved = await Promise.race([
+        hitl.requestApproval("virtualCard.issueCard", {
+          userId,
+          spendLimitDollars: input.spendLimitDollars,
+          memo: input.memo,
+          riskNote:
+            "This action issues a real virtual credit card charged against the Lithic account.",
+        }),
+        new Promise<boolean>((_, reject) =>
+          setTimeout(() => reject(new Error("timeout")), 5 * 60 * 1000)
+        ),
+      ]).catch((err: unknown) => {
+        if (err instanceof Error && err.message === "timeout") {
+          throw new TRPCError({
+            code: "TIMEOUT",
+            message: "Card issuance approval timed out after 5 minutes.",
+          });
+        }
+        throw err;
+      });
+
+      if (!approved) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: "Card issuance rejected by administrator.",
+        });
+      }
+
+      log.info(`Card issuance approved for user ${userId} — $${input.spendLimitDollars} limit`);
 
       const spendLimitCents = Math.round(input.spendLimitDollars * 100);
-      const card = await service.issueCard({
-        spendLimitCents,
-        memo: input.memo,
-        userId: String(userId),
-      });
+      let card;
+      try {
+        card = await service.issueCard({
+          spendLimitCents,
+          memo: input.memo,
+          userId: String(userId),
+        });
+      } catch (err) {
+        // CardOperationError carries only a safe, redacted message (the raw
+        // processor response was already logged internally). Never leak details.
+        if (err instanceof CardOperationError) {
+          throw new TRPCError({ code: "BAD_GATEWAY", message: err.message });
+        }
+        throw err;
+      }
 
       // Record issuance timestamp for rate limiting
       issuanceRateMap.set(userId, Date.now());

@@ -15,8 +15,26 @@
 import crypto from "crypto";
 import { ENV } from "../../_core/env.js";
 import { createLogger } from "../../_core/logger.js";
+import { redactSensitive } from "../../_core/redaction.js";
+import { resilientFetch, CircuitOpenError } from "../../_core/resilientFetch.js";
 
 const log = createLogger("VirtualCardService");
+
+/**
+ * Safe, user-facing error for card operations. Never carries raw Lithic
+ * response text — that is logged internally (redacted) only. PCI DSS: card
+ * data and processor debug info must not surface to clients or persist in
+ * plaintext logs.
+ */
+export class CardOperationError extends Error {
+  constructor(
+    message: string,
+    public readonly status?: number,
+  ) {
+    super(message);
+    this.name = "CardOperationError";
+  }
+}
 
 const LITHIC_API_BASE = "https://api.lithic.com/v1";
 const ALGORITHM = "aes-256-gcm" as const;
@@ -79,28 +97,81 @@ export class VirtualCardService {
       state: "OPEN",
     };
 
-    const response = await fetch(`${LITHIC_API_BASE}/cards`, {
-      method: "POST",
-      headers: {
-        "Authorization": ENV.lithicApiKey,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(body),
+    // Compliance audit trail: record the attempt (no card data — none exists yet).
+    log.info("card.issue.attempt", {
+      userId: input.userId,
+      spendLimitCents: input.spendLimitCents,
     });
 
-    if (!response.ok) {
-      const errorText = await response.text().catch(() => "unknown error");
-      throw new Error(`Lithic API error ${response.status}: ${errorText}`);
+    let response: Response;
+    try {
+      response = await resilientFetch(`${LITHIC_API_BASE}/cards`, {
+        method: "POST",
+        headers: {
+          "Authorization": ENV.lithicApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(body),
+        circuitKey: "lithic",
+        timeoutMs: 20_000,
+      });
+    } catch (err) {
+      if (err instanceof CircuitOpenError) {
+        log.error("card.issue.circuit_open", { userId: input.userId });
+        throw new CardOperationError(
+          "Card service is temporarily unavailable. Please try again shortly.",
+        );
+      }
+      // Network/timeout — log internally, return safe message.
+      log.error("card.issue.network_error", {
+        userId: input.userId,
+        error: redactSensitive((err as Error)?.message ?? String(err)),
+      });
+      throw new CardOperationError("Unable to issue card right now. Please try again.");
     }
 
-    const card: any = await response.json();
+    if (!response.ok) {
+      // The Lithic error body may contain PAN/CVV/PII or processor debug info.
+      // Read it ONLY to log internally with redaction — never surface it.
+      const rawError = await response.text().catch(() => "unknown error");
+      log.error("card.issue.api_error", {
+        userId: input.userId,
+        status: response.status,
+        detail: redactSensitive(rawError),
+      });
+      throw new CardOperationError(
+        `Card issuance failed (status ${response.status}). Please try again or contact support.`,
+        response.status,
+      );
+    }
 
-    // Encrypt the PAN — never store or return it in plaintext
+    let card: { pan?: string; token?: string; last_four?: string; exp_month?: number; exp_year?: number };
+    try {
+      card = await response.json();
+    } catch (err) {
+      log.error("card.issue.parse_error", {
+        userId: input.userId,
+        error: redactSensitive((err as Error)?.message ?? String(err)),
+      });
+      throw new CardOperationError("Card issuance returned an invalid response. Please try again.");
+    }
+
+    // Encrypt the PAN IMMEDIATELY — before any further logic or error path can
+    // run. The plaintext PAN exists only on this line and is never stored,
+    // logged, or returned (PCI DSS: PAN must never persist in plaintext).
     const { encryptedData, ivHex, authTagHex } = this.encryptToken(card.pan ?? "");
+    const last4 = card.last_four ?? (card.pan ? card.pan.slice(-4) : "****");
+    // card.pan goes out of scope here; nothing downstream references it.
+
+    log.info("card.issue.success", {
+      userId: input.userId,
+      cardId: card.token ?? "(generated)",
+      last4,
+    });
 
     return {
       id: card.token ?? uuidv4(),
-      last4: card.last_four ?? card.pan?.slice(-4) ?? "****",
+      last4,
       expMonth: card.exp_month ?? 0,
       expYear: card.exp_year ?? 0,
       encryptedPan: encryptedData,
