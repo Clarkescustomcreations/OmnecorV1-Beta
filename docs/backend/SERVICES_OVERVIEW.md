@@ -125,6 +125,140 @@ graph TD
     -   Wiring the server shutdown into the application's graceful shutdown process.
     -   Respecting `VALET_AUTO_START` environment variable (set to `"false"` to disable auto-start without removing the artifact).
 
-## 3. Service Interaction
+### 2.13. `AuditLogService` (`server/phase2/services/AuditLogService.ts`)
+
+-   **Purpose**: Maintains an immutable, append-only audit trail of all privileged system actions for compliance and security monitoring.
+-   **Key Responsibilities**:
+    -   Recording login/logout events, HITL approvals, agent spawns, budget changes, and security events.
+    -   Automatically scrubbing sensitive data (API keys, tokens, PII) via `redactSensitiveData()` before writing.
+    -   Enforcing append-only semantics — no update or delete procedures exist for the `audit_log` table.
+    -   Providing filtered log viewing and CSV export capabilities for audit and compliance purposes.
+
+### 2.14. `WebSocketServer` (`server/_core/websocket.ts`)
+
+-   **Purpose**: Provides real-time pub/sub messaging across multiple channels for instant UI updates and cross-system communication.
+-   **Key Responsibilities**:
+    -   Publishing events to channels: `training`, `hardware`, `voice`, `mesh`, `budget`, `security`.
+    -   Handling client subscriptions and delivering filtered messages based on channel subscriptions.
+    -   Enabling real-time streaming of progress updates from long-running operations (e.g., model training, file processing).
+
+### 2.15. `TokenRefreshService` (`server/phase2/services/TokenRefreshService.ts`)
+
+-   **Purpose**: Automatically refreshes OAuth tokens on a recurring interval to maintain valid authentication without user intervention.
+-   **Key Responsibilities**:
+    -   Implementing 15-minute token refresh cycles for cloud AI providers and external integrations.
+    -   Handling token rotation and storage of refreshed credentials (AES-256-GCM encrypted at rest).
+    -   Gracefully handling refresh failures and notifying the user if re-authentication is required.
+    -   Pre-flight expiry checks (60s skew) before making authenticated API calls.
+    -   Safe retry logic with single 401-refresh-retry pattern for automatic token recovery.
+
+### 2.15a. `resilientFetch` Utility (`server/_core/resilientFetch.ts`)
+
+-   **Purpose**: Provides a robust fetch wrapper for all external API calls with timeout, retry, and circuit-breaker capabilities.
+-   **Key Responsibilities**:
+    -   Implementing exponential backoff on transient failures (429 rate limits, 5xx errors; respects `Retry-After` header).
+    -   Per-host circuit breaker: opens after 5 consecutive failures, enters half-open state after 60s cooldown.
+    -   AbortController timeout enforcement (default 30s, configurable per call).
+    -   Throwing `CircuitOpenError` when a breaker is open to fail fast and prevent cascading failures.
+    -   Applied to critical external APIs: Lithic (cards), cloud compute (Vast.ai/RunPod/Lambda), OAuth refresh, ElevenLabs, and others.
+
+### 2.15b. `apiClient` Wrapper (`server/_core/apiClient.ts`)
+
+-   **Purpose**: Unified API client for consistent error handling, logging, and redaction across all external services.
+-   **Key Responsibilities**:
+    -   Wrapping fetch calls with timeout protection and labeled error context (`[Service.method]`).
+    -   Delegating to `resilientFetch` for retry and circuit-breaker logic.
+    -   Automatically redacting sensitive request/response data before logging (via `redactSensitive()`).
+    -   Applied to: ComfyUI, PCBWay, OpenArt, ElevenLabs, and other service clients.
+
+### 2.15c. `redactSensitive` Utility (`server/_core/redaction.ts`)
+
+-   **Purpose**: Centralized sensitive data redaction to prevent accidental exposure of secrets in logs, errors, and audit trails.
+-   **Key Responsibilities**:
+    -   Detecting and redacting payment card PANs (Luhn-validated to prevent false positives).
+    -   Removing CVV, CVC, and other payment card fields.
+    -   Redacting Bearer tokens, JWTs, and OAuth access/refresh tokens.
+    -   Removing PEM-encoded private keys and hex-encoded secrets.
+    -   Sanitizing long opaque authentication tokens and `.env` file contents.
+    -   Applied to: Lithic card operations, API error messages, audit logs, and service logs.
+
+### 2.16. `UpdateCheckerService` (`server/phase2/services/UpdateCheckerService.ts`)
+
+-   **Purpose**: Periodically checks for new Omnecor releases on GitHub and notifies the user of available updates.
+-   **Key Responsibilities**:
+    -   Polling GitHub release API on a configurable interval.
+    -   Detecting version upgrades and comparing against current installation.
+    -   Emitting update notifications via WebSocket events to the UI.
+
+### 2.17. `BlenderBridge` (`server/phase2/bridges/BlenderBridge.ts` + `server/python_bridges/blender_bridge.py`)
+
+-   **Purpose**: Orchestrates 3D modeling and rendering automation tasks through Blender.
+-   **Key Responsibilities**:
+    -   Spawning and managing Blender processes via `ProcessManagerService`.
+    -   Executing Python scripts for asset generation, scene rendering, and model manipulation.
+    -   Streaming progress and output back to the UI.
+
+### 2.18. `KiCadBridge` (`server/phase2/bridges/KiCadBridge.ts` + `server/python_bridges/kicad_bridge.py`)
+
+-   **Purpose**: Automates PCB design tasks including schematic validation, layout, and electrical rules checking (ERC/DRC).
+-   **Key Responsibilities**:
+    -   Interfacing with KiCad via Python API for headless automation.
+    -   Running design rule checks (DRC) and electrical rules checks (ERC).
+    -   Managing schematic-to-layout workflows and generating fabrication outputs (Gerbers, drill files).
+
+### 2.19. `ESPToolBridge` (`server/phase2/bridges/ESPToolBridge.ts` + `server/python_bridges/esptool_bridge.py`)
+
+-   **Purpose**: Automates ESP32/ESP8266 firmware flashing, serial monitoring, and hardware communication.
+-   **Key Responsibilities**:
+    -   Detecting connected serial devices and managing firmware upload workflows.
+    -   Monitoring serial output from microcontroller devices in real time.
+    -   Managing flash partition layout, erasing, and verifying firmware integrity.
+
+### 2.20. `MemoryArchitectService` (Extended) (`server/phase2/services/MemoryArchitectService.ts`)
+
+-   **Purpose**: Manages the complete memory and context layers, including both local ChromaDB and cloud-backed Honcho integration.
+-   **Key Responsibilities**:
+    -   Orchestrating document chunking strategies (recursive, semantic, fixed-size).
+    -   Retrieving semantically relevant context from ChromaDB via vector similarity search.
+    -   Integrating with `HonchoService` for cross-session persistent user facts and preferences.
+    -   Providing a unified RAG interface that transparently combines local and persistent memory.
+
+### 2.21. `VoiceService` (`server/phase2/services/VoiceService.ts` + FastAPI bridge)
+
+-   **Purpose**: Manages speech-to-text (STT), text-to-speech (TTS), and real-time voice cloning (RVC).
+-   **Key Responsibilities**:
+    -   Sending audio to Whisper endpoints for transcription.
+    -   Converting text to speech via XTTS-v2 or ElevenLabs cloud voices.
+    -   Proxying voice cloning requests to RVC models.
+    -   Managing FastAPI microservice lifecycle and health checks.
+
+---
+
+## 3. Service Startup Sequence
+
+```mermaid
+graph TD
+    START[Server Start] --> DB[Database Connection\nDrizzle ORM Init]
+    DB --> SEC[SecurityService\nInit]
+    DB --> VDB[VectorDBService\nChromaDB Connect]
+    DB --> PM[ProcessManagerService\nInit]
+    DB --> AL[AuditLogService\nInit]
+    SEC --> WS[WebSocketServer\nAttach to HTTP]
+    VDB --> MA[MemoryArchitectService\nInit]
+    PM --> FS[FileSystemWatcherService\nStart]
+    WS --> VS[ValetServerService\nCheck Artifact]
+    VS -->|Artifact present| VI[Start Valet Inference\nPort 8010]
+    VS -->|No artifact| VF[Keyword Fallback\nMode Active]
+    AL --> TR[TokenRefreshService\nStart 15-min interval]
+    AL --> UC[UpdateCheckerService\nStart polling]
+    FS --> READY[Server Ready]
+    VI --> READY
+    VF --> READY
+    MA --> READY
+```
+
+---
+
+## 4. Service Interaction
 
 Services primarily interact with each other by calling methods on their singleton instances. This allows for a clean, dependency-injected architecture where services can collaborate to fulfill complex requests. The tRPC context factory (`server/_core/context.ts`) plays a crucial role in making these service instances available to every tRPC procedure.

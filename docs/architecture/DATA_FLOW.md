@@ -124,3 +124,122 @@ The `MemoryArchitectService` and frontend context controls ensure efficient toke
 -   **File System**: Unstructured data, such as project files, AI model weights, generated media, and log files, are stored directly on the local file system. The `FileSystemWatcherService` monitors changes to project files and triggers appropriate backend events.
 -   **Context Persistence**: The `MemoryArchitectService` and `VectorDBService` ensure that AI context and semantic memory are persistently stored and available across sessions.
 -   **Cross-Session Memory**: The `HonchoService` persists user facts and preferences across sessions via the Honcho external memory service. When enabled, these are queried and injected into the system prompt on each new conversation.
+
+---
+
+## 4. External API Resilience & Error Handling
+
+All communication with external cloud APIs (AI providers, payments, cloud compute, etc.) is hardened with resilience patterns to ensure reliable operation even during transient failures or service degradation.
+
+### 4.1. Resilient Fetch Pattern
+
+Every external API call passes through the `resilientFetch` utility wrapper (`server/_core/resilientFetch.ts`), which provides:
+
+```mermaid
+graph TD
+    Request["API Request<br/>(OpenAI, Lithic, etc.)"]
+    Request --> Timeout["AbortController<br/>Timeout (default 30s)"]
+    Timeout --> Fetch["fetch() Call"]
+    Fetch --> Response{Response<br/>Status}
+    Response -->|2xx| Success["✅ Return Result"]
+    Response -->|429 or 5xx| Retry["Check Circuit<br/>Breaker"]
+    Response -->|4xx non-429| ClientError["❌ Fail Immediately<br/>(no retry)"]
+    
+    Retry --> CircuitCheck{"Circuit<br/>Breaker<br/>Open?"}
+    CircuitCheck -->|Yes| CircuitOpen["🔴 CircuitOpenError<br/>(fail-fast)"]
+    CircuitCheck -->|No| Backoff["Exponential Backoff<br/>1s → 2s → 4s<br/>(respects Retry-After)"]
+    Backoff --> RetryCount{"Retries<br/>Left?"}
+    RetryCount -->|Yes| Fetch
+    RetryCount -->|No| Exhausted["❌ Max Retries<br/>Exhausted"]
+    
+    CircuitOpen --> CircuitHalf["After 60s cooldown:<br/>half-open state<br/>Next request is trial"]
+    
+    Success --> Log["Log Success"]
+    ClientError --> Log
+    Exhausted --> Track["Track 5 Consecutive<br/>Failures<br/>→ Open Circuit"]
+    CircuitOpen --> Log
+```
+
+### 4.2. Per-Host Circuit Breaker
+
+- **Threshold:** Circuit opens after 5 consecutive failures (per API host)
+- **Cooldown:** 60 seconds in open state (fail-fast)
+- **Recovery:** After cooldown, enters half-open state and attempts a trial request
+- **Success:** One successful request closes the circuit and resets counter
+- **Applied to:** Lithic, all cloud compute providers, OAuth refresh, ElevenLabs, and others
+
+### 4.3. Exponential Backoff
+
+- **Transient Errors:** 429 (rate limit) and 5xx (server error) trigger automatic retry
+- **Backoff Schedule:** 1s, 2s, 4s delays (3 retries maximum)
+- **Retry-After Header:** Custom retry timing from API responses is honored
+- **Client Errors:** 4xx responses (except 429) fail immediately without retry
+
+### 4.4. Sensitive Data Redaction
+
+All API error responses and logs pass through `redactSensitive()` before being stored or displayed:
+
+- **Payment Cards:** PAN, CVV, expiration date
+- **Tokens:** Bearer tokens, JWTs, OAuth tokens, API keys
+- **Cryptographic Material:** PEM private keys, hex-encoded secrets
+- **Prevents:** Accidental exposure in error messages, logs, or audit trails
+
+### 4.5. Error Wrapping for Critical APIs
+
+Certain APIs that handle sensitive data (financial, authentication) have special error wrapping:
+
+| API | Error Wrapping |
+|-----|---|
+| **Lithic** | Raw errors logged internally; users see safe `CardOperationError` |
+| **OAuth Refresh** | Failures don't expose cause; triggers re-auth flow |
+| **Cloud Compute** | Users see clear env var names (e.g., "VASTAI_API_KEY not set") |
+
+### 4.6. Token Refresh Safety
+
+OAuth token refresh ensures automatic recovery without exposing refresh state:
+
+```mermaid
+sequenceDiagram
+    Client->>Backend: API Call with Token
+    Backend->>OAuth: Check Token Expiry
+    alt Token Expired (60s margin)
+        OAuth->>OAuthProvider: Refresh Token Request
+        OAuthProvider->>OAuth: New Access Token
+    end
+    Backend->>ExternalAPI: API Call with Valid Token
+    ExternalAPI->>Backend: Response
+    Backend->>Client: Result
+```
+
+**Guarantees:**
+- Pre-flight expiry check (60s safety margin) prevents most 401 failures
+- Single 401-retry pattern: if an API call fails with 401, token is refreshed and call retried once
+- Transient refresh failures are transparent to the user (retried automatically)
+- Permanent token revocation triggers OAuth re-authentication flow
+
+### 4.7. Cloud Compute Transaction Atomicity
+
+Virtual card and cloud instance operations are atomic to prevent orphaned charges:
+
+**State Machine:**
+1. Insert session as `status: "starting"` before cloud provider call
+2. Promote to `running` only after provider confirms provisioning succeeded
+3. Mark `error` (non-billable) if provider call fails
+4. Only record spend log after provider confirms termination (2xx response)
+
+**Idempotency:**
+- Per-user request deduplication keys prevent duplicate charges on retry
+- Even if network fails after instance created, spend is logged only once
+
+---
+
+## 5. Local Service Failover
+
+Local microservices (Whisper, TTS, ComfyUI, Valet Router, etc.) degrade gracefully:
+
+- **Health Checks:** Monitored at startup and during operations
+- **Graceful Degradation:** Missing services don't crash the app; features are disabled with clear feedback
+- **Port Configuration:** Configurable via environment variables (`WHISPER_SERVER_URL`, `COMFYUI_URL`, etc.)
+- **Automatic Fallback:** Alternative routes selected when primary service unavailable (e.g., Ollama if local Whisper fails)
+
+For details, see [EXTERNAL_APIS.md](./EXTERNAL_APIS.md) and [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-security-hardening).

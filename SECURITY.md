@@ -20,6 +20,16 @@ Omnecor incorporates several security features to protect your data and system:
 
 -   **OMMESH Security**: The OMMESH distributed mesh intelligence layer federates securely via mTLS (mutual Transport Layer Security), ensuring authenticated and encrypted communication between Omnecor nodes.
 
+-   **External API Security Hardening**: All calls to 30+ external cloud services (AI providers, payment processors, cloud compute, etc.) are hardened with:
+    -   **Circuit breakers**: Automatic fail-fast after repeated failures to prevent cascading outages
+    -   **Exponential backoff**: Transient failures are retried with intelligent delays
+    -   **Token refresh safety**: OAuth tokens are automatically refreshed with pre-flight expiry checks
+    -   **Sensitive data redaction**: Payment card numbers, API keys, and tokens are automatically scrubbed from logs and error messages
+    -   **Transaction atomicity**: Cloud compute and payment operations are protected against orphaned charges
+    -   **Error wrapping**: Sensitive API errors are logged internally; users see safe, actionable error messages
+    
+    See [docs/backend/EXTERNAL_APIS.md](docs/backend/EXTERNAL_APIS.md) for a complete reference of all integrated services.
+
 ## 2. Best Practices for Users
 
 To enhance the security of your Omnecor installation, we recommend the following best practices:

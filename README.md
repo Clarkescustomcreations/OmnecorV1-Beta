@@ -88,7 +88,8 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **PII Redaction** — `redactSensitiveData()` scrubs API keys and personal data before any log entry is written.
 - **Prompt Injection Defense** — `PromptSanitizer` blocks injection attempts and fires `security:injection_attempt` events.
 - **Zero-Login / Air-Gapped Mode** — `ZERO_LOGIN_MODE=true` bypasses OAuth entirely; auto-enforces Sovereign Mode.
-- **Extended OAuth** — Manus, Google, and Microsoft identity providers supported out of the box.
+- **Extended OAuth** — Google and Microsoft identity providers supported out of the box (Phase 23). Zero-login / air-gapped mode available for classified environments.
+- **External API Hardening** — All cloud API calls (OpenAI, Lithic, cloud compute, etc.) protected by circuit breakers, exponential backoff, token refresh safety, and atomic transactions. Payment card data never exposed in errors or logs.
 - **Role-Based Access Control** — Four roles: `viewer`, `user`, `admin`, `owner`.
 
 ### Developer Experience
@@ -98,6 +99,36 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **YARA Security Scanning** — Integrated malware/threat pattern scanning for uploaded files.
 - **Accessibility** — WCAG 2.1 AA compliance tested with axe-core across all pages.
 - **Packaging** — AppImage, `.deb`, Flatpak, and systemd service targets included.
+- **Real-Time File Watching** — `FileSystemWatcherService` monitors project directories and auto-updates the Neural Brain Map on changes.
+- **Artifact Versioning** — Register, version, and compare training artifacts (models, datasets, checkpoints) within training workflows.
+- **Image Generation Hub** — Unified interface for ComfyUI, Fal.ai, OpenArt, and Replicate with batch support and version history.
+
+### Agent Networking & Social Media Automation
+- **Multi-Platform Publishing** — Schedule and publish content across Twitter/X, LinkedIn, Instagram, TikTok, Facebook, and YouTube from one interface.
+- **OAuth 2.0 Platform Connection** — One-click connection to all 6 platforms via OAuth; tokens stored securely with auto-refresh.
+- **Content Discovery Engine** — AI-curated content from RSS feeds, keyword searches, and trending topics.
+- **Character Persona Studio** — Create branded social identities with custom bios, tone, hashtags, and posting schedules.
+- **Approval Workflows** — Review and approve AI-generated content drafts before publishing.
+- **Engagement Analytics** — Real-time dashboard for reach, impressions, and engagement metrics per platform.
+- **CSRF-Protected OAuth Flow** — State token validation (10-minute TTL) prevents authorization code injection.
+
+### Cloud Compute & GPU Scaling
+- **On-Demand GPU Rental** — Provision instances from Vast.ai, RunPod, and Lambda Labs without leaving Omnecor.
+- **Cost Estimation** — Preview instance cost before provisioning; spend is tracked in the Agentic Wallet.
+- **Session Lifecycle** — Provision, monitor, SSH into, and terminate cloud instances from the Settings panel.
+- **Persona Agent Backends** — Assign rented compute as the inference backend for always-on Persona agents.
+
+### MCP Tool Integration
+- **External Tool Providers** — Connect any MCP-compatible server as a tool provider for agents.
+- **Auto-Discovery** — Tool schemas are discovered automatically from connected MCP servers.
+- **Cached Schemas** — Tool schemas are cached locally to reduce latency on repeated calls.
+- **Multi-Server Support** — Connect and manage multiple MCP servers simultaneously.
+
+### Security & Sovereignty (Additional)
+- **File Encryption** — AES-256-GCM per-file encryption with per-file key derivation; metadata stored in database.
+- **System Backup & Recovery** — Full and incremental backups with restore-and-rollback capability; configurable retention policies.
+- **Vulnerability Scanning & IoC Detection** — YARA-based file scanning against threat intelligence feeds before file processing.
+- **Loop Detection** — Circular dependency and runaway agent spawn detection with configurable admin override.
 
 ---
 
@@ -109,6 +140,31 @@ Omnecor operates as a unified application with a single Express server serving a
 - **WebSocket Server**: Attached at `/ws` on the same HTTP server, facilitating real-time Neural Node-Tree and training progress updates.
 - **OMMESH**: The distributed mesh intelligence layer for multi-node discovery and inference routing.
 - **Phase 2 Services**: Singletons like `SecurityService`, `VectorDBService`, and `ProcessManagerService` are initialized at startup to ensure readiness.
+
+### System Architecture Overview
+
+```mermaid
+graph TD
+    User[User] --> UI[React Frontend]
+    UI -->|tRPC| BE[Express Backend]
+    UI -->|WebSocket| BE
+    BE --> VR[1.5B Valet Router]
+    VR -->|Sovereign Check| SC{Execution Mode}
+    SC -->|sovereign| LM[Local Models\nOllama / Llama.cpp]
+    SC -->|scrapper / big_spender| CM[Cloud APIs\nOpenAI / Anthropic / Gemini]
+    SC -->|omesh modes| ON[OMMESH Peers]
+    SC -->|moe_chain| FB[LLM-Builder\nFine-Tuned Models]
+    BE --> SVC[Phase 2 Services]
+    SVC --> SEC[SecurityService\nEncryption / YARA / Backup]
+    SVC --> VDB[VectorDBService\nChromaDB RAG]
+    SVC --> PM[ProcessManagerService\nBlender / KiCad / ESP]
+    SVC --> WS[WebSocketServer\nReal-Time Events]
+    SVC --> AN[AgentNetworkingService\nSocial Media OAuth]
+    SVC --> CC[CloudComputeService\nVast.ai / RunPod / Lambda]
+    SVC --> MCP[MCPService\nExternal Tool Providers]
+    BE --> DB[(SQLite / MySQL)]
+    BE --> OM[OMMESH Mesh\nmTLS Federation]
+```
 
 ---
 
@@ -158,6 +214,27 @@ For upcoming features, planned enhancements, and the overall direction of the Om
 ## Documentation
 
 Explore the comprehensive documentation suite in the [docs/](docs/) directory for in-depth information on various aspects of Omnecor.
+
+### Architecture & Integration
+
+- [System Architecture](docs/backend/SERVER_ARCHITECTURE.md) — Unified Express.js server, tRPC API, and service layer design
+- [Data Flow](docs/architecture/DATA_FLOW.md) — How data flows between frontend, backend, AI models, and external services
+- [External API Integrations](docs/backend/EXTERNAL_APIS.md) — Complete reference for all 30+ external cloud service integrations (AI providers, payments, cloud compute)
+- [Services Overview](docs/backend/SERVICES_OVERVIEW.md) — Deep dive into backend singleton services and their responsibilities
+
+### Security & Reliability
+
+- [Security Features Guide](docs/user-guides/SECURITY_FEATURES.md) — Encryption, auditing, threat scanning, execution modes, external API security hardening
+- [External Endpoints Audit](EXTERNAL_ENDPOINTS_AUDIT.md) — Full inventory of all external API connections verified as real and functional
+
+### Agent Documentation
+
+For detailed information on agent capabilities, collaboration workflows, and the Valet Router architecture, consult the following resources:
+
+- [AI Agent Responsibilities](docs/ai-agents/Omnecor%20AI%20Agent%20Responsibilities.md) — Define agent roles and decision-making authority.
+- [Multi-Agent Collaboration Workflows](docs/ai-agents/Omnecor%20Multi-Agent%20Collaboration%20Workflows.md) — Learn how agents collaborate and exchange context.
+- [Valet Router Architecture](docs/ai-agents/VALET_ROUTER.md) — Understand the 1.5B routing classifier and model selection logic.
+- [Workflow Sequencing](docs/ai-agents/WORKFLOW_SEQUENCING.md) — Guide to orchestrating complex multi-step pipelines.
 
 ---
 

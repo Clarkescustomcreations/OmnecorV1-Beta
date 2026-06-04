@@ -105,3 +105,50 @@ These are Python scripts that act as interfaces to specialized external tools an
 
 -   **OAuth**: The backend includes routes for OAuth integration (`registerOAuthRoutes`), allowing for secure third-party authentication.
 -   **Security Service**: The `SecurityService` is responsible for managing user sessions, permissions, and ensuring secure access to resources. It handles cryptographic operations and enforces security policies.
+
+## 5. External API Resilience & Hardening
+
+Omnecor integrates with 30+ external cloud services. All external API calls are protected by comprehensive resilience patterns:
+
+### Resilient Fetch Wrapper (`server/_core/resilientFetch.ts`)
+
+-   **Circuit Breaker**: Per-host failure tracking. Opens after 5 consecutive failures; closes after 60s cooldown.
+-   **Exponential Backoff**: Transient errors (429, 5xx) trigger automatic retry with 1s → 2s → 4s delays.
+-   **Timeout Protection**: AbortController enforces configurable timeout (default 30s).
+-   **Retry-After Respect**: Honors rate-limit API responses for custom retry timing.
+
+**Applied to**: Lithic (cards), all cloud compute providers (Vast.ai, RunPod, Lambda), OAuth token refresh, ElevenLabs TTS, and others.
+
+### Sensitive Data Redaction (`server/_core/redaction.ts`)
+
+All API errors and logs pass through `redactSensitive()` to prevent accidental exposure of:
+- Payment card PANs and CVV
+- Bearer tokens, JWTs, OAuth tokens, API keys
+- PEM-encoded private keys and hex secrets
+
+### Token Refresh Safety (`TokenRefreshService`)
+
+-   **Pre-flight Expiry Check**: Verifies token validity (60s safety margin) before use.
+-   **Automatic Refresh**: Expired tokens refreshed transparently via OAuth provider.
+-   **Single 401-Retry Pattern**: If an API call fails with 401, token is refreshed once and call retried.
+-   **Encrypted Storage**: Tokens encrypted at rest with AES-256-GCM.
+
+### Transaction Atomicity for Financial Operations
+
+Cloud compute instance start/stop and virtual card issuance operations are atomic:
+- Sessions inserted as `status: "starting"` before cloud provider call
+- Promoted to `running` only after provider confirms provisioning
+- Spend logged only after provider confirms termination (2xx response)
+- Per-user idempotency keys prevent duplicate charges on retry
+
+**Guarantee**: Charges can never be orphaned. If provider confirms action, spending is logged atomically.
+
+### Error Wrapping for Sensitive APIs
+
+| API | Error Strategy |
+|-----|---|
+| **Lithic** | Raw errors logged internally; users see safe `CardOperationError` |
+| **OAuth** | Failures don't expose cause; triggers re-auth flow |
+| **Cloud Compute** | Users see clear env var names (e.g., "VASTAI_API_KEY not set") |
+
+For detailed API reference, see [EXTERNAL_APIS.md](./EXTERNAL_APIS.md).
