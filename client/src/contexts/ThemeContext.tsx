@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useState } from "react";
+import { safeStorage } from "@/lib/safeStorage";
 
 export type Theme = "light" | "dark";
 
@@ -24,7 +25,7 @@ export function ThemeProvider({
 }: ThemeProviderProps) {
   const [theme, setTheme] = useState<Theme>(() => {
     if (switchable) {
-      const stored = localStorage.getItem("theme");
+      const stored = safeStorage.getItem("theme");
       return (stored as Theme) || defaultTheme;
     }
     return defaultTheme;
@@ -39,7 +40,7 @@ export function ThemeProvider({
     }
 
     if (switchable) {
-      localStorage.setItem("theme", theme);
+      safeStorage.setItem("theme", theme);
     }
   }, [theme, switchable]);
 

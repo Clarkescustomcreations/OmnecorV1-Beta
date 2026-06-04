@@ -64,7 +64,7 @@ export class AppPreferencesManager {
    */
   private loadPreferences() {
     try {
-      const stored = localStorage.getItem(this.storageKey);
+      const stored = safeStorage.getItem(this.storageKey);
       if (stored) {
         const parsed = JSON.parse(stored);
         this.preferences = { ...DEFAULT_PREFERENCES, ...parsed };
@@ -80,7 +80,7 @@ export class AppPreferencesManager {
    */
   private savePreferences() {
     try {
-      localStorage.setItem(this.storageKey, JSON.stringify(this.preferences));
+      safeStorage.setItem(this.storageKey, JSON.stringify(this.preferences));
       this.notifyListeners();
     } catch (error) {
       console.error("Failed to save preferences:", error);
@@ -186,3 +186,4 @@ export function useAppPreferences() {
 
 // Import React for the hook
 import React from "react";
+import { safeStorage } from "@/lib/safeStorage";
