@@ -244,12 +244,6 @@ Omnecor stands on the shoulders of giants. See the full [Open Source Acknowledge
 
 ---
 
-## Demo Site
-
-https://clarkescustomcreations.github.io/
-
----
-
 ## License
 
 Omnecor is released under the [MIT License](LICENSE).
