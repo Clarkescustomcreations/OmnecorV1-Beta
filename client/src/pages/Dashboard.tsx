@@ -18,6 +18,7 @@ import {
   Settings,
   ArrowRight,
   Sparkles,
+  Share2,
 } from "lucide-react";
 import { Link } from "wouter";
 import ProcessManagerPanel from "@/components/ProcessManagerPanel";
@@ -85,6 +86,14 @@ export default function Dashboard() {
       icon: GitBranch,
       href: "/pipelines",
       badge: blenderStatus?.isInstalled ? "Blender Ready" : "Blender Offline",
+    },
+    {
+      title: "Agent Networking",
+      description:
+        "Automated social media management and autonomous agent networking",
+      icon: Share2,
+      href: "/agent-networking",
+      badge: "Beta",
     },
     {
       title: "Integrations",

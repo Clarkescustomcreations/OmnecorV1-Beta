@@ -24,7 +24,7 @@ import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes } from "./oauth";
+import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes, registerSocialMediaOAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -173,6 +173,7 @@ async function startServer() {
     registerGoogleOAuthRoutes(app);
     registerMicrosoftOAuthRoutes(app);
   }
+  registerSocialMediaOAuthRoutes(app);
 
   // ─── tRPC API (unified router) ─────────────────────────────────────────
   app.use(
