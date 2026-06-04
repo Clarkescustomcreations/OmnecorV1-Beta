@@ -3,9 +3,12 @@ export interface LlamaCppGenerateOptions {
   temperature?: number;
 }
 
+// LLAMA_CPP_PORT configures the llama.cpp bridge server port (default: 8013)
+const LLAMA_CPP_PORT = process.env.LLAMA_CPP_PORT ?? "8013";
+
 export class LlamaCppService {
   private static instance: LlamaCppService | null = null;
-  private readonly bridgeUrl = "http://127.0.0.1:8013";
+  private readonly bridgeUrl = `http://127.0.0.1:${LLAMA_CPP_PORT}`;
 
   static getInstance(): LlamaCppService {
     if (!LlamaCppService.instance) LlamaCppService.instance = new LlamaCppService();

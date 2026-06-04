@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { ENV } from "../../_core/env.js";
+import { apiFetch } from "../../_core/apiClient.js";
 
 export interface PCBWayQuote {
   quoteId: string;
@@ -45,35 +46,53 @@ export class PCBWayService {
 
   async getQuote(gerberFilePath: string): Promise<PCBWayQuote> {
     this.guardConfigured();
-    const resp = await fetch(`${this.baseUrl}/order/GetQuote`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${ENV.pcbwayApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ partnerId: ENV.pcbwayPartnerId, gerberFile: gerberFilePath }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!resp.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `PCBWay API error: ${resp.status}` });
-    return resp.json() as Promise<PCBWayQuote>;
+    try {
+      return await apiFetch<PCBWayQuote>(
+        `${this.baseUrl}/order/GetQuote`,
+        {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${ENV.pcbwayApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ partnerId: ENV.pcbwayPartnerId, gerberFile: gerberFilePath }),
+          timeoutMs: 10_000,
+        },
+        { label: "PCBWay.getQuote" }
+      );
+    } catch (err) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: (err as Error).message });
+    }
   }
 
   async placeOrder(quoteId: string, shippingAddress: ShippingAddress): Promise<PCBWayOrder> {
     this.guardConfigured();
-    const resp = await fetch(`${this.baseUrl}/order/PlaceOrder`, {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${ENV.pcbwayApiKey}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ quoteId, shippingAddress }),
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!resp.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `PCBWay API error: ${resp.status}` });
-    return resp.json() as Promise<PCBWayOrder>;
+    try {
+      return await apiFetch<PCBWayOrder>(
+        `${this.baseUrl}/order/PlaceOrder`,
+        {
+          method: "POST",
+          headers: { "Authorization": `Bearer ${ENV.pcbwayApiKey}`, "Content-Type": "application/json" },
+          body: JSON.stringify({ quoteId, shippingAddress }),
+          timeoutMs: 10_000,
+        },
+        { label: "PCBWay.placeOrder" }
+      );
+    } catch (err) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: (err as Error).message });
+    }
   }
 
   async getOrderStatus(orderId: string): Promise<{ orderId: string; status: string; trackingNumber: string | null }> {
     this.guardConfigured();
-    const resp = await fetch(`${this.baseUrl}/order/GetOrderStatus?orderId=${encodeURIComponent(orderId)}`, {
-      headers: { "Authorization": `Bearer ${ENV.pcbwayApiKey}` },
-      signal: AbortSignal.timeout(10000),
-    });
-    if (!resp.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `PCBWay API error: ${resp.status}` });
-    return resp.json() as Promise<{ orderId: string; status: string; trackingNumber: string | null }>;
+    try {
+      return await apiFetch<{ orderId: string; status: string; trackingNumber: string | null }>(
+        `${this.baseUrl}/order/GetOrderStatus?orderId=${encodeURIComponent(orderId)}`,
+        {
+          headers: { "Authorization": `Bearer ${ENV.pcbwayApiKey}` },
+          timeoutMs: 10_000,
+        },
+        { label: "PCBWay.getOrderStatus" }
+      );
+    } catch (err) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: (err as Error).message });
+    }
   }
 }

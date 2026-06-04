@@ -18,8 +18,33 @@ import { eq, and, desc, isNull } from "drizzle-orm";
 import { getDb } from "../db.factory.js";
 import { cloudComputeSessions, cloudComputeSubscriptions, spendLog } from "../../drizzle/schema.js";
 import { createLogger } from "../_core/logger.js";
+import { resilientFetch } from "../_core/resilientFetch.js";
 
 const log = createLogger("CloudCompute");
+
+// In-memory idempotency guard: maps an idempotency key to the sessionId already
+// created for it. Prevents a client retry (same key) from provisioning — and
+// billing for — a duplicate instance. Entries expire after 10 minutes.
+const idempotencyCache = new Map<string, { sessionId: string; at: number }>();
+const IDEMPOTENCY_TTL_MS = 10 * 60 * 1000;
+
+function getIdempotent(key: string): string | undefined {
+  const hit = idempotencyCache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() - hit.at > IDEMPOTENCY_TTL_MS) {
+    idempotencyCache.delete(key);
+    return undefined;
+  }
+  return hit.sessionId;
+}
+
+function setIdempotent(key: string, sessionId: string): void {
+  idempotencyCache.set(key, { sessionId, at: Date.now() });
+  // Opportunistic sweep
+  for (const [k, v] of idempotencyCache) {
+    if (Date.now() - v.at > IDEMPOTENCY_TTL_MS) idempotencyCache.delete(k);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Provider catalog — real-world rates as of 2026-06. Update as market moves.
@@ -110,10 +135,11 @@ async function vastaiStartInstance(
   // We surface the external session ID for reference; actual provisioning
   // depends on the user's Vast.ai account balance.
   try {
-    const res = await fetch(`https://console.vast.ai/api/v0/asks/0/`, {
+    const res = await resilientFetch(`https://console.vast.ai/api/v0/asks/0/`, {
       method: "PUT",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ gpu_name: planId, num_gpus: 1, image: "pytorch/pytorch:latest" }),
+      circuitKey: "vastai",
     });
     if (!res.ok) return null;
     const data = await res.json() as { new_contract?: number };
@@ -128,10 +154,11 @@ async function runpodStartPod(
   planId: string
 ): Promise<{ externalId: string } | null> {
   try {
-    const res = await fetch("https://rest.runpod.io/v1/pods", {
+    const res = await resilientFetch("https://rest.runpod.io/v1/pods", {
       method: "POST",
       headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
       body: JSON.stringify({ gpuTypeId: planId, imageName: "runpod/pytorch:latest", containerDiskInGb: 20 }),
+      circuitKey: "runpod",
     });
     if (!res.ok) return null;
     const data = await res.json() as { id?: string };
@@ -147,10 +174,11 @@ async function lambdaStartInstance(
 ): Promise<{ externalId: string } | null> {
   try {
     const credentials = Buffer.from(`${apiKey}:`).toString("base64");
-    const res = await fetch("https://cloud.lambdalabs.com/api/v1/instance-operations/launch", {
+    const res = await resilientFetch("https://cloud.lambdalabs.com/api/v1/instance-operations/launch", {
       method: "POST",
       headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/json" },
       body: JSON.stringify({ instance_type_name: planId, region_name: "us-east-1", quantity: 1 }),
+      circuitKey: "lambda",
     });
     if (!res.ok) return null;
     const data = await res.json() as { instance_ids?: string[] };
@@ -160,32 +188,42 @@ async function lambdaStartInstance(
   }
 }
 
+/**
+ * Terminate a provider session. Returns true when the provider confirmed the
+ * stop (2xx), false otherwise. The caller MUST only write the spend log after a
+ * confirmed stop so we never bill for compute the provider kept running.
+ */
 async function terminateProviderSession(
   provider: ProviderId,
   externalId: string,
   apiKey: string
-): Promise<void> {
+): Promise<boolean> {
   try {
+    let res: Response | null = null;
     if (provider === "vastai") {
-      await fetch(`https://console.vast.ai/api/v0/instances/${externalId}/`, {
+      res = await resilientFetch(`https://console.vast.ai/api/v0/instances/${externalId}/`, {
         method: "DELETE",
         headers: { Authorization: `Bearer ${apiKey}` },
+        circuitKey: "vastai",
       });
     } else if (provider === "runpod") {
-      await fetch(`https://rest.runpod.io/v1/pods/${externalId}/stop`, {
+      res = await resilientFetch(`https://rest.runpod.io/v1/pods/${externalId}/stop`, {
         method: "POST",
         headers: { Authorization: `Bearer ${apiKey}` },
+        circuitKey: "runpod",
       });
     } else if (provider === "lambda") {
       const credentials = Buffer.from(`${apiKey}:`).toString("base64");
-      await fetch("https://cloud.lambdalabs.com/api/v1/instance-operations/terminate", {
+      res = await resilientFetch("https://cloud.lambdalabs.com/api/v1/instance-operations/terminate", {
         method: "POST",
         headers: { Authorization: `Basic ${credentials}`, "Content-Type": "application/json" },
         body: JSON.stringify({ instance_ids: [externalId] }),
+        circuitKey: "lambda",
       });
     }
+    return res ? res.ok : false;
   } catch {
-    // best-effort termination; session is marked stopped in DB regardless
+    return false;
   }
 }
 
@@ -198,6 +236,12 @@ const startSessionSchema = z.object({
   planId: z.string().min(1),
   billingUnit: z.enum(["minute", "hour"]).default("hour"),
   projectId: z.string().min(1).max(64),
+  /**
+   * Optional client-supplied idempotency key. When the same key is replayed
+   * (e.g. a network retry), the existing session is returned instead of
+   * provisioning — and billing for — a second instance.
+   */
+  idempotencyKey: z.string().min(1).max(128).optional(),
 });
 
 const stopSessionSchema = z.object({
@@ -271,33 +315,97 @@ export const cloudComputeRouter = router({
         ? ratePerHourCentsToMicrocents(plan.ratePerHourCents) / 60
         : ratePerHourCentsToMicrocents(plan.ratePerHourCents);
 
-      const apiKey = getProviderApiKey(providerCfg.envKey);
-      let externalSessionId: string | undefined;
-
-      if (apiKey) {
-        log.info(`Starting ${input.provider} session for user ${ctx.user.id}, plan ${input.planId}`);
-        let result: { externalId: string } | null = null;
-        if (input.provider === "vastai") result = await vastaiStartInstance(apiKey, input.planId);
-        else if (input.provider === "runpod") result = await runpodStartPod(apiKey, input.planId);
-        else if (input.provider === "lambda") result = await lambdaStartInstance(apiKey, input.planId);
-        externalSessionId = result?.externalId;
-      } else {
-        log.warn(`${providerCfg.envKey} not set — session tracked locally without provider provisioning`);
+      // Idempotency: scope the key to the user so keys can't collide/leak across
+      // accounts. A replayed request returns the existing session.
+      const idemKey = input.idempotencyKey
+        ? `${ctx.user.id}:${input.idempotencyKey}`
+        : undefined;
+      if (idemKey) {
+        const existingId = getIdempotent(idemKey);
+        if (existingId) {
+          const existing = await db
+            .select()
+            .from(cloudComputeSessions)
+            .where(eq(cloudComputeSessions.id, existingId))
+            .limit(1);
+          if (existing[0]) {
+            log.info(`Idempotent replay for key — returning existing session ${existingId}`);
+            return {
+              sessionId: existingId,
+              provider: providerCfg.name,
+              plan: plan.label,
+              billingUnit: input.billingUnit,
+              ratePerHourCents: plan.ratePerHourCents,
+              externalSessionId: existing[0].externalSessionId,
+              provisionedByApi: Boolean(existing[0].externalSessionId),
+              idempotentReplay: true,
+            };
+          }
+        }
       }
 
+      const apiKey = getProviderApiKey(providerCfg.envKey);
       const sessionId = uuidv4();
+
+      // State machine: insert as "starting" BEFORE calling the provider. No
+      // charge can ever accrue against a "starting" or "error" session, so a
+      // failed/partial provisioning never produces an orphaned billable record.
       await db.insert(cloudComputeSessions).values({
         id: sessionId,
         userId: ctx.user.id,
         projectId: input.projectId,
         provider: input.provider,
-        externalSessionId: externalSessionId ?? null,
+        externalSessionId: null,
         planId: input.planId,
         instanceLabel: plan.label,
         billingUnit: input.billingUnit,
         ratePerUnitMicrocents,
-        status: "running",
+        status: "starting",
       });
+      if (idemKey) setIdempotent(idemKey, sessionId);
+
+      let externalSessionId: string | undefined;
+
+      if (apiKey) {
+        log.info(`Starting ${input.provider} session for user ${ctx.user.id}, plan ${input.planId}`);
+        let result: { externalId: string } | null = null;
+        try {
+          if (input.provider === "vastai") result = await vastaiStartInstance(apiKey, input.planId);
+          else if (input.provider === "runpod") result = await runpodStartPod(apiKey, input.planId);
+          else if (input.provider === "lambda") result = await lambdaStartInstance(apiKey, input.planId);
+        } catch (err) {
+          log.error(`Provider provisioning threw for session ${sessionId}`, { error: (err as Error)?.message });
+          result = null;
+        }
+        externalSessionId = result?.externalId;
+
+        if (!externalSessionId) {
+          // Provider did not provision. Mark the session "error" so it is never
+          // billed, and surface a clear failure to the user.
+          await db
+            .update(cloudComputeSessions)
+            .set({ status: "error" })
+            .where(eq(cloudComputeSessions.id, sessionId));
+          throw new TRPCError({
+            code: "BAD_GATEWAY",
+            message: `${providerCfg.name} did not provision an instance. No charge was incurred.`,
+          });
+        }
+      } else {
+        log.warn(`${providerCfg.envKey} not set — session tracked locally without provider provisioning`);
+      }
+
+      // Provisioning confirmed (or local-only tracking) → promote to "running".
+      await db
+        .update(cloudComputeSessions)
+        .set({ status: "running", externalSessionId: externalSessionId ?? null })
+        .where(eq(cloudComputeSessions.id, sessionId));
+
+      // Surface a clear note when the provider key is absent so the user
+      // understands the session is locally-tracked only — not real GPU compute.
+      const providerNote = !apiKey
+        ? `${providerCfg.envKey} is not configured — session tracked locally only. Set ${providerCfg.envKey} in your .env to provision real GPU compute on ${providerCfg.name}.`
+        : null;
 
       return {
         sessionId,
@@ -307,6 +415,7 @@ export const cloudComputeRouter = router({
         ratePerHourCents: plan.ratePerHourCents,
         externalSessionId: externalSessionId ?? null,
         provisionedByApi: Boolean(apiKey && externalSessionId),
+        providerNote,
       };
     }),
 
@@ -338,11 +447,29 @@ export const cloudComputeRouter = router({
         elapsedMs
       );
 
-      // Terminate on provider if API key present and external session exists
+      // Terminate on provider if API key present and external session exists.
+      // We must CONFIRM the provider stopped the instance before recording spend
+      // — otherwise we could bill the user while the instance keeps running.
       const providerCfg = CLOUD_PROVIDERS[session.provider as ProviderId];
       const apiKey = getProviderApiKey(providerCfg.envKey);
-      if (apiKey && session.externalSessionId) {
-        await terminateProviderSession(session.provider as ProviderId, session.externalSessionId, apiKey);
+      const needsProviderStop = Boolean(apiKey && session.externalSessionId);
+      let providerStopConfirmed = !needsProviderStop; // local-only sessions need no confirmation
+      if (needsProviderStop) {
+        providerStopConfirmed = await terminateProviderSession(
+          session.provider as ProviderId,
+          session.externalSessionId!,
+          apiKey!,
+        );
+        if (!providerStopConfirmed) {
+          // Do NOT mark stopped or write the spend log: the instance may still
+          // be running and accruing real charges. Surface a clear error so the
+          // user (or a retry) can stop it. The session stays "running".
+          log.error(`Provider did not confirm stop for session ${input.sessionId} — not recording spend`);
+          throw new TRPCError({
+            code: "BAD_GATEWAY",
+            message: `${providerCfg.name} did not confirm instance termination. The session is still active — please retry stopping it.`,
+          });
+        }
       }
 
       await db
@@ -350,7 +477,8 @@ export const cloudComputeRouter = router({
         .set({ status: "stopped", stoppedAt, totalCostMicrocents })
         .where(eq(cloudComputeSessions.id, input.sessionId));
 
-      // Record cost to wallet spend log so budget tracking captures it
+      // Record cost to wallet spend log so budget tracking captures it — ONLY
+      // after the provider stop is confirmed (or for local-only sessions).
       if (totalCostMicrocents > 0) {
         await db.insert(spendLog).values({
           id: uuidv4(),

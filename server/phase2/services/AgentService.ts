@@ -209,7 +209,8 @@ export class AgentService extends EventEmitter {
 
   // ── RecursiveMAS bridge methods ─────────────────────────────────────────────
 
-  private readonly MAS_BRIDGE_URL = "http://127.0.0.1:8011";
+  // MAS_BRIDGE_PORT configures the Multi-Agent System bridge port (default: 8011)
+  private readonly MAS_BRIDGE_URL = `http://127.0.0.1:${process.env.MAS_BRIDGE_PORT ?? "8011"}`;
   private readonly MAS_TIMEOUT_MS = 5_000;
 
   /**

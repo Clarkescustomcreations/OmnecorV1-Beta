@@ -2,6 +2,10 @@ import { ProcessManagerService } from "./ProcessManagerService.js";
 import { PYTHON_SCRIPTS } from "../config/index.js";
 import path from "path";
 
+// FAL_LOCAL_PORT configures the local Fal AI bridge server port (default: 8004)
+const FAL_LOCAL_PORT = process.env.FAL_LOCAL_PORT ?? "8004";
+const FAL_BRIDGE_URL = `http://localhost:${FAL_LOCAL_PORT}`;
+
 /**
  * FalApiService
  * Bridges the Node.js backend to the Python-based Fal AI bridge server.
@@ -24,7 +28,7 @@ export class FalApiService {
   async generateCharacter(prompt: string, loraPath?: string): Promise<string> {
     // This assumes the Python bridge is running as a FastAPI service
     // We would typically communicate with it via HTTP requests
-    const response = await fetch("http://localhost:8004/flux-character", {
+    const response = await fetch(`${FAL_BRIDGE_URL}/flux-character`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ prompt, lora_path: loraPath }),
@@ -34,7 +38,7 @@ export class FalApiService {
   }
 
   async generateVideo(imageUrl: string, prompt: string): Promise<string> {
-    const response = await fetch("http://localhost:8004/minimax-video", {
+    const response = await fetch(`${FAL_BRIDGE_URL}/minimax-video`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ image_url: imageUrl, prompt }),

@@ -1,5 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { ENV } from "../../_core/env.js";
+import { apiFetch } from "../../_core/apiClient.js";
 
 export interface OpenArtGenerateResult {
   imageUrl: string;
@@ -25,20 +26,24 @@ export class OpenArtService {
     if (!this.isConfigured()) {
       throw new TRPCError({ code: "PRECONDITION_FAILED", message: "OpenArt API key not configured. Set OPENART_API_KEY." });
     }
-    const resp = await fetch("https://openart.ai/api/v1/image_request", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${ENV.openArtApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ prompt, model, width, height, num_images: 1 }),
-      signal: AbortSignal.timeout(60000),
-    });
-    if (!resp.ok) {
-      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `OpenArt API error: ${resp.status}` });
+    try {
+      const data = await apiFetch<{ images?: Array<{ url: string }> }>(
+        "https://openart.ai/api/v1/image_request",
+        {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${ENV.openArtApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ prompt, model, width, height, num_images: 1 }),
+          timeoutMs: 60_000,
+        },
+        { label: "OpenArt.generate" }
+      );
+      const imageUrl = data.images?.[0]?.url ?? "";
+      return { imageUrl, prompt, model, width, height };
+    } catch (err) {
+      throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: (err as Error).message });
     }
-    const data = await resp.json() as { images?: Array<{ url: string }> };
-    const imageUrl = data.images?.[0]?.url ?? "";
-    return { imageUrl, prompt, model, width, height };
   }
 }

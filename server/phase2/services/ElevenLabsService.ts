@@ -4,6 +4,7 @@
  * Respects ENV.elevenLabsApiKey.
  */
 import { ENV } from "../../_core/env.js";
+import { apiFetch } from "../../_core/apiClient.js";
 
 export interface ElevenLabsVoice {
   voice_id: string;
@@ -55,13 +56,11 @@ export class ElevenLabsService {
 
   async listVoices(): Promise<ElevenLabsVoice[]> {
     this.assertConfigured();
-    const res = await fetch(`${this.baseUrl}/voices`, {
-      headers: { "xi-api-key": this.apiKey },
-    });
-    if (!res.ok) {
-      throw new Error(`ElevenLabs API error: ${res.status} ${res.statusText}`);
-    }
-    const data = await res.json() as { voices: ElevenLabsVoice[] };
+    const data = await apiFetch<{ voices: ElevenLabsVoice[] }>(
+      `${this.baseUrl}/voices`,
+      { headers: { "xi-api-key": this.apiKey } },
+      { label: "ElevenLabs.listVoices" }
+    );
     return data.voices ?? [];
   }
 
@@ -79,19 +78,26 @@ export class ElevenLabsService {
       },
     };
 
-    const res = await fetch(`${this.baseUrl}/text-to-speech/${opts.voiceId}`, {
-      method: "POST",
-      headers: {
-        "xi-api-key": this.apiKey,
-        "Content-Type": "application/json",
-        "Accept": "audio/mpeg",
-      },
-      body: JSON.stringify(body),
-    });
+    // synthesis returns audio/mpeg — handle manually for the binary response
+    let res: Response;
+    try {
+      res = await fetch(`${this.baseUrl}/text-to-speech/${opts.voiceId}`, {
+        method: "POST",
+        headers: {
+          "xi-api-key": this.apiKey,
+          "Content-Type": "application/json",
+          "Accept": "audio/mpeg",
+        },
+        body: JSON.stringify(body),
+        signal: AbortSignal.timeout(30_000),
+      });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      throw new Error(`[ElevenLabs.synthesize] network error: ${msg}`);
+    }
 
     if (!res.ok) {
-      const errText = await res.text().catch(() => "");
-      throw new Error(`ElevenLabs synthesis failed: ${res.status} ${errText}`);
+      throw new Error(`[ElevenLabs.synthesize] HTTP ${res.status} ${res.statusText}`);
     }
 
     const arrayBuffer = await res.arrayBuffer();

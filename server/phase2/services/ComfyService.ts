@@ -1,4 +1,5 @@
 import { ProcessManagerService } from "./ProcessManagerService.js";
+import { apiFetch } from "../../_core/apiClient.js";
 
 /**
  * ComfyService
@@ -11,7 +12,9 @@ export class ComfyService {
 
   private constructor() {
     this.processManager = ProcessManagerService.getInstance();
-    this.comfyUrl = process.env.COMFYUI_URL || "http://127.0.0.1:8188";
+    // COMFYUI_URL takes precedence; COMFYUI_PORT allows changing just the port
+    const port = process.env.COMFYUI_PORT ?? "8188";
+    this.comfyUrl = process.env.COMFYUI_URL || `http://127.0.0.1:${port}`;
   }
 
   public static getInstance(): ComfyService {
@@ -27,50 +30,54 @@ export class ComfyService {
    * @returns The prompt response (prompt_id)
    */
   async queuePrompt(prompt: any): Promise<any> {
-    const response = await fetch(`${this.comfyUrl}/prompt`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ prompt }),
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      throw new Error(`ComfyUI error: ${error}`);
-    }
-
-    return response.json();
+    return apiFetch(
+      `${this.comfyUrl}/prompt`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ prompt }),
+      },
+      { label: "ComfyUI.queuePrompt" }
+    );
   }
 
   /**
    * Get the current queue status
    */
   async getQueue(): Promise<any> {
-    const response = await fetch(`${this.comfyUrl}/queue`);
-    return response.json();
+    return apiFetch(`${this.comfyUrl}/queue`, {}, { label: "ComfyUI.getQueue" });
   }
 
   /**
    * Get system information from ComfyUI
    */
   async getSystemStats(): Promise<any> {
-    const response = await fetch(`${this.comfyUrl}/system_stats`);
-    return response.json();
+    return apiFetch(`${this.comfyUrl}/system_stats`, {}, { label: "ComfyUI.getSystemStats" });
   }
 
   /**
    * Interrupt the current execution
    */
   async interrupt(): Promise<void> {
-    await fetch(`${this.comfyUrl}/interrupt`, { method: "POST" });
+    await apiFetch(
+      `${this.comfyUrl}/interrupt`,
+      { method: "POST" },
+      { label: "ComfyUI.interrupt" }
+    );
   }
 
   /**
    * Clear the queue
    */
   async clearQueue(): Promise<void> {
-    await fetch(`${this.comfyUrl}/queue`, {
-      method: "POST",
-      body: JSON.stringify({ clear: true }),
-    });
+    await apiFetch(
+      `${this.comfyUrl}/queue`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ clear: true }),
+      },
+      { label: "ComfyUI.clearQueue" }
+    );
   }
 }

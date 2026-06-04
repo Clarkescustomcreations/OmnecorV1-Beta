@@ -267,6 +267,47 @@ async function startServer() {
         log.info(`${check.name}: ✗ offline (not required)`);
       }
     }
+
+    // ── Local microservice port diagnostics ──────────────────────────────────
+    const localServices = [
+      { name: "Fal AI bridge",   url: `http://localhost:${process.env.FAL_LOCAL_PORT ?? "8004"}/health` },
+      { name: "MAS bridge",      url: `http://127.0.0.1:${process.env.MAS_BRIDGE_PORT ?? "8011"}/health` },
+      { name: "llama.cpp bridge",url: `http://127.0.0.1:${process.env.LLAMA_CPP_PORT ?? "8013"}/health` },
+      { name: "ComfyUI",         url: process.env.COMFYUI_URL ?? `http://127.0.0.1:${process.env.COMFYUI_PORT ?? "8188"}/system_stats` },
+      { name: "Whisper STT",     url: process.env.WHISPER_SERVER_URL ?? "http://localhost:8001/health" },
+      { name: "TTS service",     url: process.env.TTS_SERVER_URL ?? "http://localhost:8002/health" },
+      { name: "RVC service",     url: process.env.RVC_SERVER_URL ?? "http://127.0.0.1:8003/health" },
+    ];
+    for (const svc of localServices) {
+      try {
+        const r = await fetch(svc.url, { signal: AbortSignal.timeout(1500) });
+        log.info(`  ${svc.name}: ${r.ok ? "✓ online" : `✗ unreachable (HTTP ${r.status})`}`);
+      } catch {
+        log.info(`  ${svc.name}: ✗ offline (optional — start separately if needed)`);
+      }
+    }
+
+    // ── Optional API key diagnostics ─────────────────────────────────────────
+    const optionalKeys: Array<{ envKey: string; label: string }> = [
+      { envKey: "OPENAI_API_KEY",     label: "OpenAI" },
+      { envKey: "ANTHROPIC_API_KEY",  label: "Anthropic (Claude)" },
+      { envKey: "XAI_API_KEY",        label: "xAI (Grok)" },
+      { envKey: "GEMINI_API_KEY",     label: "Google Gemini" },
+      { envKey: "ELEVENLABS_API_KEY", label: "ElevenLabs TTS" },
+      { envKey: "LITHIC_API_KEY",     label: "Lithic (virtual cards)" },
+      { envKey: "PCBWAY_API_KEY",     label: "PCBWay manufacturing" },
+      { envKey: "OPENART_API_KEY",    label: "OpenArt image generation" },
+      { envKey: "FAL_KEY",            label: "Fal.ai image/video generation" },
+      { envKey: "VASTAI_API_KEY",     label: "Vast.ai cloud compute" },
+      { envKey: "RUNPOD_API_KEY",     label: "RunPod cloud compute" },
+      { envKey: "LAMBDA_API_KEY",     label: "Lambda Labs cloud compute" },
+    ];
+    for (const { envKey, label } of optionalKeys) {
+      if (!process.env[envKey]) {
+        log.info(`  Optional: ${envKey} not set — ${label} provider disabled`);
+      }
+    }
+
     if (ENV.zeroLoginMode) {
       log.warn("ZERO_LOGIN_MODE enabled — OAuth disabled, all requests authenticated as local admin");
     }
