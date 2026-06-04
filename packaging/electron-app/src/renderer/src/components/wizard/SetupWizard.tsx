@@ -30,9 +30,11 @@ export const SetupWizard: React.FC = () => {
   const progress = ((currentStep + 1) / STEPS.length) * 100;
 
   useEffect(() => {
-    window.api.getSystemInfo()
-      .then(setSysInfo)
-      .catch((e) => console.error('Failed to fetch system info', e));
+    if (window.api?.getSystemInfo) {
+      window.api.getSystemInfo()
+        .then(setSysInfo)
+        .catch((e) => console.error('Failed to fetch system info', e));
+    }
   }, []);
 
   const nextStep = () => {
@@ -52,7 +54,8 @@ export const SetupWizard: React.FC = () => {
       // Capacitor / Browser thin-client mode:
       // Read the IP from localStorage (set in StepNetwork) and navigate.
       const serverIP = localStorage.getItem('omnecor_server_ip') || 'localhost';
-      window.location.href = `http://${serverIP}:3000`;
+      const serverPort = (window as any).__OMNECOR_PORT__ || localStorage.getItem('omnecor_server_port') || '3000';
+      window.location.href = `http://${serverIP}:${serverPort}`;
     }
   };
 
