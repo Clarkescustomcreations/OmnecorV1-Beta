@@ -184,16 +184,24 @@ export const systemRouter = router({
 
   detectHardware: protectedProcedure.mutation(async () => {
     const blenderCandidates = [
+      ...(process.env.BLENDER_BIN ? [process.env.BLENDER_BIN] : []),
       "/usr/bin/blender",
       "/usr/local/bin/blender",
+      "/snap/bin/blender",
       "/Applications/Blender.app/Contents/MacOS/Blender",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.4\\blender.exe",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.3\\blender.exe",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.2\\blender.exe",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.1\\blender.exe",
       "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe",
       "C:\\Program Files\\Blender Foundation\\Blender 3.6\\blender.exe",
     ];
     const kicadCandidates = [
+      ...(process.env.KICAD_BIN ? [process.env.KICAD_BIN] : []),
       "/usr/bin/kicad-cli",
       "/usr/local/bin/kicad-cli",
       "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+      "C:\\Program Files\\KiCad\\9.0\\bin\\kicad-cli.exe",
       "C:\\Program Files\\KiCad\\8.0\\bin\\kicad-cli.exe",
       "C:\\Program Files\\KiCad\\7.0\\bin\\kicad-cli.exe",
     ];
