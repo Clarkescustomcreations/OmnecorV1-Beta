@@ -25,11 +25,11 @@ finish-args:
   - --talk-name=org.freedesktop.Notifications
 
 sdk-extensions:
-  - org.freedesktop.Sdk.Extension.node20
-  - org.freedesktop.Sdk.Extension.python311
+  - org.freedesktop.Sdk.Extension.node22
+  - org.freedesktop.Sdk.Extension.python312
 
 build-options:
-  append-path: /usr/lib/sdk/node20/bin:/usr/lib/sdk/python311/bin
+  append-path: /usr/lib/sdk/node22/bin:/usr/lib/sdk/python312/bin
   build-args:
     - --share=network
 
