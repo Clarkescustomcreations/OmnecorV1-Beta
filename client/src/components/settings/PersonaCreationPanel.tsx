@@ -1,4 +1,4 @@
-import React, { useState, useRef, useCallback, useEffect } from "react";
+import React, { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { trpc } from "../../lib/trpc";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../ui/card";
 import { Button } from "../ui/button";
@@ -17,7 +17,7 @@ import {
   AlertCircle, CheckCircle2, Loader2, Camera, Play,
   UserCircle2, Copy, RefreshCw, X, Network, ExternalLink,
   Power, Cpu, CloudLightning, Server, Plug, MessageSquare,
-  Webhook, Bell, Mail, Link2, Radio, CircleDot,
+  Webhook, Bell, Mail, Link2, Radio, CircleDot, Wallet,
 } from "lucide-react";
 import type { NeuralBrainMap } from "../../types/neural";
 
@@ -49,6 +49,13 @@ interface PersonaModelConfig {
   apiKey: string;
 }
 
+interface AgenticWallet {
+  id: string;
+  label: string;
+  address: string;
+  isNew: boolean;
+}
+
 interface Persona {
   id: string;
   name: string;
@@ -64,6 +71,9 @@ interface Persona {
   agentSystemPrompt: string;
   agentTools: string[];
   brainMapId: string | null;
+  // identity extras
+  assignedEmail: string;
+  agenticWallet: AgenticWallet | null;
   // always-on + model connection
   alwaysOn: boolean;
   modelConfig: PersonaModelConfig;
@@ -89,6 +99,8 @@ function emptyPersona(): Persona {
     agentSystemPrompt: "",
     agentTools: [],
     brainMapId: null,
+    assignedEmail: "",
+    agenticWallet: null,
     alwaysOn: false,
     modelConfig: {
       backend: "ollama",
@@ -107,6 +119,21 @@ function emptyPersona(): Persona {
     },
     createdAt: new Date().toISOString(),
   };
+}
+
+const WALLET_STORE_KEY = "omnecor_agentic_wallets";
+
+function loadWallets(): AgenticWallet[] {
+  try { return JSON.parse(localStorage.getItem(WALLET_STORE_KEY) ?? "[]"); }
+  catch { return []; }
+}
+
+function saveWallet(w: AgenticWallet) {
+  const wallets = loadWallets();
+  if (!wallets.find(x => x.id === w.id)) {
+    wallets.push(w);
+    localStorage.setItem(WALLET_STORE_KEY, JSON.stringify(wallets));
+  }
 }
 
 function loadPersonas(): Persona[] {
@@ -224,6 +251,18 @@ function PersonaPreviewCard({
             <Badge className="text-xs gap-1 bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/20">
               <CircleDot className="w-3 h-3 animate-pulse" />
               Always-On
+            </Badge>
+          )}
+          {persona.assignedEmail && (
+            <Badge variant="outline" className="text-xs gap-1">
+              <Mail className="w-3 h-3" />
+              Email set
+            </Badge>
+          )}
+          {persona.agenticWallet && (
+            <Badge variant="outline" className="text-xs gap-1">
+              <Wallet className="w-3 h-3" />
+              Wallet
             </Badge>
           )}
         </div>
@@ -492,6 +531,134 @@ function IdentityTab({
         <p className="text-xs text-muted-foreground">
           The linked map's knowledge graph and semantic context will be injected when this persona is active in chat or an agent session.
         </p>
+      </div>
+
+      <Separator />
+
+      {/* Assigned email */}
+      <div className="space-y-2">
+        <div className="flex items-center gap-2">
+          <Mail className="w-4 h-4 text-accent" />
+          <Label htmlFor="assigned-email">Assigned Email Address</Label>
+        </div>
+        <Input
+          id="assigned-email"
+          type="email"
+          placeholder="agent@yourdomain.com — email identity for this persona"
+          value={persona.assignedEmail}
+          onChange={e => onChange({ assignedEmail: e.target.value })}
+        />
+        <p className="text-xs text-muted-foreground">
+          Give this persona a dedicated email address. Used by the Email messaging channel and Agent Networking outreach.
+        </p>
+      </div>
+
+      <Separator />
+
+      {/* Agentic wallet */}
+      <AgenticWalletSection persona={persona} onChange={onChange} />
+    </div>
+  );
+}
+
+function AgenticWalletSection({
+  persona,
+  onChange,
+}: {
+  persona: Persona;
+  onChange: (updates: Partial<Persona>) => void;
+}) {
+  const [wallets, setWallets] = React.useState<AgenticWallet[]>(() => loadWallets());
+  const [newAddress, setNewAddress] = React.useState("");
+  const [newLabel, setNewLabel] = React.useState("");
+
+  const createWallet = () => {
+    if (!newAddress.trim()) return;
+    const w: AgenticWallet = {
+      id: crypto.randomUUID(),
+      label: newLabel.trim() || newAddress.slice(0, 10) + "…",
+      address: newAddress.trim(),
+      isNew: true,
+    };
+    saveWallet(w);
+    setWallets(prev => [...prev, w]);
+    onChange({ agenticWallet: w });
+    setNewAddress("");
+    setNewLabel("");
+  };
+
+  return (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2">
+        <Wallet className="w-4 h-4 text-accent" />
+        <Label>Agentic Wallet</Label>
+      </div>
+      <p className="text-xs text-muted-foreground">
+        Assign an existing wallet address or create a new one for this persona's on-chain identity and budget.
+      </p>
+
+      {/* Existing wallets */}
+      {wallets.length > 0 && (
+        <div className="grid grid-cols-1 gap-1.5">
+          <button
+            onClick={() => onChange({ agenticWallet: null })}
+            aria-pressed={persona.agenticWallet === null}
+            className={`flex items-center gap-3 rounded-lg border px-3 py-2 text-left text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+              ${persona.agenticWallet === null
+                ? "border-primary bg-primary/10 text-primary"
+                : "border-border bg-background hover:border-muted-foreground text-muted-foreground"
+              }`}
+          >
+            <X className="w-3.5 h-3.5 shrink-0" />
+            <span className="font-medium">No wallet</span>
+          </button>
+
+          {wallets.map(w => {
+            const isSelected = persona.agenticWallet?.id === w.id;
+            return (
+              <button
+                key={w.id}
+                onClick={() => onChange({ agenticWallet: w })}
+                aria-pressed={isSelected}
+                className={`flex items-center gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
+                  ${isSelected
+                    ? "border-primary bg-primary/10"
+                    : "border-border bg-background hover:border-muted-foreground"
+                  }`}
+              >
+                <Wallet className={`w-4 h-4 shrink-0 ${isSelected ? "text-primary" : "text-muted-foreground"}`} />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">{w.label}</p>
+                  <p className="text-xs text-muted-foreground font-mono truncate">{w.address}</p>
+                </div>
+                {isSelected && <CheckCircle2 className="w-3.5 h-3.5 shrink-0 text-primary" />}
+              </button>
+            );
+          })}
+        </div>
+      )}
+
+      {/* Create new wallet */}
+      <div className="rounded-lg border bg-muted/20 p-3 space-y-2">
+        <p className="text-xs font-semibold uppercase text-muted-foreground tracking-wide">Add Wallet</p>
+        <div className="space-y-1.5">
+          <Input
+            placeholder="Wallet address (0x… or ENS)"
+            value={newAddress}
+            onChange={e => setNewAddress(e.target.value)}
+            className="text-xs font-mono"
+          />
+          <Input
+            placeholder="Label (optional, e.g. 'Agent Treasury')"
+            value={newLabel}
+            onChange={e => setNewLabel(e.target.value)}
+            className="text-xs"
+          />
+        </div>
+        <Button size="sm" variant="outline" onClick={createWallet} disabled={!newAddress.trim()} className="w-full">
+          <Plus className="w-3.5 h-3.5 mr-1.5" />
+          Assign Wallet
+        </Button>
       </div>
     </div>
   );

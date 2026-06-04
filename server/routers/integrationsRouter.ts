@@ -203,7 +203,7 @@ async function gdriveFetch(path: string, token: string) {
 // Router
 // ---------------------------------------------------------------------------
 
-const INTEGRATION_TYPES = ["github", "notion", "slack", "google-drive", "dropbox", "onedrive", "generic"] as const;
+const INTEGRATION_TYPES = ["outlook", "gmail", "github", "notion", "slack", "google-drive", "dropbox", "onedrive", "generic"] as const;
 type IntegrationType = typeof INTEGRATION_TYPES[number];
 
 export const integrationsRouter = router({
@@ -266,6 +266,25 @@ export const integrationsRouter = router({
             email: about.user?.emailAddress ?? null,
             storageTotal: about.storageQuota?.limit ? Number(about.storageQuota.limit) : null,
             storageUsed: about.storageQuota?.usage ? Number(about.storageQuota.usage) : null,
+          };
+
+        } else if (input.type === "outlook") {
+          const me = await fetch("https://graph.microsoft.com/v1.0/me", {
+            headers: { Authorization: `Bearer ${input.token}` },
+          }).then(r => r.json()) as { displayName?: string; mail?: string; userPrincipalName?: string };
+          metadata = {
+            username: me.displayName ?? me.userPrincipalName ?? "Outlook User",
+            email: me.mail ?? me.userPrincipalName ?? null,
+          };
+
+        } else if (input.type === "gmail") {
+          const profile = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+            headers: { Authorization: `Bearer ${input.token}` },
+          }).then(r => r.json()) as { emailAddress?: string; messagesTotal?: number };
+          metadata = {
+            username: profile.emailAddress ?? "Gmail User",
+            email: profile.emailAddress ?? null,
+            messagesTotal: profile.messagesTotal ?? null,
           };
         }
 
@@ -351,6 +370,25 @@ export const integrationsRouter = router({
           syncData = {
             storageTotal: about.storageQuota?.limit ? Number(about.storageQuota.limit) : null,
             storageUsed: about.storageQuota?.usage ? Number(about.storageQuota.usage) : null,
+          };
+
+        } else if (input.type === "outlook") {
+          const msgs = await fetch("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=10&$select=id,subject,from,receivedDateTime", {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(r => r.json()) as { value?: Array<{ id: string; subject: string }> };
+          syncData = {
+            recentCount: msgs.value?.length ?? 0,
+            lastSynced: new Date().toISOString(),
+          };
+
+        } else if (input.type === "gmail") {
+          const profile = await fetch("https://gmail.googleapis.com/gmail/v1/users/me/profile", {
+            headers: { Authorization: `Bearer ${token}` },
+          }).then(r => r.json()) as { emailAddress?: string; messagesTotal?: number; threadsTotal?: number };
+          syncData = {
+            messagesTotal: profile.messagesTotal ?? null,
+            threadsTotal: profile.threadsTotal ?? null,
+            lastSynced: new Date().toISOString(),
           };
         }
 

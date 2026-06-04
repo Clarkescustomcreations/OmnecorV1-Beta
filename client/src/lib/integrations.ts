@@ -16,7 +16,22 @@ export type IntegrationType =
   | "google-drive"
   | "dropbox"
   | "onedrive"
+  | "outlook"
+  | "gmail"
   | "generic";
+
+/** Which Omnecor features each integration can power */
+export const INTEGRATION_FEATURES: Record<IntegrationType, string[]> = {
+  github:       ["chat", "neural-map"],
+  notion:       ["chat"],
+  slack:        ["chat"],
+  "google-drive": ["chat"],
+  dropbox:      ["chat"],
+  onedrive:     ["chat"],
+  outlook:      ["chat", "neural-map", "agent-networking"],
+  gmail:        ["chat", "neural-map", "agent-networking"],
+  generic:      ["chat"],
+};
 
 export interface OAuthConfig {
   clientId: string;
@@ -132,7 +147,7 @@ export function getIntegrationInfo(type: IntegrationType) {
   > = {
     github: {
       title: "GitHub",
-      description: "Connect your GitHub account for repository management",
+      description: "Connect your GitHub account for repository management — use in Chat and Neural Map",
       icon: "🐙",
       color: "bg-slate-900",
       scope: ["repo", "user", "gist"],
@@ -171,6 +186,20 @@ export function getIntegrationInfo(type: IntegrationType) {
       icon: "☁️",
       color: "bg-blue-400",
       scope: ["Files.ReadWrite.All"],
+    },
+    outlook: {
+      title: "Outlook",
+      description: "Connect Outlook / Microsoft 365 email — use in Chat, Neural Map, and Agent Networking",
+      icon: "📧",
+      color: "bg-blue-700",
+      scope: ["Mail.Read", "Mail.Send", "Calendars.Read"],
+    },
+    gmail: {
+      title: "Gmail",
+      description: "Connect your Gmail account — use in Chat, Neural Map, and Agent Networking",
+      icon: "✉️",
+      color: "bg-red-600",
+      scope: ["gmail.readonly", "gmail.send"],
     },
     generic: {
       title: "Custom OAuth Provider",
@@ -465,6 +494,42 @@ export function createMockSlackIntegration(): SlackIntegration {
         ],
       },
     ],
+  };
+}
+
+export interface OutlookIntegration extends Integration {
+  type: "outlook";
+  mailboxes?: {
+    id: string;
+    displayName: string;
+    emailAddress: string;
+    unreadCount: number;
+  }[];
+}
+
+export interface GmailIntegration extends Integration {
+  type: "gmail";
+  labels?: {
+    id: string;
+    name: string;
+    messagesTotal: number;
+    messagesUnread: number;
+  }[];
+}
+
+export function createOutlookIntegration(): OutlookIntegration {
+  return {
+    ...createIntegration("outlook", "Outlook", "Connect Outlook / Microsoft 365 email"),
+    type: "outlook",
+    mailboxes: [],
+  };
+}
+
+export function createGmailIntegration(): GmailIntegration {
+  return {
+    ...createIntegration("gmail", "Gmail", "Connect your Gmail account"),
+    type: "gmail",
+    labels: [],
   };
 }
 

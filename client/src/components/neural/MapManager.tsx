@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
 import { NeuralMapMode } from "@/types/neural";
-import { Plus, Trash2, Copy, Settings, Brain, Globe, Shield, Code, Book } from "lucide-react";
+import { Plus, Trash2, Copy, Settings, Brain, Globe, Shield, Code, Book, Plug } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import {
@@ -23,6 +23,14 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
+import { INTEGRATION_FEATURES, type IntegrationType } from "@/lib/integrations";
+
+const NEURAL_MAP_INTEGRATION_ICONS: Partial<Record<IntegrationType, string>> = {
+  outlook: "📧",
+  gmail:   "✉️",
+  github:  "🐙",
+};
 
 const MODE_ICONS: Record<NeuralMapMode, React.ReactNode> = {
   standard: <Globe className="w-4 h-4" />,
@@ -38,13 +46,31 @@ export default function MapManager() {
   const [newName, setNewName] = useState("");
   const [newMode, setNewMode] = useState<NeuralMapMode>("standard");
   const [newRoots, setNewRoots] = useState("");
+  const [selectedIntegrations, setSelectedIntegrations] = useState<string[]>([]);
+
+  const { data: integrations } = trpc.integrations.getIntegrations.useQuery(undefined, {
+    staleTime: 60_000,
+  });
+
+  const neuralMapIntegrations = integrations?.filter(i =>
+    i.isConnected && INTEGRATION_FEATURES[i.type as IntegrationType]?.includes("neural-map")
+  ) ?? [];
+
+  const toggleIntegration = (type: string) => {
+    setSelectedIntegrations(prev =>
+      prev.includes(type) ? prev.filter(t => t !== type) : [...prev, type]
+    );
+  };
 
   const handleCreate = () => {
     if (!newName.trim()) return;
     const roots = newRoots.split(",").map(r => r.trim()).filter(Boolean);
-    createMap(newName, newMode, roots);
+    // Encode selected integrations as special root entries so the indexer can resolve them
+    const integrationRoots = selectedIntegrations.map(t => `integration://${t}`);
+    createMap(newName, newMode, [...roots, ...integrationRoots]);
     setNewName("");
     setNewRoots("");
+    setSelectedIntegrations([]);
     setIsCreateOpen(false);
   };
 
@@ -97,6 +123,42 @@ export default function MapManager() {
                   onChange={e => setNewRoots(e.target.value)}
                 />
               </div>
+
+              {neuralMapIntegrations.length > 0 && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium flex items-center gap-2">
+                    <Plug className="w-4 h-4 text-accent" />
+                    Integration Data Sources
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Include emails or repository data from connected accounts.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {neuralMapIntegrations.map(i => {
+                      const icon = NEURAL_MAP_INTEGRATION_ICONS[i.type as IntegrationType] ?? "🔌";
+                      const meta = i.metadata as Record<string, unknown> | null;
+                      const label = String(meta?.username ?? i.type);
+                      const active = selectedIntegrations.includes(i.type);
+                      return (
+                        <button
+                          key={i.type}
+                          onClick={() => toggleIntegration(i.type)}
+                          aria-pressed={active}
+                          className={cn(
+                            "flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                            active
+                              ? "border-primary bg-primary/10 text-primary"
+                              : "border-border bg-background hover:border-muted-foreground text-muted-foreground"
+                          )}
+                        >
+                          <span>{icon}</span>
+                          <span>{label}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <DialogFooter>
               <Button onClick={handleCreate} disabled={!newName.trim()}>
@@ -136,9 +198,35 @@ export default function MapManager() {
                           {map.mode}
                         </Badge>
                       </div>
-                      <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                        {map.rootDirectories.join(", ") || "No roots defined"}
-                      </p>
+                      {(() => {
+                        const integrationSources = map.rootDirectories.filter(r => r.startsWith("integration://"));
+                        const fileSources = map.rootDirectories.filter(r => !r.startsWith("integration://"));
+                        return (
+                          <>
+                            {fileSources.length > 0 && (
+                              <p className="text-xs text-muted-foreground truncate max-w-[200px]">
+                                {fileSources.join(", ")}
+                              </p>
+                            )}
+                            {integrationSources.length > 0 && (
+                              <div className="flex flex-wrap gap-1 mt-0.5">
+                                {integrationSources.map(s => {
+                                  const type = s.replace("integration://", "") as IntegrationType;
+                                  const icon = NEURAL_MAP_INTEGRATION_ICONS[type] ?? "🔌";
+                                  return (
+                                    <span key={s} className="text-[10px] bg-accent/20 text-accent-foreground rounded px-1.5 py-0.5">
+                                      {icon} {type}
+                                    </span>
+                                  );
+                                })}
+                              </div>
+                            )}
+                            {map.rootDirectories.length === 0 && (
+                              <p className="text-xs text-muted-foreground">No roots defined</p>
+                            )}
+                          </>
+                        );
+                      })()}
                     </div>
                     <div className="flex items-center gap-1">
                       <Button

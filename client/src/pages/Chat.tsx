@@ -1,5 +1,6 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import ChatIntegrationBar from "@/components/chat/ChatIntegrationBar";
 import ChatInterface from "@/components/ChatInterface";
 import ContextTransparencyIndicator from "@/components/ContextTransparencyIndicator";
 import VisualContextMap from "@/components/VisualContextMap";
@@ -673,6 +674,11 @@ export default function Chat() {
                 ))}
               </div>
             )}
+          <ChatIntegrationBar
+            onInjectContext={(snippet) =>
+              handleSendMessage(`[Integration context injected]\n\n${snippet}`)
+            }
+          />
           <ChatInterface
             className="flex-1 min-w-0"
             messages={conversation.messages}

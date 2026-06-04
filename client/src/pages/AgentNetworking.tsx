@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef, useCallback } from "react";
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
 import {
   Card,
@@ -10,6 +10,14 @@ import {
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import {
   Calendar,
   Zap,
@@ -21,13 +29,136 @@ import {
   XCircle,
   RefreshCw,
   UserCircle2,
+  Upload,
+  Image,
+  Video,
+  Music,
+  Trash2,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import PersonaCreationPanel from "@/components/settings/PersonaCreationPanel";
 
+const PERSONA_STORE_KEY = "omnecor_personas";
+
+function loadPersonaList(): Array<{ id: string; name: string; type: string; avatarDataUrl: string | null }> {
+  try { return JSON.parse(localStorage.getItem(PERSONA_STORE_KEY) ?? "[]"); }
+  catch { return []; }
+}
+
+type MediaItem = {
+  id: string;
+  name: string;
+  type: "image" | "video" | "audio";
+  dataUrl: string;
+  size: number;
+};
+
+function MediaUploadTab() {
+  const [media, setMedia] = useState<MediaItem[]>([]);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleFiles = useCallback((files: FileList | null) => {
+    if (!files) return;
+    Array.from(files).forEach(file => {
+      const kind: MediaItem["type"] = file.type.startsWith("image/")
+        ? "image"
+        : file.type.startsWith("video/")
+        ? "video"
+        : "audio";
+      const reader = new FileReader();
+      reader.onload = e => {
+        const dataUrl = e.target?.result as string;
+        setMedia(prev => [...prev, {
+          id: crypto.randomUUID(),
+          name: file.name,
+          type: kind,
+          dataUrl,
+          size: file.size,
+        }]);
+      };
+      reader.readAsDataURL(file);
+    });
+    toast.success(`${files.length} file(s) added`);
+  }, []);
+
+  const remove = (id: string) => setMedia(prev => prev.filter(m => m.id !== id));
+
+  const typeIcon = (t: MediaItem["type"]) =>
+    t === "image" ? <Image className="w-4 h-4" />
+    : t === "video" ? <Video className="w-4 h-4" />
+    : <Music className="w-4 h-4" />;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Media Library</CardTitle>
+        <CardDescription>Upload photos, videos, and audio for agent networking content.</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {/* Drop zone */}
+        <div
+          onClick={() => fileRef.current?.click()}
+          onDragOver={e => { e.preventDefault(); }}
+          onDrop={e => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
+          className="flex flex-col items-center justify-center gap-3 rounded-xl border-2 border-dashed border-border bg-muted/20 hover:border-primary hover:bg-primary/5 cursor-pointer transition-colors p-8"
+        >
+          <Upload className="w-10 h-10 text-muted-foreground" />
+          <div className="text-center">
+            <p className="text-sm font-medium">Click or drag to upload</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Images (JPG, PNG, WEBP) · Videos (MP4, MOV) · Audio (MP3, WAV)</p>
+          </div>
+          <input
+            ref={fileRef}
+            type="file"
+            multiple
+            accept="image/*,video/*,audio/*"
+            className="sr-only"
+            onChange={e => handleFiles(e.target.files)}
+            aria-label="Upload media files"
+          />
+        </div>
+
+        {/* Media grid */}
+        {media.length > 0 && (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3">
+            {media.map(item => (
+              <div key={item.id} className="group relative rounded-lg overflow-hidden border bg-muted/20">
+                <div className="aspect-square flex items-center justify-center bg-muted/40 overflow-hidden">
+                  {item.type === "image" ? (
+                    <img src={item.dataUrl} alt={item.name} className="w-full h-full object-cover" />
+                  ) : item.type === "video" ? (
+                    <video src={item.dataUrl} className="w-full h-full object-cover" />
+                  ) : (
+                    <Music className="w-10 h-10 text-muted-foreground" />
+                  )}
+                </div>
+                <div className="p-2 space-y-1">
+                  <div className="flex items-center gap-1.5 text-muted-foreground">
+                    {typeIcon(item.type)}
+                    <span className="text-[10px] truncate">{item.name}</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => remove(item.id)}
+                  className="absolute top-1 right-1 hidden group-hover:flex items-center justify-center w-6 h-6 rounded-full bg-destructive text-destructive-foreground"
+                  aria-label="Remove media"
+                >
+                  <Trash2 className="w-3 h-3" />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function AgentNetworking() {
   const [activeTab, setActiveTab] = useState("calendar");
+  const [selectedPersonaId, setSelectedPersonaId] = useState<string>("");
+  const personas = loadPersonaList();
 
   // Queries
   const { data: scheduledPostsData, isLoading: isLoadingScheduled, refetch: refetchScheduled } = trpc.scheduling.listScheduledPosts.useQuery({ limit: 50 });
@@ -72,21 +203,46 @@ export default function AgentNetworking() {
     <OmnecorDashboardLayout>
       <div className="p-8 max-w-7xl mx-auto space-y-8">
         {/* Header */}
-        <div className="flex justify-between items-start">
+        <div className="flex justify-between items-start flex-wrap gap-4">
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Agent Networking</h1>
             <p className="text-muted-foreground">
               Automating agent discourse across {accountsData?.length || 0} platforms.
             </p>
           </div>
-          <Button
-            onClick={() => fetchDiscoveryMutation.mutate({})}
-            disabled={fetchDiscoveryMutation.isPending}
-            className="gap-2"
-          >
-            {fetchDiscoveryMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
-            Sync Content
-          </Button>
+          <div className="flex items-center gap-3 flex-wrap">
+            {/* Agent / Persona selector */}
+            <div className="flex items-center gap-2">
+              <UserCircle2 className="w-4 h-4 text-muted-foreground" />
+              <Select value={selectedPersonaId} onValueChange={setSelectedPersonaId}>
+                <SelectTrigger className="w-44 h-9 text-sm">
+                  <SelectValue placeholder="Select agent / persona" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">No persona</SelectItem>
+                  {personas.map(p => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.avatarDataUrl ? (
+                        <img src={p.avatarDataUrl} alt="" className="inline-block w-4 h-4 rounded-full object-cover mr-1.5" />
+                      ) : null}
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                  {personas.length === 0 && (
+                    <SelectItem value="__none" disabled>No personas created yet</SelectItem>
+                  )}
+                </SelectContent>
+              </Select>
+            </div>
+            <Button
+              onClick={() => fetchDiscoveryMutation.mutate({})}
+              disabled={fetchDiscoveryMutation.isPending}
+              className="gap-2"
+            >
+              {fetchDiscoveryMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
+              Sync Content
+            </Button>
+          </div>
         </div>
 
         {/* Stats Grid */}
@@ -153,6 +309,10 @@ export default function AgentNetworking() {
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="platforms">Platforms</TabsTrigger>
             <TabsTrigger value="discovery">Discovery</TabsTrigger>
+            <TabsTrigger value="media" className="gap-2">
+              <Upload className="w-4 h-4" />
+              Media
+            </TabsTrigger>
             <TabsTrigger value="personas" className="gap-2">
               <UserCircle2 className="w-4 h-4" />
               Personas
@@ -370,6 +530,11 @@ export default function AgentNetworking() {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Media Tab */}
+          <TabsContent value="media" className="space-y-4">
+            <MediaUploadTab />
           </TabsContent>
 
           {/* Personas Tab */}

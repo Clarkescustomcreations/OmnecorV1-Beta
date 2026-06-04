@@ -1,4 +1,4 @@
-import { useState } from "react";
+import React, { useState } from "react";
 import {
   Card,
   CardContent,
@@ -27,20 +27,41 @@ import {
   Unlink2,
   RefreshCw,
   Settings,
+  MessageSquare,
+  Network,
+  Share2,
 } from "lucide-react";
+
+const FEATURE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
+  "chat":             { label: "Chat",          icon: <MessageSquare className="w-3 h-3" /> },
+  "neural-map":       { label: "Neural Map",    icon: <Network className="w-3 h-3" /> },
+  "agent-networking": { label: "Agent Network", icon: <Share2 className="w-3 h-3" /> },
+};
 import { cn } from "@/lib/utils";
-import { getIntegrationInfo, type IntegrationType } from "@/lib/integrations";
+import { getIntegrationInfo, INTEGRATION_FEATURES, type IntegrationType } from "@/lib/integrations";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-const ALL_INTEGRATION_TYPES: IntegrationType[] = ["github", "notion", "slack", "google-drive"];
+const ALL_INTEGRATION_TYPES: IntegrationType[] = ["outlook", "gmail", "github", "notion", "slack", "google-drive"];
 
 const TOKEN_HINTS: Record<string, { label: string; placeholder: string; helpUrl: string; helpText: string }> = {
+  outlook: {
+    label: "Microsoft Graph Access Token",
+    placeholder: "eyJ...",
+    helpUrl: "https://developer.microsoft.com/en-us/graph/graph-explorer",
+    helpText: "Use Microsoft Graph Explorer to generate an access token with Mail.Read, Mail.Send, and Calendars.Read scopes. Enables Chat context, Neural Map email indexing, and Agent Networking.",
+  },
+  gmail: {
+    label: "Google OAuth Access Token",
+    placeholder: "ya29...",
+    helpUrl: "https://developers.google.com/oauthplayground/",
+    helpText: "Use Google OAuth Playground with scopes: gmail.readonly and gmail.send. Enables Chat context, Neural Map email indexing, and Agent Networking.",
+  },
   github: {
     label: "Personal Access Token",
     placeholder: "ghp_...",
     helpUrl: "https://github.com/settings/tokens/new",
-    helpText: "Create a token at GitHub → Settings → Developer settings → Personal access tokens (classic). Required scopes: repo, user.",
+    helpText: "Create a token at GitHub → Settings → Developer settings → Personal access tokens (classic). Required scopes: repo, user. Enables Chat context and Neural Map of GitHub projects.",
   },
   notion: {
     label: "Integration Token",
@@ -121,10 +142,27 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
               <div>
                 <CardTitle className="text-sm">{info.title}</CardTitle>
                 <CardDescription className="text-xs">{info.description}</CardDescription>
+                {(() => {
+                  const features = INTEGRATION_FEATURES[item.type as IntegrationType] ?? [];
+                  if (features.length === 0) return null;
+                  return (
+                    <div className="flex flex-wrap gap-1 mt-1.5">
+                      {features.map(f => {
+                        const fl = FEATURE_LABELS[f];
+                        if (!fl) return null;
+                        return (
+                          <span key={f} className="inline-flex items-center gap-1 text-[10px] bg-accent/20 text-accent-foreground rounded px-1.5 py-0.5">
+                            {fl.icon}{fl.label}
+                          </span>
+                        );
+                      })}
+                    </div>
+                  );
+                })()}
               </div>
             </div>
-            <Badge variant={item.isConnected ? "default" : "secondary"} className="ml-2">
-              {item.isConnected ? "Connected" : "Disconnected"}
+            <Badge variant={item.isConnected ? "default" : "secondary"} className="ml-2 shrink-0">
+              {item.isConnected ? "Connected" : "Available"}
             </Badge>
           </div>
         </CardHeader>
