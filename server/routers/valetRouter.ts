@@ -7,6 +7,7 @@ import path from "path";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
 import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
+import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -53,7 +54,7 @@ async function detectMlVenv(): Promise<{ installed: boolean; path: string }> {
   }
   // Quick python3 import check (falls through if importable globally).
   try {
-    await execFileAsync("python3", ["-c", "import unsloth"], { timeout: 5000 });
+    await execFileAsync(PYTHON_SCRIPTS.pythonBin, ["-c", "import unsloth"], { timeout: 5000 });
     return { installed: true, path: "system" };
   } catch { /* not installed */ }
   return { installed: false, path: "" };
@@ -160,9 +161,9 @@ export const valetRouter = router({
         const dir = "data/valet";
         const jobId = await ctx.services.processManager.spawn({
           type: "custom",
-          command: "python3",
+          command: PYTHON_SCRIPTS.pythonBin,
           args: [
-            "server/python_bridges/valet_dataset_builder.py",
+            PYTHON_SCRIPTS.valetDatasetBuilder,
             "--out", `${dir}/train.jsonl`,
             "--val-out", `${dir}/val.jsonl`,
             "--eval-out", `${dir}/eval.jsonl`,
@@ -227,7 +228,7 @@ export const valetRouter = router({
       await access(kbScript, constants.R_OK);
       embeddingJobId = await ctx.services.processManager.spawn({
         type: "custom",
-        command: "python3",
+        command: PYTHON_SCRIPTS.pythonBin,
         args: [kbScript],
         label: "Valet KB Refresh (ChromaDB embedding)",
       });
