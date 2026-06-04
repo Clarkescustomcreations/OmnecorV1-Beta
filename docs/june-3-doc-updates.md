@@ -570,12 +570,21 @@ A comprehensive audit of the codebase reveals **Omnecor has significantly more i
 
 ---
 
-#### 6. **Custom Workflow Builder**
-**Status:** Partially implemented (only GodMode 5-phase available)
-**README claim:** "Complex projects, and orchestrates multi-step workflows"
-**Reality:** Only predefined 5-phase GodMode (DEFINE→PLAN→EXECUTE→REVIEW→SHIP)
-**What's missing:** No visual workflow builder; can't create custom phases
-**Action needed:** Clarify that workflows are pre-configured, not customizable yet
+#### 6. **Multi-Stage Workflow & Routing Architecture** ✅ CORRECTION
+**Status:** Fully implemented with comprehensive documentation in docs/ai-agents/
+**Actually includes:** 
+- **10 distinct Valet routing modes** (api_direct, valet_background, local_omesh, main_api, multi_api, main_api_omesh, multi_api_omesh, moe_chain, moe_chain_omesh, multi_task)
+- **13 task categories** for Valet classification (code_generation, code_review, research, synthesis, media_generation, knowledge_retrieval, instruction_writing, integration, hardware, reporting, context_management, memory_operations, local_task)
+- **5-phase GodMode pipelines** (DEFINE→PLAN→EXECUTE→REVIEW→SHIP)
+- **Multi-agent collaboration workflows** (Documentation, Research-to-Implementation, Distributed OMMESH chains)
+- **Hardcoded project management rules** (todo.md/status.md creation, /plan mode for structured planning)
+- **MoE (Mixture of Experts) chaining** for sequential specialized model chains
+
+**Documentation quality:** Excellent — fully documented in `/docs/ai-agents/WORKFLOW_SEQUENCING.md`, `VALET_ROUTER.md`, and `Omnecor Multi-Agent Collaboration Workflows.md`
+
+**Why this was incomplete in initial audit:** These workflow features are documented but scattered across ai-agents subfolder rather than highlighted in main README. The feature set is sophisticated and worth promoting.
+
+**Action needed:** Reference Valet Router and workflow architecture in README as a headline feature
 
 ---
 
@@ -630,10 +639,11 @@ A comprehensive audit of the codebase reveals **Omnecor has significantly more i
 ❌ Artifact management
 ❌ Image generation (generic)
 ❌ Real-time file watching
+❌ Valet Router routing modes (only hardcoded rules are in core README)
 
 ### What's PARTIALLY DOCUMENTED:
 ⚠️ Persona creation (exists but workflow unclear)
-⚠️ Custom workflows (only GodMode 5-phase)
+⚠️ Valet Router & multi-agent workflows (fully documented in ai-agents/ subfolder but not in main README)
 ⚠️ Light mode (incomplete implementation)
 ⚠️ Android support (experimental, unclear status)
 ⚠️ Extended OAuth (Manus provider missing)
@@ -663,8 +673,15 @@ A comprehensive audit of the codebase reveals **Omnecor has significantly more i
    - Immutable audit logs
 
 ### Priority 2 (IMPORTANT):
-4. **MCP Server Setup & Usage** (2 pages)
-5. **Advanced Features Reference** (2 pages)
+4. **Valet Router & Workflow Architecture** (2-3 pages) ⭐ **UPDATED: Already well-documented in ai-agents/, just needs README summary**
+   - Overview of 10 routing modes
+   - 13 task classification categories
+   - MoE chaining and OMMESH integration
+   - Guided Walk-Through Scrapper Mode
+
+5. **MCP Server Setup & Usage** (2 pages)
+
+6. **Advanced Features Reference** (2 pages)
    - Loop detection
    - Real-time file watching
    - Artifact management
@@ -731,13 +748,27 @@ A comprehensive audit of the codebase reveals **Omnecor has significantly more i
 
 ---
 
+## CORRECTION NOTE
+
+**Valet Router & Multi-Agent Workflows:** Initial audit underestimated documentation quality. These are thoroughly documented in `/docs/ai-agents/WORKFLOW_SEQUENCING.md`, `VALET_ROUTER.md`, and `Omnecor Multi-Agent Collaboration Workflows.md` with 10 routing modes, 13 task categories, and multiple workflow examples. Not underdocumented — just not in the main README. Recommendation: link to these docs from README rather than create new ones.
+
+---
+
 ## CONCLUSION
 
-Omnecor's implementation significantly exceeds its documentation. The product is production-ready with many advanced features (cloud compute, content automation, security), but users won't discover them without better docs. **Priority:** Update README with Agent Networking, Cloud Compute, and MCP, then create detailed guides for each system.
+Omnecor's implementation significantly exceeds its documentation in the main README and user guide. The product is production-ready with many advanced features (cloud compute, content automation, security, sophisticated workflow orchestration), but users won't discover them without better visibility in the main README. 
 
-**Total documentation work estimated:** 12-15 pages of new guides + README updates
+**Key finding:** Most "missing" docs already exist in `/docs/ai-agents/` subfolder but aren't referenced in the main README, making them invisible to new users.
+
+**Priority:** 
+1. Update README with Agent Networking, Cloud Compute, and MCP
+2. Add README links to existing ai-agents/ workflow docs
+3. Create new guides for security features (encryption, backup, scanning)
+4. Create cloud compute setup guide
+
+**Total documentation work estimated:** 8-10 pages of new guides + README revisions (less than initially estimated due to existing ai-agents/ docs)
 
 ---
 
 *Audit completed: June 4, 2025*
-*Audit scope: Full codebase scan + all documentation + comparison analysis*
+*Audit scope: Full codebase scan + all documentation + comparison analysis + ai-agents/ subfolder deep-dive*
