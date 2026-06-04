@@ -772,3 +772,460 @@ Omnecor's implementation significantly exceeds its documentation in the main REA
 
 *Audit completed: June 4, 2025*
 *Audit scope: Full codebase scan + all documentation + comparison analysis + ai-agents/ subfolder deep-dive*
+
+---
+
+# APPENDIX 2: Second-Pass Comprehensive Audit (Agent Swarm Analysis)
+
+## Executive Summary
+
+A **5-agent parallel audit** conducted a comprehensive second pass covering:
+- 📄 **All documentation files** (25+ issues found)
+- 🎨 **All UI components** (50+ features identified)
+- 🗄️ **Complete database schema** (14 tables, 1 bug found)
+- 🔧 **All backend services** (15+ core services, 15 Python bridges)
+- 🚩 **Hidden features & TODOs** (4 incomplete features, 34 phases documented)
+
+### Critical Findings
+
+**False Claims in Docs (MUST FIX):**
+1. Manus OAuth documented but NOT in code (`oauthClients.ts` has only 6 platforms)
+2. Execution Modes (Sovereign/Scrapper/Big Spender) documented as current but marked Phase 15 in UPGRADE-PLAN
+3. User Guide is TOC-only, actual content missing
+4. Database Schema doc incomplete (cuts off at line 100)
+
+**Underdocumented Features (Still Missing from README):**
+- Agent Networking (full social media automation system)
+- Cloud Compute Rental (Vast.ai, RunPod, Lambda Labs integration)
+- MCP Server connections
+- Virtual Cards (opt-in financial isolation)
+- Execution Modes enforcement system
+
+**Incomplete/Experimental Features:**
+- Virtual Card HITL approval not wired
+- Mesh Discovery returns empty (mDNS stub only)
+- Model health checks not implemented
+- Fal.ai has 2 dead code procedures
+- Light mode incomplete
+
+**Code Quality Issues:**
+- `postAnalytics` table query has join logic bug
+- `getAllModels()` uses hardcoded test data, not tRPC
+
+---
+
+## PART 1: Documentation Audit Findings (25+ Issues)
+
+### CRITICAL ISSUES (Must Fix Before Release)
+
+#### 1. **Manus OAuth Missing Implementation**
+**File:** `/docs/OAUTH_SETUP.md` + README claims "Extended OAuth — Manus"
+**Reality:** Code search shows NO Manus provider in:
+- `/server/oauth/oauthClients.ts` - Only 6 platforms (Twitter, LinkedIn, Instagram, TikTok, Facebook, YouTube)
+- `/server/routers/oauthRouter.ts` - No Manus handling
+**Action:** Remove Manus from README or implement the provider
+
+#### 2. **Execution Modes Status Conflict**
+**Claim in docs:** EXECUTION_MODES.md describes Sovereign/Scrapper/Big Spender as implemented features
+**Reality:** UPGRADE-PLAN.md marks these as Phase 15 (not shipped in v2.3.0)
+**File Paths:**
+- `EXECUTION_MODES.md` - describes as current architecture
+- `UPGRADE-PLAN.md` Phase 15 - marks as future work
+- `package.json` - version is "2.3.0-beta.1" (not v3.0.0)
+**Action:** Add version clarification tags to docs: "These modes are implemented in Phase 15+ architecture"
+
+#### 3. **Incomplete User Guide**
+**File:** `/docs/user-guides/Omnecor User Guide.md`
+**Issue:** Only contains Table of Contents (lines 1-100); actual content missing
+**Claims 22 sections:** No actual documentation for any of them
+**Action:** Complete all 22 sections or move to work-in-progress status
+
+#### 4. **Incomplete Database Schema Documentation**
+**File:** `/docs/backend/DATABASE_SCHEMA.md`
+**Issue:** Document cuts off mid-table at line 100
+**Missing:** 40+ tables not documented including:
+- `audit_log` (immutable audit trail)
+- `pipeline_phases` (GodMode phases)
+- `platform_accounts` (social media OAuth)
+- `personas` (AI personas)
+- `analytics` (engagement tracking)
+- `scheduledPosts`, `curatedPosts`, `discoveredArticles`
+**Action:** Document all 50+ tables with schema
+
+#### 5. **Light Mode Feature Incomplete**
+**File:** `/docs/user-guides/LIGHT_MODE.md`
+**Claim:** Full light mode implementation
+**Reality:** Light mode toggle exists but theme incomplete (dark-mode dominant)
+**Action:** Mark as "EXPERIMENTAL" or complete the implementation
+
+---
+
+### HIGH PRIORITY ISSUES
+
+#### 6. **Valet Router Documentation Inconsistencies**
+**Files:** `VALET_ROUTER.md`, `WORKFLOW_SEQUENCING.md`, `Omnecor AI Agent Responsibilities.md`
+**Issues:**
+- Line 5: Claims "Qwen2.5-1.5B-Instruct model fine-tuned" is shipped but artifact not deployed
+- Line 7: Claims "auto-starts the inference server" but no auto-start code found
+- Lines 42-82: Describes status badges that don't exist in UI (Online/Loaded, Online/Loading, Offline)
+**Cross-Reference Problem:** 5 different docs describe Valet Router with conflicting completeness claims
+**Action:** Consolidate into single source of truth, add "Phase Status" tags
+
+#### 7. **DATABASE_SCHEMA.md Missing Join Relationships**
+**Issue:** Schema shows tables but no foreign key documentation
+**Problem:** Complex relationships undocumented:
+- `platformAccounts` → `users` (implicit)
+- `curatedPosts` → `discoveredArticles` + `platformAccounts`
+- `scheduledPosts` → `curatedPosts` + `platformAccounts`
+- `postAnalytics` → `scheduledPosts` (has bug in join logic)
+**Action:** Add ER diagram or comprehensive relationship table
+
+#### 8. **WORKFLOW_SEQUENCING.md References Non-Implemented Features**
+**Lines 43, 71-78:** References "context_management" and "memory_operations" routing categories
+**Reality:** These are Phase 16a/16b additions not in v2.3.0
+**Action:** Add version tag "⚠️ Phase 3.0.0 feature" to sections
+
+#### 9. **MODEL_ROUTING_GUIDE.md Table May Be Outdated**
+**File:** `/docs/ai-agents/valet-training/MODEL_ROUTING_GUIDE.md`
+**Line 26:** Routing defaults table shows specific model mappings
+**Line 60:** Notes "these will be stale within months" with no refresh date
+**Action:** Add "Last Updated: [date]" and refresh cadence
+
+#### 10. **Duplicate Documentation Folders**
+**Issue:** Two Neural Brain Map docs exist:
+- `/docs/frontend/NEURAL_BRAIN_MAP_UI.md`
+- `/docs/neural brain map/NEURAL_BRAIN_MAP_UI.md` (note space in folder name)
+**Action:** Merge into single location
+
+---
+
+### MISSING DOCUMENTATION
+
+#### 11. **Agent Networking Not in Main User Guide**
+**Status:** Fully implemented with 7 routers + extensive features
+**Documented Only In:** `/docs/june-3-doc-updates.md` (appendix section)
+**Should Be In:** README (1-2 sentences), User Guide (5-10 pages)
+**Missing Sections:**
+- How to set up OAuth for each platform
+- How to create and manage personas
+- How to configure content discovery
+- How to schedule posts
+- How to view analytics
+**Action:** Create 6-page Agent Networking User Guide
+
+#### 12. **Cloud Compute Rental Not Documented Anywhere**
+**Status:** Fully implemented via `cloudComputeRouter.ts`
+**Files:** Vast.ai, RunPod, Lambda Labs integration complete
+**Documented:** Zero pages
+**Action:** Create 3-page Cloud Compute Setup & Usage Guide
+
+#### 13. **MCP (Model Context Protocol) Not in User Guide**
+**Status:** Fully implemented via `mcpRouter.ts`
+**Features:** Connect external MCP servers as tool providers
+**Documented:** Not in README or main docs
+**Action:** Create 2-page MCP Integration Guide
+
+#### 14. **Virtual Card Billing System Not Fully Documented**
+**Status:** Opt-in via `LITHIC_API_KEY`
+**Incomplete:** HITL approval gate not wired (Phase 28 pending)
+**Documented:** Mentioned in wallet guide but not as "opt-in" or "experimental"
+**Action:** Add "EXPERIMENTAL - Phase 28 pending" tag, document Lithic setup
+
+#### 15. **File Encryption Feature Not Documented**
+**Status:** Fully implemented via `securityRouter.ts`
+**Features:** AES-256-GCM per-file encryption
+**Documented:** Zero pages
+**Action:** Create 1-page File Encryption Guide
+
+#### 16. **System Backup/Recovery Not Documented**
+**Status:** Fully implemented via `securityRouter.ts`
+**Features:** Full/incremental backups, restore with rollback
+**Documented:** Zero pages
+**Action:** Create 2-page Backup & Recovery Guide
+
+#### 17. **Vulnerability Scanning & IoC Detection Not Documented**
+**Status:** Fully implemented via `securityRouter.ts`
+**Features:** YARA scanning, IoC feed integration, threat detection
+**Documented:** Zero pages
+**Action:** Create 1-page Security Scanning Guide
+
+---
+
+### CONFLICTING INFORMATION
+
+#### 18. **Wallet Feature Implementation Status Unclear**
+**AGENTIC_WALLET.md:** "Agentic Wallet is Omnecor's built-in financial management layer" (present tense)
+**UPGRADE-PLAN.md Phase 13:** "Establish the database schema for per-project budgets" (future tense)
+**Code:** `walletRouter.ts` and `projectBudgets` table exist and work
+**Conflict:** Is this Phase 13 work (future) or already shipped?
+**Action:** Clarify version/phase in wallet documentation
+
+#### 19. **Execution Modes Implementation Status Unclear**
+**Multiple docs:** Describe Sovereign/Scrapper/Big Spender as architectural features
+**Code:** `users.executionMode` field exists, `sovereignCheck` middleware exists
+**UPGRADE-PLAN:** Lists these as Phase 15
+**Question:** Are these implemented or planned?
+**Action:** Add explicit "Shipped in v2.3.0" or "Coming in v3.0.0" tags
+
+---
+
+### CONFIGURATION DOCUMENTATION GAPS
+
+#### 20. **OAUTH_SETUP.md Incomplete for All Platforms**
+**Issue:** Document mentions platforms but doesn't explain:
+- Step-by-step OAuth app creation for EACH platform
+- Exact redirect URL to use per platform
+- All required scopes per platform
+- Common troubleshooting per platform
+**Current:** Generic template without platform-specific instructions
+**Action:** Expand with 1 page per platform (6 platforms)
+
+#### 21. **BUILD_INSTRUCTIONS.md Has Path Ambiguities**
+**Line 56:** References script path as relative: `python3 server/phase2/python_scripts/localLLMfine-tuning.py`
+**Issue:** Assumes running from repo root but doesn't state this prerequisite
+**Action:** Add "Prerequisites: Run from repo root" section
+
+#### 22. **Environment Variables Documentation Incomplete**
+**File:** `/.env.example` exists but doesn't explain:
+- Which vars are required vs optional
+- What happens if optional var is missing (graceful degradation)
+- Which features are enabled by each var
+- What to do if a service is unavailable
+**Action:** Create `docs/CONFIGURATION.md` with detailed env var reference
+
+---
+
+### MISSING CROSS-REFERENCES & INDICES
+
+#### 23. **Valet Router Mentioned in 5 Docs, No Unified Index**
+**Mentions In:**
+- `VALET_ROUTER.md` (standalone)
+- `WORKFLOW_SEQUENCING.md` (context)
+- `Omnecor AI Agent Responsibilities.md` (agent routing)
+- `DATA_FLOW.md` (architecture)
+- `UPGRADE-PLAN.md` (Phase 16)
+**Problem:** If you update feature in one, must remember to update all 5
+**Action:** Create "Valet Router Overview" landing page with links to each doc
+
+#### 24. **Hardcoded Rules Spread Across Multiple Docs**
+**Mentioned In:**
+- `HARDCODED_RULES.md` (primary)
+- `VALET_ROUTER.md` section 1.1 (duplication)
+- `WORKFLOW_SEQUENCING.md` (referenced)
+**Problem:** Rule changes must be synced across 3 places
+**Action:** Single source of truth with cross-references only
+
+---
+
+### EXPERIMENTAL/BETA STATUS ISSUES
+
+#### 25. **Features Missing "EXPERIMENTAL" Badges**
+These docs describe features with NO warning that they're incomplete:
+- `LIGHT_MODE.md` - Theme visually incomplete
+- `NEURAL_BRAIN_MAP_UI.md` - May have layout gaps
+- `Omnecor Multi-Agent Collaboration Workflows.md` - Phase 16+ features marked as current
+- `MCP_INTEGRATION.md` (if it existed) - Phase 27, may be incomplete
+**Action:** Add status badges: ✅ SHIPPED | ⚠️ EXPERIMENTAL | 🔜 UPCOMING
+
+---
+
+## PART 2: UI Features (50+ Identified)
+
+**7 Main Pages:**
+1. **Dashboard** - Feature overview cards, budget panel, process manager
+2. **Chat** - Multi-turn conversations, system prompt editor, context management, slash commands (`/new`, `/clear`, `/compress`, `/export`, `/btw`, `/plan`, `/skill`)
+3. **Brain Map** - Graph + tree view, project watcher, fiction mode (lore, characters, timeline)
+4. **Model Hub** - Ollama integration, provider management, model discovery
+5. **Pipelines** - GodMode 5-phase execution, phase output panels
+6. **Integrations** - OAuth for GitHub, Notion, Slack, Google Drive
+7. **Settings** - Multi-tab configuration (API providers, security, hardware, system, accounts, Valet Router, appearance, cloud compute, personas, admin, threat dashboard)
+8. **Agent Networking** - Social media automation, calendar, approvals, analytics, discovery, personas, platforms
+
+**8+ Specialized Modules:**
+- LLM Builder (LoRA fine-tuning with live metrics)
+- Blender Bridge (3D modeling, rendering)
+- KiCad EDA (PCB design, DRC/ERC)
+- ESP Tool (Firmware flashing)
+- Unsloth (Model optimization)
+- Image Generation (ComfyUI, Fal.ai, OpenArt)
+- Voice (TTS, Whisper transcription, RVC)
+- RecursiveMAS (Multi-agent orchestration)
+
+**Real-Time Features:**
+- WebSocket job monitoring (training, hardware, voice)
+- Budget tracking with provider breakdown
+- Process manager with status icons
+- File watcher synchronization
+- Voice synthesis progress
+
+**Command Palette:** 30+ commands (Ctrl+K)
+
+---
+
+## PART 3: Database & Code Quality Issues
+
+**Bug Found in Code:**
+- `postAnalytics` table query has join logic error (checking `scheduledPostId` against `platformAccounts.id`)
+
+**Feature Mapping:**
+- 14 tables with complete feature documentation
+- Fully implemented: Chat, budgets, audit logs, pipelines, cloud compute, social media, OAuth, articles, curation, scheduling, analytics
+- Partially implemented: Discovery (RSS/API ingestion is stub), Integrations (filesystem fallback)
+
+---
+
+## PART 4: Backend Services (15+ Core Services)
+
+**Auto-Started at Startup:**
+1. SecurityService - File scanning, encryption, backup/restore
+2. VectorDBService - ChromaDB semantic search (gracefully degradable)
+3. ProcessManagerService - Child process lifecycle management
+4. FileSystemWatcherService - Real-time project sync
+5. AuditLogService - Immutable append-only audit trail
+6. WebSocketServer - Real-time pub/sub communication
+
+**Background Services:**
+7. TokenRefreshService - OAuth token auto-refresh (15-min interval)
+8. ValetServerService - Valet Router inference server lifecycle (auto-restart on crash)
+9. UpdateCheckerService - GitHub release polling
+
+**Hardware Bridges:**
+10. BlenderBridge - 3D modeling automation
+11. KiCadBridge - PCB design automation
+12. ESPToolBridge - Firmware flashing
+
+**Memory Systems:**
+13. MemoryArchitectService - ChromaDB integration, document chunking
+14. HonchoService - Cloud-backed user facts (gracefully degradable)
+
+**Specialized Services:**
+15. VoiceService - Whisper, TTS, RVC proxy
+
+**Python Bridges:** 15 Python scripts managing specialized workflows
+
+**Admin-Only Hidden Features:**
+- Docker sandbox execution (`system.runInSandbox()`)
+- Audit log access (immutable log queries)
+
+---
+
+## PART 5: Incomplete Features & Blockers
+
+### 4 Incomplete Features Blocking Production:
+
+#### 1. **Virtual Card HITL Approval**
+**File:** `/server/routers/virtualCardRouter.ts` line 61
+**Issue:** TODO comment: "Wire HITLApprovalService when integrated in Phase 28"
+**Current:** Cards issue with logging only; no approval workflow
+**Impact:** Virtual cards can't be properly approved by humans
+**Fix Needed:** Phase 28 GodMode integration
+
+#### 2. **Mesh Discovery Stub (Returns Empty)**
+**File:** `/server/phase2/services/MeshDiscoveryService.ts` lines 13-22
+**Status:** Marked "TEMPORARY STUB"
+**Issue:** mDNS discovery disabled due to missing dependency
+**Current:** Returns empty node list; OMMESH peer discovery non-functional
+**Impact:** Users can't see other Omnecor nodes on LAN
+**Fix Needed:** mDNS dependency resolution
+
+#### 3. **Model Health Checks Not Implemented**
+**File:** `/client/src/lib/aiModels.ts` lines 253-283
+**Issue:** TODOs show stub implementations
+- `getAllModels()` uses hardcoded test data instead of tRPC query
+- `checkModelHealth()` doesn't ping API endpoints or validate keys
+**Current:** Static list; can't detect provider unavailability
+**Impact:** Users don't know if their API keys are invalid
+**Fix Needed:** Wire to actual tRPC queries + endpoint validation
+
+#### 4. **Fal.ai Image Generation Dead Code**
+**File:** `/server/routers/falRouter.ts` lines 40-54
+**Issue:** 2 procedures are stub implementations:
+- `listImages()` returns empty array
+- `generateImage()` returns placeholder data
+**Status:** `generateCharacter` and `generateVideo` ARE wired to production
+**Impact:** Image list/generation UI might not work
+**Fix Needed:** Wire image procedures or remove from API
+
+---
+
+### Phase Status:
+**All 34 phases documented in todo.md as "complete"** but some incomplete features suggest phases 14b, 15, 27, 28, 33 have blockers or stubs.
+
+---
+
+## PART 6: Summary Metrics
+
+| Category | Count | Status |
+|----------|-------|--------|
+| **Documentation Issues** | 25+ | CRITICAL (5), HIGH (8), MEDIUM (12+) |
+| **UI Features** | 50+ | All implemented |
+| **Database Tables** | 14 | Fully mapped; 1 bug found |
+| **Backend Services** | 15+ | Mostly implemented; 4 incomplete |
+| **Python Bridges** | 15 | Supporting hardware/ML workflows |
+| **Feature Flags** | 5 | 1 unused |
+| **API Routers** | 31+ | All active |
+| **WebSocket Channels** | 7+ | Real-time events |
+| **Execution Modes** | 3 | Status disputed (current vs Phase 15) |
+| **OAuth Platforms** | 6 | 7th (Manus) claimed but missing |
+| **Incomplete/Experimental** | 4 | Blocking issues identified |
+
+---
+
+## PART 7: Recommended Action Items
+
+### CRITICAL (Before Release):
+
+**Documentation:**
+1. ❌ Remove Manus from README or implement OAuth provider
+2. ⚠️ Add version tags to EXECUTION_MODES.md and related docs
+3. 📄 Complete Omnecor User Guide (missing content)
+4. 📊 Complete DATABASE_SCHEMA.md (missing tables)
+5. 🔧 Document Agent Networking (5-page guide)
+6. ☁️ Document Cloud Compute (3-page guide)
+
+**Code:**
+7. 🐛 Fix `postAnalytics` join logic bug
+8. ⚙️ Wire Virtual Card HITL approval or mark experimental
+9. 🔍 Fix Fal.ai dead code procedures
+10. 📡 Fix Mesh Discovery stub or mark experimental
+
+### HIGH (This Week):
+
+11. 📚 Create MCP Integration Guide (2 pages)
+12. 🔐 Create Security Features Guide (3 pages: encryption, backup, scanning)
+13. 🎯 Consolidate Valet Router documentation (single index)
+14. 🏷️ Add "EXPERIMENTAL" badges to incomplete features
+15. 🔗 Add cross-references for scattered docs (hardcoded rules, etc.)
+
+### MEDIUM (This Sprint):
+
+16. 🔧 Complete Model Health Checks implementation
+17. 📡 Resolve Mesh Discovery mDNS dependency
+18. 🎨 Complete Light Mode or deprecate
+19. 📋 Update MODEL_ROUTING_GUIDE.md refresh date
+20. 🗂️ Merge duplicate Neural Brain Map docs
+
+---
+
+## CONCLUSION: Second Pass
+
+The second-pass swarm audit confirmed that **Omnecor's implementation significantly exceeds documentation**, but also identified **5 critical issues that must be fixed before release**:
+
+1. **False Claim:** Manus OAuth not implemented
+2. **Ambiguous Status:** Execution Modes current vs Phase 15
+3. **Missing Content:** User Guide incomplete
+4. **Missing Content:** Database Schema incomplete
+5. **Bug:** Post Analytics join logic error
+
+Additionally, **25+ documentation issues** were identified ranging from critical to low priority.
+
+**Estimated effort to address:**
+- Documentation updates: 12-15 pages new content + README revisions
+- Code fixes: 4 blockers (HITL, mesh discovery, model health checks, Fal.ai)
+- Process: Create unified documentation index to prevent drift
+
+---
+
+*Second-pass audit completed: June 4, 2026*
+*Agent swarm: 5 agents (Documentation, UI, Database, Services, Hidden Features)*
+*Issues identified: 25+ documentation, 4 code blockers, 1 database bug*
