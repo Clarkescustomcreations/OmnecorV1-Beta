@@ -51,9 +51,18 @@ export function useOmnecorSocket(
   const pingIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const subscribedChannels = useRef<Set<string>>(new Set());
 
-  const WS_URL =
-    import.meta.env.VITE_WS_URL ??
-    `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`;
+  const WS_URL = (() => {
+    if (import.meta.env.VITE_WS_URL) return import.meta.env.VITE_WS_URL;
+    if (typeof window === "undefined") return "ws://localhost:3000/ws";
+    // Capacitor thin-client: connect to desktop brain
+    const capacitorHost = localStorage.getItem("omnecor_server_ip");
+    const capacitorPort = localStorage.getItem("omnecor_server_port") || "3000";
+    if (capacitorHost && capacitorHost !== "localhost") {
+      return `ws://${capacitorHost}:${capacitorPort}/ws`;
+    }
+    const wsProto = window.location.protocol === "https:" ? "wss" : "ws";
+    return `${wsProto}://${window.location.host}/ws`;
+  })();
 
   const subscribe = useCallback((channel: string) => {
     subscribedChannels.current.add(channel);

@@ -44,10 +44,25 @@ queryClient.getMutationCache().subscribe(event => {
   }
 });
 
+function getServerBase(): { host: string; proto: string; wsProto: string } {
+  if (typeof window === "undefined") {
+    return { host: "localhost:3000", proto: "http:", wsProto: "ws:" };
+  }
+  // Capacitor thin-client: server runs on desktop, not on this origin
+  const capacitorHost = localStorage.getItem("omnecor_server_ip");
+  const capacitorPort = localStorage.getItem("omnecor_server_port") || "3000";
+  if (capacitorHost && capacitorHost !== "localhost") {
+    return { host: `${capacitorHost}:${capacitorPort}`, proto: "http:", wsProto: "ws:" };
+  }
+  const proto = window.location.protocol;
+  const wsProto = proto === "https:" ? "wss:" : "ws:";
+  return { host: window.location.host, proto, wsProto };
+}
+
 const wsClient = createWSClient({
   url: () => {
-    const proto = window.location.protocol === "https:" ? "wss:" : "ws:";
-    return `${proto}//${window.location.host}/api/trpc`;
+    const { host, wsProto } = getServerBase();
+    return `${wsProto}//${host}/api/trpc`;
   },
 });
 
@@ -57,7 +72,15 @@ const trpcClient = trpc.createClient({
       condition: op => op.type === "subscription",
       true: wsLink({ client: wsClient, transformer: superjson }),
       false: httpBatchLink({
-        url: "/api/trpc",
+        url: () => {
+          const { host, proto } = getServerBase();
+          // Relative URL works for web/desktop, absolute needed for Capacitor
+          const capacitorHost = typeof window !== "undefined" && localStorage.getItem("omnecor_server_ip");
+          if (capacitorHost && capacitorHost !== "localhost") {
+            return `${proto}//${host}/api/trpc`;
+          }
+          return "/api/trpc";
+        },
         transformer: superjson,
         fetch(input, init) {
           return globalThis.fetch(input, {
