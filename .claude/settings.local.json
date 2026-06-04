@@ -24,7 +24,22 @@
       "Bash(curl -s https://api.github.com/repos/Clarkescustomcreations/OmnecorV1-Beta/branches)",
       "Bash(curl -s \"https://api.github.com/repos/Clarkescustomcreations/OmnecorV1-Beta/git/trees/valet-updates?recursive=1\")",
       "Bash(git config *)",
-      "Bash(git -C /mnt/c/Claude-Code remote -v)"
+      "Bash(git -C /mnt/c/Claude-Code remote -v)",
+      "Bash(curl *)",
+      "Bash(systemctl --user status ollama)",
+      "Bash(systemctl status *)",
+      "Bash(ollama --version)",
+      "Bash(journalctl -u ollama --since \"10 minutes ago\")",
+      "Bash(OLLAMA_DEBUG=1 ollama run qwen2.5-coder:7b \"say READY\")",
+      "Read(//etc/systemd/system/**)",
+      "Read(//usr/local/lib/systemd/system/**)",
+      "Read(//etc/**)",
+      "Bash(sudo sed -i '/^Environment=\"PATH=/a Environment=\"OLLAMA_NUM_GPU=0\"' /etc/systemd/system/ollama.service)",
+      "Bash(sudo systemctl daemon-reload)",
+      "Bash(sudo systemctl restart ollama)",
+      "Bash(systemctl is-active *)",
+      "Bash(OLLAMA_NUM_GPU=0 OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=/usr/share/ollama/.ollama/models ollama serve)",
+      "Bash(echo \"CPU Ollama PID: $!\")"
     ]
   }
 }
