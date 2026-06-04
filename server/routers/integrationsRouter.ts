@@ -76,7 +76,10 @@ interface StoredEntry {
   connectedAt: string;
 }
 
-type Store = Record<string, StoredEntry>;
+/** One user's integrations, keyed by integration type. */
+type UserBucket = Record<string, StoredEntry>;
+/** The whole store, keyed by userId → UserBucket. */
+type Store = Record<string, UserBucket>;
 
 function readStore(): Store {
   try {
@@ -85,6 +88,31 @@ function readStore(): Store {
   } catch {
     return {};
   }
+}
+
+/** A pre-userId (legacy, flat) entry has crypto fields at the top level. */
+function isLegacyEntry(v: unknown): v is StoredEntry {
+  return typeof v === "object" && v !== null && "ciphertext" in v;
+}
+
+/**
+ * Returns the caller's bucket, isolating each user's tokens. Any legacy
+ * top-level entries (written before per-user keying existed) are folded into
+ * the first caller's bucket exactly once — correct for a local single-user
+ * upgrade; a shared host starts clean so the ambiguous case never arises.
+ * Mutates `store` in place; callers persist via writeStoreDirect on writes.
+ */
+function getBucket(store: Store, userId: string): UserBucket {
+  const legacy: UserBucket = {};
+  for (const [key, value] of Object.entries(store)) {
+    if (isLegacyEntry(value)) {
+      legacy[key] = value;
+      delete store[key];
+    }
+  }
+  const merged: UserBucket = { ...legacy, ...(store[userId] ?? {}) };
+  store[userId] = merged;
+  return merged;
 }
 
 function writeStoreDirect(data: Store): void {
@@ -181,10 +209,12 @@ type IntegrationType = typeof INTEGRATION_TYPES[number];
 export const integrationsRouter = router({
 
   /** Return all configured integration statuses (no raw tokens ever leave the server). */
-  getIntegrations: protectedProcedure.query(() => {
+  getIntegrations: protectedProcedure.query(({ ctx }) => {
+    if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
     const store = readStore();
+    const bucket = getBucket(store, String(ctx.user.id));
     return INTEGRATION_TYPES.map(type => {
-      const entry = store[type];
+      const entry = bucket[type];
       return {
         type,
         isConnected: !!entry,
@@ -200,8 +230,9 @@ export const integrationsRouter = router({
       type: z.enum(INTEGRATION_TYPES),
       token: z.string().min(1).max(512),
     }))
-    .mutation(({ input }) =>
+    .mutation(({ input, ctx }) =>
       withLock(async () => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         let metadata: Record<string, unknown> = {};
 
         if (input.type === "github") {
@@ -240,7 +271,8 @@ export const integrationsRouter = router({
 
         const { ciphertext, iv, tag } = encryptToken(input.token);
         const store = readStore();
-        store[input.type] = { type: input.type, ciphertext, iv, tag, metadata, connectedAt: new Date().toISOString() };
+        const bucket = getBucket(store, String(ctx.user.id));
+        bucket[input.type] = { type: input.type, ciphertext, iv, tag, metadata, connectedAt: new Date().toISOString() };
         writeStoreDirect(store);
         log.info(`Connected ${input.type}: ${String(metadata.username ?? "")}`);
         return { success: true, metadata };
@@ -250,10 +282,12 @@ export const integrationsRouter = router({
   /** Remove a stored integration. */
   disconnect: protectedProcedure
     .input(z.object({ type: z.enum(INTEGRATION_TYPES) }))
-    .mutation(({ input }) =>
+    .mutation(({ input, ctx }) =>
       withLock(async () => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         const store = readStore();
-        delete store[input.type];
+        const bucket = getBucket(store, String(ctx.user.id));
+        delete bucket[input.type];
         writeStoreDirect(store);
         log.info(`Disconnected ${input.type}`);
         return { success: true };
@@ -263,10 +297,12 @@ export const integrationsRouter = router({
   /** Re-fetch live data from the connected service. */
   sync: protectedProcedure
     .input(z.object({ type: z.enum(INTEGRATION_TYPES) }))
-    .mutation(({ input }) =>
+    .mutation(({ input, ctx }) =>
       withLock(async () => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         const store = readStore();
-        const entry = store[input.type];
+        const bucket = getBucket(store, String(ctx.user.id));
+        const entry = bucket[input.type];
         if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: `${input.type} is not connected.` });
 
         const token = readToken(entry);
@@ -318,7 +354,7 @@ export const integrationsRouter = router({
           };
         }
 
-        store[input.type] = {
+        bucket[input.type] = {
           ...entry,
           metadata: { ...entry.metadata, ...syncData, lastSynced: new Date().toISOString() },
         };
@@ -333,12 +369,14 @@ export const integrationsRouter = router({
       type: z.enum(INTEGRATION_TYPES),
       settings: z.record(z.string(), z.unknown()),
     }))
-    .mutation(({ input }) =>
+    .mutation(({ input, ctx }) =>
       withLock(async () => {
+        if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
         const store = readStore();
-        const entry = store[input.type];
+        const bucket = getBucket(store, String(ctx.user.id));
+        const entry = bucket[input.type];
         if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: `${input.type} is not connected.` });
-        store[input.type] = { ...entry, metadata: { ...entry.metadata, settings: input.settings } };
+        bucket[input.type] = { ...entry, metadata: { ...entry.metadata, settings: input.settings } };
         writeStoreDirect(store);
         return { success: true };
       })
