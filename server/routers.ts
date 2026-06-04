@@ -63,6 +63,13 @@ import { imageGenRouter } from "./routers/imageGenRouter.js";
 import { cloudComputeRouter } from "./routers/cloudComputeRouter.js";
 import { integrationsRouter } from "./routers/integrationsRouter.js";
 import { honchoRouter } from "./routers/honchoRouter.js";
+import { schedulingRouter } from "./routers/schedulingRouter.js";
+import { curatorRouter } from "./routers/curatorRouter.js";
+import { discoveryRouter } from "./routers/discoveryRouter.js";
+import { platformsRouter } from "./routers/platformsRouter.js";
+import { analyticsRouter } from "./routers/analyticsRouter.js";
+import { agentSettingsRouter } from "./routers/agentSettingsRouter.js";
+import { oauthRouter } from "./routers/oauthRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -153,6 +160,15 @@ export const appRouter = router({
 
   // ─── Honcho Memory Layer (User facts, long-term session memory) ───────────
   honcho: honchoRouter,
+
+  // ─── Agent Networking (Social media automation) ──────────────────────────
+  scheduling: schedulingRouter,
+  curator: curatorRouter,
+  discovery: discoveryRouter,
+  platforms: platformsRouter,
+  analytics: analyticsRouter,
+  settings: agentSettingsRouter,
+  oauth: oauthRouter,
 });
 
 export type AppRouter = typeof appRouter;

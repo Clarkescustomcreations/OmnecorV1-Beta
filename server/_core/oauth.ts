@@ -5,6 +5,113 @@ import { getSessionCookieOptions } from "./cookies";
 import { sdk } from "./sdk";
 import { ENV } from "./env.js";
 import crypto from "crypto";
+import { exchangeCodeForToken, fetchUserProfile } from "../oauth/oauthClients.js";
+import { getDb } from "../db.js";
+import { platformAccounts, oauthStates } from "../../drizzle/schema.js";
+import { eq, lt } from "drizzle-orm";
+
+export const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
+
+export interface OAuthStateData {
+  platform: string;
+  userId: number;
+  codeVerifier?: string;
+  /** Creation time (ms). Reconstructed from expiresAt when read from the DB. */
+  timestamp: number;
+}
+
+// In-memory fallback used when no SQL database is available (sqlite mode, or a
+// MySQL deployment that hasn't run the oauthStates migration yet). When a DB is
+// present, state lives there so the flow survives restarts and works across
+// multiple instances behind a load balancer.
+const memoryStore = new Map<string, OAuthStateData>();
+
+let _warnedFallback = false;
+function warnFallback(reason: unknown) {
+  if (_warnedFallback) return;
+  _warnedFallback = true;
+  console.warn(
+    "[OAuth] state store falling back to in-memory — run the oauthStates migration for multi-instance support:",
+    reason instanceof Error ? reason.message : reason
+  );
+}
+
+/** Persist a new OAuth state (CSRF nonce + optional PKCE verifier). */
+export async function saveOAuthState(
+  state: string,
+  data: Omit<OAuthStateData, "timestamp">
+): Promise<void> {
+  const db = await getDb();
+  if (db) {
+    try {
+      await db.insert(oauthStates).values({
+        state,
+        platform: data.platform,
+        userId: data.userId,
+        codeVerifier: data.codeVerifier ?? null,
+        expiresAt: new Date(Date.now() + OAUTH_STATE_TTL),
+      });
+      // Opportunistic sweep of expired rows.
+      await db.delete(oauthStates).where(lt(oauthStates.expiresAt, new Date()));
+      return;
+    } catch (error) {
+      warnFallback(error);
+    }
+  }
+  memoryStore.set(state, { ...data, timestamp: Date.now() });
+  for (const [key, value] of memoryStore.entries()) {
+    if (Date.now() - value.timestamp > OAUTH_STATE_TTL) memoryStore.delete(key);
+  }
+}
+
+/** Fetch a non-expired OAuth state, or undefined. Expired rows are pruned. */
+export async function getOAuthState(state: string): Promise<OAuthStateData | undefined> {
+  const db = await getDb();
+  if (db) {
+    try {
+      const rows = await db
+        .select()
+        .from(oauthStates)
+        .where(eq(oauthStates.state, state))
+        .limit(1);
+      const row = rows[0];
+      if (!row) return undefined;
+      if (row.expiresAt.getTime() < Date.now()) {
+        await db.delete(oauthStates).where(eq(oauthStates.state, state));
+        return undefined;
+      }
+      return {
+        platform: row.platform,
+        userId: row.userId,
+        codeVerifier: row.codeVerifier ?? undefined,
+        timestamp: row.expiresAt.getTime() - OAUTH_STATE_TTL,
+      };
+    } catch (error) {
+      warnFallback(error);
+    }
+  }
+  const data = memoryStore.get(state);
+  if (!data) return undefined;
+  if (Date.now() - data.timestamp > OAUTH_STATE_TTL) {
+    memoryStore.delete(state);
+    return undefined;
+  }
+  return data;
+}
+
+/** Delete an OAuth state (single-use consumption). */
+export async function deleteOAuthState(state: string): Promise<void> {
+  const db = await getDb();
+  if (db) {
+    try {
+      await db.delete(oauthStates).where(eq(oauthStates.state, state));
+      return;
+    } catch (error) {
+      warnFallback(error);
+    }
+  }
+  memoryStore.delete(state);
+}
 
 function getQueryParam(req: Request, key: string): string | undefined {
   const value = req.query[key];
@@ -274,6 +381,90 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
     } catch (error) {
       console.error("[OAuth/Microsoft] Callback failed", error);
       res.status(500).json({ error: "Microsoft OAuth callback failed" });
+    }
+  });
+}
+
+export function registerSocialMediaOAuthRoutes(app: Express) {
+  app.get("/api/oauth/callback/:platform", async (req: Request, res: Response) => {
+    const { platform } = req.params;
+    const code = getQueryParam(req, "code");
+    const state = getQueryParam(req, "state");
+
+    if (!code || !state) {
+      res.status(400).json({ error: "Missing code or state parameter" });
+      return;
+    }
+
+    // Validate state and extract userId (CSRF protection)
+    const stateData = await getOAuthState(state);
+    if (
+      !stateData ||
+      stateData.platform !== platform ||
+      Date.now() - stateData.timestamp > OAUTH_STATE_TTL
+    ) {
+      await deleteOAuthState(state);
+      res.status(400).json({ error: "Invalid OAuth state" });
+      return;
+    }
+    await deleteOAuthState(state);
+
+    try {
+      // Exchange code for token (PKCE verifier passed through when present)
+      const tokenResponse = await exchangeCodeForToken(
+        platform,
+        code,
+        "",
+        stateData.codeVerifier
+      );
+
+      // Fetch user profile
+      const profile = await fetchUserProfile(platform, tokenResponse.access_token);
+
+      // Save to database
+      const dbInstance = await getDb();
+      if (!dbInstance) {
+        res.status(500).json({ error: "Database connection failed" });
+        return;
+      }
+
+      const accountName = (
+        profile.name ||
+        profile.username ||
+        profile.login ||
+        "Connected Account"
+      ) as string;
+
+      await dbInstance.insert(platformAccounts).values({
+        userId: stateData.userId,
+        platform,
+        accountName,
+        oauthToken: tokenResponse.access_token,
+        oauthRefreshToken: tokenResponse.refresh_token || undefined,
+        tokenExpiresAt: tokenResponse.expires_in
+          ? new Date(Date.now() + tokenResponse.expires_in * 1000)
+          : undefined,
+        accountMetadata: profile,
+        isActive: 1,
+      });
+
+      // Redirect back to Agent Networking with success message
+      const redirectUrl = new URL(`${req.protocol}://${getValidatedHost(req)}`);
+      redirectUrl.pathname = "/agent-networking";
+      redirectUrl.searchParams.set("platform", platform);
+      redirectUrl.searchParams.set("connected", "true");
+
+      res.redirect(302, redirectUrl.toString());
+    } catch (error) {
+      console.error(`[OAuth/${platform}] Callback failed`, error);
+
+      // Redirect back with error message
+      const redirectUrl = new URL(`${req.protocol}://${getValidatedHost(req)}`);
+      redirectUrl.pathname = "/agent-networking";
+      redirectUrl.searchParams.set("platform", platform);
+      redirectUrl.searchParams.set("error", "true");
+
+      res.redirect(302, redirectUrl.toString());
     }
   });
 }

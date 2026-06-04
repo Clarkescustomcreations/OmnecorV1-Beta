@@ -17,6 +17,7 @@ const ModelHub = lazy(() => import("@/pages/ModelHub"));
 const Pipelines = lazy(() => import("@/pages/Pipelines"));
 const Integrations = lazy(() => import("@/pages/Integrations"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
+const AgentNetworking = lazy(() => import("@/pages/AgentNetworking"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const ExternalBrainMapWindow = lazy(() => import("./components/window-system/ExternalBrainMapWindow"));
 
@@ -65,6 +66,7 @@ function Router() {
         <Route path="/model-hub" component={withBoundary(ModelHub)} />
         <Route path="/pipelines" component={withBoundary(Pipelines)} />
         <Route path="/integrations" component={withBoundary(Integrations)} />
+        <Route path="/agent-networking" component={withBoundary(AgentNetworking)} />
         <Route path="/settings" component={withBoundary(SettingsPage)} />
         <Route path="/404" component={withBoundary(NotFound)} />
         {/* Final fallback route */}

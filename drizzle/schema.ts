@@ -231,3 +231,138 @@ export const cloudComputeSubscriptions = mysqlTable("cloud_compute_subscriptions
 
 export type CloudComputeSubscription = typeof cloudComputeSubscriptions.$inferSelect;
 export type InsertCloudComputeSubscription = typeof cloudComputeSubscriptions.$inferInsert;
+
+/**
+ * Platform Accounts (OAuth tokens for social media)
+ */
+export const platformAccounts = mysqlTable("platformAccounts", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  accountName: varchar("accountName", { length: 255 }),
+  oauthToken: text("oauthToken").notNull(),
+  oauthRefreshToken: text("oauthRefreshToken"),
+  tokenExpiresAt: timestamp("tokenExpiresAt"),
+  accountMetadata: json("accountMetadata"),
+  isActive: int("isActive").default(1),
+  lastSyncedAt: timestamp("lastSyncedAt"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PlatformAccount = typeof platformAccounts.$inferSelect;
+export type InsertPlatformAccount = typeof platformAccounts.$inferInsert;
+
+/**
+ * Transient OAuth state for the social-media connect flow (CSRF token + PKCE
+ * verifier). Persisted so the flow survives server restarts and works across
+ * multiple instances behind a load balancer. Rows are single-use and expire;
+ * `expiresAt` is enforced on read and old rows are swept opportunistically.
+ */
+export const oauthStates = mysqlTable("oauthStates", {
+  /** The opaque state token (also the CSRF nonce). */
+  state: varchar("state", { length: 128 }).primaryKey(),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  userId: int("userId").notNull(),
+  /** PKCE code_verifier, when the provider flow uses PKCE. */
+  codeVerifier: varchar("codeVerifier", { length: 256 }),
+  expiresAt: timestamp("expiresAt").notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type OAuthState = typeof oauthStates.$inferSelect;
+export type InsertOAuthState = typeof oauthStates.$inferInsert;
+
+/**
+ * Discovered Articles (content to be curated)
+ */
+export const discoveredArticles = mysqlTable("discoveredArticles", {
+  id: int("id").autoincrement().primaryKey(),
+  title: varchar("title", { length: 500 }),
+  url: varchar("url", { length: 2048 }).unique(),
+  urlHash: varchar("urlHash", { length: 64 }).unique(),
+  source: varchar("source", { length: 100 }),
+  content: text("content"),
+  summary: text("summary"),
+  publishedAt: timestamp("publishedAt"),
+  fetchedAt: timestamp("fetchedAt").defaultNow(),
+  isProcessed: int("isProcessed").default(0),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type DiscoveredArticle = typeof discoveredArticles.$inferSelect;
+export type InsertDiscoveredArticle = typeof discoveredArticles.$inferInsert;
+
+/**
+ * Curated Posts (LLM-generated content for platforms)
+ */
+export const curatedPosts = mysqlTable("curatedPosts", {
+  id: int("id").autoincrement().primaryKey(),
+  articleId: int("articleId"),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  content: text("content"),
+  metadata: json("metadata"),
+  status: mysqlEnum("status", ["draft", "pending_review", "approved", "scheduled", "published", "failed"]).default("draft"),
+  approvalNotes: text("approvalNotes"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type CuratedPost = typeof curatedPosts.$inferSelect;
+export type InsertCuratedPost = typeof curatedPosts.$inferInsert;
+
+/**
+ * Scheduled Posts
+ */
+export const scheduledPosts = mysqlTable("scheduledPosts", {
+  id: int("id").autoincrement().primaryKey(),
+  curatedPostId: int("curatedPostId").notNull(),
+  platformAccountId: int("platformAccountId").notNull(),
+  scheduledAt: timestamp("scheduledAt"),
+  publishedAt: timestamp("publishedAt"),
+  status: mysqlEnum("status", ["scheduled", "published", "failed", "cancelled"]).default("scheduled"),
+  errorMessage: text("errorMessage"),
+  platformPostId: varchar("platformPostId", { length: 255 }),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type ScheduledPost = typeof scheduledPosts.$inferSelect;
+export type InsertScheduledPost = typeof scheduledPosts.$inferInsert;
+
+/**
+ * Post Analytics
+ */
+export const postAnalytics = mysqlTable("postAnalytics", {
+  id: int("id").autoincrement().primaryKey(),
+  scheduledPostId: int("scheduledPostId").notNull(),
+  impressions: int("impressions").default(0),
+  reach: int("reach").default(0),
+  likes: int("likes").default(0),
+  shares: int("shares").default(0),
+  comments: int("comments").default(0),
+  clicks: int("clicks").default(0),
+  engagementRate: varchar("engagementRate", { length: 10 }),
+  lastUpdatedAt: timestamp("lastUpdatedAt").defaultNow().onUpdateNow(),
+});
+
+export type PostAnalytic = typeof postAnalytics.$inferSelect;
+export type InsertPostAnalytic = typeof postAnalytics.$inferInsert;
+
+/**
+ * Posting Schedule Configuration
+ */
+export const postingScheduleConfig = mysqlTable("postingScheduleConfig", {
+  id: int("id").autoincrement().primaryKey(),
+  userId: int("userId").notNull(),
+  platform: varchar("platform", { length: 50 }).notNull(),
+  postsPerDay: int("postsPerDay").default(1),
+  autoApprove: int("autoApprove").default(0),
+  optimalPostingTimes: json("optimalPostingTimes"),
+  timezone: varchar("timezone", { length: 50 }).default("UTC"),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+  updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+});
+
+export type PostingScheduleConfig = typeof postingScheduleConfig.$inferSelect;
+export type InsertPostingScheduleConfig = typeof postingScheduleConfig.$inferInsert;
