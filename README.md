@@ -10,7 +10,7 @@
 ---
 
 
-Omnecor is a powerful, elegant, and polished local-first AI workstation designed for power users who demand both function and beauty. It seamlessly integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows—all in one refined interface.
+Omnecor is a powerful,local-first AI workstation designed for power users who demand both function and beauty. It seamlessly integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows—all in one refined interface.
 
 ---
 <img width="1254" height="1254" alt="file_0000000036d471f7a2101a53fc9370a4" src="https://github.com/user-attachments/assets/c487fb35-2cd0-4483-936b-6010ec16d91d" />
@@ -60,9 +60,9 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **Voice Cloning (RVC)** — Real-time voice conversion for generating speech in any cloned voice.
 
 ### Persistent Memory Layer
-- **Honcho Cross-Session Memory** — External memory service that remembers durable facts about the user across sessions and projects.
+- **Cross-Session Memory** — External memory service that remembers durable facts about the user across sessions and projects.
 - **Background Notes** — Use `/btw <note>` command to save persistent notes that are auto-injected into the chat system prompt.
-- **Optional Configuration** — Enabled via `HONCHO_API_KEY` environment variable; gracefully disabled if not set (nothing breaks).
+- **Optional Honcho Configuration** — Enabled via `HONCHO_API_KEY` environment variable; gracefully disabled if not set (nothing breaks).
 
 ### Conversation Context Management
 - **Token Budget Bar** — Visual indicator under chat input showing context usage (amber at ~70%, red at ~90% of model window).
