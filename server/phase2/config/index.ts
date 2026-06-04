@@ -105,6 +105,11 @@ export const PYTHON_SCRIPTS = {
   ),
   /** Path to the ESP flash tool wrapper */
   espFlash: path.resolve(__dirname, "../../python_bridges/esptool_bridge.py"),
+  /** Path to the Valet dataset builder script */
+  valetDatasetBuilder: path.resolve(
+    __dirname,
+    "../../python_bridges/valet_dataset_builder.py"
+  ),
   /** Python executable (can be overridden for venvs) */
   pythonBin: process.env.PYTHON_BIN || "python3",
   /** Blender executable path */
