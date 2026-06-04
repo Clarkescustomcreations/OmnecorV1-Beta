@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
 import { FictionState, FictionNodeData, FictionRelationship, FictionTimelineEvent } from "@/types/fiction";
+import { safeStorage } from "@/lib/safeStorage";
 
 interface FictionModeContextType {
   isFictionMode: boolean;
@@ -34,7 +35,7 @@ export const FictionModeProvider: React.FC<{ children: ReactNode; mapId?: string
   // Load isolated state based on mapId
   useEffect(() => {
     if (mapId) {
-      const saved = localStorage.getItem(`omnecor_fiction_state_${mapId}`);
+      const saved = safeStorage.getItem(`omnecor_fiction_state_${mapId}`);
       if (saved) {
         try {
           setFictionState(JSON.parse(saved));
@@ -50,7 +51,7 @@ export const FictionModeProvider: React.FC<{ children: ReactNode; mapId?: string
   // Save isolated state
   useEffect(() => {
     if (mapId && fictionState !== INITIAL_STATE) {
-      localStorage.setItem(`omnecor_fiction_state_${mapId}`, JSON.stringify(fictionState));
+      safeStorage.setItem(`omnecor_fiction_state_${mapId}`, JSON.stringify(fictionState));
     }
   }, [fictionState, mapId]);
 
