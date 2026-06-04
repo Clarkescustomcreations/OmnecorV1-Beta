@@ -1,6 +1,6 @@
 import { Toaster } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Switch } from "wouter";
+import { Route, Router, Switch } from "wouter";
 import { useEffect, Suspense, lazy, ComponentType, Component, ReactNode } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
@@ -54,7 +54,7 @@ function withBoundary(Page: ComponentType) {
   };
 }
 
-function Router() {
+function RouterRoutes() {
   // make sure to consider if you need authentication for certain routes
   return (
     <Suspense fallback={<PageSkeleton />}>
@@ -96,6 +96,8 @@ function App() {
     return () => window.removeEventListener("keydown", handleKeyDown);
   }, []);
 
+  const base = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+
   return (
     <ErrorBoundary>
       <ThemeProvider
@@ -103,9 +105,11 @@ function App() {
         switchable
       >
         <TooltipProvider>
-          <CommandPalette />
-          <Toaster />
-          <Router />
+          <Router base={base}>
+            <CommandPalette />
+            <Toaster />
+            <RouterRoutes />
+          </Router>
         </TooltipProvider>
       </ThemeProvider>
     </ErrorBoundary>

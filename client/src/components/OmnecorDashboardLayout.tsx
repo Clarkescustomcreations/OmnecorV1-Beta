@@ -15,6 +15,7 @@ import {
   ChevronRight,
   Sparkles,
   BookOpenText,
+  Share2,
 } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
@@ -90,6 +91,12 @@ export default function OmnecorDashboardLayout({
       href: "/integrations",
       icon: Plug,
       description: "Third-party connections",
+    },
+    {
+      label: "Agent Networking",
+      href: "/agent-networking",
+      icon: Share2,
+      description: "Automated social media & agent discourse",
     },
     {
       label: "Settings",
