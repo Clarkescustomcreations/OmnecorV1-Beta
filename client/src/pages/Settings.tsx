@@ -349,8 +349,18 @@ const HealthMetric = ({ label, value, status }: { label: string, value: string, 
 );
 
 const HardwarePanel: React.FC = () => {
-  const [blenderPath, setBlenderPath] = React.useState("/usr/bin/blender");
-  const [kicadPath, setKicadPath] = React.useState("/usr/bin/kicad-cli");
+  const isWindows = typeof navigator !== "undefined" && navigator.userAgent.includes("Windows");
+  const isMac = typeof navigator !== "undefined" && navigator.userAgent.includes("Mac");
+  const [blenderPath, setBlenderPath] = React.useState(
+    isWindows ? "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe"
+    : isMac ? "/Applications/Blender.app/Contents/MacOS/Blender"
+    : "/usr/bin/blender"
+  );
+  const [kicadPath, setKicadPath] = React.useState(
+    isWindows ? "C:\\Program Files\\KiCad\\8.0\\bin\\kicad-cli.exe"
+    : isMac ? "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli"
+    : "/usr/bin/kicad-cli"
+  );
 
   const detectMutation = trpc.system.detectHardware.useMutation({
     onSuccess: (data) => {
