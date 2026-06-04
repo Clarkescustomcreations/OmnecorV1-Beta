@@ -370,10 +370,14 @@ export class ESPToolBridge extends EventEmitter {
 
   /** Validate serial port path */
   private validatePort(port: string): void {
-    // Must start with /dev/ on Linux
-    if (!port.startsWith("/dev/")) {
+    // Accept Linux/macOS /dev/ paths and Windows COM ports
+    const isLinuxPort = port.startsWith("/dev/");
+    const isWindowsPort = /^COM\d+$/i.test(port);
+    const isMacPort = port.startsWith("/dev/cu.") || port.startsWith("/dev/tty.");
+
+    if (!isLinuxPort && !isWindowsPort && !isMacPort) {
       throw new Error(
-        `[Omnecor ESP] Invalid port path: ${port}. Must be a /dev/ device path.`
+        `[Omnecor ESP] Invalid port path: ${port}. Expected /dev/ttyUSB0 (Linux), /dev/cu.usbserial (macOS), or COM3 (Windows).`
       );
     }
 
