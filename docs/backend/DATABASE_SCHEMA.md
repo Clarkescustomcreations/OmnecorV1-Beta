@@ -151,13 +151,198 @@ Stores per-phase state and HITL approval records for a pipeline run. Phases are 
 | `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
 | `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL` |
 
+### 2.10. `cloud_compute_sessions` Table
+
+Tracks rented GPU/compute sessions across providers (VastAI, RunPod, Lambda). Integrates with the Agentic Wallet spend log on session stop.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `varchar(36)` | UUID | `PRIMARY KEY` |
+| `userId` | `int` | FK to `users.id`. User who owns this compute session. | `NOT NULL` |
+| `projectId` | `varchar(64)` | Associated project identifier | `NOT NULL` |
+| `provider` | `varchar(64)` | Compute provider name (`'vastai'`, `'runpod'`, `'lambda'`) | `NOT NULL` |
+| `externalSessionId` | `varchar(128)` | External session identifier from the cloud provider | |
+| `planId` | `varchar(64)` | Cloud provider plan identifier | `NOT NULL` |
+| `instanceLabel` | `varchar(128)` | Human-readable instance label | `NOT NULL` |
+| `billingUnit` | `enum('minute', 'hour')` | Billing unit for cost calculation | `NOT NULL`, `DEFAULT 'hour'` |
+| `ratePerUnitMicrocents` | `bigint` | Cost per billing unit in microcents | `NOT NULL` |
+| `status` | `enum('starting', 'running', 'stopped', 'error')` | Session status | `NOT NULL`, `DEFAULT 'starting'` |
+| `startedAt` | `timestamp` | Timestamp when session started | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+| `stoppedAt` | `timestamp` | Timestamp when session stopped (if applicable) | |
+| `totalCostMicrocents` | `bigint` | Total cost in microcents for this session | `NOT NULL`, `DEFAULT 0` |
+| `metadata` | `json` | Additional session metadata (JSON object) | |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+
+### 2.11. `cloud_compute_subscriptions` Table
+
+Tracks monthly subscription plans a user has with cloud compute providers (e.g. RunPod monthly credit pack).
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `varchar(36)` | UUID | `PRIMARY KEY` |
+| `userId` | `int` | FK to `users.id`. User who owns this subscription. | `NOT NULL` |
+| `provider` | `varchar(64)` | Compute provider name | `NOT NULL` |
+| `planName` | `varchar(128)` | Name of the subscription plan | `NOT NULL` |
+| `monthlyCents` | `int` | Monthly cost in cents | `NOT NULL`, `DEFAULT 0` |
+| `renewalDate` | `timestamp` | Date when subscription renews | |
+| `isActive` | `int` | Boolean flag (0 = inactive, 1 = active) | `NOT NULL`, `DEFAULT 1` |
+| `apiKeyHint` | `varchar(32)` | Last few characters of API key (for identification) | |
+| `notes` | `text` | Additional notes about the subscription | |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
+
+### 2.12. `platformAccounts` Table
+
+Stores OAuth-connected social media platform accounts. Tokens are stored encrypted. Used for the social media integration and content curation features.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `userId` | `int` | FK to `users.id`. User who owns this platform account. | `NOT NULL` |
+| `platform` | `varchar(50)` | Platform name (`'twitter'`, `'linkedin'`, `'facebook'`, etc.) | `NOT NULL` |
+| `accountName` | `varchar(255)` | Display name of the account on the platform | |
+| `oauthToken` | `text` | Encrypted OAuth access token | `NOT NULL` |
+| `oauthRefreshToken` | `text` | Encrypted OAuth refresh token (if applicable) | |
+| `tokenExpiresAt` | `timestamp` | Timestamp when the OAuth token expires | |
+| `accountMetadata` | `json` | Platform-specific metadata (JSON object) | |
+| `isActive` | `int` | Boolean flag (0 = inactive, 1 = active) | `DEFAULT 1` |
+| `lastSyncedAt` | `timestamp` | Timestamp of last sync with the platform | |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
+
+### 2.13. `oauthStates` Table
+
+Transient OAuth state for the social-media connect flow. Stores CSRF tokens and PKCE verifiers. Persisted so the flow survives server restarts and works across multiple instances behind a load balancer. Rows are single-use and expire; `expiresAt` is enforced on read and old rows are swept opportunistically.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `state` | `varchar(128)` | The opaque state token (also serves as CSRF nonce) | `PRIMARY KEY` |
+| `platform` | `varchar(50)` | Platform name for this OAuth flow | `NOT NULL` |
+| `userId` | `int` | FK to `users.id`. User initiating the OAuth flow. | `NOT NULL` |
+| `codeVerifier` | `varchar(256)` | PKCE code_verifier (when the provider uses PKCE) | |
+| `expiresAt` | `timestamp` | Timestamp when this state token expires | `NOT NULL` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+
+### 2.14. `discoveredArticles` Table
+
+Stores articles found by the content discovery engine. These articles are candidates for curation into social media posts.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `title` | `varchar(500)` | Title of the article | |
+| `url` | `varchar(2048)` | URL of the article | `UNIQUE` |
+| `urlHash` | `varchar(64)` | Hash of the URL for deduplication | `UNIQUE` |
+| `source` | `varchar(100)` | Source publication or website name | |
+| `content` | `text` | Full text content of the article (if fetched) | |
+| `summary` | `text` | AI-generated summary of the article | |
+| `publishedAt` | `timestamp` | Timestamp when the article was published | |
+| `fetchedAt` | `timestamp` | Timestamp when the article content was fetched | `DEFAULT CURRENT_TIMESTAMP` |
+| `isProcessed` | `int` | Boolean flag (0 = unprocessed, 1 = processed) | `DEFAULT 0` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+
+### 2.15. `curatedPosts` Table
+
+AI-curated content drafts intended for publishing to social media platforms. Tracks the curation workflow from draft through approval to publication.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `articleId` | `int` | FK to `discoveredArticles.id`. Source article (nullable; post may be original). | |
+| `platform` | `varchar(50)` | Target platform for this post | `NOT NULL` |
+| `content` | `text` | The curated/generated post content | |
+| `metadata` | `json` | Additional metadata about the curation (JSON object) | |
+| `status` | `enum('draft', 'pending_review', 'approved', 'scheduled', 'published', 'failed')` | Curation workflow status | `DEFAULT 'draft'` |
+| `approvalNotes` | `text` | Notes from the approval process | |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
+
+### 2.16. `scheduledPosts` Table
+
+Posts queued for publishing to a platform via a specific account. Tracks the publishing workflow from scheduled through published or failed.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `curatedPostId` | `int` | FK to `curatedPosts.id`. The curated post being scheduled. | `NOT NULL` |
+| `platformAccountId` | `int` | FK to `platformAccounts.id`. Account to publish via. | `NOT NULL` |
+| `scheduledAt` | `timestamp` | Timestamp when the post is scheduled to publish | |
+| `publishedAt` | `timestamp` | Timestamp when the post was actually published | |
+| `status` | `enum('scheduled', 'published', 'failed', 'cancelled')` | Publishing status | `DEFAULT 'scheduled'` |
+| `errorMessage` | `text` | Error details if the post failed to publish | |
+| `platformPostId` | `varchar(255)` | External post ID from the platform (e.g. tweet ID) | |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
+
+### 2.17. `postAnalytics` Table
+
+Engagement metrics for published posts. Records likes, comments, shares, impressions, and other engagement data for analytics and reporting.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `scheduledPostId` | `int` | FK to `scheduledPosts.id`. The published post being tracked. | `NOT NULL` |
+| `impressions` | `int` | Number of times the post was seen | `DEFAULT 0` |
+| `reach` | `int` | Number of unique users who saw the post | `DEFAULT 0` |
+| `likes` | `int` | Number of likes/reactions | `DEFAULT 0` |
+| `shares` | `int` | Number of shares/retweets | `DEFAULT 0` |
+| `comments` | `int` | Number of comments/replies | `DEFAULT 0` |
+| `clicks` | `int` | Number of clicks (if applicable) | `DEFAULT 0` |
+| `engagementRate` | `varchar(10)` | Calculated engagement rate as a percentage string | |
+| `lastUpdatedAt` | `timestamp` | Timestamp of last analytics update | `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
+
+### 2.18. `postingScheduleConfig` Table
+
+Configuration for automated posting schedules. Defines how often posts are published and when the optimal posting times are for a given user/platform pair.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `userId` | `int` | FK to `users.id`. User who owns this configuration. | `NOT NULL` |
+| `platform` | `varchar(50)` | Target platform | `NOT NULL` |
+| `postsPerDay` | `int` | Target number of posts per day | `DEFAULT 1` |
+| `autoApprove` | `int` | Boolean flag (0 = manual approval, 1 = auto-approve) | `DEFAULT 0` |
+| `optimalPostingTimes` | `json` | JSON array of optimal posting times (e.g. hours of day) | |
+| `timezone` | `varchar(50)` | Timezone for posting schedule calculations | `DEFAULT 'UTC'` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
+
 ## 3. Relationships
 
+### Core Chat & Audit
+
 -   **`chat_messages` to `chat_sessions`**: A one-to-many relationship where multiple `chat_messages` can belong to a single `chat_session`. The `sessionId` in `chat_messages` is a foreign key referencing `chat_sessions.id`, with `ON DELETE CASCADE` ensuring that messages are deleted when their parent session is removed.
+-   **`audit_log` to `users`**: Many-to-one via `actorId` (nullable). System-initiated events have `actorId = NULL`.
+
+### Budgets & Spending
+
 -   **`project_budgets` to `projects`**: Many-to-one via `projectId`. A project may have at most one active budget record.
 -   **`spend_log` to `project_budgets`**: Many-to-one via `projectId`. All spend entries for a project roll up against that project's budget.
--   **`audit_log` to `users`**: Many-to-one via `actorId` (nullable). System-initiated events have `actorId = NULL`.
+
+### Pipelines
+
+-   **`pipelines` to `users`**: Many-to-one via `ownerId`. A pipeline is owned by exactly one user.
 -   **`pipeline_phases` to `pipelines`**: Many-to-one via `pipelineId`, with `ON DELETE CASCADE` ensuring phases are removed when their parent pipeline is deleted.
+
+### Cloud Compute
+
+-   **`cloud_compute_sessions` to `users`**: Many-to-one via `userId`. A session belongs to one user.
+-   **`cloud_compute_subscriptions` to `users`**: Many-to-one via `userId`. A subscription belongs to one user.
+
+### Social Media & Content Curation
+
+-   **`platformAccounts` to `users`**: Many-to-one via `userId`. A platform account belongs to one user.
+-   **`oauthStates` to `users`**: Many-to-one via `userId`. An OAuth state record is created for a user initiating a connection.
+-   **`discoveredArticles`**: Standalone table. Articles are discovered by the content discovery engine without direct user ownership (reusable across all users).
+-   **`curatedPosts` to `discoveredArticles`**: Many-to-one via `articleId` (nullable). A curated post may reference a discovered article, or be original content.
+-   **`curatedPosts` to `users`** (implicit): Via the parent `discoveredArticles` relationship; curated posts are created by the curation system.
+-   **`scheduledPosts` to `curatedPosts`**: Many-to-one via `curatedPostId`. A scheduled post represents a curated post queued for publication.
+-   **`scheduledPosts` to `platformAccounts`**: Many-to-one via `platformAccountId`. A scheduled post is published to exactly one platform account.
+-   **`postAnalytics` to `scheduledPosts`**: Many-to-one via `scheduledPostId`. A scheduled post has zero-to-one analytics records.
+
+### Posting Schedule Configuration
+
+-   **`postingScheduleConfig` to `users`**: Many-to-one via `userId`. A posting schedule belongs to one user.
 
 ## 4. Migrations
 
@@ -176,3 +361,148 @@ The `users.executionMode` column is the persistence layer for Omnecor's three pr
 When a `hard` budget limit is hit (see `project_budgets.mode`), the effective execution mode is temporarily downgraded to `scrapper` for that project regardless of the user's stored preference.
 
 Database schema changes are managed through Drizzle Kit migrations. The `drizzle/migrations` directory contains SQL files representing these changes, ensuring that the database schema can be evolved systematically and reliably.
+
+## 6. Entity Relationship Diagram
+
+The following diagram shows the key relationships between the major table groups.
+
+```mermaid
+erDiagram
+    USERS {
+        int id PK
+        varchar openId
+        text name
+        varchar email
+        varchar role
+        varchar executionMode
+    }
+    CHAT_SESSIONS {
+        varchar id PK
+        varchar projectId
+        text title
+        varchar providerId
+        varchar modelId
+    }
+    CHAT_MESSAGES {
+        varchar id PK
+        varchar sessionId FK
+        varchar role
+        text content
+    }
+    INTEGRATIONS {
+        varchar id PK
+        varchar provider
+        text accessToken
+        text refreshToken
+    }
+    PROJECT_BUDGETS {
+        varchar id PK
+        varchar projectId
+        int limitCents
+        varchar mode
+    }
+    SPEND_LOG {
+        varchar id PK
+        varchar projectId
+        varchar provider
+        varchar modelId
+        int promptTokens
+        bigint estimatedCostMicrocents
+    }
+    AUDIT_LOG {
+        varchar id PK
+        varchar eventType
+        int actorId FK
+        varchar actorType
+    }
+    PIPELINES {
+        varchar id PK
+        varchar name
+        varchar status
+        varchar currentPhase
+        int ownerId FK
+    }
+    PIPELINE_PHASES {
+        varchar id PK
+        varchar pipelineId FK
+        varchar phase
+        varchar status
+    }
+    CLOUD_COMPUTE_SESSIONS {
+        varchar id PK
+        int userId FK
+        varchar provider
+        varchar instanceLabel
+        varchar status
+    }
+    CLOUD_COMPUTE_SUBSCRIPTIONS {
+        varchar id PK
+        int userId FK
+        varchar provider
+        varchar planName
+        int monthlyCents
+    }
+    PLATFORM_ACCOUNTS {
+        int id PK
+        int userId FK
+        varchar platform
+        varchar accountName
+        text oauthToken
+    }
+    OAUTH_STATES {
+        varchar state PK
+        varchar platform
+        int userId FK
+    }
+    DISCOVERED_ARTICLES {
+        int id PK
+        varchar title
+        varchar url
+        text summary
+        timestamp publishedAt
+    }
+    CURATED_POSTS {
+        int id PK
+        int articleId FK
+        varchar platform
+        text content
+        varchar status
+    }
+    SCHEDULED_POSTS {
+        int id PK
+        int curatedPostId FK
+        int platformAccountId FK
+        varchar status
+        timestamp scheduledAt
+    }
+    POST_ANALYTICS {
+        int id PK
+        int scheduledPostId FK
+        int likes
+        int impressions
+        int reach
+    }
+    POSTING_SCHEDULE_CONFIG {
+        int id PK
+        int userId FK
+        varchar platform
+        int postsPerDay
+        varchar timezone
+    }
+
+    USERS ||--o{ CHAT_SESSIONS : owns
+    USERS ||--o{ INTEGRATIONS : configures
+    CHAT_SESSIONS ||--o{ CHAT_MESSAGES : contains
+    USERS ||--o{ AUDIT_LOG : generates
+    USERS ||--o{ PIPELINES : owns
+    PIPELINES ||--o{ PIPELINE_PHASES : has
+    USERS ||--o{ CLOUD_COMPUTE_SESSIONS : rents
+    USERS ||--o{ CLOUD_COMPUTE_SUBSCRIPTIONS : subscribes_to
+    USERS ||--o{ PLATFORM_ACCOUNTS : connects
+    USERS ||--o{ OAUTH_STATES : initiates
+    USERS ||--o{ POSTING_SCHEDULE_CONFIG : configures
+    DISCOVERED_ARTICLES ||--o{ CURATED_POSTS : sourced_by
+    CURATED_POSTS ||--o{ SCHEDULED_POSTS : schedules
+    PLATFORM_ACCOUNTS ||--o{ SCHEDULED_POSTS : publishes_via
+    SCHEDULED_POSTS ||--o{ POST_ANALYTICS : tracks
+```

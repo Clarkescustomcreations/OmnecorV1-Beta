@@ -249,14 +249,12 @@ export function convertToAIModel(
 }
 
 /**
- * Get all available models (local + API)
- * TODO: populate via tRPC query
+ * Return a list of models with `isSelected` applied.
+ * Pass the real models fetched via tRPC as the second argument.
  */
-export function getAllModels(_selectedId?: string): AIModel[] {
-  // Production path returns only real/fetched models.
-  // Mock arrays (mockLocalModels, mockAPIModels) are kept for tests only.
-  const allModels: AIModel[] = [];
-  return allModels;
+export function getAllModels(selectedId?: string, externalModels?: AIModel[]): AIModel[] {
+  if (!externalModels?.length) return [];
+  return externalModels.map(m => ({ ...m, isSelected: m.id === selectedId }));
 }
 
 /**
@@ -276,16 +274,26 @@ export function getModelsByType(type: "local" | "api"): AIModel[] {
 }
 
 /**
- * Check model health/availability
- * TODO: Implement real health checks - ping local endpoints and validate API keys
+ * Check model health/availability.
+ * For local (Ollama/Llama.cpp) models: pings the inference endpoint and checks
+ * that the model is actually loaded. For API models: returns the model's stored
+ * status (key validation requires a backend round-trip via trpc.aiProvider.checkHealth).
  */
 export async function checkModelHealth(model: AIModel): Promise<ModelStatus> {
   try {
     if (model.type === "local") {
-      return "available";
-    } else {
-      return "available";
+      const endpoint = (model.metadata?.endpoint as string | undefined) ?? "http://localhost:11434";
+      const base = endpoint.replace(/\/$/, "");
+      const res = await fetch(`${base}/api/tags`, {
+        signal: AbortSignal.timeout(3000),
+      });
+      if (!res.ok) return "error";
+      const data = (await res.json()) as { models?: Array<{ name: string }> };
+      const loaded = data.models?.some(m => m.name === model.id);
+      return loaded ? "available" : "offline";
     }
+    // API models: honour the status already returned by the provider list.
+    return model.status ?? "offline";
   } catch (error) {
     console.error(`Health check failed for ${model.name}:`, error);
     return "error";

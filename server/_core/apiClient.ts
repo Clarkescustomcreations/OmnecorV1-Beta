@@ -17,9 +17,16 @@
  *   }, { label: "ExampleService" });
  */
 
+import { resilientFetch, CircuitOpenError } from "./resilientFetch.js";
+import { redactSensitive } from "./redaction.js";
+
 export interface ApiFetchOptions extends RequestInit {
   /** Timeout in milliseconds (default: 30 000). */
   timeoutMs?: number;
+  /** Max retries on 429/5xx (default: 3). Set 0 to disable. */
+  maxRetries?: number;
+  /** Circuit-breaker bucket key (default: request URL origin). */
+  circuitKey?: string;
 }
 
 export interface ApiFetchContext {
@@ -43,30 +50,34 @@ export async function apiFetch<T = unknown>(
   options: ApiFetchOptions = {},
   ctx: ApiFetchContext = { label: "apiFetch" }
 ): Promise<T> {
-  const { timeoutMs = 30_000, ...fetchOptions } = options;
+  const { timeoutMs = 30_000, maxRetries = 3, circuitKey, ...fetchOptions } = options;
 
   let response: Response;
   try {
-    response = await fetch(url, {
+    // resilientFetch adds timeout, exponential backoff on 429/5xx, and a
+    // per-host circuit breaker so a rate-limited or degraded provider doesn't
+    // fail immediately or get hammered.
+    response = await resilientFetch(url, {
       ...fetchOptions,
-      signal: fetchOptions.signal ?? AbortSignal.timeout(timeoutMs),
+      timeoutMs,
+      maxRetries,
+      circuitKey,
     });
   } catch (err) {
+    if (err instanceof CircuitOpenError) {
+      throw new Error(`[${ctx.label}] provider temporarily unavailable (circuit open)`);
+    }
     const msg = err instanceof Error ? err.message : String(err);
-    throw new Error(`[${ctx.label}] network error: ${msg}`);
+    throw new Error(`[${ctx.label}] network error: ${redactSensitive(msg)}`);
   }
 
   if (!response.ok) {
-    // Read a small prefix of the body for debug context, but cap it so we
-    // don't accidentally log multi-KB payloads or embedded credentials.
+    // Read a small prefix of the body for debug context, but cap it and run it
+    // through the central redactor so we never leak keys/tokens/PANs/PII.
     let hint = "";
     try {
       const text = await response.text();
-      // Strip anything that looks like an API key or Bearer token
-      const sanitized = text
-        .replace(/Bearer\s+\S+/gi, "Bearer [redacted]")
-        .replace(/"(api_?key|token|secret|authorization)"\s*:\s*"[^"]{4,}"/gi, '"$1":"[redacted]"')
-        .slice(0, 200);
+      const sanitized = redactSensitive(text).slice(0, 200);
       if (sanitized) hint = ` — ${sanitized}`;
     } catch {
       // ignore read errors

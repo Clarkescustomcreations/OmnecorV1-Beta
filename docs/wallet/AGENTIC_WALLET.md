@@ -98,6 +98,18 @@ const card = await trpc.virtualCard.issueCard.mutate({
 // Returns: { cardToken, last4, status, spendLimit }
 ```
 
+### HITL Approval (Active)
+
+Card issuance is gated behind a **Human-in-the-Loop (HITL) approval** workflow. When `virtualCard.issueCard` is called, the procedure **suspends** and submits the request to `HITLApprovalService` before any card is created:
+
+- The approval payload includes `userId`, `spendLimitDollars`, `memo`, and a `riskNote` so the approver sees exactly what they are authorizing (a real virtual card charged against the Lithic account).
+- The request is audit-logged (`hitl_request`, then `hitl_approved` / `hitl_rejected`).
+- **Approve** → issuance proceeds normally.
+- **Reject** → throws `FORBIDDEN` (`"Card issuance rejected by administrator."`); no card is issued.
+- **No response within 5 minutes** → auto-rejects with `TIMEOUT` (`"Card issuance approval timed out after 5 minutes."`); the procedure never hangs indefinitely.
+
+Rate limiting (1 issuance per 60s per user) runs **before** the approval flow is started.
+
 ### Use Cases
 - **Project Isolation**: Each project gets a unique card number. If an agent leaks credentials, only that card is exposed.
 - **Agent Isolation**: Issue a separate card per autonomous agent run for forensic spend attribution.

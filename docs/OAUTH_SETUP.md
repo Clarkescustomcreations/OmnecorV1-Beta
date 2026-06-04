@@ -14,93 +14,130 @@ Agent Networking supports OAuth 2.0 integration with major social media platform
 - Facebook
 - YouTube
 
+## Callback URL Quick Reference
+
+| Platform | Callback URL (Development) | Callback URL (Production) |
+|---|---|---|
+| Twitter/X | `http://localhost:3000/api/oauth/callback/twitter` | `https://yourdomain.com/api/oauth/callback/twitter` |
+| LinkedIn | `http://localhost:3000/api/oauth/callback/linkedin` | `https://yourdomain.com/api/oauth/callback/linkedin` |
+| Instagram | `http://localhost:3000/api/oauth/callback/instagram` | `https://yourdomain.com/api/oauth/callback/instagram` |
+| TikTok | `http://localhost:3000/api/oauth/callback/tiktok` | `https://yourdomain.com/api/oauth/callback/tiktok` |
+| Facebook | `http://localhost:3000/api/oauth/callback/facebook` | `https://yourdomain.com/api/oauth/callback/facebook` |
+| YouTube | `http://localhost:3000/api/oauth/callback/youtube` | `https://yourdomain.com/api/oauth/callback/youtube` |
+
 ## Setup Steps
 
 ### 1. Create OAuth Applications
 
-For each platform you want to connect, create an OAuth application in their developer console:
+For each platform you want to connect, follow the platform-specific instructions below.
 
-#### Twitter/X OAuth
-1. Go to [Twitter Developer Portal](https://developer.twitter.com/en/dashboard)
-2. Create a new app
-3. Set Authorization settings:
-   - Callback URL: `https://your-domain.com/api/oauth/callback/twitter`
-   - Scopes: `tweet.read`, `tweet.write`, `users.read`
-4. Copy Client ID and Secret
+## Platform-Specific Setup
 
-#### LinkedIn OAuth
-1. Go to [LinkedIn Developers](https://www.linkedin.com/developers)
-2. Create an app under your company
-3. Set Authorized redirect URLs: `https://your-domain.com/api/oauth/callback/linkedin`
-4. Request scopes: `w_member_social`, `r_liteprofile`
-5. Copy Client ID and Secret
+### Twitter/X OAuth Setup
 
-#### Instagram OAuth
-1. Go to [Meta App Dashboard](https://developers.facebook.com/)
-2. Create Business App
-3. Add Instagram Graph API
-4. Set redirect URL: `https://your-domain.com/api/oauth/callback/instagram`
-5. Copy App ID and Secret
+1. Go to [developer.twitter.com](https://developer.twitter.com) and sign in.
+2. Create a new project and app under **Developer Portal → Projects & Apps → New App**.
+3. Set **App Permissions** to "Read and Write".
+4. Under **User authentication settings**:
+   - Enable OAuth 2.0
+   - App type: **Web App**
+   - Callback URL: `http://localhost:3000/api/oauth/callback/twitter` (development) or your production URL
+   - Website URL: your site (or `http://localhost:3000` for dev)
+5. Copy **Client ID** and **Client Secret** to `.env`:
+   ```
+   TWITTER_CLIENT_ID=your_client_id
+   TWITTER_CLIENT_SECRET=your_client_secret
+   ```
 
-#### TikTok OAuth
-1. Go to [TikTok Developer](https://developer.tiktok.com/)
-2. Create Developer Account
-3. Create Application
-4. Set callback URL: `https://your-domain.com/api/oauth/callback/tiktok`
-5. Copy Client Key and Secret
+**Required Scopes:** `tweet.read`, `tweet.write`, `users.read`, `offline.access`
 
-#### Facebook OAuth
-1. Go to [Meta Developers](https://developers.facebook.com/)
-2. Create or select app
-3. Add Facebook Login product
-4. Set Valid OAuth redirect URIs: `https://your-domain.com/api/oauth/callback/facebook`
-5. Copy App ID and Secret
+### LinkedIn OAuth Setup
 
-#### YouTube OAuth
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create new project
-3. Enable YouTube Data API v3
-4. Create OAuth 2.0 credentials (Web application)
-5. Add redirect URI: `https://your-domain.com/api/oauth/callback/youtube`
-6. Copy Client ID and Secret
+1. Go to [linkedin.com/developers](https://linkedin.com/developers) and sign in.
+2. Click **Create App** and fill in app details.
+3. Under **Auth** tab → **OAuth 2.0 settings**:
+   - Add Redirect URL: `http://localhost:3000/api/oauth/callback/linkedin` (development) or your production URL
+4. Request these **Products**: "Share on LinkedIn", "Sign In with LinkedIn using OpenID Connect"
+5. Copy **Client ID** and **Client Secret** to `.env`:
+   ```
+   LINKEDIN_CLIENT_ID=your_client_id
+   LINKEDIN_CLIENT_SECRET=your_client_secret
+   ```
+
+**Required Scopes:** `r_liteprofile`, `r_emailaddress`, `w_member_social`
+
+### Instagram OAuth Setup
+
+Instagram OAuth is provided via the Facebook Developer platform.
+
+1. Go to [developers.facebook.com](https://developers.facebook.com).
+2. Create a new App → Select **Business** type.
+3. Add **Instagram Basic Display** product.
+4. Under Instagram Basic Display → **Basic Display**:
+   - Add OAuth Redirect URI: `http://localhost:3000/api/oauth/callback/instagram` (development) or your production URL
+5. Copy **Instagram App ID** and **Instagram App Secret** to `.env`:
+   ```
+   INSTAGRAM_CLIENT_ID=your_app_id
+   INSTAGRAM_CLIENT_SECRET=your_app_secret
+   ```
+
+**Required Scopes:** `user_profile`, `user_media`
+
+### TikTok OAuth Setup
+
+1. Go to [developers.tiktok.com](https://developers.tiktok.com).
+2. Create a new app under **My Apps → Create**.
+3. Add the **Login Kit** and **Content Posting API** products.
+4. Under **Login Kit → Redirect domain**:
+   - Add: `localhost:3000` (development) or your production domain
+5. Under **Login Kit → Redirect URI**:
+   - Add: `http://localhost:3000/api/oauth/callback/tiktok` (development) or your production URL
+6. Copy **Client Key** (= Client ID) and **Client Secret** to `.env`:
+   ```
+   TIKTOK_CLIENT_ID=your_client_key
+   TIKTOK_CLIENT_SECRET=your_client_secret
+   ```
+
+**Required Scopes:** `user.info.basic`, `video.list`, `video.upload`
+
+### Facebook OAuth Setup
+
+1. Go to [Meta Developers](https://developers.facebook.com/).
+2. Create or select an app → Select **Business** type if creating new.
+3. Add **Facebook Login** product.
+4. Under **Facebook Login → Settings**:
+   - Add Valid OAuth Redirect URI: `http://localhost:3000/api/oauth/callback/facebook` (development) or your production URL
+5. Copy **App ID** and **App Secret** to `.env`:
+   ```
+   FACEBOOK_CLIENT_ID=your_app_id
+   FACEBOOK_CLIENT_SECRET=your_app_secret
+   ```
+
+**Required Scopes:** `pages_manage_posts`, `pages_read_engagement`, `public_profile`
+
+### YouTube OAuth Setup
+
+YouTube OAuth uses Google's OAuth 2.0 system.
+
+1. Go to [console.cloud.google.com](https://console.cloud.google.com).
+2. Create a new project (or use an existing one).
+3. Enable the **YouTube Data API v3** under APIs & Services → Library.
+4. Create OAuth credentials: APIs & Services → Credentials → Create Credentials → OAuth client ID.
+   - Application type: **Web application**
+   - Authorized redirect URI: `http://localhost:3000/api/oauth/callback/youtube` (development) or your production URL
+5. Copy **Client ID** and **Client Secret** to `.env`:
+   ```
+   YOUTUBE_CLIENT_ID=your_client_id
+   YOUTUBE_CLIENT_SECRET=your_client_secret
+   ```
+
+**Required Scopes:** `https://www.googleapis.com/auth/youtube.upload`, `https://www.googleapis.com/auth/youtube.readonly`
 
 ### 2. Configure Environment Variables
 
-Add the OAuth credentials to your `.env` file:
+After setting up OAuth apps on each platform, add the credentials to your `.env` file. The specific variable names for each platform are shown in the platform-specific setup sections above.
 
-```bash
-# Twitter/X
-TWITTER_CLIENT_ID=your_client_id
-TWITTER_CLIENT_SECRET=your_client_secret
-
-# LinkedIn
-LINKEDIN_CLIENT_ID=your_client_id
-LINKEDIN_CLIENT_SECRET=your_client_secret
-
-# Instagram
-INSTAGRAM_CLIENT_ID=your_client_id
-INSTAGRAM_CLIENT_SECRET=your_client_secret
-
-# TikTok
-TIKTOK_CLIENT_ID=your_client_id
-TIKTOK_CLIENT_SECRET=your_client_secret
-
-# Facebook
-FACEBOOK_CLIENT_ID=your_client_id
-FACEBOOK_CLIENT_SECRET=your_client_secret
-
-# YouTube
-YOUTUBE_CLIENT_ID=your_client_id
-YOUTUBE_CLIENT_SECRET=your_client_secret
-```
-
-### 3. Update Redirect URLs
-
-Make sure the OAuth callback URLs in each platform's developer dashboard match:
-- Local development: `http://localhost:5173/api/oauth/callback/{platform}`
-- Production: `https://your-domain.com/api/oauth/callback/{platform}`
-
-### 4. Use in Agent Networking
+### 3. Use in Agent Networking
 
 Once configured:
 

@@ -18,6 +18,27 @@ import { router, publicProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 
 // ---------------------------------------------------------------------------
+// In-Process Image Gallery
+// Persists generated images for the lifetime of the server process.
+// Capped at 100 entries (oldest evicted first).
+// ---------------------------------------------------------------------------
+
+interface GeneratedImage {
+  id: string;
+  url: string;
+  prompt: string;
+  createdAt: string;
+}
+
+const IMAGE_GALLERY_CAP = 100;
+const imageGallery: GeneratedImage[] = [];
+
+function addToGallery(img: GeneratedImage): void {
+  imageGallery.unshift(img);
+  if (imageGallery.length > IMAGE_GALLERY_CAP) imageGallery.length = IMAGE_GALLERY_CAP;
+}
+
+// ---------------------------------------------------------------------------
 // Input Schemas
 // ---------------------------------------------------------------------------
 
@@ -36,21 +57,31 @@ const generateVideoSchema = z.object({
 // ---------------------------------------------------------------------------
 
 export const falRouter = router({
-  /**
-   * Stub for listing generated images.
-   */
-  listImages: publicProcedure.query(async () => {
-    return [];
+  /** List previously generated images (most recent first, process-lifetime). */
+  listImages: publicProcedure.query(async (): Promise<GeneratedImage[]> => {
+    return imageGallery;
   }),
 
-  /**
-   * Stub for generating an image.
-   */
-  generateImage: publicProcedure
+  /** Generate an image via the Fal.ai Flux endpoint and add to the gallery. */
+  generateImage: cloudProcedure
     .input(z.object({ prompt: z.string().min(1) }))
-    .mutation(async ({ input }) => {
-      // Stub implementation
-      return { id: Date.now().toString(), url: "", prompt: input.prompt };
+    .mutation(async ({ ctx, input }): Promise<GeneratedImage> => {
+      try {
+        const url = await ctx.services.fal.generateCharacter(input.prompt);
+        const img: GeneratedImage = {
+          id: Date.now().toString(),
+          url,
+          prompt: input.prompt,
+          createdAt: new Date().toISOString(),
+        };
+        addToGallery(img);
+        return img;
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Image generation failed: ${(error as Error).message}`,
+        });
+      }
     }),
 
   /**

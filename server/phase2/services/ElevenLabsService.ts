@@ -5,6 +5,7 @@
  */
 import { ENV } from "../../_core/env.js";
 import { apiFetch } from "../../_core/apiClient.js";
+import { resilientFetch, CircuitOpenError } from "../../_core/resilientFetch.js";
 
 export interface ElevenLabsVoice {
   voice_id: string;
@@ -78,10 +79,11 @@ export class ElevenLabsService {
       },
     };
 
-    // synthesis returns audio/mpeg — handle manually for the binary response
+    // synthesis returns audio/mpeg — handle manually for the binary response.
+    // resilientFetch gives us timeout + backoff on 429/5xx + circuit breaker.
     let res: Response;
     try {
-      res = await fetch(`${this.baseUrl}/text-to-speech/${opts.voiceId}`, {
+      res = await resilientFetch(`${this.baseUrl}/text-to-speech/${opts.voiceId}`, {
         method: "POST",
         headers: {
           "xi-api-key": this.apiKey,
@@ -89,9 +91,13 @@ export class ElevenLabsService {
           "Accept": "audio/mpeg",
         },
         body: JSON.stringify(body),
-        signal: AbortSignal.timeout(30_000),
+        circuitKey: "elevenlabs",
+        timeoutMs: 30_000,
       });
     } catch (err) {
+      if (err instanceof CircuitOpenError) {
+        throw new Error("[ElevenLabs.synthesize] provider temporarily unavailable (circuit open)");
+      }
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`[ElevenLabs.synthesize] network error: ${msg}`);
     }

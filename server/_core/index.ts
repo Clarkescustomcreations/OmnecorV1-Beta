@@ -175,6 +175,40 @@ async function startServer() {
   }
   registerSocialMediaOAuthRoutes(app);
 
+  // ─── Cross-origin request validation (CSRF defense-in-depth) ────────────
+  // Cookies are already SameSite=Strict, but we add an explicit Origin/Referer
+  // check on state-changing tRPC requests so a cross-site page can never drive
+  // an authenticated mutation. Same-origin and no-Origin (native/server-to-
+  // server) requests pass; a foreign Origin is rejected with 403.
+  const allowedHosts = new Set(ENV.oauthAllowedHosts);
+  app.use("/api/trpc", (req, res, next) => {
+    const method = req.method.toUpperCase();
+    if (method === "GET" || method === "HEAD" || method === "OPTIONS") {
+      next();
+      return;
+    }
+    const origin = req.get("origin");
+    if (!origin) {
+      // Non-browser clients (CLI, native app, server-to-server) omit Origin.
+      next();
+      return;
+    }
+    let originHost: string;
+    try {
+      originHost = new URL(origin).host.toLowerCase();
+    } catch {
+      res.status(403).json({ error: "Invalid Origin" });
+      return;
+    }
+    const requestHost = (req.get("host") ?? "").toLowerCase();
+    if (originHost === requestHost || allowedHosts.has(originHost)) {
+      next();
+      return;
+    }
+    log.warn(`[CORS] Rejected cross-origin ${method} from origin ${originHost}`);
+    res.status(403).json({ error: "Cross-origin request rejected" });
+  });
+
   // ─── tRPC API (unified router) ─────────────────────────────────────────
   app.use(
     "/api/trpc",

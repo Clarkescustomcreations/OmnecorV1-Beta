@@ -578,6 +578,33 @@ Full reference: [docs/user-guides/CLOUD_COMPUTE.md](CLOUD_COMPUTE.md)
 
 ---
 
+## 11a. Agent Networking & Social Media Automation
+
+Omnecor's Agent Networking system automates your social media presence across 6 platforms using AI-driven content curation, persona management, and scheduled publishing.
+
+**Access:** Agent Networking icon in the sidebar.
+
+### Quick Start
+
+1. Set OAuth credentials for your platforms in `.env` (see [OAUTH_SETUP.md](../OAUTH_SETUP.md)).
+2. Go to **Agent Networking → Platforms** → click a platform button → complete OAuth.
+3. Go to **Agent Networking → Personas** → create a persona with your brand voice and tone.
+4. Go to **Agent Networking → Discovery** → configure content sources (RSS feeds or keywords).
+5. AI-drafted content appears in **Agent Networking → Approvals** for your review.
+6. Approved content is scheduled in the **Calendar** tab.
+
+### Supported Platforms
+
+Twitter/X · LinkedIn · Instagram · TikTok · Facebook · YouTube
+
+### Security
+
+OAuth tokens are stored encrypted. CSRF state tokens (10-minute TTL) protect the authorization flow. Tokens auto-refresh every 15 minutes.
+
+Full reference: [docs/user-guides/AGENT_NETWORKING.md](AGENT_NETWORKING.md)
+
+---
+
 ## 12. Persona & Agent Creation
 
 The **Character Persona Studio** lets you build a digital clone, a social media identity, or a fully autonomous AI agent.

@@ -26,6 +26,7 @@ import {
 import { cn } from "@/lib/utils";
 import {
   getAllModels,
+  convertToAIModel,
   type AIModel,
   type ModelMarketplaceItem,
 } from "@/lib/aiModels";
@@ -62,9 +63,59 @@ export default function ModelHubPanel({
     onError: (err) => toast.error("Delete failed: " + err.message),
   });
 
+  // Discover real models from Ollama and configured API providers
+  const { data: ollamaRaw = [], isLoading: ollamaLoading } =
+    trpc.aiProvider.discoverOllamaModels.useQuery(undefined, {
+      refetchInterval: 30_000,
+    });
+
+  const { data: providerList = [] } = trpc.aiProvider.getProviders.useQuery(
+    undefined,
+    { refetchInterval: 60_000 }
+  );
+
+  // Convert Ollama discovery results to AIModel format
+  const fetchedModels = useMemo<AIModel[]>(() => {
+    const ollama: AIModel[] = ollamaRaw.map((m: any) => ({
+      id: m.name ?? m.model,
+      name: m.name ?? m.model,
+      displayName: `${m.name ?? m.model} (Ollama)`,
+      source: "ollama" as const,
+      type: "local" as const,
+      status: "available" as const,
+      contextWindow: m.details?.parameter_size ? undefined : undefined,
+      metadata: {
+        size: m.size ? Math.round(m.size / 1024 / 1024) : undefined,
+        quantization: m.details?.quantization_level,
+        endpoint: "http://localhost:11434",
+      },
+      capabilities: { chat: true, completion: true, embedding: false, vision: false, functionCalling: false },
+    }));
+
+    const apiModels: AIModel[] = providerList
+      .filter((p: any) => p.id !== "ollama")
+      .map((p: any) => ({
+        id: p.id,
+        name: p.name,
+        displayName: p.name,
+        source: p.id as any,
+        type: "api" as const,
+        status: (p.status === "online" ? "available" : "offline") as any,
+        capabilities: {
+          chat: true,
+          completion: true,
+          embedding: p.id === "openai",
+          vision: p.id === "openai" || p.id === "gemini",
+          functionCalling: p.id === "openai" || p.id === "anthropic",
+        },
+      }));
+
+    return [...ollama, ...apiModels];
+  }, [ollamaRaw, providerList]);
+
   const allModels = useMemo(
-    () => getAllModels(selectedModelId || undefined),
-    [selectedModelId]
+    () => getAllModels(selectedModelId || undefined, fetchedModels),
+    [selectedModelId, fetchedModels]
   );
 
   const filteredModels = useMemo(() => {
@@ -191,7 +242,12 @@ export default function ModelHubPanel({
       <div className="flex-1 overflow-auto">
         {activeTab === "models" ? (
           <div role="list" className="space-y-3">
-            {filteredModels.length === 0 ? (
+            {ollamaLoading ? (
+              <div className="flex items-center justify-center h-48 text-muted-foreground">
+                <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+                <p>Discovering models…</p>
+              </div>
+            ) : filteredModels.length === 0 ? (
               <div className="flex items-center justify-center h-48 text-muted-foreground">
                 <p>No models found</p>
               </div>
