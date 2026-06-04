@@ -4,6 +4,16 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1" />
     <title>Omnecor: The Ultimate All-in-One AI Workstation</title>
+    <script>
+      (function() {
+        var p = new URLSearchParams(window.location.search).get('p');
+        if (p) {
+          window.history.replaceState(null, null,
+            window.location.pathname + decodeURIComponent(p) + window.location.hash
+          );
+        }
+      })();
+    </script>
     <script type="module" crossorigin src="./assets/index-CuiZzZwv.js"></script>
     <link rel="modulepreload" crossorigin href="./assets/vendor-react-Bhh30CDp.js">
     <link rel="modulepreload" crossorigin href="./assets/vendor-data-B_WJGqzE.js">
