@@ -125,4 +125,4 @@ publish:
   repo: workstation
   releaseType: draft
 
-npmRebuild: false
+npmRebuild: true
