@@ -4,6 +4,13 @@ export { COOKIE_NAME, ONE_YEAR_MS } from "@shared/const";
 export const getLoginUrl = () => {
   const oauthPortalUrl = import.meta.env.VITE_OAUTH_PORTAL_URL;
   const appId = import.meta.env.VITE_APP_ID;
+
+  // Demo/static builds have no OAuth portal configured. Constructing
+  // `new URL("undefined/app-auth")` throws "Invalid URL" and crashes any
+  // component that reads this (e.g. useAuth evaluates it eagerly), so bail
+  // out with a harmless path instead.
+  if (!oauthPortalUrl) return "/";
+
   const redirectUri = `${window.location.origin}/api/oauth/callback`;
   const state = btoa(redirectUri);
 
