@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import { FileEvent } from "@/types/neural";
 import { useAppStore } from "@/lib/store/app.store";
+import { IS_DEMO } from "@/lib/demo";
 
 export interface JobProgressEvent {
   percent: number;
@@ -80,6 +81,10 @@ export function useOmnecorSocket(
 
   const connect = useCallback(
     (reconnectDelay = 1000) => {
+      // Demo/static build: no backend, so never open the socket (and never
+      // enter the reconnect loop that would spam failed-connection errors).
+      if (IS_DEMO) return;
+
       // Close existing if any
       if (socketRef.current) {
         socketRef.current.close();
