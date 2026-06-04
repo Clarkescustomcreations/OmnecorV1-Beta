@@ -10,6 +10,9 @@ dist/
 build/
 *.dist
 
+# Demo build artifact — intermediate only; the served copy lives in docs/demo/
+dist-demo/
+
 # Exception: Windows installer build assets (static source files, not compile outputs)
 !packaging/electron-app/build/
 !packaging/electron-app/build/*.ico
