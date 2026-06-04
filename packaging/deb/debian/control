@@ -3,7 +3,7 @@ Version: 2.3.0
 Section: science
 Priority: optional
 Architecture: amd64
-Depends: nodejs (>= 18.0.0), python3 (>= 3.10), python3-pip, python3-venv, git, curl
+Depends: nodejs (>= 22.0.0), python3 (>= 3.10), python3-pip, python3-venv, git, curl, libsqlite3-0, libssl3, libnotify4, libxtst6, libnss3, libatk1.0-0, libatk-bridge2.0-0, libcups2, libdrm2, libgtk-3-0, libgbm1
 Maintainer: Omnecor Team <dev@omnecor.local>
 Description: Omnecor HMCI — Context-Aware AI Infrastructure Workstation
  Omnecor is a context-aware AI infrastructure designed as a central nervous system for digital and physical workflows.

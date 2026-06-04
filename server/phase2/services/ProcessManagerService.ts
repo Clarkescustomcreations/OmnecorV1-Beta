@@ -26,7 +26,7 @@
  *  - Process output is size-limited to prevent memory exhaustion
  */
 
-import { ChildProcess, spawn } from "child_process";
+import { ChildProcess, spawn, execSync } from "child_process";
 import { EventEmitter } from "events";
 import path from "path";
 import fs from "fs/promises";
@@ -119,6 +119,33 @@ interface ManagedProcess {
   lastProgress: Record<string, any> | null;
   stderrBuffer: string;
   timeoutHandle: ReturnType<typeof setTimeout> | null;
+}
+
+// ---------------------------------------------------------------------------
+// Platform-Aware Process Termination
+// ---------------------------------------------------------------------------
+
+/**
+ * Kill a child process in a platform-aware manner.
+ *
+ * - Windows: `taskkill /PID <pid> /T /F` to terminate the full process tree.
+ * - Unix:    SIGTERM for graceful shutdown; SIGKILL when force=true.
+ */
+function killProcess(proc: ChildProcess, force = false): void {
+  if (process.platform === "win32") {
+    if (proc.pid) {
+      try {
+        execSync(`taskkill /PID ${proc.pid} /T /F`, { stdio: "ignore" });
+      } catch {
+        // taskkill failed — fall back to direct kill
+        try { proc.kill(); } catch { /* ignore if already dead */ }
+      }
+    }
+  } else {
+    try {
+      proc.kill(force ? "SIGKILL" : "SIGTERM");
+    } catch { /* ignore if already dead */ }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -454,15 +481,19 @@ export class ProcessManagerService extends EventEmitter {
 
     managed.state = "cancelled";
 
-    // Graceful termination
-    managed.process.kill("SIGTERM");
-
-    // Force kill after 5 seconds if still alive
-    setTimeout(() => {
-      if (managed.process && !managed.process.killed) {
-        managed.process.kill("SIGKILL");
-      }
-    }, 5000);
+    if (process.platform === "win32") {
+      // Windows: taskkill handles the whole process tree in one shot — no need
+      // for a delayed SIGKILL follow-up.
+      killProcess(managed.process);
+    } else {
+      // Unix: graceful SIGTERM first, then SIGKILL after 5 s if still alive.
+      killProcess(managed.process);
+      setTimeout(() => {
+        if (managed.process && !managed.process.killed) {
+          killProcess(managed.process!, true);
+        }
+      }, 5000);
+    }
 
     return true;
   }

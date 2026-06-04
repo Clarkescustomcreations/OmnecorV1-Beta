@@ -10,6 +10,7 @@
 
 import path from "path";
 import { fileURLToPath } from "url";
+import os from "os";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -105,6 +106,11 @@ export const PYTHON_SCRIPTS = {
   ),
   /** Path to the ESP flash tool wrapper */
   espFlash: path.resolve(__dirname, "../../python_bridges/esptool_bridge.py"),
+  /** Path to the Valet dataset builder script */
+  valetDatasetBuilder: path.resolve(
+    __dirname,
+    "../../python_bridges/valet_dataset_builder.py"
+  ),
   /** Python executable (can be overridden for venvs) */
   pythonBin: process.env.PYTHON_BIN || "python3",
   /** Blender executable path */
@@ -119,7 +125,7 @@ export const TRAINING_CONFIG = {
   /** Default output directory for LoRA adapters */
   defaultOutputDir:
     process.env.LORA_OUTPUT_DIR ||
-    path.resolve(process.env.HOME || "/home/user", ".omnecor/lora_outputs"),
+    path.resolve(process.env.HOME || os.homedir(), ".omnecor/lora_outputs"),
   /** Maximum concurrent training jobs */
   maxConcurrentJobs: parseInt(process.env.MAX_TRAINING_JOBS || "1", 10),
 } as const;
@@ -138,7 +144,7 @@ export const SECURITY_CONFIG = {
   /** Backup directory */
   backupDir:
     process.env.OMNECOR_BACKUP_DIR ||
-    path.resolve(process.env.HOME || "/home/user", ".omnecor/backups"),
+    path.resolve(process.env.HOME || os.homedir(), ".omnecor/backups"),
 } as const;
 
 // ---------------------------------------------------------------------------

@@ -134,3 +134,4 @@ tsc_output.txt
 models/valet-router/*/
 *.gguf
 _refs/
+.claude/worktrees/
