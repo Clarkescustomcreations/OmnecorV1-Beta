@@ -11,6 +11,8 @@ import { TRPCError } from "@trpc/server";
 import { PCBWayService } from "../phase2/services/PCBWayService.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import os from "os";
+import path from "path";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -151,7 +153,8 @@ export const kicadRouter = router({
   exportForManufacturing: protectedProcedure
     .input(z.object({ pcbPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      return ctx.services.kicad.exportGerbers({ inputFile: input.pcbPath, outputDir: "/tmp/omnecor_gerbers" });
+      const gerberDir = path.join(os.tmpdir(), "omnecor_gerbers");
+      return ctx.services.kicad.exportGerbers({ inputFile: input.pcbPath, outputDir: gerberDir });
     }),
 
   placeOrder: protectedProcedure
