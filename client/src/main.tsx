@@ -59,38 +59,54 @@ function getServerBase(): { host: string; proto: string; wsProto: string } {
   return { host: window.location.host, proto, wsProto };
 }
 
-const wsClient = createWSClient({
-  url: () => {
-    const { host, wsProto } = getServerBase();
-    return `${wsProto}//${host}/api/trpc`;
-  },
-});
+// In demo/static builds there is no backend — skip WebSocket entirely to
+// prevent connection errors, and use a fetch that resolves to empty data.
+const isDemoMode = (import.meta.env.VITE_DEMO_MODE as string) === "true";
+
+const noopFetch: typeof fetch = () =>
+  Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { "content-type": "application/json" } }));
+
+const wsClient = isDemoMode
+  ? null
+  : createWSClient({
+      url: () => {
+        const { host, wsProto } = getServerBase();
+        return `${wsProto}//${host}/api/trpc`;
+      },
+    });
 
 const trpcClient = trpc.createClient({
-  links: [
-    splitLink({
-      condition: op => op.type === "subscription",
-      true: wsLink({ client: wsClient, transformer: superjson }),
-      false: httpBatchLink({
-        url: () => {
-          const { host, proto } = getServerBase();
-          // Relative URL works for web/desktop, absolute needed for Capacitor
-          const capacitorHost = typeof window !== "undefined" && localStorage.getItem("omnecor_server_ip");
-          if (capacitorHost && capacitorHost !== "localhost") {
-            return `${proto}//${host}/api/trpc`;
-          }
-          return "/api/trpc";
-        },
-        transformer: superjson,
-        fetch(input, init) {
-          return globalThis.fetch(input, {
-            ...(init ?? {}),
-            credentials: "include",
-          });
-        },
-      }),
-    }),
-  ],
+  links: isDemoMode
+    ? [
+        httpBatchLink({
+          url: "/api/trpc",
+          transformer: superjson,
+          fetch: noopFetch,
+        }),
+      ]
+    : [
+        splitLink({
+          condition: op => op.type === "subscription",
+          true: wsLink({ client: wsClient!, transformer: superjson }),
+          false: httpBatchLink({
+            url: () => {
+              const { host, proto } = getServerBase();
+              const capacitorHost = typeof window !== "undefined" && localStorage.getItem("omnecor_server_ip");
+              if (capacitorHost && capacitorHost !== "localhost") {
+                return `${proto}//${host}/api/trpc`;
+              }
+              return "/api/trpc";
+            },
+            transformer: superjson,
+            fetch(input, init) {
+              return globalThis.fetch(input, {
+                ...(init ?? {}),
+                credentials: "include",
+              });
+            },
+          }),
+        }),
+      ],
 });
 
 createRoot(document.getElementById("root")!).render(

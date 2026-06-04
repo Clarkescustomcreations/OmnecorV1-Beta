@@ -16,6 +16,9 @@ export default defineConfig({
   root: path.resolve(import.meta.dirname, "client"),
   publicDir: path.resolve(import.meta.dirname, "client", "public"),
   base: "/OmnecorV1-Beta/demo/",
+  define: {
+    "import.meta.env.VITE_DEMO_MODE": JSON.stringify("true"),
+  },
   build: {
     outDir: path.resolve(import.meta.dirname, "dist-demo/public"),
     emptyOutDir: true,
