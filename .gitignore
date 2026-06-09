@@ -138,3 +138,7 @@ models/valet-router/*/
 *.gguf
 _refs/
 .claude/worktrees/
+
+# AppImage build artifacts (large binaries — never commit)
+packaging/appimage-build/
+*.AppImage
