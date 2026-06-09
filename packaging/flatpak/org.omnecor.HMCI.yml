@@ -52,7 +52,7 @@ modules:
       # Install launcher and metadata
       - install -Dm755 omnecor-launcher.sh /app/bin/omnecor
       - install -Dm644 org.omnecor.HMCI.desktop /app/share/applications/org.omnecor.HMCI.desktop
-      - install -Dm644 omnecor.svg /app/share/icons/hicolor/scalable/apps/org.omnecor.HMCI.svg
+      - install -Dm644 omnecor.png /app/share/icons/hicolor/256x256/apps/org.omnecor.HMCI.png
       
     sources:
       - type: dir
@@ -62,4 +62,4 @@ modules:
       - type: file
         path: org.omnecor.HMCI.desktop
       - type: file
-        path: omnecor.svg
+        path: omnecor.png

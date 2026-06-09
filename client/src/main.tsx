@@ -13,6 +13,7 @@ import superjson from "superjson";
 import App from "./App";
 import { getLoginUrl } from "./const";
 import { FictionModeProvider } from "./contexts/FictionModeContext";
+import { IS_DEMO } from "@/lib/demo";
 import "./index.css";
 
 const queryClient = new QueryClient();
@@ -61,22 +62,20 @@ function getServerBase(): { host: string; proto: string; wsProto: string } {
 
 // In demo/static builds there is no backend — skip WebSocket entirely to
 // prevent connection errors, and use a fetch that resolves to empty data.
-const isDemoMode = (import.meta.env.VITE_DEMO_MODE as string) === "true";
-
 const noopFetch: typeof fetch = () =>
   Promise.resolve(new Response(JSON.stringify([]), { status: 200, headers: { "content-type": "application/json" } }));
 
-const wsClient = isDemoMode
+const wsClient = IS_DEMO
   ? null
   : createWSClient({
       url: () => {
         const { host, wsProto } = getServerBase();
-        return `${wsProto}//${host}/api/trpc`;
+        return `${wsProto}//${host}/ws`;
       },
     });
 
 const trpcClient = trpc.createClient({
-  links: isDemoMode
+  links: IS_DEMO
     ? [
         httpBatchLink({
           url: "/api/trpc",
@@ -89,14 +88,16 @@ const trpcClient = trpc.createClient({
           condition: op => op.type === "subscription",
           true: wsLink({ client: wsClient!, transformer: superjson }),
           false: httpBatchLink({
-            url: () => {
+            url: (() => {
               const { host, proto } = getServerBase();
-              const capacitorHost = typeof window !== "undefined" && localStorage.getItem("omnecor_server_ip");
+              const capacitorHost =
+                typeof window !== "undefined" &&
+                localStorage.getItem("omnecor_server_ip");
               if (capacitorHost && capacitorHost !== "localhost") {
                 return `${proto}//${host}/api/trpc`;
               }
               return "/api/trpc";
-            },
+            })(),
             transformer: superjson,
             fetch(input, init) {
               return globalThis.fetch(input, {

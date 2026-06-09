@@ -1,17 +1,18 @@
 import path from "path";
 import fs from "fs/promises";
-import os from "os";
+import { PATHS } from "./paths.js";
 
 /**
  * Security Utility for path validation
  */
 
+// os.homedir() intentionally excluded — it is too broad on multi-user systems
+// and would allow traversal to SSH keys, credentials, and sibling project dirs.
 const ALLOWED_DIRECTORIES = [
-  process.env.DATA_DIR || path.join(process.cwd(), "data"),
-  process.env.MODELS_DIR || path.join(process.cwd(), "models"),
-  process.env.OUTPUT_DIR || path.join(process.cwd(), "exports"),
-  process.env.PROJECTS_DIR || path.join(process.cwd(), "projects"),
-  os.homedir(), // Allow access within user's home directory for local workstation use
+  PATHS.data,
+  PATHS.models,
+  PATHS.exports,
+  PATHS.projects,
 ];
 
 /**

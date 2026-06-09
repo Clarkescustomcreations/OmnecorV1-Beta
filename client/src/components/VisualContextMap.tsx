@@ -173,21 +173,15 @@ export default function VisualContextMap({
 
       <CardContent className="space-y-4">
         {/* Summary Stats */}
-        <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="p-2 rounded-lg bg-muted">
             <p className="text-muted-foreground mb-1">Total Files</p>
             <p className="font-mono font-medium">{files.length}</p>
           </div>
           <div className="p-2 rounded-lg bg-accent/10 border border-accent/30">
-            <p className="text-muted-foreground mb-1">Included</p>
+            <p className="text-muted-foreground mb-1">Active</p>
             <p className="font-mono font-medium text-accent">
               {includedFiles.length}
-            </p>
-          </div>
-          <div className="p-2 rounded-lg bg-muted">
-            <p className="text-muted-foreground mb-1">Total Tokens</p>
-            <p className="font-mono font-medium">
-              {totalTokens.toLocaleString()}
             </p>
           </div>
         </div>

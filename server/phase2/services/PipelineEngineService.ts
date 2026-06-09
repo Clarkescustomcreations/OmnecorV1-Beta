@@ -25,6 +25,8 @@ function phaseOutput(phase: PhaseName, goal: string): string {
 
 export class PipelineEngineService {
   private static instance: PipelineEngineService | null = null;
+  private inMemoryPipelines: Pipeline[] = [];
+  private inMemoryPhases: PipelinePhase[] = [];
 
   static getInstance(): PipelineEngineService {
     if (!PipelineEngineService.instance) {
@@ -36,8 +38,39 @@ export class PipelineEngineService {
   async createPipeline(name: string, goal: string, ownerId: number): Promise<Pipeline> {
     const sanitized = PromptSanitizer.getInstance().sanitize(goal).clean;
     const db = await getDb();
-    if (!db) throw new Error("Database not available");
     const id = randomUUID();
+
+    const newPipeline: Pipeline = {
+      id,
+      name,
+      goal: sanitized,
+      status: "running",
+      currentPhase: "DEFINE",
+      ownerId,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    const phaseId = randomUUID();
+    const output = PromptSanitizer.getInstance().sanitize(phaseOutput("DEFINE", sanitized)).clean;
+    const newPhase: PipelinePhase = {
+      id: phaseId,
+      pipelineId: id,
+      phase: "DEFINE",
+      status: "awaiting_approval",
+      inputText: null,
+      outputText: output,
+      approvedBy: null,
+      approvedAt: null,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    };
+
+    if (!db) {
+      this.inMemoryPipelines.push(newPipeline);
+      this.inMemoryPhases.push(newPhase);
+      return newPipeline;
+    }
 
     await db.insert(pipelines).values({
       id,
@@ -48,8 +81,6 @@ export class PipelineEngineService {
       ownerId,
     });
 
-    const phaseId = randomUUID();
-    const output = PromptSanitizer.getInstance().sanitize(phaseOutput("DEFINE", sanitized)).clean;
     await db.insert(pipelinePhases).values({
       id: phaseId,
       pipelineId: id,
@@ -75,7 +106,46 @@ export class PipelineEngineService {
 
   async approvePhase(pipelineId: string, phase: string, userId: number): Promise<Pipeline> {
     const db = await getDb();
-    if (!db) throw new Error("Database not available");
+    if (!db) {
+      const pipeline = this.inMemoryPipelines.find(p => p.id === pipelineId);
+      if (!pipeline) throw new Error("Pipeline not found");
+
+      const phaseObj = this.inMemoryPhases.find(p => p.pipelineId === pipelineId && p.phase === phase);
+      if (phaseObj) {
+        phaseObj.status = "complete";
+        phaseObj.approvedBy = userId;
+        phaseObj.approvedAt = new Date();
+        phaseObj.updatedAt = new Date();
+      }
+
+      const currentIdx = PHASE_ORDER.indexOf(phase as PhaseName);
+      const nextPhase = currentIdx < PHASE_ORDER.length - 1 ? PHASE_ORDER[currentIdx + 1] : null;
+
+      if (!nextPhase) {
+        pipeline.status = "complete";
+        pipeline.currentPhase = "DONE";
+        pipeline.updatedAt = new Date();
+      } else {
+        pipeline.currentPhase = nextPhase;
+        pipeline.updatedAt = new Date();
+        const output = PromptSanitizer.getInstance().sanitize(phaseOutput(nextPhase, pipeline.goal)).clean;
+        const newPhase: PipelinePhase = {
+          id: randomUUID(),
+          pipelineId,
+          phase: nextPhase,
+          status: "awaiting_approval",
+          inputText: null,
+          outputText: output,
+          approvedBy: null,
+          approvedAt: null,
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        };
+        this.inMemoryPhases.push(newPhase);
+      }
+      return pipeline;
+    }
+
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
     if (!pipeline) throw new Error("Pipeline not found");
 
@@ -109,7 +179,14 @@ export class PipelineEngineService {
 
   async abortPipeline(pipelineId: string): Promise<Pipeline> {
     const db = await getDb();
-    if (!db) throw new Error("Database not available");
+    if (!db) {
+      const pipeline = this.inMemoryPipelines.find(p => p.id === pipelineId);
+      if (!pipeline) throw new Error("Pipeline not found");
+      pipeline.status = "aborted";
+      pipeline.updatedAt = new Date();
+      return pipeline;
+    }
+
     await db.update(pipelines).set({ status: "aborted" }).where(eq(pipelines.id, pipelineId));
     AuditLogService.getInstance().log({ eventType: "pipeline_aborted", actorId: null, actorType: "user", procedure: "pipeline.abort", args: { pipelineId }, result: null, ipAddress: null, sessionId: null }).catch(() => {});
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
@@ -118,7 +195,13 @@ export class PipelineEngineService {
 
   async getPipeline(pipelineId: string): Promise<{ pipeline: Pipeline; phases: PipelinePhase[] } | null> {
     const db = await getDb();
-    if (!db) return null;
+    if (!db) {
+      const pipeline = this.inMemoryPipelines.find(p => p.id === pipelineId);
+      if (!pipeline) return null;
+      const phases = this.inMemoryPhases.filter(p => p.pipelineId === pipelineId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
+      return { pipeline, phases };
+    }
+
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
     if (!pipeline) return null;
     const phases = await db.select().from(pipelinePhases).where(eq(pipelinePhases.pipelineId, pipelineId)).orderBy(asc(pipelinePhases.createdAt));
@@ -127,7 +210,9 @@ export class PipelineEngineService {
 
   async listPipelines(ownerId: number): Promise<Pipeline[]> {
     const db = await getDb();
-    if (!db) return [];
+    if (!db) {
+      return this.inMemoryPipelines.filter(p => p.ownerId === ownerId);
+    }
     return db.select().from(pipelines).where(eq(pipelines.ownerId, ownerId));
   }
 }

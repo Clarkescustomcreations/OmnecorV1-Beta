@@ -9,6 +9,7 @@ import { exchangeCodeForToken, fetchUserProfile } from "../oauth/oauthClients.js
 import { getDb } from "../db.js";
 import { platformAccounts, oauthStates } from "../../drizzle/schema.js";
 import { eq, lt } from "drizzle-orm";
+import { SettingsService } from "../phase2/services/SettingsService.js";
 
 export const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -277,7 +278,8 @@ export function registerGoogleOAuthRoutes(app: Express) {
   const pendingVerifiers = new Map<string, string>(); // state → code_verifier
 
   app.get("/api/oauth/google/login", (req: Request, res: Response) => {
-    if (!ENV.googleClientId) {
+    const clientId = SettingsService.getInstance().getSecret("googleClientId", ENV.googleClientId);
+    if (!clientId) {
       res.status(404).json({ error: "Google OAuth not configured" });
       return;
     }
@@ -292,7 +294,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
     const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/google/callback`;
     const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
-    url.searchParams.set("client_id", ENV.googleClientId);
+    url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("scope", "openid email profile");
@@ -314,6 +316,9 @@ export function registerGoogleOAuthRoutes(app: Express) {
     }
     pendingVerifiers.delete(state);
 
+    const clientId = SettingsService.getInstance().getSecret("googleClientId", ENV.googleClientId);
+    const clientSecret = SettingsService.getInstance().getSecret("googleClientSecret", ENV.googleClientSecret);
+
     try {
       const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/google/callback`;
       const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
@@ -321,8 +326,8 @@ export function registerGoogleOAuthRoutes(app: Express) {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           code,
-          client_id: ENV.googleClientId,
-          client_secret: ENV.googleClientSecret,
+          client_id: clientId,
+          client_secret: clientSecret,
           redirect_uri: redirectUri,
           grant_type: "authorization_code",
           code_verifier: codeVerifier,
@@ -366,7 +371,8 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
   const pendingVerifiers = new Map<string, string>();
 
   app.get("/api/oauth/microsoft/login", (req: Request, res: Response) => {
-    if (!ENV.microsoftClientId) {
+    const clientId = SettingsService.getInstance().getSecret("microsoftClientId", ENV.microsoftClientId);
+    if (!clientId) {
       res.status(404).json({ error: "Microsoft OAuth not configured" });
       return;
     }
@@ -381,7 +387,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
 
     const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/microsoft/callback`;
     const url = new URL("https://login.microsoftonline.com/common/v2.0/oauth2/authorize");
-    url.searchParams.set("client_id", ENV.microsoftClientId);
+    url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
     url.searchParams.set("scope", "openid email profile");
@@ -403,6 +409,9 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
     }
     pendingVerifiers.delete(state);
 
+    const clientId = SettingsService.getInstance().getSecret("microsoftClientId", ENV.microsoftClientId);
+    const clientSecret = SettingsService.getInstance().getSecret("microsoftClientSecret", ENV.microsoftClientSecret);
+
     try {
       const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/microsoft/callback`;
       const tokenRes = await fetch("https://login.microsoftonline.com/common/v2.0/oauth2/token", {
@@ -410,8 +419,8 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
           code,
-          client_id: ENV.microsoftClientId,
-          client_secret: ENV.microsoftClientSecret,
+          client_id: clientId,
+          client_secret: clientSecret,
           redirect_uri: redirectUri,
           grant_type: "authorization_code",
           code_verifier: codeVerifier,

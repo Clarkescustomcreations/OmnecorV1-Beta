@@ -1,4 +1,4 @@
-import { app, shell, BrowserWindow, ipcMain, dialog } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem } from 'electron'
 import { join } from 'path'
 import { randomBytes } from 'crypto'
 import { appendFile } from 'fs'
@@ -137,6 +137,7 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
+    mainWindow.webContents.openDevTools()
   })
 
   // window.open / target=_blank: never open a sub-window; hand safe URLs to the
@@ -180,6 +181,25 @@ app.whenReady().then(async () => {
 
   app.on('browser-window-created', (_, window) => {
     optimizer.watchWindowShortcuts(window)
+
+    window.webContents.on('context-menu', (_event, params) => {
+      const menu = new Menu()
+      if (params.isEditable) {
+        menu.append(new MenuItem({ label: 'Undo', role: 'undo' }))
+        menu.append(new MenuItem({ label: 'Redo', role: 'redo' }))
+        menu.append(new MenuItem({ type: 'separator' }))
+        menu.append(new MenuItem({ label: 'Cut', role: 'cut' }))
+        menu.append(new MenuItem({ label: 'Copy', role: 'copy' }))
+        menu.append(new MenuItem({ label: 'Paste', role: 'paste' }))
+        menu.append(new MenuItem({ type: 'separator' }))
+        menu.append(new MenuItem({ label: 'Select All', role: 'selectAll' }))
+      } else if (params.selectionText && params.selectionText.trim() !== '') {
+        menu.append(new MenuItem({ label: 'Copy', role: 'copy' }))
+      } else {
+        return
+      }
+      menu.popup({ window })
+    })
   })
 
   // --- IPC: system hardware info for the Setup Wizard ---

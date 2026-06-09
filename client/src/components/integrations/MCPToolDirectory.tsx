@@ -100,7 +100,7 @@ function ConnectServerForm() {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
-        <Button variant="outline" size="sm" className="gap-2">
+                                        <Button variant="outline" size="sm" className="gap-2">
           <Plus className="w-4 h-4" />
           Connect Server
           <ChevronDown

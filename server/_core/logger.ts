@@ -1,6 +1,7 @@
 import fs from "fs";
 import path from "path";
 import os from "os";
+import { PATHS } from "./paths.js";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -10,7 +11,7 @@ const LEVELS: Record<LogLevel, number> = { debug: 0, info: 1, warn: 2, error: 3 
 // Append-only file stream. "Unalterable" here means write-only O_APPEND mode —
 // the OS kernel guarantees each write is atomic and sequential, preventing
 // in-place modification of earlier entries.
-const AUDIT_LOG_DIR = path.join(os.homedir(), ".omnecor", "logs");
+const AUDIT_LOG_DIR = PATHS.logs;
 const AUDIT_LOG_PATH = path.join(AUDIT_LOG_DIR, "audit.log");
 let _auditStream: fs.WriteStream | null = null;
 

@@ -5,7 +5,7 @@
  * and Visual Context Map for the AI chat interface.
  */
 
-import { countTokens } from "@anthropic-ai/tokenizer";
+// We replaced @anthropic-ai/tokenizer to avoid WebAssembly resolution issues in Vite
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 
@@ -61,11 +61,7 @@ export interface ConversationContext {
  * Rule of thumb: ~1 token per 4 characters for English
  */
 export function estimateTokens(text: string): number {
-  try {
-    return countTokens(text);
-  } catch {
-    return Math.ceil(text.length / 4);
-  }
+  return Math.ceil((text || "").length / 4);
 }
 
 /**

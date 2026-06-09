@@ -21,7 +21,11 @@ import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import path from "path";
 import fs from "fs/promises";
+import { exec } from "child_process";
+import { promisify } from "util";
 import { validatePath } from "../_core/security.js";
+
+const execAsync = promisify(exec);
 
 // ---------------------------------------------------------------------------
 // FileTreeNode — matches fileTreeToNetwork.ts on the frontend exactly
@@ -183,6 +187,8 @@ export const projectRouter = router({
   /**
    * ORIGINAL — kept for backwards compatibility with any existing callers.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   registerWatcher: protectedProcedure
     .input(registerProjectSchema)
     .mutation(async ({ ctx, input }) => {
@@ -205,16 +211,31 @@ export const projectRouter = router({
         });
       }
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   unregisterWatcher: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       await ctx.services.fileWatcher.unregisterProject(input.projectId);
       return { success: true };
     }),
-
   getWatcherStatus: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.fileWatcher.getStatus();
+  }),
+
+  /**
+   * Canonical list of active projects (watchers) for UI selectors.
+   * Maps WatcherStatus to a format expected by wallet/dashboard components.
+   */
+  list: protectedProcedure.query(async ({ ctx }) => {
+    const statuses = ctx.services.fileWatcher.getStatus();
+    return statuses.map(s => ({
+      id: s.projectId,
+      name: path.basename(s.rootDir) || s.projectId,
+      projectId: s.projectId,
+      rootDir: s.rootDir,
+      isActive: s.isActive,
+    }));
   }),
 
   /**
@@ -256,6 +277,8 @@ export const projectRouter = router({
   /**
    * PRESERVED — original flat string[] version for any existing internal callers.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getFileTreeFlat: publicProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
@@ -273,7 +296,8 @@ export const projectRouter = router({
   // =========================================================================
   // Loop Detector (AI Agent Safety) — unchanged
   // =========================================================================
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   checkAgentLoop: publicProcedure
     .input(loopCheckSchema)
     .mutation(async ({ ctx, input }) => {
@@ -284,14 +308,16 @@ export const projectRouter = router({
       );
       return ctx.services.hashTracker.checkAndRecord(input.sessionId, hash);
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   resetLoopDetector: publicProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       ctx.services.hashTracker.resetSession(input.sessionId);
       return { success: true };
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getLoopDetectorState: publicProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
@@ -300,5 +326,59 @@ export const projectRouter = router({
         return { exists: false, snapshot: null };
       }
       return { exists: true, snapshot };
+    }),
+  readFile: protectedProcedure
+    .input(z.object({ path: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      try {
+        const resolved = await validatePath(input.path);
+        const content = await fs.readFile(resolved, "utf-8");
+        return { content };
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Failed to read file: ${(error as Error).message}`,
+        });
+      }
+    }),
+  writeFile: protectedProcedure
+    .input(z.object({ path: z.string().min(1), content: z.string() }))
+    .mutation(async ({ input }) => {
+      try {
+        const resolved = await validatePath(input.path);
+        await fs.writeFile(resolved, input.content, "utf-8");
+        return { success: true };
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `Failed to write file: ${(error as Error).message}`,
+        });
+      }
+    }),
+
+  // Open a file or directory path in the OS file manager
+  openPath: publicProcedure
+    .input(z.object({ path: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      try {
+        const resolved = path.resolve(input.path);
+        const stat = await fs.stat(resolved).catch(() => null);
+        // Open the directory itself; for files, open the containing folder
+        const targetDir = stat?.isDirectory() ? resolved : path.dirname(resolved);
+        const platform = process.platform;
+        if (platform === "linux") {
+          execAsync(`xdg-open "${targetDir}"`).catch(() => {});
+        } else if (platform === "darwin") {
+          execAsync(`open "${targetDir}"`).catch(() => {});
+        } else if (platform === "win32") {
+          execAsync(`explorer "${targetDir.replace(/\//g, "\\")}"`).catch(() => {});
+        }
+        return { success: true, openedPath: targetDir };
+      } catch (error) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Failed to open path: ${(error as Error).message}`,
+        });
+      }
     }),
 });

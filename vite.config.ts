@@ -165,6 +165,7 @@ export default defineConfig({
       "@": path.resolve(import.meta.dirname, "client", "src"),
       "@shared": path.resolve(import.meta.dirname, "shared"),
       "@assets": path.resolve(import.meta.dirname, "attached_assets"),
+      "tiktoken": path.resolve(import.meta.dirname, "client", "src", "lib", "tokenizer-shim.ts"),
     },
   },
   envDir: path.resolve(import.meta.dirname),
@@ -187,9 +188,14 @@ export default defineConfig({
           if (id.includes("node_modules/lucide-react")) {
             return "vendor-icons";
           }
-          // Three.js + react-three ecosystem — heavy 3D runtime
-          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) {
-            return "vendor-three";
+          // Three.js, ReactFlow, Recharts ecosystem — heavy visualization runtime
+          if (
+            id.includes("node_modules/three") ||
+            id.includes("node_modules/@react-three") ||
+            id.includes("node_modules/recharts") ||
+            id.includes("node_modules/reactflow")
+          ) {
+            return "vendor-viz";
           }
           // Radix UI primitives — large but stable design-system dep
           if (id.includes("node_modules/@radix-ui")) {
@@ -202,10 +208,6 @@ export default defineConfig({
             id.includes("node_modules/zod")
           ) {
             return "vendor-data";
-          }
-          // Recharts / ReactFlow — charting & diagram libs
-          if (id.includes("node_modules/recharts") || id.includes("node_modules/reactflow")) {
-            return "vendor-charts";
           }
           // React core + framer-motion (animation)
           if (
@@ -232,6 +234,13 @@ export default defineConfig({
     ],
     fs: {
       strict: true,
+      allow: [
+        path.resolve(import.meta.dirname, "client"),
+        path.resolve(import.meta.dirname, "assets"),
+        path.resolve(import.meta.dirname, "shared"),
+        path.resolve(import.meta.dirname, "attached_assets"),
+        path.resolve(import.meta.dirname, "node_modules"),
+      ],
       deny: ["**/.*"],
     },
   },

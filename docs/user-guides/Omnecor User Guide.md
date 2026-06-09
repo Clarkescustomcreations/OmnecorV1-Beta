@@ -38,7 +38,7 @@ Operational Memory Never Escapes. Context Overview Remains.
 
 ## 1. Introduction
 
-Omnecor is a powerful, elegant, and polished local-first AI workstation designed for power users who demand both function and beauty. It seamlessly integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows—all in one refined interface. It serves as the unifying layer across every creative and technical discipline, built for individuals who code, design hardware, generate media, and run AI agents, often within the same session.
+Omnecor is a powerful, local-first AI workstation designed for Creativity (Operational Memory Never Escapes Context Overview Remains). It seamlessly integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows—all in one refined interface. It serves as the unifying layer across every creative and technical discipline, built for individuals who code, design hardware, generate media, and run AI agents, often within the same session.
 
 ### 1.1. Project Overview
 
@@ -434,6 +434,28 @@ Monitor and manage your conversation's token usage:
    - Red (~90%): Context nearly full
 2. Use the `/compress` command to summarize and shrink conversation history. The Goal & Plan buffer is never pruned.
 3. Hover over individual messages and click the context menu to **toggle per-message exclusion** — remove messages from what the model sees without deleting them locally.
+
+**Slash Command Reference**
+
+Type `/` in the chat input to open the autocomplete popup. All available commands:
+
+| Command | Description |
+|---|---|
+| `/clear` | Clear conversation history |
+| `/new` | Start a fresh conversation |
+| `/system` | Toggle the system prompt editor |
+| `/export` | Download the conversation as a Markdown file |
+| `/compress` | Collapse older messages into a single summary block to save tokens. The permanent Goal & Plan buffer is never compressed. |
+| `/btw <note>` | Add a persistent background context note. Appears as a dismissible chip; injected silently into every AI call. Persists cross-session via Honcho when `HONCHO_API_KEY` is set. |
+| `/skill` | Open the skill-save dialog. Names and stores the current workflow to `localStorage:omnecor:skills` for future reuse via the Command Palette. |
+| `/plan` | Launch the Valet-guided project planning session. Creates `todo.md`, `status.md`, and the `project-docs/` suite. |
+| `/help` | Show a quick-reference of all commands and keyboard shortcuts. |
+
+**Keyboard shortcuts:**
+- `Enter` — Send message
+- `Shift+Enter` — Insert new line
+- `@filename` — Mention and attach a context file
+- `Ctrl+K` — Open Command Palette
 
 ### 7.3. Hardware Automation: Flashing Firmware with ESPTool
 

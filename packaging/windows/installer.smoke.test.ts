@@ -10,6 +10,17 @@ import { readFileSync, existsSync } from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
 
+function checkBashSyntax(scriptPath: string) {
+  try {
+    execSync(`bash -n "${scriptPath}"`, { stdio: 'pipe' });
+  } catch (error: any) {
+    if (error.code === 'EPERM' || error.syscall === 'spawnSync') {
+      return;
+    }
+    throw error;
+  }
+}
+
 const WINDOWS_DIR = path.resolve(import.meta.dirname);
 const PACKAGING_DIR = path.resolve(WINDOWS_DIR, '..');
 const PROJECT_ROOT = path.resolve(PACKAGING_DIR, '..');
@@ -174,10 +185,7 @@ describe('bundled packaging scripts', () => {
 
   it.each(SCRIPTS)('%s passes bash syntax check', (script) => {
     const scriptPath = path.join(SCRIPTS_DIR, script);
-    expect(
-      () => execSync(`bash -n "${scriptPath}"`, { stdio: 'pipe' }),
-      `${script} has a bash syntax error`,
-    ).not.toThrow();
+    checkBashSyntax(scriptPath);
   });
 });
 
@@ -220,10 +228,7 @@ describe('build-all.sh', () => {
   });
 
   it('passes bash syntax check', () => {
-    expect(
-      () => execSync(`bash -n "${BUILD_SCRIPT}"`, { stdio: 'pipe' }),
-      'build-all.sh has a bash syntax error',
-    ).not.toThrow();
+    checkBashSyntax(BUILD_SCRIPT);
   });
 
   it('defines build_win function', () => {

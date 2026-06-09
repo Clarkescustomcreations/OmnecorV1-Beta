@@ -1,6 +1,6 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
-import { getDb } from "../db";
+import { getDb } from "../db.factory.js";
 import { platformAccounts } from "../../drizzle/schema";
 import { eq } from "drizzle-orm";
 import {
@@ -18,9 +18,25 @@ import {
   OAUTH_STATE_TTL,
 } from "../_core/oauth.js";
 
+// Providers supported by the authorization-code flow: social platforms plus
+// cloud storage providers. The cloud providers reuse the same generic flow
+// (state + PKCE + /api/oauth/callback/:platform) as the social platforms.
+const SUPPORTED_OAUTH_PROVIDERS = [
+  "twitter",
+  "linkedin",
+  "instagram",
+  "tiktok",
+  "facebook",
+  "youtube",
+  // Cloud storage
+  "google_drive",
+  "dropbox",
+  "onedrive",
+] as const;
+
 export const oauthRouter = router({
   getAuthorizationUrl: protectedProcedure
-    .input(z.object({ platform: z.string() }))
+    .input(z.object({ platform: z.enum(SUPPORTED_OAUTH_PROVIDERS) }))
     .mutation(async ({ input, ctx }) => {
       try {
         if (!ctx.user?.id) {
@@ -60,11 +76,12 @@ export const oauthRouter = router({
         });
       }
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   handleCallback: protectedProcedure
     .input(
       z.object({
-        platform: z.string(),
+        platform: z.enum(SUPPORTED_OAUTH_PROVIDERS),
         code: z.string(),
         state: z.string(),
       })
@@ -110,7 +127,14 @@ export const oauthRouter = router({
 
         // Save to database
         const db = await getDb();
-        if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+        if (!db) {
+          return {
+            success: false,
+            accountName: "Offline Account",
+            platform: input.platform,
+            error: "Database not available in local mode",
+          };
+        }
 
         const accountName =
           (profile.name ||
@@ -143,12 +167,13 @@ export const oauthRouter = router({
         });
       }
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   disconnectAccount: protectedProcedure
     .input(z.object({ accountId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, error: "Database not available in local mode" };
 
       const account = await db
         .select()

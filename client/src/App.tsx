@@ -1,10 +1,12 @@
 import { Toaster } from "@/components/ui/sonner";
+import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { Route, Router, Switch } from "wouter";
+import { Route, Router, Switch, useLocation } from "wouter";
 import { useEffect, Suspense, lazy, ComponentType, Component, ReactNode } from "react";
 import ErrorBoundary from "./components/ErrorBoundary";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
+import { NeuralMapProvider } from "./contexts/NeuralMapContext";
 import CommandPalette from "./components/shell/CommandPalette";
 import PageSkeleton from "./components/PageSkeleton";
 
@@ -15,10 +17,14 @@ const Chat = lazy(() => import("@/pages/Chat"));
 const BrainMap = lazy(() => import("@/pages/BrainMap"));
 const ModelHub = lazy(() => import("@/pages/ModelHub"));
 const Pipelines = lazy(() => import("@/pages/Pipelines"));
+const Designer3D = lazy(() => import("@/pages/3DDesigner"));
 const Integrations = lazy(() => import("@/pages/Integrations"));
 const SettingsPage = lazy(() => import("@/pages/Settings"));
 const AgentNetworking = lazy(() => import("@/pages/AgentNetworking"));
+const PodcastStudio = lazy(() => import("@/pages/PodcastStudio"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
+const AgenticWallet = lazy(() => import("@/pages/AgenticWallet"));
+const SetupWizard = lazy(() => import("@/pages/SetupWizard"));
 const ExternalBrainMapWindow = lazy(() => import("./components/window-system/ExternalBrainMapWindow"));
 
 /** Per-route error boundary that renders RouteErrorBoundary on failure. */
@@ -55,18 +61,32 @@ function withBoundary(Page: ComponentType) {
 }
 
 function RouterRoutes() {
-  // make sure to consider if you need authentication for certain routes
+  const [location, setLocation] = useLocation();
+
+  useEffect(() => {
+    const isSetupComplete = localStorage.getItem("omnecor:setup_complete") === "true"
+      || import.meta.env.VITE_DEMO_MODE === "true";
+    if (!isSetupComplete && location !== "/setup") {
+      setLocation("/setup");
+    }
+  }, [location, setLocation]);
+
   return (
     <Suspense fallback={<PageSkeleton />}>
       <Switch>
+        <Route path="/setup" component={withBoundary(SetupWizard)} />
         <Route path="/" component={withBoundary(Dashboard)} />
         <Route path="/chat" component={withBoundary(Chat)} />
         <Route path="/brain-map" component={withBoundary(BrainMap)} />
         <Route path="/brain-map-external" component={withBoundary(ExternalBrainMapWindow)} />
         <Route path="/model-hub" component={withBoundary(ModelHub)} />
         <Route path="/pipelines" component={withBoundary(Pipelines)} />
+        <Route path="/3d-designer" component={withBoundary(Designer3D)} />
+        <Route path="/3d-designer-external" component={withBoundary(Designer3D)} />
         <Route path="/integrations" component={withBoundary(Integrations)} />
         <Route path="/agent-networking" component={withBoundary(AgentNetworking)} />
+        <Route path="/podcast-studio" component={withBoundary(PodcastStudio)} />
+        <Route path="/wallet" component={withBoundary(AgenticWallet)} />
         <Route path="/settings" component={withBoundary(SettingsPage)} />
         <Route path="/404" component={withBoundary(NotFound)} />
         {/* Final fallback route */}
@@ -88,7 +108,7 @@ function App() {
       // Shift+?: Show help
       if (e.shiftKey && e.key === "?") {
         e.preventDefault();
-        alert("Keyboard shortcuts help - see documentation for full list");
+        toast.info("Keyboard shortcuts: Ctrl+K — Command palette · Shift+? — Help · Esc — Close panel");
       }
     };
 
@@ -104,13 +124,15 @@ function App() {
         defaultTheme="dark"
         switchable
       >
-        <TooltipProvider>
-          <Router base={base}>
-            <CommandPalette />
-            <Toaster />
-            <RouterRoutes />
-          </Router>
-        </TooltipProvider>
+        <NeuralMapProvider>
+          <TooltipProvider>
+            <Router base={base}>
+              <CommandPalette />
+              <Toaster />
+              <RouterRoutes />
+            </Router>
+          </TooltipProvider>
+        </NeuralMapProvider>
       </ThemeProvider>
     </ErrorBoundary>
   );

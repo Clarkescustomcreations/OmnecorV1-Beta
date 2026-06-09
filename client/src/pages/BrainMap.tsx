@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Grid3x3, List, Settings, Shield, Maximize2, Anchor, ExternalLink, PanelRightClose, PanelRightOpen, Palette, Layers, Activity, Filter, Zap, X as XIcon, Pencil } from "lucide-react";
+import { Brain, Grid3x3, List, Settings, Shield, Maximize2, Anchor, ExternalLink, PanelRightClose, PanelRightOpen, Palette, Layers, Activity, Filter, Zap, X as XIcon, Pencil, Lock, LockOpen, Map, MessageSquare, FolderOpen } from "lucide-react";
 import { useState, useMemo, useEffect, useCallback } from "react";
 import NeuralGraphView, { BrainMapViewport } from "@/components/neural/NeuralGraphView";
 import NeuralTreeView from "@/components/neural/NeuralTreeView";
@@ -36,6 +36,36 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useVisualControlStore } from "@/lib/stores/visualControlStore";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+// ---------------------------------------------------------------------------
+// Node description helper
+// ---------------------------------------------------------------------------
+function getNodeDescription(label: string, type: string, fileCount?: number): string {
+  if (type === "project") return "Project root — the top-level workspace node.";
+  if (type === "integration") return "Remote integration source (GitHub repo or cloud service).";
+  if (type === "folder") return `Directory${fileCount !== undefined ? ` containing ${fileCount} items` : ""}.`;
+  const ext = label.includes(".") ? (label.split(".").pop()?.toLowerCase() ?? "") : "";
+  const descriptions: Record<string, string> = {
+    ts: "TypeScript source file — compiled to JavaScript.", tsx: "React TypeScript component — renders UI.",
+    js: "JavaScript module.", jsx: "React JSX component.", json: "JSON data or configuration file.",
+    md: "Markdown documentation or notes.", mdx: "MDX — Markdown with embedded JSX.",
+    css: "CSS stylesheet.", scss: "SCSS stylesheet with extended features.", html: "HTML document.",
+    py: "Python script or module.", sh: "Shell script.", bash: "Bash shell script.",
+    env: "Environment variables config — keep secret.", yaml: "YAML configuration file.",
+    yml: "YAML configuration file.", toml: "TOML configuration file.", svg: "SVG vector graphic.",
+    png: "PNG raster image.", jpg: "JPEG image.", jpeg: "JPEG image.", gif: "Animated GIF.",
+    webp: "WebP image.", wasm: "WebAssembly binary module.", sql: "SQL query or schema.",
+    prisma: "Prisma ORM schema file.", graphql: "GraphQL schema or query.", gql: "GraphQL file.",
+    proto: "Protocol Buffers schema.", lock: "Package lock file — do not edit manually.",
+    gitignore: "Git ignore rules.", rs: "Rust source file.", go: "Go source file.",
+    java: "Java source file.", kt: "Kotlin source file.", cpp: "C++ source file.",
+    c: "C source file.", h: "C/C++ header file.", vue: "Vue.js single-file component.",
+    svelte: "Svelte component.", kicad_pcb: "KiCad PCB layout file.",
+    kicad_sch: "KiCad schematic file.", kicad_pro: "KiCad project file.",
+  };
+  return descriptions[ext] ?? (ext ? `${ext.toUpperCase()} file.` : "File.");
+}
 
 /**
  * Visual Toolbar for Neural Map Controls
@@ -51,10 +81,14 @@ function NeuralMapToolbar() {
     simSpeed, setSimSpeed,
     gpuEnabled, setGpuEnabled,
     autoClustering, setAutoClustering,
+    showMiniMap, setShowMiniMap,
+    showHoverDescriptions, setShowHoverDescriptions,
+    lockLayout, unlockLayout, isLayoutLocked,
   } = useVisualControlStore();
+  const { nodes: brainNodes, projectId: brainProjectId } = useBrainMapStore();
 
-  // TODO: Implement trpc.brainmap.saveLayoutPreferences on backend
-  // Layout preferences are persisted in Zustand store (useVisualControlStore)
+  const lockKey = `${brainProjectId}:${layout}`;
+  const locked = isLayoutLocked(lockKey);
 
   return (
     <Card className={cn(
@@ -81,24 +115,76 @@ function NeuralMapToolbar() {
 
       {!collapsed && (
         <div className="p-4 space-y-4">
-          {/* Layout Engine */}
+          {/* Legend */}
+          <div className="space-y-1.5 pb-3 border-b border-border/50">
+            <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Legend</Label>
+            <div className="flex flex-col gap-1">
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="text-muted-foreground">Folder</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="text-muted-foreground">File</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
+                <span className="text-muted-foreground">Project</span>
+              </div>
+              <div className="flex items-center gap-2 text-[11px]">
+                <span className="w-3 h-3 rounded-full bg-emerald-400 flex-shrink-0" />
+                <span className="text-muted-foreground">In AI Context</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Layout Engine + Lock */}
           <div className="space-y-2">
             <Label className="text-[11px] font-semibold flex items-center gap-2">
               <Layers className="w-3 h-3" /> Layout Engine
             </Label>
-            <Select value={layout} onValueChange={(v) => {
-              setLayout(v as typeof layout);
-            }}>
-              <SelectTrigger className="h-8 text-xs">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="force">Force-Directed</SelectItem>
-                <SelectItem value="hierarchical">Hierarchical</SelectItem>
-                <SelectItem value="mindmap">Mind-Map</SelectItem>
-                <SelectItem value="circular">Circular</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex gap-1.5">
+              <Select value={layout} onValueChange={(v) => setLayout(v as typeof layout)}>
+                <SelectTrigger className="h-8 text-xs flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="force">Force-Directed</SelectItem>
+                  <SelectItem value="hierarchical">Hierarchical</SelectItem>
+                  <SelectItem value="mindmap">Mind-Map</SelectItem>
+                  <SelectItem value="circular">Circular</SelectItem>
+                </SelectContent>
+              </Select>
+              <HowToTooltip
+                title={locked ? "Layout Locked" : "Lock Layout"}
+                description={locked
+                  ? "This layout's arrangement is pinned. Node positions are saved per-project. Click to unlock (next layout switch will re-compute)."
+                  : "Pin the current node arrangement for this layout. Switching layouts and back will restore this exact arrangement."}
+                side="right"
+              >
+                <Button
+                  size="icon"
+                  variant={locked ? "default" : "outline"}
+                  className={cn("h-8 w-8 flex-shrink-0", locked && "bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30")}
+                  onClick={() => {
+                    if (locked) {
+                      unlockLayout(lockKey);
+                      toast.success(`"${layout}" layout unlocked — will auto-arrange on next switch.`);
+                    } else {
+                      lockLayout(lockKey, brainNodes);
+                      toast.success(`"${layout}" layout locked for this project.`);
+                    }
+                  }}
+                >
+                  {locked ? <Lock className="w-3.5 h-3.5" /> : <LockOpen className="w-3.5 h-3.5" />}
+                </Button>
+              </HowToTooltip>
+            </div>
+            {locked && (
+              <p className="text-[10px] text-amber-400 flex items-center gap-1">
+                <Lock className="w-2.5 h-2.5" /> Layout pinned — drag nodes freely
+              </p>
+            )}
           </div>
 
           {/* Rendering */}
@@ -113,9 +199,7 @@ function NeuralMapToolbar() {
               </div>
               <Slider
                 value={[nodeSize]}
-                onValueChange={([v]) => {
-                  setNodeSize(v);
-                }}
+                onValueChange={([v]) => setNodeSize(v)}
                 min={5}
                 max={30}
                 step={1}
@@ -123,9 +207,19 @@ function NeuralMapToolbar() {
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-[10px] text-muted-foreground">GPU Acceleration</Label>
-              <Switch checked={gpuEnabled} onCheckedChange={(v) => {
-                setGpuEnabled(v);
-              }} />
+              <Switch checked={gpuEnabled} onCheckedChange={setGpuEnabled} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                <Map className="w-3 h-3" /> Mini Map
+              </Label>
+              <Switch checked={showMiniMap} onCheckedChange={setShowMiniMap} />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label className="text-[10px] text-muted-foreground flex items-center gap-1.5">
+                <MessageSquare className="w-3 h-3" /> Hover Info
+              </Label>
+              <Switch checked={showHoverDescriptions} onCheckedChange={setShowHoverDescriptions} />
             </div>
           </div>
 
@@ -141,9 +235,7 @@ function NeuralMapToolbar() {
               </div>
               <Slider
                 value={[simSpeed]}
-                onValueChange={([v]) => {
-                  setSimSpeed(v);
-                }}
+                onValueChange={([v]) => setSimSpeed(v)}
                 min={0.1}
                 max={3}
                 step={0.1}
@@ -158,9 +250,7 @@ function NeuralMapToolbar() {
             </Label>
             <div className="flex items-center justify-between">
               <Label className="text-[10px] text-muted-foreground">Auto-Clustering</Label>
-              <Switch checked={autoClustering} onCheckedChange={(v) => {
-                setAutoClustering(v);
-              }} />
+              <Switch checked={autoClustering} onCheckedChange={setAutoClustering} />
             </div>
           </div>
         </div>
@@ -772,6 +862,7 @@ function BrainMapContent() {
                         <CardContent>
                           {selectedNode ? (
                             <div className="space-y-3 text-sm">
+                              {/* Name (editable) */}
                               <div className="flex flex-col gap-1">
                                 <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Name</span>
                                 {editingLabel ? (
@@ -817,16 +908,54 @@ function BrainMapContent() {
                                   </button>
                                 )}
                               </div>
+                              {/* Type */}
                               <div className="flex flex-col gap-1">
                                 <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Type</span>
                                 <Badge className="w-fit capitalize">{selectedNode.type}</Badge>
                               </div>
+                              {/* Path */}
                               <div className="flex flex-col gap-1">
                                 <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Path</span>
                                 <span className="font-mono text-[10px] break-all bg-muted p-1 rounded">
                                   {selectedNode.data?.path}
                                 </span>
                               </div>
+                              {/* Auto-generated description */}
+                              <div className="flex flex-col gap-1">
+                                <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Description</span>
+                                <p className="text-[11px] text-foreground/80 leading-relaxed bg-muted/50 rounded p-1.5">
+                                  {getNodeDescription(selectedNode.label, selectedNode.type, selectedNode.data?.fileCount)}
+                                </p>
+                              </div>
+                              {/* Folder contents */}
+                              {(selectedNode.type === "folder" || selectedNode.type === "project") && (() => {
+                                const children = displayNetwork.nodes.filter(n =>
+                                  displayNetwork.edges.some(e => e.source === selectedNode.id && e.target === n.id)
+                                );
+                                if (children.length === 0) return null;
+                                return (
+                                  <div className="flex flex-col gap-1">
+                                    <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1">
+                                      <FolderOpen className="w-3 h-3" /> Contents ({children.length})
+                                    </span>
+                                    <ScrollArea className="max-h-32 rounded border border-border/50">
+                                      <ul className="p-1 space-y-0.5">
+                                        {children.map(child => (
+                                          <li
+                                            key={child.id}
+                                            className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-accent/10 cursor-pointer text-[10px] font-mono"
+                                            onClick={() => setSelectedNodeId(child.id)}
+                                          >
+                                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${child.type === "folder" ? "bg-blue-500" : "bg-green-500"}`} />
+                                            <span className="truncate">{child.label}</span>
+                                          </li>
+                                        ))}
+                                      </ul>
+                                    </ScrollArea>
+                                  </div>
+                                );
+                              })()}
+                              {/* Add to context */}
                               {selectedNode.type !== "project" && selectedNode.type !== "integration" && (
                                 <Button
                                   size="sm"

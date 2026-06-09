@@ -1,16 +1,30 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Paperclip, Image, Square, X, FileText } from "lucide-react";
+import { Send, Paperclip, Image, Square, X, FileText, Loader2, Terminal } from "lucide-react";
 import { VoiceInputButton } from "@/components/voice/VoiceInputButton";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import { cn } from "@/lib/utils";
-import type { ContextFile } from "@/lib/chatContext";
+import type { ContextFile, SelectedModel } from "@/lib/chatContext";
+import { trpc } from "@/lib/trpc";
 
 export type SlashCommand = "clear" | "new" | "system" | "export" | "help" | "compress" | "btw" | "skill" | "plan";
 
 interface Attachment {
   name: string;
   kind: "file" | "image";
+  /** The real File object, used for upload at send-time. */
+  file: File;
+}
+
+/** Convert a File to a base64 data URL using FileReader. */
+function readFileAsDataURL(file: File): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => resolve(e.target?.result as string);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
 }
 
 interface ChatInputProps {
@@ -20,11 +34,15 @@ interface ChatInputProps {
   onStop: () => void;
   onCommand: (cmd: SlashCommand) => void | Promise<void>;
   onBtw?: (note: string) => void;
+  onToggleCliTerminal?: () => void;
+  onToggleSandbox?: () => void;
   contextFiles: ContextFile[];
   isLoading: boolean;
   disabled?: boolean;
   tokenCount?: number;
   maxTokens?: number;
+  sessionId?: string;
+  selectedModel?: SelectedModel;
 }
 
 const COMMANDS: { cmd: SlashCommand; label: string; description: string }[] = [
@@ -46,14 +64,21 @@ export default function ChatInput({
   onStop,
   onCommand,
   onBtw,
+  onToggleCliTerminal,
+  onToggleSandbox,
   contextFiles,
   isLoading,
   disabled,
   tokenCount,
   maxTokens,
+  sessionId,
+  selectedModel,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [isUploading, setIsUploading] = useState(false);
+
+  const uploadMutation = trpc.attachments.uploadFile.useMutation();
 
   // Slash command state
   const [slashOpen, setSlashOpen] = useState(false);
@@ -84,6 +109,42 @@ export default function ChatInput({
     el.style.height = "auto";
     el.style.height = `${Math.min(el.scrollHeight, 200)}px`;
   };
+
+  // Listen for injection events (e.g. from saved scripts)
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const detail = (e as CustomEvent).detail;
+      if (typeof detail === "string") {
+        setValue(detail);
+        setTimeout(resize, 0);
+        textareaRef.current?.focus();
+      }
+    };
+    window.addEventListener("omnecor:inject_chat", handler);
+
+    // Check for pending AI query from 3D Designer
+    const pendingQuery = localStorage.getItem("omnecor:pending_ai_query");
+    if (pendingQuery) {
+      try {
+        const { code, notes, actionType } = JSON.parse(pendingQuery);
+        let prompt = "";
+        const actionLabel = actionType === "fix" ? "fix" : actionType === "suggest" ? "suggest changes to" : "explain / assist with";
+        prompt = `I have highlighted this section of code in the 3D Designer:\n\n\`\`\`\n${code}\n\`\`\`\n\nPlease ${actionLabel} it. ${notes ? `Additional details: ${notes}` : ""}`;
+        
+        setValue(prompt);
+        setTimeout(resize, 50);
+        textareaRef.current?.focus();
+      } catch (err) {
+        console.error("Error parsing pending AI query:", err);
+      } finally {
+        localStorage.removeItem("omnecor:pending_ai_query");
+      }
+    }
+
+    return () => {
+      window.removeEventListener("omnecor:inject_chat", handler);
+    };
+  }, []);
 
   const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     const val = e.target.value;
@@ -136,9 +197,9 @@ export default function ChatInput({
     setTimeout(resize, 0);
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const trimmed = value.trim();
-    if (!trimmed || isLoading || disabled) return;
+    if (!trimmed || isLoading || disabled || isUploading) return;
 
     // Intercept /btw notes — store as session context, don't send as chat
     if (trimmed.startsWith("/btw ")) {
@@ -152,7 +213,35 @@ export default function ChatInput({
       return;
     }
 
-    onSend(trimmed);
+    // Pre-upload any pending attachments, then append markdown references
+    let finalMessage = trimmed;
+    if (attachments.length > 0) {
+      setIsUploading(true);
+      try {
+        const uploadedFiles = await Promise.all(
+          attachments.map(async (att) => {
+            const dataUrl = await readFileAsDataURL(att.file);
+            return uploadMutation.mutateAsync({
+              name: att.name,
+              mimeType: att.file.type || "application/octet-stream",
+              dataUrl,
+            });
+          })
+        );
+        const attachmentText = uploadedFiles
+          .map((f) => `[Attachment: ${f.filename}](${f.url})`)
+          .join("\n");
+        finalMessage = `${trimmed}\n\n${attachmentText}`;
+      } catch (err) {
+        console.error("Attachment upload failed:", err);
+        // Still send the message without attachments rather than silently dropping
+        finalMessage = trimmed;
+      } finally {
+        setIsUploading(false);
+      }
+    }
+
+    onSend(finalMessage);
     setValue("");
     setAttachments([]);
     if (textareaRef.current) textareaRef.current.style.height = "auto";
@@ -185,7 +274,7 @@ export default function ChatInput({
       const file = imageItem.getAsFile();
       if (file) {
         onAddImage(file);
-        setAttachments(prev => [...prev, { name: "pasted-image.png", kind: "image" }]);
+        setAttachments(prev => [...prev, { name: "pasted-image.png", kind: "image", file }]);
       }
     }
   };
@@ -194,7 +283,7 @@ export default function ChatInput({
     const handler = kind === "file" ? onAddFile : onAddImage;
     Array.from(e.target.files ?? []).forEach(file => {
       handler(file);
-      setAttachments(prev => [...prev, { name: file.name, kind }]);
+      setAttachments(prev => [...prev, { name: file.name, kind, file }]);
     });
     e.target.value = "";
   };
@@ -307,29 +396,31 @@ export default function ChatInput({
             onChange={e => handleFileSelect(e, "image")}
           />
 
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={() => fileInputRef.current?.click()}
-            title="Attach file"
-            type="button"
-            disabled={isLoading}
-          >
-            <Paperclip className="w-3.5 h-3.5" />
-          </Button>
+          <HowToTooltip title="Attach File" description="Upload any file as context for the AI to reference." side="top">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => fileInputRef.current?.click()}
+              type="button"
+              disabled={isLoading}
+            >
+              <Paperclip className="w-3.5 h-3.5" />
+            </Button>
+          </HowToTooltip>
 
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={() => imageInputRef.current?.click()}
-            title="Attach image"
-            type="button"
-            disabled={isLoading}
-          >
-            <Image className="w-3.5 h-3.5" />
-          </Button>
+          <HowToTooltip title="Attach Image" description="Upload an image for vision-capable models to analyze." side="top">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={() => imageInputRef.current?.click()}
+              type="button"
+              disabled={isLoading}
+            >
+              <Image className="w-3.5 h-3.5" />
+            </Button>
+          </HowToTooltip>
 
           <VoiceInputButton
             size="sm"
@@ -343,28 +434,34 @@ export default function ChatInput({
           />
 
           {isLoading ? (
-            <Button
-              size="icon"
-              variant="destructive"
-              className="h-7 w-7"
-              onClick={onStop}
-              title="Stop generation"
-              type="button"
-            >
-              <Square className="w-3 h-3 fill-current" />
-            </Button>
+            <HowToTooltip title="Stop Generation" description="Halt the current AI response immediately." side="top">
+              <Button
+                size="icon"
+                variant="destructive"
+                className="h-7 w-7"
+                onClick={onStop}
+                type="button"
+              >
+                <Square className="w-3 h-3 fill-current" />
+              </Button>
+            </HowToTooltip>
           ) : (
-            <Button
-              size="icon"
-              className="h-7 w-7"
-              onClick={handleSend}
-              disabled={!value.trim() || disabled}
-              title="Send (Enter)"
-              aria-label="Send message"
-              type="button"
-            >
-              <Send className="w-3.5 h-3.5" />
-            </Button>
+            <HowToTooltip title="Send Message" description="Send your message to the AI. You can also press Enter to send." side="top">
+              <Button
+                size="icon"
+                className="h-7 w-7"
+                onClick={handleSend}
+                disabled={!value.trim() || disabled || isUploading}
+                aria-label={isUploading ? "Uploading attachments" : "Send message"}
+                type="button"
+              >
+                {isUploading ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <Send className="w-3.5 h-3.5" />
+                )}
+              </Button>
+            </HowToTooltip>
           )}
         </div>
       </div>
@@ -372,7 +469,9 @@ export default function ChatInput({
       {/* Hint line */}
       <div className="flex items-center justify-between mt-1 pl-1">
         <p className="text-[10px] text-muted-foreground">
-          {isLoading
+          {isUploading
+            ? "Uploading attachments…"
+            : isLoading
             ? "Generating response…"
             : "Enter ↵ send · Shift+Enter new line · / commands · @ mention files · paste image"}
         </p>
@@ -389,6 +488,30 @@ export default function ChatInput({
           >
             {tokenCount.toLocaleString()} / {maxTokens.toLocaleString()} tokens
           </span>
+        )}
+      </div>
+
+      {/* Terminal buttons */}
+      <div className="flex items-center gap-2 pl-1 mt-1">
+        {onToggleCliTerminal && (
+          <Button
+            onClick={onToggleCliTerminal}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] h-5 px-2 py-0 rounded transition-all flex items-center gap-1 shadow-sm"
+            type="button"
+          >
+            <Terminal className="w-2.5 h-2.5" />
+            Terminal/CLI
+          </Button>
+        )}
+        {onToggleSandbox && (
+          <Button
+            onClick={onToggleSandbox}
+            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] h-5 px-2 py-0 rounded transition-all flex items-center gap-1 shadow-sm"
+            type="button"
+          >
+            <Terminal className="w-2.5 h-2.5" />
+            Sandboxed
+          </Button>
         )}
       </div>
     </div>

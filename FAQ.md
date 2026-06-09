@@ -6,7 +6,7 @@ This document addresses common questions about Omnecor, its functionality, and u
 
 ### Q: What is Omnecor?
 
-A: Omnecor is a powerful, elegant, and polished local-first AI workstation designed for power users. It integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows in a single, refined interface.
+A: Omnecor is a powerful, local-first AI workstation designed for Creativity (Operational Memory Never Escapes Context Overview Remains). It integrates local and API-based AI models, manages complex projects, and orchestrates multi-step workflows in a single, refined interface.
 
 ### Q: What does "local-first" mean for Omnecor?
 

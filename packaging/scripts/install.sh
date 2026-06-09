@@ -155,6 +155,22 @@ Type=Application
 Categories=Development;AI;
 DESKTOP
 
+# Install icon
+ICON_DIR="$HOME/.local/share/icons/hicolor/256x256/apps"
+mkdir -p "$ICON_DIR"
+
+# Try to find icon in common locations (relative to script or in current dir)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd 2>/dev/null || pwd)"
+if [ -f "$SCRIPT_DIR/../../assets/logo_mark_256.png" ]; then
+    cp "$SCRIPT_DIR/../../assets/logo_mark_256.png" "$ICON_DIR/omnecor.png"
+elif [ -f "assets/logo_mark_256.png" ]; then
+    cp "assets/logo_mark_256.png" "$ICON_DIR/omnecor.png"
+elif [ -f "$INSTALL_DIR/omnecor" ]; then
+    # Fallback: if AppImage exists, try to extract icon if it's a real AppImage
+    # (Simplified: just skip if not found, usually the builder handles this)
+    true
+fi
+
 # ---------------------------------------------------------------------------
 # Finalize
 # ---------------------------------------------------------------------------

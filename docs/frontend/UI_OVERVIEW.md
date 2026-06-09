@@ -31,7 +31,12 @@ The central and largest part of the UI is the **Main Content Area**, which dynam
 -   **Purpose**: Displaying the primary content and interactive elements of the currently active module.
 -   **Examples**:
     -   **Dashboard**: Overview of active projects, system status, and recent activities.
-    -   **Chat Interface**: Conversational AI interface with streaming responses.
+    -   **Chat Interface**: Conversational AI interface with streaming responses, multi-model selection, and a full slash-command system. Key features:
+        -   **Token Budget Bar** — Live `tokenCount / maxTokens` indicator below the input. Turns amber at ≥70%, red at ≥90%.
+        -   **`@`-mention context files** — Type `@filename` to attach project files as context inline.
+        -   **Slash commands** — Type `/` to open the autocomplete popup: `/clear`, `/new`, `/system`, `/export`, `/compress`, `/btw <note>`, `/skill`, `/plan`, `/help`.
+        -   **HITL panel** — Floating approval card for agent-loop actions requiring human confirmation.
+        -   **Budget spend cards** — Real-time cost tracking card per cloud API call with provider, model, and USD cost.
     -   **Neural Workspaces (Neural Brain Map)**: An interactive canvas where users visualize and manage projects as spatial graphs.
     -   **Model Hub**: Interface for managing local and cloud AI models.
     -   **Pipelines**: Workflow orchestration and management interface.

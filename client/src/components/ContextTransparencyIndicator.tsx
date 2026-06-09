@@ -113,7 +113,7 @@ export default function ContextTransparencyIndicator({
         </div>
 
         {/* Token Breakdown */}
-        <div className="grid grid-cols-3 gap-2 text-xs">
+        <div className="grid grid-cols-2 gap-2 text-xs">
           <div className="p-2 rounded-lg bg-muted">
             <p className="text-muted-foreground mb-1">System</p>
             <p className="font-mono font-medium">
@@ -121,70 +121,11 @@ export default function ContextTransparencyIndicator({
             </p>
           </div>
           <div className="p-2 rounded-lg bg-muted">
-            <p className="text-muted-foreground mb-1">Conversation</p>
+            <p className="text-muted-foreground mb-1">Context</p>
             <p className="font-mono font-medium">
               {transparency.conversationTokens.toLocaleString()}
             </p>
           </div>
-          <div className="p-2 rounded-lg bg-muted">
-            <p className="text-muted-foreground mb-1">Files</p>
-            <p className="font-mono font-medium">
-              {transparency.files
-                .filter(f => f.included)
-                .reduce((sum, f) => sum + f.tokens, 0)
-                .toLocaleString()}
-            </p>
-          </div>
-        </div>
-
-        {/* File Inclusion Status */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-muted-foreground">Files in Context</span>
-            <Badge variant="outline" className="text-xs">
-              {includedFilesCount} / {totalFilesCount}
-            </Badge>
-          </div>
-
-          {totalFilesCount === 0 ? (
-            <div className="p-3 rounded-lg bg-muted/50 text-center text-xs text-muted-foreground">
-              No files added to context
-            </div>
-          ) : (
-            <div className="space-y-1 max-h-40 overflow-y-auto">
-              {transparency.files.map(file => (
-                <div
-                  key={file.id}
-                  className={cn(
-                    "flex items-center justify-between p-2 rounded-lg text-xs transition-colors",
-                    file.included
-                      ? "bg-accent/10 border border-accent/30"
-                      : "bg-muted/50"
-                  )}
-                >
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono truncate text-foreground">
-                      {file.name}
-                    </p>
-                    <p className="text-muted-foreground text-xs">
-                      {file.tokens.toLocaleString()} tokens
-                    </p>
-                  </div>
-                  <div className="ml-2">
-                    {file.included ? (
-                      <Badge className="text-xs bg-green-500/20 text-green-500 border-green-500/30">
-                        Included
-                      </Badge>
-                    ) : (
-                      <Badge variant="outline" className="text-xs">
-                        Excluded
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
         </div>
 
         {/* Warnings */}

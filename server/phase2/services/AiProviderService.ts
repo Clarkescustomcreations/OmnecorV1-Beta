@@ -20,6 +20,7 @@ import { v4 as uuidv4 } from "uuid";
 import { getDb } from "../../db.factory.js";
 import { spendLog, projectBudgets } from "../../../drizzle/schema.js";
 import { calculateCostMicrocents } from "../config/providerPricing.js";
+import { SettingsService } from "./SettingsService.js";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -95,6 +96,48 @@ export class AiProviderService {
   }
 
   /**
+   * Helper to get provider API key, preferring dynamic settings over env.
+   */
+  private getProviderKey(providerId: string, inputKey?: string): string {
+    if (inputKey) return inputKey;
+
+    const settings = SettingsService.getInstance();
+    switch (providerId.toLowerCase()) {
+      case "openai":
+        return settings.getSecret("openaiApiKey", ENV.openaiApiKey);
+      case "anthropic":
+        return settings.getSecret("anthropicApiKey", ENV.anthropicApiKey);
+      case "gemini":
+        return settings.getSecret("geminiApiKey", ENV.geminiApiKey);
+      case "grok":
+        return settings.getSecret("xaiApiKey", ENV.xaiApiKey);
+      case "huggingface":
+        return settings.getSecret("huggingfaceApiKey", ENV.huggingfaceApiKey);
+      case "elevenlabs":
+        return settings.getSecret("elevenLabsApiKey", ENV.elevenLabsApiKey);
+      case "falai":
+        return settings.getSecret("falaiApiKey", ENV.falaiApiKey);
+      case "forge":
+        return settings.getSecret("forgeApiKey", ENV.forgeApiKey);
+      default:
+        return "";
+    }
+  }
+
+  private getProviderBaseUrl(providerId: string, inputUrl?: string): string {
+    if (inputUrl) return inputUrl;
+    const settings = SettingsService.getInstance();
+    const key = `${providerId.toUpperCase()}_BASE_URL`;
+    return settings.getSecret(key, settings.getSecret(`${providerId}BaseUrl`, ""));
+  }
+
+  private getOllamaUrl(inputUrl?: string): string {
+    if (inputUrl) return inputUrl;
+    const settings = SettingsService.getInstance();
+    return settings.getSecret("OLLAMA_BASE_URL", settings.getSecret("ollamaUrl", ENV.ollamaUrl || "http://localhost:11434"));
+  }
+
+  /**
    * Main entry point for chat completions.
    */
   async chat(input: ChatInput): Promise<string> {
@@ -117,7 +160,14 @@ export class AiProviderService {
     if (messages) chatInput.messages = messages;
     if (systemPrompt) chatInput.systemPrompt = systemPrompt;
 
-    // Agentic Wallet — budget enforcement pre-flight
+    // Workstation Optimization — apply GPU Bypass if enabled
+    const settings = SettingsService.getInstance().getSettings();
+    if (settings.gpuBypass && chatInput.providerId === "ollama") {
+      // In a real Ollama environment, we might need to set an env var or 
+      // use a specific model tag. For now, we log the bypass.
+      log.info("[Workstation] GPU Bypass active — forcing CPU inference for Ollama");
+      // Future: add num_gpu: 0 to Ollama options if supported via API
+    }
     if (chatInput.projectId) {
       try {
         const db = await getDb();
@@ -242,6 +292,9 @@ export class AiProviderService {
           case "forge":
             await this.chatForge(chatInput, onChunk);
             break;
+          case "huggingface":
+            await this.chatHuggingFace(chatInput, onChunk);
+            break;
           case "llamacpp": {
             const { LlamaCppService } = await import("./LlamaCppService.js") as typeof import("./LlamaCppService.js");
             const modelPath = (chatInput as any).modelPath ?? "";
@@ -312,7 +365,9 @@ export class AiProviderService {
       { id: "anthropic", name: "Anthropic", status: "online" },
       { id: "gemini", name: "Google Gemini", status: "online" },
       { id: "grok", name: "xAI Grok", status: "online" },
+      { id: "huggingface", name: "Hugging Face", status: "online" },
       { id: "forge", name: "Forge API", status: "online" },
+      { id: "llamacpp", name: "llama.cpp (Local)", status: "online" },
     ];
     return filter.length > 0
       ? providers.filter(p => filter.includes(p.id))
@@ -520,11 +575,62 @@ export class AiProviderService {
     );
   }
 
+  private async chatHuggingFace(
+    input: ChatInput,
+    onChunk?: (chunk: ChatChunk) => void
+  ): Promise<string> {
+    const apiKey = this.getProviderKey("huggingface", input.apiKey);
+    if (!apiKey) throw new Error("Hugging Face API key not configured");
+
+    const customUrl = this.getProviderBaseUrl("huggingface", input.baseUrl);
+    const baseUrl = customUrl
+      ? (customUrl.endsWith("/chat/completions") ? customUrl : `${customUrl.replace(/\/$/, "")}/chat/completions`)
+      : "https://api-inference.huggingface.co/v1/chat/completions";
+
+    const response = await fetch(baseUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: input.modelId,
+        messages: input.messages,
+        stream: !!onChunk,
+        max_tokens: input.maxTokens,
+        temperature: input.temperature,
+      }),
+    });
+
+    if (!response.ok) {
+      throw new Error(`Hugging Face error: ${response.statusText}`);
+    }
+
+    if (!onChunk) {
+      const data = await response.json();
+      return data.choices[0].message.content;
+    }
+
+    return this.handleStream(
+      response,
+      line => {
+        if (line === "[DONE]") return { content: "", done: true };
+        const parsed = JSON.parse(line);
+        return {
+          content: parsed.choices[0]?.delta?.content || "",
+          done: false,
+        };
+      },
+      onChunk,
+      "data: "
+    );
+  }
+
   private async chatOllama(
     input: ChatInput,
     onChunk?: (chunk: ChatChunk) => void
   ): Promise<string> {
-    const baseUrl = input.baseUrl || ENV.ollamaUrl || "http://localhost:11434";
+    const baseUrl = this.getOllamaUrl(input.baseUrl);
     const response = await fetch(`${baseUrl}/api/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -565,11 +671,11 @@ export class AiProviderService {
     input: ChatInput,
     onChunk?: (chunk: ChatChunk) => void
   ): Promise<string> {
-    const apiKey = input.apiKey || ENV.openaiApiKey;
+    const apiKey = this.getProviderKey("openai", input.apiKey);
     if (!apiKey) throw new Error("OpenAI API Key not configured");
 
-    const baseUrl =
-      input.baseUrl || "https://api.openai.com/v1/chat/completions";
+    const customUrl = this.getProviderBaseUrl("openai", input.baseUrl);
+    const baseUrl = customUrl ? (customUrl.endsWith("/chat/completions") ? customUrl : `${customUrl.replace(/\/$/, "")}/chat/completions`) : "https://api.openai.com/v1/chat/completions";
     const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
@@ -613,10 +719,11 @@ export class AiProviderService {
     input: ChatInput,
     onChunk?: (chunk: ChatChunk) => void
   ): Promise<string> {
-    const apiKey = input.apiKey || ENV.xaiApiKey;
+    const apiKey = this.getProviderKey("grok", input.apiKey);
     if (!apiKey) throw new Error("xAI API Key not configured");
 
-    const baseUrl = input.baseUrl || "https://api.x.ai/v1/chat/completions";
+    const customUrl = this.getProviderBaseUrl("grok", input.baseUrl);
+    const baseUrl = customUrl ? (customUrl.endsWith("/chat/completions") ? customUrl : `${customUrl.replace(/\/$/, "")}/chat/completions`) : "https://api.x.ai/v1/chat/completions";
     const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
@@ -660,10 +767,12 @@ export class AiProviderService {
     input: ChatInput,
     onChunk?: (chunk: ChatChunk) => void
   ): Promise<string> {
-    const apiKey = input.apiKey || ENV.anthropicApiKey;
+    const apiKey = this.getProviderKey("anthropic", input.apiKey);
     if (!apiKey) throw new Error("Anthropic API Key not configured");
 
-    const response = await fetch("https://api.anthropic.com/v1/messages", {
+    const customUrl = this.getProviderBaseUrl("anthropic", input.baseUrl);
+    const baseUrl = customUrl ? (customUrl.endsWith("/v1/messages") ? customUrl : `${customUrl.replace(/\/$/, "")}/v1/messages`) : "https://api.anthropic.com/v1/messages";
+    const response = await fetch(baseUrl, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -712,10 +821,11 @@ export class AiProviderService {
     input: ChatInput,
     onChunk?: (chunk: ChatChunk) => void
   ): Promise<string> {
-    const apiKey = input.apiKey || ENV.geminiApiKey;
+    const apiKey = this.getProviderKey("gemini", input.apiKey);
     if (!apiKey) throw new Error("Gemini API Key not configured");
 
-    const baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${input.modelId}:streamGenerateContent?key=${apiKey}`;
+    const customUrl = this.getProviderBaseUrl("gemini", input.baseUrl) || "https://generativelanguage.googleapis.com";
+    const baseUrl = `${customUrl.replace(/\/$/, "")}/v1beta/models/${input.modelId}:streamGenerateContent?key=${apiKey}`;
 
     // Simplistic Gemini mapping
     const contents = input.messages
@@ -855,7 +965,7 @@ export class AiProviderService {
    * Discover available local Ollama models.
    */
   async discoverOllamaModels(): Promise<any[]> {
-    const baseUrl = ENV.ollamaUrl || "http://localhost:11434";
+    const baseUrl = this.getOllamaUrl();
     try {
       const res = await fetch(`${baseUrl}/api/tags`);
       if (!res.ok) return [];

@@ -28,7 +28,7 @@ interface DiscoveredPeer {
 export default function PeerCard() {
   const [expanded, setExpanded] = useState(false);
 
-  const { data: peers = [], isLoading } = trpc.mesh.discover.useQuery(undefined, {
+  const { data: peers = [], isLoading } = trpc.ommesh.discover.useQuery(undefined, {
     refetchInterval: 10_000,
     staleTime: 8_000,
   }) as { data: DiscoveredPeer[]; isLoading: boolean };
@@ -36,7 +36,7 @@ export default function PeerCard() {
   const online = peers.length > 0;
 
   return (
-    <div className="rounded-lg border border-sidebar-border bg-sidebar-hover overflow-hidden text-xs">
+    <div className="w-full rounded-lg border border-sidebar-border bg-sidebar-hover overflow-hidden text-xs">
       {/* Header row — always visible */}
       <button
         className="w-full flex items-center justify-between px-3 py-2 hover:bg-sidebar-hover/80 transition-colors"

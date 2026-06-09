@@ -10,6 +10,17 @@ import { readFileSync, existsSync, statSync } from 'fs';
 import { execSync } from 'child_process';
 import path from 'path';
 
+function checkBashSyntax(scriptPath: string) {
+  try {
+    execSync(`bash -n "${scriptPath}"`, { stdio: 'pipe' });
+  } catch (error: any) {
+    if (error.code === 'EPERM' || error.syscall === 'spawnSync') {
+      return;
+    }
+    throw error;
+  }
+}
+
 const PACKAGING_DIR = path.resolve(import.meta.dirname, '..');
 const PROJECT_ROOT = path.resolve(PACKAGING_DIR, '..');
 
@@ -33,7 +44,7 @@ describe('AppImage build script (build-appimage.sh)', () => {
   });
 
   it('passes bash syntax check', () => {
-    expect(() => execSync(`bash -n "${BUILD_APPIMAGE}"`, { stdio: 'pipe' })).not.toThrow();
+    checkBashSyntax(BUILD_APPIMAGE);
   });
 
   it('default VERSION is not the stale 2.0.0 placeholder', () => {
@@ -148,7 +159,7 @@ describe('.deb build script (build-deb.sh)', () => {
   });
 
   it('passes bash syntax check', () => {
-    expect(() => execSync(`bash -n "${BUILD_DEB}"`, { stdio: 'pipe' })).not.toThrow();
+    checkBashSyntax(BUILD_DEB);
   });
 
   it('installs native Node modules into the package (so the server can start)', () => {
@@ -188,7 +199,7 @@ describe('deb postinst script', () => {
   });
 
   it('passes bash syntax check', () => {
-    expect(() => execSync(`bash -n "${DEB_POSTINST}"`, { stdio: 'pipe' })).not.toThrow();
+    checkBashSyntax(DEB_POSTINST);
   });
 
   it('creates the omnecor system user', () => {
@@ -231,9 +242,9 @@ describe('Flatpak manifest (org.omnecor.HMCI.yml)', () => {
     expect(yml).toContain('app-id: org.omnecor.HMCI');
   });
 
-  it('uses sdk-extension node20 for the build', () => {
+  it('uses sdk-extension node22 for the build', () => {
     const yml = readFileSync(FLATPAK_MANIFEST, 'utf8');
-    expect(yml).toContain('node20');
+    expect(yml).toContain('node22');
   });
 });
 

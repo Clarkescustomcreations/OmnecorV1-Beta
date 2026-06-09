@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { toast } from "sonner";
 import {
   Card,
   CardContent,
@@ -12,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Brain, Box, Zap, Play, Settings, Plus, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { trpc } from "@/lib/trpc";
 import {
   getModuleInfo,
   type LLMBuilderSession,
@@ -39,6 +41,71 @@ export default function SpecializedModuleLauncher({
   const [blenderProject, setBlenderProject] = useState<BlenderProject | null>(null);
   const [pcbProject, setPCBProject] = useState<PCBProject | null>(null);
 
+  const openInBlenderMutation = trpc.blender.openFile.useMutation({
+    onSuccess: (d) => {
+      const name = d.file ? d.file.split("/").pop() : null;
+      toast.success(name ? `Opened ${name} in Blender` : "Blender launched");
+    },
+    onError: (e) => toast.error("Failed to launch Blender: " + e.message),
+  });
+
+  const openInKicadMutation = trpc.kicad.openProject.useMutation({
+    onSuccess: (d) => {
+      const name = d.file ? d.file.split("/").pop() : null;
+      toast.success(name ? `Opened ${name} in KiCad` : "KiCad launched");
+    },
+    onError: (e) => toast.error("Failed to launch KiCad: " + e.message),
+  });
+  const handleCreateSession = () => {
+    toast.info("Creating new fine-tuning session...");
+    setLLMSession({
+      id: "new-session",
+      name: "New Fine-tuning Task",
+      baseModel: "Qwen/Qwen1.5-1.8B",
+      status: "idle",
+      progress: 0,
+      loraConfigs: [],
+      trainingMetrics: [],
+      createdAt: new Date(),
+      updatedAt: new Date(),
+    });
+  };
+
+  const handleStartTraining = () => {
+    if (!llmSession) return;
+    setLLMSession({ ...llmSession, status: "training" });
+    toast.success("Training started!");
+  };
+
+  const handleNewProject = (type: "3d" | "pcb") => {
+    if (type === "3d") {
+      setBlenderProject({
+        id: "new-blender",
+        name: "New Scene",
+        filePath: "/projects/scene_01.blend",
+        status: "idle",
+        objects: [],
+        description: "",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      toast.success("New Blender project created");
+    } else {
+      setPCBProject({
+        id: "new-pcb",
+        name: "New Board",
+        status: "idle",
+        components: [],
+        nets: [],
+        filePath: "",
+        description: "",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      });
+      toast.success("New KiCad project created");
+    }
+  };
+
   const getLLMBuilderContent = () => {
     if (!llmSession) {
       return (
@@ -49,7 +116,7 @@ export default function SpecializedModuleLauncher({
             <p className="text-sm text-muted-foreground mb-4">
               Create a new LLM fine-tuning session to get started.
             </p>
-            <Button size="sm">
+            <Button size="sm" onClick={handleCreateSession}>
               <Plus className="w-4 h-4 mr-2" />
               Create Session
             </Button>
@@ -118,7 +185,7 @@ export default function SpecializedModuleLauncher({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">LoRA Configurations</CardTitle>
-            <Button size="sm" variant="outline">
+            <Button size="sm" variant="outline" onClick={() => toast.info("LoRA config creation — open UnslothPanel from the 3D Designer page to configure training parameters")}>
               <Plus className="w-4 h-4 mr-2" />
               New Config
             </Button>
@@ -139,7 +206,7 @@ export default function SpecializedModuleLauncher({
                       {config.epochs}
                     </p>
                   </div>
-                  <Button size="sm" variant="ghost" aria-label={`Configure ${config.name}`}>
+                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${config.name}`} onClick={() => toast.info(`Editing LoRA config: ${config.name} — rank ${config.rank}, alpha ${config.alpha}`)}>
                     <Settings className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
@@ -189,11 +256,11 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1" aria-label="Start LLM training">
+        <Button className="flex-1" aria-label="Start LLM training" onClick={handleStartTraining}>
           <Play className="w-4 h-4 mr-2" aria-hidden="true" />
           Start Training
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure LLM training">
+        <Button variant="outline" className="flex-1" aria-label="Configure LLM training" onClick={() => toast.info("Configure fine-tuning via Unsloth panel — navigate to 3D Designer > LLM tab")}>
           <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Configure
         </Button>
@@ -212,7 +279,7 @@ export default function SpecializedModuleLauncher({
             <p className="text-sm text-muted-foreground mb-4">
               Create a new Blender project to start 3D modeling.
             </p>
-            <Button size="sm">
+            <Button size="sm" onClick={() => handleNewProject("3d")}>
               <Plus className="w-4 h-4 mr-2" />
               New Project
             </Button>
@@ -276,7 +343,16 @@ export default function SpecializedModuleLauncher({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">Scene Objects</CardTitle>
-            <Button size="sm" variant="outline">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (!blenderProject) return;
+                const newObj = { name: `Object_${blenderProject.objects.length + 1}`, type: "MESH", position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number], scale: [1, 1, 1] as [number, number, number] };
+                setBlenderProject({ ...blenderProject, objects: [...blenderProject.objects, newObj] });
+                toast.success("Object added to scene — open Blender to place it");
+              }}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Object
             </Button>
@@ -296,7 +372,7 @@ export default function SpecializedModuleLauncher({
                       Type: {obj.type} | Pos: ({obj.position.join(", ")})
                     </p>
                   </div>
-                  <Button size="sm" variant="ghost" aria-label={`Configure ${obj.name}`}>
+                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${obj.name}`} onClick={() => toast.info(`${obj.name}: type=${obj.type}, pos=(${obj.position.join(", ")})`)}>
                     <Settings className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
@@ -310,11 +386,20 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1" aria-label="Open project in Blender">
+        <Button
+          className="flex-1"
+          aria-label="Open project in Blender"
+          disabled={openInBlenderMutation.isPending}
+          onClick={() => {
+            openInBlenderMutation.mutate({
+              filePath: blenderProject?.filePath || undefined,
+            });
+          }}
+        >
           <Box className="w-4 h-4 mr-2" aria-hidden="true" />
-          Open in Blender
+          {openInBlenderMutation.isPending ? "Opening…" : "Open in Blender"}
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure 3D Modeler settings">
+        <Button variant="outline" className="flex-1" aria-label="Configure 3D Modeler settings" onClick={() => toast.info("Blender settings — configure in Settings > Hardware")}>
           <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Settings
         </Button>
@@ -333,7 +418,7 @@ export default function SpecializedModuleLauncher({
             <p className="text-sm text-muted-foreground mb-4">
               Create a new KiCad project to start PCB design.
             </p>
-            <Button size="sm">
+            <Button size="sm" onClick={() => handleNewProject("pcb")}>
               <Plus className="w-4 h-4 mr-2" />
               New Project
             </Button>
@@ -402,7 +487,16 @@ export default function SpecializedModuleLauncher({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">Components</CardTitle>
-            <Button size="sm" variant="outline">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                if (!pcbProject) return;
+                const ref = `C${pcbProject.components.length + 1}`;
+                setPCBProject({ ...pcbProject, components: [...pcbProject.components, { reference: ref, value: "100nF", footprint: "C_0402", position: [0, 0] as [number, number], rotation: 0 }] });
+                toast.success(`Component ${ref} added`);
+              }}
+            >
               <Plus className="w-4 h-4 mr-2" />
               Add Component
             </Button>
@@ -432,11 +526,20 @@ export default function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1" aria-label="Open project in KiCad">
+        <Button
+          className="flex-1"
+          aria-label="Open project in KiCad"
+          disabled={openInKicadMutation.isPending}
+          onClick={() => {
+            openInKicadMutation.mutate({
+              filePath: pcbProject?.filePath || undefined,
+            });
+          }}
+        >
           <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
-          Open in KiCad
+          {openInKicadMutation.isPending ? "Opening…" : "Open in KiCad"}
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure PCB Designer settings">
+        <Button variant="outline" className="flex-1" aria-label="Configure PCB Designer settings" onClick={() => toast.info("KiCad settings — configure in Settings > Hardware")}>
           <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Settings
         </Button>

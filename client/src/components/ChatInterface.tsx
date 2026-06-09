@@ -21,13 +21,41 @@ import {
   Settings2,
   ChevronDown,
   ChevronUp,
+  Save,
+  Terminal,
+  Eye,
+  Clock,
+  Coins,
+  Brain,
+  Zap,
+  Activity,
+  BookOpenText,
+  ShieldAlert,
+  UserCircle2,
 } from "lucide-react";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
+import { Switch } from "@/components/ui/switch";
+import { Label } from "@/components/ui/label";
 import { cn } from "@/lib/utils";
 import { Streamdown } from "streamdown";
 import { toast } from "sonner";
 import type { ChatMessage, ContextFile, SelectedModel } from "@/lib/chatContext";
 import ChatInput, { type SlashCommand } from "@/components/chat/ChatInput";
 import ModelSelector from "@/components/chat/ModelSelector";
+import { saveScript } from "@/lib/scriptStorage";
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogFooter,
+} from "@/components/ui/dialog";
+import { Input } from "@/components/ui/input";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 // ---------------------------------------------------------------------------
 // Code-block copy button injection (runs after Streamdown renders to DOM)
@@ -97,6 +125,9 @@ interface AssistantBubbleProps {
   onDelete: () => void;
   copied: boolean;
   isLast: boolean;
+  showTimestamps?: boolean;
+  showTokenCounts?: boolean;
+  onOpenPreview?: (mode: "3d" | "pcb" | "web", code: string) => void;
 }
 
 function AssistantBubble({
@@ -106,9 +137,76 @@ function AssistantBubble({
   onDelete,
   copied,
   isLast,
+  showTimestamps = true,
+  showTokenCounts = true,
+  onOpenPreview,
 }: AssistantBubbleProps) {
   const contentRef = useRef<HTMLDivElement>(null);
+  const [showSaveDialog, setShowSaveDialog] = useState(false);
+  const [scriptName, setScriptName] = useState("");
+  const [scriptProject, setScriptProject] = useState("");
+  const [extractedCode, setExtractedCode] = useState("");
+
   useCodeBlockCopy(contentRef, message.content);
+
+  const handleSaveScriptClick = useCallback(() => {
+    // Extract first python code block
+    const pythonMatch = message.content.match(/```(?:python|py)\n([\s\S]*?)```/);
+    if (pythonMatch) {
+      setExtractedCode(pythonMatch[1]);
+      setScriptName(`script_${Date.now().toString(36)}`);
+      setShowSaveDialog(true);
+    } else {
+      toast.error("No Python code block found in this message");
+    }
+  }, [message.content]);
+
+  const confirmSave = () => {
+    if (!scriptName.trim()) {
+      toast.error("Please provide a name for the script");
+      return;
+    }
+    saveScript({
+      name: scriptName.trim(),
+      project: scriptProject.trim() || "Default",
+      code: extractedCode,
+      language: "python",
+      description: `Saved from chat: ${message.content.slice(0, 100)}...`,
+    });
+    setShowSaveDialog(false);
+    toast.success(`Script "${scriptName}" saved to ${scriptProject || "Default"}`);
+    // Trigger sidebar update
+    window.dispatchEvent(new CustomEvent("omnecor:scripts_updated"));
+  };
+
+  const hasPython = message.content.includes("```python") || message.content.includes("```py");
+  const hasHtml = message.content.includes("```html");
+  const hasReactThree = message.content.includes("```tsx") && message.content.includes("@react-three");
+  const hasReactFlow = message.content.includes("```tsx") && message.content.includes("reactflow");
+  const hasPreviewable = hasHtml || hasReactThree || hasReactFlow;
+
+  const handleLivePreviewClick = useCallback(() => {
+    if (!onOpenPreview) return;
+    
+    let mode: "3d" | "pcb" | "web" = "web";
+    let code = "";
+    
+    if (hasReactThree) {
+      mode = "3d";
+      const match = message.content.match(/```(?:tsx|jsx)\n([\s\S]*?)```/);
+      if (match) code = match[1];
+    } else if (hasReactFlow) {
+      mode = "pcb";
+      const match = message.content.match(/```(?:tsx|jsx)\n([\s\S]*?)```/);
+      if (match) code = match[1];
+    } else if (hasHtml) {
+      mode = "web";
+      const match = message.content.match(/```html\n([\s\S]*?)```/);
+      if (match) code = match[1];
+    }
+    
+    onOpenPreview(mode, code);
+  }, [hasHtml, hasReactThree, hasReactFlow, message.content, onOpenPreview]);
 
   return (
     <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 group">
@@ -118,7 +216,7 @@ function AssistantBubble({
       </div>
 
       <div className="flex flex-col gap-1 max-w-2xl xl:max-w-3xl min-w-0">
-        <div className="rounded-lg px-4 py-3 bg-card border border-border text-card-foreground text-sm">
+        <div className="rounded-lg px-4 py-3 bg-card border border-border text-card-foreground text-sm shadow-sm">
           <div ref={contentRef} className="prose-sm prose dark:prose-invert max-w-none break-words">
             <Streamdown>{message.content}</Streamdown>
           </div>
@@ -132,13 +230,41 @@ function AssistantBubble({
 
         {/* Footer: timestamp + tokens + actions */}
         <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] text-muted-foreground/60">
-            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </span>
-          {message.tokens !== undefined && (
+          {showTimestamps && (
+            <span className="text-[10px] text-muted-foreground/60">
+              {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+          {showTokenCounts && message.tokens !== undefined && (
             <span className="text-[10px] text-muted-foreground/60">
               {message.tokens.toLocaleString()} tokens
             </span>
+          )}
+
+          {/* Action: Live Preview */}
+          {hasPreviewable && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-5 text-[10px] px-1.5 gap-1 border-purple-500/30 text-purple-500 bg-purple-500/5 hover:bg-purple-500/10"
+              onClick={handleLivePreviewClick}
+            >
+              <Eye className="w-2.5 h-2.5" />
+              Live Preview
+            </Button>
+          )}
+
+          {/* Action: Save Script (always visible if python present) */}
+          {hasPython && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="h-5 text-[10px] px-1.5 gap-1 border-blue-500/30 text-blue-500 bg-blue-500/5 hover:bg-blue-500/10"
+              onClick={handleSaveScriptClick}
+            >
+              <Save className="w-2.5 h-2.5" />
+              Save Script
+            </Button>
           )}
 
           {/* Hover actions */}
@@ -170,22 +296,6 @@ function AssistantBubble({
             <Button
               size="icon"
               variant="ghost"
-              className="h-5 w-5 hover:text-green-500"
-              title="Good response"
-            >
-              <ThumbsUp className="w-3 h-3" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-5 w-5 hover:text-destructive"
-              title="Bad response"
-            >
-              <ThumbsDown className="w-3 h-3" />
-            </Button>
-            <Button
-              size="icon"
-              variant="ghost"
               className="h-5 w-5 hover:text-destructive"
               onClick={onDelete}
               title="Delete message"
@@ -195,6 +305,41 @@ function AssistantBubble({
           </div>
         </div>
       </div>
+
+      {/* Save Script Dialog */}
+      <Dialog open={showSaveDialog} onOpenChange={setShowSaveDialog}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <Terminal className="w-5 h-5 text-blue-500" />
+              Save Python Script
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Script Name</label>
+              <Input
+                value={scriptName}
+                onChange={e => setScriptName(e.target.value)}
+                placeholder="e.g. data-sorter-v1"
+                autoFocus
+              />
+            </div>
+            <div className="space-y-1.5">
+              <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Project / Folder</label>
+              <Input
+                value={scriptProject}
+                onChange={e => setScriptProject(e.target.value)}
+                placeholder="e.g. Finance App"
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(false)}>Cancel</Button>
+            <Button size="sm" onClick={confirmSave}>Save to Library</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
@@ -208,9 +353,19 @@ interface UserBubbleProps {
   onEdit: (newContent: string) => void;
   onDelete: () => void;
   copied: boolean;
+  showTimestamps?: boolean;
+  showTokenCounts?: boolean;
 }
 
-function UserBubble({ message, onCopy, onEdit, onDelete, copied }: UserBubbleProps) {
+function UserBubble({
+  message,
+  onCopy,
+  onEdit,
+  onDelete,
+  copied,
+  showTimestamps = true,
+  showTokenCounts = true,
+}: UserBubbleProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
 
@@ -229,7 +384,7 @@ function UserBubble({ message, onCopy, onEdit, onDelete, copied }: UserBubblePro
   return (
     <div className="flex gap-3 justify-end animate-in fade-in slide-in-from-bottom-2 group">
       <div className="flex flex-col gap-1 items-end max-w-xl min-w-0">
-        <div className="rounded-lg px-4 py-3 bg-accent text-accent-foreground text-sm w-full">
+        <div className="rounded-lg px-4 py-3 bg-accent text-accent-foreground text-sm w-full shadow-sm">
           {editing ? (
             <div className="flex flex-col gap-2">
               <Textarea
@@ -272,10 +427,12 @@ function UserBubble({ message, onCopy, onEdit, onDelete, copied }: UserBubblePro
 
         {/* Footer */}
         <div className="flex items-center gap-2 px-1">
-          <span className="text-[10px] text-muted-foreground/60">
-            {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
-          </span>
-          {message.tokens !== undefined && (
+          {showTimestamps && (
+            <span className="text-[10px] text-muted-foreground/60">
+              {message.timestamp.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })}
+            </span>
+          )}
+          {showTokenCounts && message.tokens !== undefined && (
             <span className="text-[10px] text-muted-foreground/60">
               {message.tokens.toLocaleString()} tokens
             </span>
@@ -336,6 +493,7 @@ export interface ChatInterfaceProps {
   isLoading?: boolean;
   conversationTitle?: string;
   selectedModel?: SelectedModel;
+  conversationId?: string;
   contextFiles?: ContextFile[];
   systemPrompt?: string;
   showSystemPrompt?: boolean;
@@ -355,12 +513,21 @@ export interface ChatInterfaceProps {
   onStop?: () => void;
   onCommand?: (cmd: SlashCommand) => void | Promise<void>;
   onBtw?: (note: string) => void;
+  onToggleMemory?: () => void;
+  onToggleTerminal?: () => void;
+  onToggleCliTerminal?: () => void;
+
+  isFictionMode?: boolean;
+  fictionPersonas?: Array<{ id: string; name: string }>;
+  fictionPersonaId?: string;
+  onFictionPersonaChange?: (id: string) => void;
 
   tokenCount?: number;
   maxTokens?: number;
 
   excludedMessageIds?: Set<string>;
   onToggleExclusion?: (id: string) => void;
+  onOpenPreview?: (mode: "3d" | "pcb" | "web", code: string) => void;
 
   className?: string;
 }
@@ -373,6 +540,7 @@ export default function ChatInterface({
   isLoading = false,
   conversationTitle = "Conversation",
   selectedModel,
+  conversationId,
   contextFiles = [],
   systemPrompt = "",
   showSystemPrompt = false,
@@ -391,16 +559,54 @@ export default function ChatInterface({
   onStop,
   onCommand,
   onBtw,
+  onToggleMemory,
+  onToggleTerminal,
+  onToggleCliTerminal,
+  isFictionMode = false,
+  fictionPersonas = [],
+  fictionPersonaId = "",
+  onFictionPersonaChange,
   tokenCount,
   maxTokens,
   excludedMessageIds,
   onToggleExclusion,
+  onOpenPreview,
   className,
 }: ChatInterfaceProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [editingTitle, setEditingTitle] = useState(false);
   const [titleDraft, setTitleDraft] = useState(conversationTitle);
   const scrollRef = useRef<HTMLDivElement>(null);
+
+  // Chat-specific display settings
+  const [chatSettings, setChatSettings] = useState(() => {
+    try {
+      const saved = localStorage.getItem("omnecor:chat_display_settings");
+      return saved ? JSON.parse(saved) : {
+        showTimestamps: true,
+        showTokenCounts: true,
+        showModelName: true,
+        showLatency: false,
+        autoStoreMemory: true,
+      };
+    } catch {
+      return {
+        showTimestamps: true,
+        showTokenCounts: true,
+        showModelName: true,
+        showLatency: false,
+        autoStoreMemory: true,
+      };
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem("omnecor:chat_display_settings", JSON.stringify(chatSettings));
+  }, [chatSettings]);
+
+  const toggleSetting = (key: keyof typeof chatSettings) => {
+    setChatSettings((prev: any) => ({ ...prev, [key]: !prev[key] }));
+  };
 
   // Sync title draft when prop changes (switching conversations)
   useEffect(() => {
@@ -423,9 +629,6 @@ export default function ChatInterface({
     setEditingTitle(false);
   };
 
-  const totalTokens = messages.reduce((s, m) => s + (m.tokens ?? 0), 0);
-  const lastAssistantIdx = messages.map(m => m.role).lastIndexOf("assistant");
-
   const handleCommand = useCallback(
     (cmd: SlashCommand) => {
       if (cmd === "help") {
@@ -441,7 +644,40 @@ export default function ChatInterface({
   );
 
   return (
-    <Card className={cn("flex flex-col h-full overflow-hidden", className)}>
+    <Card className={cn(
+      "flex flex-col h-full overflow-hidden transition-all duration-300",
+      isFictionMode && "border-purple-500/60 shadow-[0_0_18px_-4px_theme(colors.purple.500/0.35)]",
+      className
+    )}>
+      {/* ── Fiction Mode Persistent Banner ─────────────────────────── */}
+      {isFictionMode && (
+        <div className="flex items-center gap-2 px-4 py-2 bg-purple-950/60 border-b border-purple-500/40 flex-shrink-0 flex-wrap">
+          <BookOpenText className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+          <span className="text-xs font-semibold text-purple-300 tracking-wide">FICTION MODE</span>
+          <span className="text-[10px] text-purple-400/70 hidden sm:inline">Creative writing &amp; roleplay only</span>
+          {/* Persona selector */}
+          <div className="flex items-center gap-1.5 ml-1">
+            <UserCircle2 className="w-3 h-3 text-purple-400/70 flex-shrink-0" />
+            <select
+              value={fictionPersonaId}
+              onChange={e => onFictionPersonaChange?.(e.target.value)}
+              className="text-[10px] bg-purple-900/50 border border-purple-500/30 rounded px-1.5 py-0.5 text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500/50 max-w-[130px]"
+              title="Active fiction persona"
+            >
+              <option value="">No persona</option>
+              {fictionPersonas.map(p => (
+                <option key={p.id} value={p.id}>{p.name}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex-1" />
+          <div className="flex items-center gap-1 text-[10px] text-purple-400/60">
+            <ShieldAlert className="w-3 h-3" />
+            <span className="hidden md:inline">Terminal · Agent Net · Wallet · Cloud blocked</span>
+            <span className="md:hidden">Restricted</span>
+          </div>
+        </div>
+      )}
       {/* ── Header ─────────────────────────────────────────────────── */}
       <CardHeader className="border-b border-border px-4 py-2.5 flex-shrink-0">
         <div className="flex items-center gap-2 flex-wrap">
@@ -472,53 +708,157 @@ export default function ChatInterface({
           )}
 
           {/* Model selector */}
-          <ModelSelector
-            selectedModel={selectedModel}
-            onSelect={model => onModelChange?.(model)}
-          />
+          {chatSettings.showModelName && (
+            <ModelSelector
+              selectedModel={selectedModel}
+              onSelect={model => onModelChange?.(model)}
+            />
+          )}
 
           {/* Spacer */}
           <div className="flex-1" />
 
-          {/* Token count */}
-          <Badge variant="outline" className="text-[10px] hidden sm:flex">
-            {messages.length} msgs · {totalTokens.toLocaleString()} tokens
-          </Badge>
+          {/* Display Settings Popover */}
+          <Popover>
+            <HowToTooltip title="Display Settings" description="Adjust chat visuals like timestamps, token counts, and model names. Controls how messages appear.">
+              <PopoverTrigger asChild>
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-7 w-7"
+                >
+                  <Eye className="w-3.5 h-3.5" />
+                </Button>
+              </PopoverTrigger>
+            </HowToTooltip>
+            <PopoverContent className="w-64 p-4" align="end">
+                <div className="space-y-4">
+                  <div className="space-y-1">
+                    <h4 className="text-sm font-semibold flex items-center gap-2">
+                      <Eye className="w-4 h-4" /> Display Options
+                    </h4>
+                    <p className="text-[11px] text-muted-foreground">Adjust how messages are rendered</p>
+                  </div>
+                  
+                  <div className="space-y-3 pt-2">
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="s-timestamps" className="text-xs cursor-pointer flex items-center gap-2">
+                        <Clock className="w-3 h-3" /> Show Timestamps
+                      </Label>
+                      <Switch 
+                        id="s-timestamps" 
+                        checked={chatSettings.showTimestamps} 
+                        onCheckedChange={() => toggleSetting("showTimestamps")} 
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="s-tokens" className="text-xs cursor-pointer flex items-center gap-2">
+                        <Coins className="w-3 h-3" /> Show Token Counts
+                      </Label>
+                      <Switch 
+                        id="s-tokens" 
+                        checked={chatSettings.showTokenCounts} 
+                        onCheckedChange={() => toggleSetting("showTokenCounts")} 
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="s-modelname" className="text-xs cursor-pointer flex items-center gap-2">
+                        <Zap className="w-3 h-3" /> Show Model Selector
+                      </Label>
+                      <Switch 
+                        id="s-modelname" 
+                        checked={chatSettings.showModelName} 
+                        onCheckedChange={() => toggleSetting("showModelName")} 
+                      />
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <Label htmlFor="s-latency" className="text-xs cursor-pointer flex items-center gap-2">
+                        <Activity className="w-3 h-3" /> Show Latency/Cost
+                      </Label>
+                      <Switch 
+                        id="s-latency" 
+                        checked={chatSettings.showLatency} 
+                        onCheckedChange={() => toggleSetting("showLatency")} 
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-1 pt-2 border-t">
+                    <h4 className="text-sm font-semibold flex items-center gap-2 pt-2">
+                      <Brain className="w-4 h-4" /> Memory System
+                    </h4>
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <div className="space-y-0.5">
+                      <Label htmlFor="s-memory" className="text-xs cursor-pointer">Auto-Store Memory</Label>
+                      <p className="text-[10px] text-muted-foreground">Sync to Honcho</p>
+                    </div>
+                    <Switch 
+                      id="s-memory" 
+                      checked={chatSettings.autoStoreMemory} 
+                      onCheckedChange={() => toggleSetting("autoStoreMemory")} 
+                    />
+                  </div>
+                </div>
+              </PopoverContent>
+          </Popover>
+
+          {/* Message count */}
+          <HowToTooltip title="Message History" description="Total number of messages in this session. Helps you track conversation length.">
+            <Badge variant="outline" className="text-[10px] hidden sm:flex cursor-help">
+              {messages.length} messages
+            </Badge>
+          </HowToTooltip>
 
           {/* System prompt toggle */}
-          <Button
-            size="icon"
-            variant={showSystemPrompt ? "secondary" : "ghost"}
-            className="h-7 w-7"
-            onClick={onToggleSystemPrompt}
-            title="System prompt"
-          >
-            <Settings2 className="w-3.5 h-3.5" />
-          </Button>
+          <HowToTooltip title="System Prompt" description="Edit the base instructions for the AI. This defines its 'personality' and core rules for the current chat.">
+            <Button
+              size="icon"
+              variant={showSystemPrompt ? "secondary" : "ghost"}
+              className="h-7 w-7"
+              onClick={onToggleSystemPrompt}
+            >
+              <Settings2 className="w-3.5 h-3.5" />
+            </Button>
+          </HowToTooltip>
+
+          {/* Memory Archiver Toggle */}
+          <HowToTooltip title="Memory Archiver" description="Compress chat history into dense insights and save them to long-term episodic memory.">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 text-accent"
+              onClick={onToggleMemory}
+            >
+              <Brain className="w-3.5 h-3.5" />
+            </Button>
+          </HowToTooltip>
 
           {/* Export */}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7"
-            onClick={onExport}
-            title="Export conversation"
-            disabled={messages.length === 0}
-          >
-            <Download className="w-3.5 h-3.5" />
-          </Button>
+          <HowToTooltip title="Export to Markdown" description="Save this entire conversation as a .md file for documentation or reference elsewhere.">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7"
+              onClick={onExport}
+              disabled={messages.length === 0}
+            >
+              <Download className="w-3.5 h-3.5" />
+            </Button>
+          </HowToTooltip>
 
           {/* Clear */}
-          <Button
-            size="icon"
-            variant="ghost"
-            className="h-7 w-7 hover:text-destructive"
-            onClick={onClearHistory}
-            disabled={messages.length === 0}
-            title="Clear history"
-          >
-            <Trash2 className="w-3.5 h-3.5" />
-          </Button>
+          <HowToTooltip title="Clear Chat" description="Wipes all messages and starts a fresh conversation. Careful: this cannot be undone.">
+            <Button
+              size="icon"
+              variant="ghost"
+              className="h-7 w-7 hover:text-destructive"
+              onClick={onClearHistory}
+              disabled={messages.length === 0}
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </Button>
+          </HowToTooltip>
         </div>
       </CardHeader>
 
@@ -573,6 +913,7 @@ export default function ChatInterface({
             messages.map((msg, idx) => {
               if (msg.role !== "assistant" && msg.role !== "user") return null;
               const excluded = excludedMessageIds?.has(msg.id) ?? false;
+              const lastAssistantIdx = messages.map(m => m.role).lastIndexOf("assistant");
               return (
                 <div
                   key={msg.id}
@@ -586,6 +927,9 @@ export default function ChatInterface({
                       onCopy={() => handleCopy(msg.content, msg.id)}
                       onRetry={() => onRetry?.()}
                       onDelete={() => onDeleteMessage?.(msg.id)}
+                      showTimestamps={chatSettings.showTimestamps}
+                      showTokenCounts={chatSettings.showTokenCounts}
+                      onOpenPreview={onOpenPreview}
                     />
                   ) : (
                     <UserBubble
@@ -594,6 +938,8 @@ export default function ChatInterface({
                       onCopy={() => handleCopy(msg.content, msg.id)}
                       onEdit={newContent => onEditMessage?.(msg.id, newContent)}
                       onDelete={() => onDeleteMessage?.(msg.id)}
+                      showTimestamps={chatSettings.showTimestamps}
+                      showTokenCounts={chatSettings.showTokenCounts}
                     />
                   )}
                   {onToggleExclusion && (
@@ -622,10 +968,14 @@ export default function ChatInterface({
           onStop={() => onStop?.()}
           onCommand={handleCommand}
           onBtw={onBtw}
+          onToggleCliTerminal={onToggleCliTerminal}
+          onToggleSandbox={onToggleTerminal}
           contextFiles={contextFiles}
           isLoading={isLoading}
           tokenCount={tokenCount}
           maxTokens={maxTokens}
+          sessionId={conversationId}
+          selectedModel={selectedModel}
         />
       </div>
     </Card>

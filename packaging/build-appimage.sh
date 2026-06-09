@@ -31,7 +31,7 @@ APP_NAME="Omnecor"
 ARCH="x86_64"
 
 DIST_DIR="$PROJECT_ROOT/dist"
-BUILD_DIR="$DIST_DIR/appimage-build"
+BUILD_DIR="$PROJECT_ROOT/packaging/appimage-build"
 APP_DIR="$BUILD_DIR/${APP_NAME}.AppDir"
 
 # AppImageTool URL
@@ -157,33 +157,15 @@ DESKTOP
 # Copy to standard location too
 cp "$APP_DIR/omnecor.desktop" "$APP_DIR/usr/share/applications/"
 
-# Create a placeholder icon (SVG)
-cat > "$APP_DIR/omnecor.svg" << 'ICON'
-<?xml version="1.0" encoding="UTF-8"?>
-<svg width="256" height="256" viewBox="0 0 256 256" xmlns="http://www.w3.org/2000/svg">
-  <defs>
-    <linearGradient id="bg" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#1a1a2e"/>
-      <stop offset="100%" style="stop-color:#16213e"/>
-    </linearGradient>
-    <linearGradient id="glow" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" style="stop-color:#0f3460"/>
-      <stop offset="100%" style="stop-color:#533483"/>
-    </linearGradient>
-  </defs>
-  <rect width="256" height="256" rx="40" fill="url(#bg)"/>
-  <circle cx="128" cy="128" r="60" fill="none" stroke="url(#glow)" stroke-width="4"/>
-  <circle cx="128" cy="128" r="20" fill="#e94560"/>
-  <line x1="128" y1="68" x2="128" y2="40" stroke="#e94560" stroke-width="3"/>
-  <line x1="128" y1="188" x2="128" y2="216" stroke="#e94560" stroke-width="3"/>
-  <line x1="68" y1="128" x2="40" y2="128" stroke="#e94560" stroke-width="3"/>
-  <line x1="188" y1="128" x2="216" y2="128" stroke="#e94560" stroke-width="3"/>
-  <text x="128" y="240" text-anchor="middle" fill="#ffffff" font-size="20" font-family="monospace">OMNECOR</text>
-</svg>
-ICON
+# Copy real icons from assets
+cp "$PROJECT_ROOT/assets/logo_mark_256.png" "$APP_DIR/omnecor.png"
+cp "$PROJECT_ROOT/assets/logo_mark_256.png" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/omnecor.png"
 
-# Also copy as PNG location reference
-cp "$APP_DIR/omnecor.svg" "$APP_DIR/usr/share/icons/hicolor/256x256/apps/omnecor.svg"
+# Add more sizes for better system integration
+mkdir -p "$APP_DIR/usr/share/icons/hicolor/512x512/apps"
+mkdir -p "$APP_DIR/usr/share/icons/hicolor/1024x1024/apps"
+cp "$PROJECT_ROOT/assets/logo_mark_512.png" "$APP_DIR/usr/share/icons/hicolor/512x512/apps/omnecor.png"
+cp "$PROJECT_ROOT/assets/app_icon_1024.png" "$APP_DIR/usr/share/icons/hicolor/1024x1024/apps/omnecor.png"
 
 # ---------------------------------------------------------------------------
 # Build AppImage

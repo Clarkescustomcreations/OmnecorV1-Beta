@@ -90,6 +90,8 @@ export const walletRouter = router({
     }),
 
   /** Get recent spend log entries for a project (read-only). */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getSpendLog: protectedProcedure
     .input(getSpendLogSchema)
     .query(async ({ input }) => {
@@ -136,6 +138,8 @@ export const walletRouter = router({
     }),
 
   /** Reset (delete) all spend log entries for a project. Requires explicit confirmation. */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   resetSpend: protectedProcedure
     .input(z.object({ projectId: projectIdSchema, confirm: z.literal(true) }))
     .mutation(async ({ input }) => {

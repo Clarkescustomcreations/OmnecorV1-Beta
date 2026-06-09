@@ -8,7 +8,6 @@ export const mcpRouter = router({
   listConnectedServers: protectedProcedure.query(() => {
     return MCPClientService.getInstance().listConnectedServers();
   }),
-
   connectServer: protectedProcedure
     .input(
       z.object({
@@ -36,7 +35,6 @@ export const mcpRouter = router({
         .catch(() => {});
       return { connected: true };
     }),
-
   disconnectServer: protectedProcedure
     .input(z.object({ serverId: z.string() }))
     .mutation(async ({ ctx, input }) => {
@@ -55,13 +53,11 @@ export const mcpRouter = router({
         .catch(() => {});
       return { disconnected: true };
     }),
-
   listTools: protectedProcedure
     .input(z.object({ serverId: z.string().optional() }))
     .query(({ input }) => {
       return MCPClientService.getInstance().listTools(input.serverId);
     }),
-
   callTool: protectedProcedure
     .input(
       z.object({
@@ -91,7 +87,6 @@ export const mcpRouter = router({
 
       return ctx.services.agent.callMCPTool(input.serverId, input.toolName, safeArgs);
     }),
-
   agenticOsStatus: protectedProcedure.query(() => ({
     configured: MCPClientService.getInstance().isAgenticOsConfigured(),
   })),

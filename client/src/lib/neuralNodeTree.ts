@@ -20,18 +20,20 @@ export interface FileSystemNode {
     modified?: Date;
     created?: Date;
     mimeType?: string;
+    description?: string;
   };
 }
 
 export interface NeuralNode {
   id: string;
   label: string;
-  type: "folder" | "file" | "project";
+  type: "folder" | "file" | "project" | "integration";
   data: {
     path: string;
     fileCount?: number;
     depth: number;
     isExpanded?: boolean;
+    isRemote?: boolean;
     metadata?: Record<string, unknown>;
   };
   position: {
@@ -132,6 +134,7 @@ export function convertFileSystemToNeuralNetwork(
         depth,
         fileCount:
           file.type === "folder" ? file.children?.length || 0 : undefined,
+        metadata: file.metadata,
       },
       position: { x, y },
       style: {
@@ -231,6 +234,7 @@ export function convertNetworkToTreeStructure(
       path: node.data.path,
       children: [],
       expanded: node.data.isExpanded !== false,
+      metadata: node.data.metadata as Record<string, unknown>,
     };
     nodeMap.set(node.id, treeNode);
   });
@@ -267,10 +271,11 @@ export function convertNetworkToTreeStructure(
 export interface TreeNode {
   id: string;
   label: string;
-  type: "folder" | "file" | "project";
+  type: "folder" | "file" | "project" | "integration";
   path: string;
   children?: TreeNode[];
   expanded?: boolean;
+  metadata?: Record<string, unknown>;
 }
 
 /**
@@ -350,4 +355,138 @@ export function generateMockFileSystem(projectName: string): FileSystemNode[] {
   ];
 
   return files;
+}
+
+// ─── Master Network ───────────────────────────────────────────────────────────
+
+import type { NeuralBrainMap } from "@/types/neural";
+
+/** Map-mode colour palette — one accent per map (cycling if > 8 maps) */
+const MAP_COLORS = [
+  "#7c3aed", // violet
+  "#0ea5e9", // sky
+  "#10b981", // emerald
+  "#f59e0b", // amber
+  "#ef4444", // red
+  "#ec4899", // pink
+  "#06b6d4", // cyan
+  "#84cc16", // lime
+];
+
+function polar(cx: number, cy: number, r: number, angleRad: number) {
+  return { x: cx + r * Math.cos(angleRad), y: cy + r * Math.sin(angleRad) };
+}
+
+function sourceLabel(uri: string): string {
+  if (uri.startsWith("github://")) return `🐙 ${uri.replace("github://", "")}`;
+  if (uri === "integration://gmail") return "✉️ Gmail";
+  if (uri === "integration://outlook") return "📧 Outlook";
+  if (uri === "integration://google-drive") return "☁️ Drive";
+  if (uri === "integration://dropbox") return "📦 Dropbox";
+  if (uri === "integration://onedrive") return "💼 OneDrive";
+  // Local path — use basename
+  return uri.split("/").pop() ?? uri;
+}
+
+/**
+ * Build a meta-graph from all neural maps — the Global Master Network View.
+ *
+ * Layout:
+ *   Workspace hub (centre) → map hub nodes (radius 420) → source nodes (radius 220 from map hub)
+ *
+ * No file-tree queries are needed: sources come directly from rootDirectories.
+ */
+export function buildMasterNetwork(maps: NeuralBrainMap[]): NeuralNetwork {
+  const nodes: NeuralNode[] = [];
+  const edges: NeuralEdge[] = [];
+
+  // Central workspace hub
+  const hubId = "master-workspace-hub";
+  nodes.push({
+    id: hubId,
+    label: "Omnecor Workspace",
+    type: "project",
+    data: { path: "/", depth: 0, metadata: { type: "workspace-hub" } },
+    position: { x: 0, y: 0 },
+    style: { background: "#1e1e2e", border: "2px solid #7c3aed", color: "#e2e8f0" },
+  });
+
+  if (maps.length === 0) return { id: "master", name: "Master Network", type: "master", nodes, edges };
+
+  const mapRadius = Math.max(380, maps.length * 60);
+  const angleStep = (2 * Math.PI) / maps.length;
+
+  maps.forEach((map, mi) => {
+    const mapAngle = mi * angleStep - Math.PI / 2; // start from top
+    const mapPos = polar(0, 0, mapRadius, mapAngle);
+    const mapColor = MAP_COLORS[mi % MAP_COLORS.length];
+    const mapNodeId = `map:${map.id}`;
+
+    nodes.push({
+      id: mapNodeId,
+      label: map.name,
+      type: "project",
+      data: {
+        path: map.id,
+        depth: 1,
+        fileCount: map.rootDirectories.length,
+        metadata: { type: "map-hub", mode: map.mode, color: mapColor },
+      },
+      position: mapPos,
+      style: { background: "#0f0f1a", border: `2px solid ${mapColor}`, color: "#e2e8f0" },
+    });
+
+    // Workspace → map edge
+    edges.push({
+      id: `e:hub->${mapNodeId}`,
+      source: hubId,
+      target: mapNodeId,
+      type: "folder-connection",
+      data: { strength: 1 },
+    });
+
+    const sources = map.rootDirectories;
+    if (sources.length === 0) return;
+
+    const srcRadius = Math.max(180, sources.length * 40);
+    const srcSpread = Math.min(Math.PI * 0.8, (sources.length * Math.PI) / 6);
+    sources.forEach((src, si) => {
+      const srcAngle = mapAngle + (si - (sources.length - 1) / 2) * (srcSpread / Math.max(sources.length - 1, 1));
+      const srcPos = polar(mapPos.x, mapPos.y, srcRadius, srcAngle);
+      const isRemote = src.startsWith("integration://") || src.startsWith("github://");
+      const srcId = `src:${map.id}:${si}`;
+
+      nodes.push({
+        id: srcId,
+        label: sourceLabel(src),
+        type: "folder",
+        data: {
+          path: src,
+          depth: 2,
+          metadata: { type: isRemote ? "remote-source" : "local-root", mapId: map.id },
+        },
+        position: srcPos,
+        style: isRemote
+          ? { background: "#0a0a1a", border: "1px dashed #7c3aed", color: "#a78bfa" }
+          : { background: "#0a0f1a", border: `1px solid ${mapColor}55`, color: "#94a3b8" },
+      });
+
+      edges.push({
+        id: `e:${mapNodeId}->${srcId}`,
+        source: mapNodeId,
+        target: srcId,
+        type: "folder-connection",
+        data: { strength: 0.6 },
+      });
+    });
+  });
+
+  return {
+    id: "master",
+    name: "Omnecor Master Network",
+    type: "master",
+    nodes,
+    edges,
+    metadata: { created: new Date(), modified: new Date(), description: `${maps.length} maps, ${nodes.length} nodes` },
+  };
 }

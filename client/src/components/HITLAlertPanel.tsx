@@ -13,6 +13,7 @@ import { cn } from "@/lib/utils";
 import type { HITLAlert } from "@/lib/actionHashDetector";
 import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
 import { useAppStore } from "@/lib/store/app.store";
+import { vanillaTrpc } from "@/lib/trpc";
 
 interface HITLAlertPanelProps {
   alert?: HITLAlert;
@@ -85,6 +86,19 @@ export default function HITLAlertPanel({
       dismissButtonRef.current?.focus();
     }
   }, [activeAlert]);
+
+  // Fire-and-forget: persist loop detection events to the audit log whenever
+  // a new loop alert arrives from the WebSocket (server-side loop) or from a
+  // prop alert (client-side loop created by actionHashDetector).
+  useEffect(() => {
+    if (!loopAlert) return;
+    vanillaTrpc.ai.reportLoopViolation.mutate({
+      sessionId: loopAlert.sessionId,
+      hash: loopAlert.actionHash,
+      consecutiveCount: loopAlert.count,
+      lastActions: [],
+    }).catch(() => {}); // fire-and-forget — never block the UI
+  }, [loopAlert]);
 
   if (!activeAlert) {
     return (

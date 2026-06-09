@@ -3,6 +3,10 @@ import fs from "fs";
 import path from "path";
 
 export function serveStatic(app: Express) {
+  // Serve user-uploaded attachments from the on-disk uploads directory.
+  const uploadsPath = path.join(process.cwd(), "uploads");
+  app.use("/uploads", express.static(uploadsPath));
+
   const distPath =
     process.env.NODE_ENV === "development"
       ? path.resolve(import.meta.dirname, "../..", "dist", "public")

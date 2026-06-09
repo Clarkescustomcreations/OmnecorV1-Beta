@@ -33,6 +33,8 @@ export const ENV = {
   microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? "",
   ollamaProxyToken: process.env.OLLAMA_PROXY_TOKEN ?? "",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
+  huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY ?? "",
+  falaiApiKey: process.env.FAL_API_KEY ?? "",
   valetRouterUrl: process.env.VALET_ROUTER_URL ?? "http://127.0.0.1:8010",
   agenticOsApiKey: process.env.AGENTICOS_API_KEY ?? "",
   pcbwayApiKey: process.env.PCBWAY_API_KEY ?? "",
@@ -57,6 +59,11 @@ export const ENV = {
 // Startup validation — halt early on critical misconfigurations rather than
 // silently using insecure defaults (e.g. empty JWT secret → session forgery).
 if (process.env.NODE_ENV === "production") {
+  if (process.env.ZERO_LOGIN_MODE === "true") {
+    throw new Error(
+      "FATAL: ZERO_LOGIN_MODE=true is not permitted in production. It bypasses all authentication and exposes the workstation as a local admin to anyone on the network. Remove it before deploying."
+    );
+  }
   if (!ENV.cookieSecret) {
     throw new Error(
       "FATAL: JWT_SECRET must be set in production. An empty secret allows session cookie forgery."

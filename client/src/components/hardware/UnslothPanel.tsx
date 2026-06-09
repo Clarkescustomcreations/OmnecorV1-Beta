@@ -5,12 +5,30 @@ import { Button } from "../ui/button";
 import { Input } from "../ui/input";
 import { Label } from "../ui/label";
 import { Slider } from "../ui/slider";
-import { Zap, Save, Database, Activity, Route, Loader2 } from "lucide-react";
+import { Zap, Save, Database, Activity, Route, Loader2, Brain, FolderOpen } from "lucide-react";
 import { Badge } from "../ui/badge";
 import { toast } from "sonner";
+import { Switch } from "../ui/switch";
+import { useNeuralMap } from "../../contexts/NeuralMapContext";
 
 export const UnslothPanel: React.FC = () => {
   const [loraRank, setLoraRank] = useState(16);
+  const [datasetPath, setDatasetPath] = useState("");
+  const [baseModel, setBaseModel] = useState("unsloth/llama-3-8b-bnb-4bit");
+
+  // Model scope: "project" saves the trained model into the active map's folder; "global" saves to main models folder
+  const [modelScope, setModelScope] = useState<"project" | "global">(() => {
+    try { return (localStorage.getItem("omnecor:unsloth_model_scope") as "project" | "global") || "global"; } catch { return "global"; }
+  });
+  const handleScopeToggle = (v: boolean) => {
+    const scope = v ? "project" : "global";
+    setModelScope(scope);
+    localStorage.setItem("omnecor:unsloth_model_scope", scope);
+  };
+
+  const { activeMap } = useNeuralMap();
+  const projectModelPath = activeMap?.rootDirectories[0] ? `${activeMap.rootDirectories[0]}/models` : undefined;
+  const effectiveOutputPath = modelScope === "project" && projectModelPath ? projectModelPath : "./models";
 
   const valetStatus = trpc.valet.status.useQuery(undefined, { refetchInterval: 15000 });
 
@@ -56,14 +74,53 @@ export const UnslothPanel: React.FC = () => {
             <CardTitle className="text-sm font-medium">Fine-Tuning Configuration</CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
+            {/* Model output scope */}
+            <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3">
+              <div className="flex items-center gap-2">
+                {modelScope === "project" ? <Brain className="w-4 h-4 text-accent" /> : <FolderOpen className="w-4 h-4 text-muted-foreground" />}
+                <div>
+                  <p className="text-xs font-semibold">{modelScope === "project" ? "Project Model" : "Global Models Folder"}</p>
+                  <p className="text-[10px] text-muted-foreground font-mono">{effectiveOutputPath}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-muted-foreground">Global</span>
+                <Switch
+                  checked={modelScope === "project"}
+                  onCheckedChange={handleScopeToggle}
+                  disabled={!activeMap}
+                  aria-label="Toggle project model scope"
+                />
+                <span className="text-[10px] text-muted-foreground">Project</span>
+              </div>
+            </div>
+
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label>Base Model</Label>
-                <Input defaultValue="unsloth/llama-3-8b-bnb-4bit" />
+                <Input value={baseModel} onChange={e => setBaseModel(e.target.value)} />
               </div>
               <div className="space-y-2">
                 <Label>Dataset Path (JSONL)</Label>
-                <Input placeholder="/path/to/dataset.jsonl" />
+                <div className="flex gap-1.5">
+                  <Input
+                    value={datasetPath}
+                    onChange={e => setDatasetPath(e.target.value)}
+                    placeholder="/path/to/dataset.jsonl"
+                    className="flex-1"
+                  />
+                  {activeMap?.rootDirectories[0] && (
+                    <Button
+                      size="icon"
+                      variant="outline"
+                      className="h-10 w-10 shrink-0"
+                      title="Use active map's data folder"
+                      onClick={() => setDatasetPath(`${activeMap.rootDirectories[0]}/data/dataset.jsonl`)}
+                    >
+                      <Brain className="w-3.5 h-3.5" />
+                    </Button>
+                  )}
+                </div>
               </div>
             </div>
 
@@ -72,7 +129,6 @@ export const UnslothPanel: React.FC = () => {
                 <Label>LoRA Rank (R)</Label>
                 <span className="text-xs font-mono">{loraRank}</span>
               </div>
-              {/* Using a custom slider placeholder since we don't have the shadcn slider imported */}
               <div className="h-6 flex items-center">
                  <div className="w-full h-2 bg-muted rounded-full relative overflow-hidden">
                     <div className="h-full bg-yellow-500" style={{ width: `${(loraRank / 128) * 100}%` }} />
@@ -83,7 +139,7 @@ export const UnslothPanel: React.FC = () => {
 
             <div className="flex gap-2">
                <Button className="flex-1 bg-yellow-600 hover:bg-yellow-700" onClick={() => startFineTuning.mutate({
-                 datasetPath: "/path/to/dataset.jsonl",
+                 datasetPath: datasetPath || "/path/to/dataset.jsonl",
                  r: loraRank,
                  loraAlpha: 32,
                  maxSeqLength: 2048,
@@ -161,17 +217,36 @@ export const UnslothPanel: React.FC = () => {
             Uses Ollama oracle to annotate prompts with optimal provider, model, cost tier, and local_capable flag.
             Output saved to <span className="font-mono">data/valet_router_dataset.jsonl</span> with 90/10 train/val split.
           </p>
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={generateValetDataset.isPending}
-            onClick={() => generateValetDataset.mutate({})}
-          >
-            {generateValetDataset.isPending
-              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-              : <><Route className="w-4 h-4 mr-2" /> Generate Valet Dataset</>
-            }
-          </Button>
+          <div className="flex gap-2 flex-wrap">
+            <Button
+              variant="outline"
+              size="sm"
+              disabled={generateValetDataset.isPending}
+              onClick={() => generateValetDataset.mutate({})}
+            >
+              {generateValetDataset.isPending
+                ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                : <><Route className="w-4 h-4 mr-2" /> Generate Valet Dataset</>
+              }
+            </Button>
+            {activeMap && (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={generateValetDataset.isPending}
+                title={`Generate training dataset from "${activeMap.name}" neural map context`}
+                onClick={() => {
+                  const mapPath = activeMap.rootDirectories[0];
+                  if (!mapPath) { toast.error("Active map has no root directory set"); return; }
+                  setDatasetPath(`${mapPath}/data/dataset.jsonl`);
+                  generateValetDataset.mutate({});
+                  toast.info(`Generating dataset from neural map: ${activeMap.name}`);
+                }}
+              >
+                <Brain className="w-4 h-4 mr-2" /> Train from Neural Map
+              </Button>
+            )}
+          </div>
           {generateValetDataset.isSuccess && (
             <p className="text-xs text-green-500">
               Dataset generation started — monitor in Jobs panel (job: {generateValetDataset.data.jobId})

@@ -33,6 +33,7 @@ import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 import { createLogger, closeAuditLog } from "./logger.js";
 import { SERVER_CONFIG } from "../phase2/config/index.js";
 import { ENV } from "./env.js";
+import { initPaths } from "./paths.js";
 
 const log = createLogger("core");
 
@@ -72,6 +73,10 @@ async function findAvailablePort(startPort: number = SERVER_CONFIG.port): Promis
 // ─────────────────────────────────────────────────────────────────────────────
 
 async function startServer() {
+  // ─── Initialize Unified Path Utility ───────────────────────────────────
+  // Ensures user-writable data directories exist before services start.
+  initPaths();
+
   // ─── Initialize Phase 2 Services ────────────────────────────────────────
   // These services are singletons. Calling getInstance() here ensures they
   // are ready before any tRPC request arrives.
@@ -215,6 +220,9 @@ async function startServer() {
     createExpressMiddleware({
       router: appRouter,
       createContext,
+      onError: ({ path, error }) => {
+        log.error(`[tRPC Error] ${path}:`, error);
+      },
     })
   );
 

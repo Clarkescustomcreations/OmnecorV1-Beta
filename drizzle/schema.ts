@@ -7,6 +7,7 @@ import {
   timestamp,
   varchar,
   json,
+  index,
 } from "drizzle-orm/mysql-core";
 
 /**
@@ -366,3 +367,183 @@ export const postingScheduleConfig = mysqlTable("postingScheduleConfig", {
 
 export type PostingScheduleConfig = typeof postingScheduleConfig.$inferSelect;
 export type InsertPostingScheduleConfig = typeof postingScheduleConfig.$inferInsert;
+
+/**
+ * Design Projects Table (PCB Editor)
+ */
+export const designProjects = mysqlTable(
+  "design_projects",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    mode: varchar("mode", { length: 20 }).notNull().default("schematic"), // 'schematic' or 'pcb'
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index("design_projects_user_id_idx").on(table.userId),
+  })
+);
+
+export type DesignProject = typeof designProjects.$inferSelect;
+export type InsertDesignProject = typeof designProjects.$inferInsert;
+
+/**
+ * Design Saves Table (PCB Editor)
+ */
+export const designSaves = mysqlTable(
+  "design_saves",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    projectId: int("projectId").notNull(),
+    userId: int("userId").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    description: text("description"),
+    canvasData: json("canvasData").notNull(),
+    componentCount: int("componentCount").default(0),
+    connectionCount: int("connectionCount").default(0),
+    version: int("version").default(1),
+    isLatest: int("isLatest").default(1),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    projectIdIdx: index("design_saves_project_id_idx").on(table.projectId),
+    userIdIdx: index("design_saves_user_id_idx").on(table.userId),
+  })
+);
+
+export type DesignSave = typeof designSaves.$inferSelect;
+export type InsertDesignSave = typeof designSaves.$inferInsert;
+
+/**
+ * Component Library Table (PCB Editor)
+ */
+export const componentLibraryItems = mysqlTable(
+  "component_library_items",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    userId: int("userId").notNull(),
+    componentId: varchar("componentId", { length: 255 }).notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    category: varchar("category", { length: 100 }).notNull(),
+    description: text("description"),
+    symbolSvg: text("symbolSvg"),
+    footprintSvg: text("footprintSvg"),
+    properties: json("properties").notNull(),
+    handles: json("handles").notNull(),
+    manufacturer: varchar("manufacturer", { length: 255 }),
+    partNumber: varchar("partNumber", { length: 255 }),
+    datasheet: varchar("datasheet", { length: 512 }),
+    tags: json("tags").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index("component_library_user_id_idx").on(table.userId),
+    componentIdIdx: index("component_library_id_idx").on(table.componentId),
+  })
+);
+
+export type ComponentLibraryItem = typeof componentLibraryItems.$inferSelect;
+export type InsertComponentLibraryItem = typeof componentLibraryItems.$inferInsert;
+
+/**
+ * Design Exports Table (PCB Editor)
+ */
+export const designExports = mysqlTable(
+  "design_exports",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    designSaveId: int("designSaveId").notNull(),
+    userId: int("userId").notNull(),
+    format: varchar("format", { length: 20 }).notNull(),
+    fileUrl: varchar("fileUrl", { length: 512 }).notNull(),
+    fileSize: int("fileSize"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    designSaveIdIdx: index("design_exports_save_id_idx").on(table.designSaveId),
+    userIdIdx: index("design_exports_user_id_idx").on(table.userId),
+  })
+);
+
+export type DesignExport = typeof designExports.$inferSelect;
+export type InsertDesignExport = typeof designExports.$inferInsert;
+
+/**
+ * AI Design Reviews Table (PCB Editor)
+ */
+export const aiDesignReviews = mysqlTable(
+  "ai_design_reviews",
+  {
+    id: int("id").autoincrement().primaryKey(),
+    designSaveId: int("designSaveId").notNull(),
+    userId: int("userId").notNull(),
+    prompt: text("prompt").notNull(),
+    response: text("response").notNull(),
+    componentCount: int("componentCount"),
+    connectionCount: int("connectionCount"),
+    mode: varchar("mode", { length: 20 }),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => ({
+    designSaveIdIdx: index("ai_reviews_save_id_idx").on(table.designSaveId),
+    userIdIdx: index("ai_reviews_user_id_idx").on(table.userId),
+  })
+);
+
+export type AIDesignReview = typeof aiDesignReviews.$inferSelect;
+export type InsertAIDesignReview = typeof aiDesignReviews.$inferInsert;
+
+/**
+ * Neural Brain Maps — persistent storage for user-created neural maps.
+ * Replaces localStorage as the canonical store; localStorage remains a fast cache.
+ */
+export const neuralMaps = mysqlTable(
+  "neural_maps",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(), // UUID from client
+    userId: int("userId").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    mode: varchar("mode", { length: 50 }).notNull().default("standard"),
+    rootDirectories: json("rootDirectories").$type<string[]>().notNull(),
+    projectContext: json("projectContext").$type<Record<string, unknown>>(),
+    labelOverrides: json("labelOverrides").$type<Record<string, string>>(),
+    settings: json("settings").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index("neural_maps_user_id_idx").on(table.userId),
+  })
+);
+
+export type NeuralMapRow = typeof neuralMaps.$inferSelect;
+export type InsertNeuralMap = typeof neuralMaps.$inferInsert;
+
+/**
+ * Personas — persistent storage for user-created AI personas.
+ * Full Persona JSON stored in the `data` column; key fields indexed for queries.
+ */
+export const personas = mysqlTable(
+  "personas",
+  {
+    id: varchar("id", { length: 36 }).primaryKey(), // UUID from client
+    userId: int("userId").notNull(),
+    name: varchar("name", { length: 255 }).notNull(),
+    type: varchar("type", { length: 50 }).notNull().default("self_clone"),
+    alwaysOn: int("alwaysOn").notNull().default(0), // MySQL boolean as int
+    data: json("data").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt").defaultNow().onUpdateNow().notNull(),
+  },
+  (table) => ({
+    userIdIdx: index("personas_user_id_idx").on(table.userId),
+  })
+);
+
+export type PersonaRow = typeof personas.$inferSelect;
+export type InsertPersona = typeof personas.$inferInsert;

@@ -1,6 +1,6 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
-import { getDb } from "../db";
+import { getDb } from "../db.factory.js";
 import { curatedPosts, discoveredArticles } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -14,7 +14,7 @@ export const curatorRouter = router({
     }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return [];
 
       const posts = await db.select()
         .from(curatedPosts)
@@ -24,12 +24,13 @@ export const curatorRouter = router({
 
       return posts;
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getPost: protectedProcedure
     .input(z.object({ postId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return null;
 
       const result = await db.select()
         .from(curatedPosts)
@@ -38,12 +39,11 @@ export const curatorRouter = router({
 
       return result[0] || null;
     }),
-
   curateArticle: protectedProcedure
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, message: "Database not available" };
 
       const article = await db.select()
         .from(discoveredArticles)
@@ -63,14 +63,13 @@ export const curatorRouter = router({
 
       return { success: true, message: "Article curated successfully" };
     }),
-
   approvePosts: protectedProcedure
     .input(z.object({
       postIds: z.array(z.number()),
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, approvedCount: 0 };
 
       for (const postId of input.postIds) {
         await db.update(curatedPosts)
@@ -80,7 +79,6 @@ export const curatorRouter = router({
 
       return { success: true, approvedCount: input.postIds.length };
     }),
-
   rejectPosts: protectedProcedure
     .input(z.object({
       postIds: z.array(z.number()),
@@ -88,7 +86,7 @@ export const curatorRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, rejectedCount: 0 };
 
       for (const postId of input.postIds) {
         await db.update(curatedPosts)
@@ -101,7 +99,8 @@ export const curatorRouter = router({
 
       return { success: true, rejectedCount: input.postIds.length };
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updatePost: protectedProcedure
     .input(z.object({
       postId: z.number(),
@@ -110,7 +109,7 @@ export const curatorRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false };
 
       await db.update(curatedPosts)
         .set({

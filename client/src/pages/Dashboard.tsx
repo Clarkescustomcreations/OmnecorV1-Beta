@@ -1,5 +1,6 @@
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
 import BudgetPanel from "@/components/wallet/BudgetPanel";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import {
   Card,
   CardContent,
@@ -19,6 +20,9 @@ import {
   ArrowRight,
   Sparkles,
   Share2,
+  Box,
+  UserCircle2,
+  Wallet,
 } from "lucide-react";
 import { Link } from "wouter";
 import ProcessManagerPanel from "@/components/ProcessManagerPanel";
@@ -96,12 +100,28 @@ export default function Dashboard() {
       badge: "Beta",
     },
     {
+      title: "Persona Creation",
+      description:
+        "Design unique AI identities with custom knowledge and voice cloning",
+      icon: UserCircle2,
+      href: "/agent-networking?tab=personas",
+      badge: "Creative",
+    },
+    {
       title: "Integrations",
       description:
         "Connect third-party apps and services via OAuth and API integrations",
       icon: Plug,
       href: "/integrations",
       badge: kbStatus?.initialized ? "Ready" : "Not configured",
+    },
+    {
+      title: "3D Designer",
+      description:
+        "Visual workspace for 3D modeling, PCB schematics, and web app previews",
+      icon: Box,
+      href: "/3d-designer",
+      badge: "Beta",
     },
     {
       title: "Settings",
@@ -128,9 +148,12 @@ export default function Dashboard() {
             <h1 className="text-4xl md:text-5xl font-bold mb-4">
               The Ultimate All-in-One AI Workbench
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl">
-              A powerful, elegant, and polished local-first AI workstation
-              designed for power users who demand both function and beauty.
+            <p className="text-lg text-muted-foreground max-w-2xl whitespace-pre-line">
+              A powerful, local-first AI workstation designed for Creativity
+              <br />
+              <span className="text-sm font-medium text-accent/80 tracking-tight">
+                Operational Memory Never Escapes Context Overview Remains
+              </span>
             </p>
           </div>
         </div>
@@ -144,26 +167,25 @@ export default function Dashboard() {
             </p>
           </div>
 
-          <BudgetPanel projectId="default" className="col-span-full lg:col-span-1 mb-6" />
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {features.map(feature => {
-              const Icon = feature.icon;
-              return (
-                <Link key={feature.href} href={feature.href} className="block">
-                  <Card className="h-full hover:border-accent/50 hover:shadow-lg transition-all duration-300 cursor-pointer group">
+          {/* Agentic Wallet Header Block */}
+          <HowToTooltip 
+            title="Agentic Wallet" 
+            description="A real-time financial monitor for your AI agents. Set hard/soft budgets, track spending by provider, and manage virtual Lithic cards."
+          >
+            <Link href="/wallet" className="block mb-6">
+              <Card className="hover:border-accent/50 hover:shadow-lg transition-all duration-300 cursor-pointer group overflow-hidden">
+                <div className="flex flex-col md:flex-row">
+                  <div className="flex-1">
                     <CardHeader>
                       <div className="flex items-start justify-between mb-2">
                         <div className="p-2 rounded-lg bg-accent/10 group-hover:bg-accent/20 transition-colors">
-                          <Icon className="w-6 h-6 text-accent" />
+                          <Wallet className="w-6 h-6 text-accent" />
                         </div>
-                        <Badge variant="secondary" className="text-xs">
-                          {feature.badge}
-                        </Badge>
+                        <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Live Monitoring</Badge>
                       </div>
-                      <CardTitle className="text-lg">{feature.title}</CardTitle>
-                      <CardDescription className="text-sm">
-                        {feature.description}
+                      <CardTitle className="text-xl">Agentic Wallet</CardTitle>
+                      <CardDescription className="text-sm max-w-md">
+                        Monitor autonomous agent spending in real-time, manage project budgets, and oversee virtual hardware issuance.
                       </CardDescription>
                     </CardHeader>
                     <CardContent>
@@ -171,14 +193,59 @@ export default function Dashboard() {
                         variant="ghost"
                         size="sm"
                         className="gap-2 group/btn"
-                        aria-label={`Explore ${feature.title}`}
                       >
                         Explore
-                        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
+                        <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" />
                       </Button>
                     </CardContent>
-                  </Card>
-                </Link>
+                  </div>
+                  <div className="p-6 bg-muted/20 md:border-l border-border min-w-[300px]">
+                    <BudgetPanel projectId="default" className="border-none bg-transparent shadow-none p-0" />
+                  </div>
+                </div>
+              </Card>
+            </Link>
+          </HowToTooltip>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {features.map(feature => {
+              const Icon = feature.icon;
+              return (
+                <HowToTooltip 
+                  key={feature.href} 
+                  title={feature.title} 
+                  description={feature.description}
+                >
+                  <Link href={feature.href} className="block">
+                    <Card className="h-full hover:border-accent/50 hover:shadow-lg transition-all duration-300 cursor-pointer group">
+                      <CardHeader>
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="p-2 rounded-lg bg-accent/10 group-hover:bg-accent/20 transition-colors">
+                            <Icon className="w-6 h-6 text-accent" />
+                          </div>
+                          <Badge variant="secondary" className="text-xs">
+                            {feature.badge}
+                          </Badge>
+                        </div>
+                        <CardTitle className="text-lg">{feature.title}</CardTitle>
+                        <CardDescription className="text-sm">
+                          {feature.description}
+                        </CardDescription>
+                      </CardHeader>
+                      <CardContent>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="gap-2 group/btn"
+                          aria-label={`Explore ${feature.title}`}
+                        >
+                          Explore
+                          <ArrowRight className="w-4 h-4 group-hover/btn:translate-x-1 transition-transform" aria-hidden="true" />
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Link>
+                </HowToTooltip>
               );
             })}
           </div>

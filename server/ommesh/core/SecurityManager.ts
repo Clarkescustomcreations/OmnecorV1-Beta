@@ -8,10 +8,11 @@ import { MeshMessage, NodeIdentity } from '../../../shared/types/ommesh.types.js
 import { EventEmitter } from 'events';
 import os from 'os';
 import { createLogger } from "../../_core/logger.js";
+import { PATHS } from "../../_core/paths.js";
 const log = createLogger("OMMESH:Security");
 
-// ESM compatibility: using process.cwd() for reliable root-relative paths
-const CERTS_DIR = path.join(process.cwd(), 'server/ommesh/certs');
+// Resolves to centralized application data directory
+const CERTS_DIR = PATHS.certs;
 const ROTATION_THRESHOLD_DAYS = 30; // Rotate 30 days before expiry
 
 export class SecurityManager extends EventEmitter {
@@ -53,8 +54,7 @@ export class SecurityManager extends EventEmitter {
   }
 
   private loadOrCreateIdentity() {
-    // ESM compatibility: using process.cwd() for reliable root-relative paths
-    const certsDir = path.join(process.cwd(), 'server/ommesh/certs');
+    const certsDir = PATHS.certs;
     const keyPath = path.join(certsDir, 'node-key.pem');
     const certPath = path.join(certsDir, 'node-cert.pem');
     const caPath = path.join(certsDir, 'ca-cert.pem');
@@ -124,7 +124,7 @@ export class SecurityManager extends EventEmitter {
     const oldFingerprint = this.identity.fingerprint;
 
     try {
-      const certsDir = path.join(process.cwd(), 'server/ommesh/certs');
+      const certsDir = PATHS.certs;
       const backupDir = path.join(certsDir, `backup-${Date.now()}`);
       fs.mkdirSync(backupDir, { recursive: true });
 
@@ -290,4 +290,3 @@ export class SecurityManager extends EventEmitter {
 
 // Singleton
 export const securityManager = new SecurityManager();
-

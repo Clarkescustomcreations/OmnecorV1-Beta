@@ -76,6 +76,11 @@ export const ChatPanel: React.FC = () => {
     });
   };
 
+  const handleStop = () => {
+    setIsStreaming(false);
+    toast.info("Inference stopped");
+  };
+
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollIntoView({ behavior: "smooth" });
@@ -141,7 +146,7 @@ export const ChatPanel: React.FC = () => {
           />
           <div className="absolute right-1.5 top-1.5 flex gap-1">
              {isStreaming && (
-               <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground">
+               <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground" onClick={handleStop}>
                  <StopCircle className="w-5 h-5" />
                </Button>
              )}

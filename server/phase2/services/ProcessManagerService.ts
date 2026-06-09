@@ -134,6 +134,11 @@ interface ManagedProcess {
 function killProcess(proc: ChildProcess, force = false): void {
   if (process.platform === "win32") {
     if (proc.pid) {
+      // Guard: proc.pid must be a positive integer (comes from our own ChildProcess, but defensive check)
+      if (!Number.isInteger(proc.pid) || proc.pid <= 0) {
+        try { proc.kill(); } catch { /* ignore if already dead */ }
+        return;
+      }
       try {
         execSync(`taskkill /PID ${proc.pid} /T /F`, { stdio: "ignore" });
       } catch {

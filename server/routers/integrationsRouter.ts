@@ -402,6 +402,8 @@ export const integrationsRouter = router({
     ),
 
   /** Persist per-integration settings (non-sensitive config). */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateSettings: protectedProcedure
     .input(z.object({
       type: z.enum(INTEGRATION_TYPES),

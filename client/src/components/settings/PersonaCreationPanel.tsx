@@ -1209,7 +1209,7 @@ function AlwaysOnModelSection({
     retry: false,
   });
 
-  const meshPeers = trpc.mesh.discover.useQuery(undefined, {
+  const meshPeers = trpc.ommesh.discover.useQuery(undefined, {
     enabled: mc.backend === "ommesh" && persona.alwaysOn,
     refetchInterval: 15_000,
     retry: false,
@@ -1790,11 +1790,44 @@ function PersonaLibraryCard({
 // Root panel
 // ---------------------------------------------------------------------------
 
+const PERSONA_MIGRATED_KEY = "omnecor_personas_migrated_v1";
+
 const PersonaCreationPanel: React.FC = () => {
   const [personas, setPersonas] = useState<Persona[]>(() => loadPersonas());
   const [current, setCurrent] = useState<Persona>(() => emptyPersona());
   const [isSaving, setIsSaving] = useState(false);
 
+  const utils = trpc.useUtils();
+  const dbPersonasQuery = trpc.personas.list.useQuery(undefined, { retry: false });
+  const upsertMutation = trpc.personas.upsert.useMutation({
+    onSuccess: () => utils.personas.list.invalidate(),
+  });
+  const deleteMutation = trpc.personas.delete.useMutation({
+    onSuccess: () => utils.personas.list.invalidate(),
+  });
+  const migrateMutation = trpc.personas.migrate.useMutation();
+
+  // Prefer DB data when available; keep localStorage as offline cache
+  useEffect(() => {
+    if (dbPersonasQuery.data && dbPersonasQuery.data.length > 0) {
+      const dbList = dbPersonasQuery.data as unknown as Persona[];
+      setPersonas(dbList);
+      savePersonas(dbList);
+    }
+  }, [dbPersonasQuery.data]);
+
+  // One-time migration from localStorage → DB
+  useEffect(() => {
+    if (localStorage.getItem(PERSONA_MIGRATED_KEY)) return;
+    const local = loadPersonas();
+    if (local.length === 0) { localStorage.setItem(PERSONA_MIGRATED_KEY, "true"); return; }
+    migrateMutation.mutate(
+      local.map(p => ({ id: p.id, name: p.name, type: p.type, alwaysOn: p.alwaysOn, data: p as unknown as Record<string, unknown> })),
+      { onSuccess: () => localStorage.setItem(PERSONA_MIGRATED_KEY, "true") }
+    );
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Keep localStorage in sync as offline cache
   useEffect(() => { savePersonas(personas); }, [personas]);
 
   const handleChange = useCallback((updates: Partial<Persona>) => {
@@ -1804,7 +1837,14 @@ const PersonaCreationPanel: React.FC = () => {
   const handleSave = async () => {
     if (!current.name.trim()) { toast.error("Give your persona a name first"); return; }
     setIsSaving(true);
-    await new Promise(r => setTimeout(r, 400));
+    // Persist to DB (non-blocking)
+    upsertMutation.mutate({
+      id: current.id,
+      name: current.name,
+      type: current.type,
+      alwaysOn: current.alwaysOn,
+      data: current as unknown as Record<string, unknown>,
+    });
     setPersonas(prev => {
       const idx = prev.findIndex(p => p.id === current.id);
       if (idx >= 0) {
@@ -1830,6 +1870,7 @@ const PersonaCreationPanel: React.FC = () => {
   };
 
   const handleDelete = (id: string) => {
+    deleteMutation.mutate({ id });
     setPersonas(prev => prev.filter(p => p.id !== id));
     if (current.id === id) setCurrent(emptyPersona());
     toast("Persona deleted");

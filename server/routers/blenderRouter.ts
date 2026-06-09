@@ -9,6 +9,8 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
+import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
+import { spawn } from "child_process";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -87,7 +89,36 @@ export const blenderRouter = router({
       }
     }),
 
+  /**
+   * Open a .blend file (or a blank scene) in the Blender GUI as a detached process.
+   * The spawned Blender process is independent of the server and persists after the
+   * response is sent.
+   */
+  openFile: protectedProcedure
+    .input(z.object({ filePath: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      const blenderBin: string = PYTHON_SCRIPTS.blenderBin;
+      const args: string[] = input.filePath ? [input.filePath] : [];
+
+      const proc = spawn(blenderBin, args, {
+        detached: true,
+        stdio: "ignore",
+      });
+      proc.unref();
+
+      if (proc.pid === undefined) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to launch Blender GUI — is Blender installed?",
+        });
+      }
+
+      return { success: true, pid: proc.pid, file: input.filePath ?? null };
+    }),
+
   /** Export a .blend file to another format (GLB, FBX, OBJ, STL) */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   export: protectedProcedure
     .input(blenderExportSchema)
     .mutation(async ({ ctx, input }) => {

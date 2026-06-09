@@ -2,18 +2,20 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./notification.js";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc.js";
-import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir, platform, cpus, totalmem, freemem } from "os";
-import { execFile } from "child_process";
+import { execFile, exec } from "child_process";
 import { promisify } from "util";
-import { getDb } from "../db.factory.js";
+import { getDb, updateUserExecutionMode } from "../db.factory.js";
 import { users } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 import { ENV } from "./env.js";
 import { getPermissionsForRole, type Role } from "../phase2/config/rbac.js";
+import { PATHS } from "./paths.js";
 
 const execFileAsync = promisify(execFile);
+const execAsync = promisify(exec);
 
 async function findExecutable(candidates: string[]): Promise<string | null> {
   for (const candidate of candidates) {
@@ -39,7 +41,7 @@ async function findExecutable(candidates: string[]): Promise<string | null> {
   return null;
 }
 
-const SETTINGS_PATH = join(homedir(), ".omnecor", "settings.json");
+const SETTINGS_PATH = join(PATHS.base, "settings.json");
 
 // Helper — read settings file, return null if not found
 function readSettingsFile(): unknown {
@@ -65,10 +67,30 @@ export const systemRouter = router({
       chromadb: { status: "ok" }
     })),
 
-  loginProviders: publicProcedure.query(() => ({
-    google: !!(ENV.googleClientId && ENV.googleClientSecret),
-    microsoft: !!(ENV.microsoftClientId && ENV.microsoftClientSecret),
-  })),
+  loginProviders: publicProcedure.query(() => {
+    const settings = (readSettingsFile() as any) || {};
+    return {
+      google: !!(ENV.googleClientId && ENV.googleClientSecret) || !!(settings.googleClientId && settings.googleClientSecret),
+      microsoft: !!(ENV.microsoftClientId && ENV.microsoftClientSecret) || !!(settings.microsoftClientId && settings.microsoftClientSecret),
+    };
+  }),
+
+  aiProviders: publicProcedure.query(() => {
+    const settings = (readSettingsFile() as any) || {};
+    return {
+      openai: !!ENV.openaiApiKey || !!settings.openaiApiKey,
+      anthropic: !!ENV.anthropicApiKey || !!settings.anthropicApiKey,
+      gemini: !!ENV.geminiApiKey || !!settings.geminiApiKey,
+      grok: !!ENV.xaiApiKey || !!settings.xaiApiKey,
+      huggingface: !!ENV.huggingfaceApiKey || !!settings.huggingfaceApiKey,
+      elevenlabs: !!ENV.elevenLabsApiKey || !!settings.elevenLabsApiKey,
+      falai: !!ENV.falaiApiKey || !!settings.falaiApiKey,
+      forge: !!ENV.forgeApiKey || !!settings.forgeApiKey,
+      ollamaUrl: settings.OLLAMA_BASE_URL || ENV.ollamaUrl || "http://localhost:11434",
+      n8nUrl: settings.n8nUrl || ENV.n8nUrl || "http://localhost:5678",
+      comfyUrl: settings.comfyUrl || "",
+    };
+  }),
 
   getSettings: publicProcedure
     .query(() => {
@@ -78,11 +100,13 @@ export const systemRouter = router({
   saveSettings: publicProcedure
     .input(z.object({ settings: z.record(z.string(), z.unknown()) }))
     .mutation(({ input }) => {
+      const current = (readSettingsFile() as any) || {};
+      const updated = { ...current, ...input.settings };
       const dir = join(homedir(), ".omnecor");
       if (!existsSync(dir)) {
         mkdirSync(dir, { recursive: true });
       }
-      writeFileSync(SETTINGS_PATH, JSON.stringify(input.settings, null, 2), "utf-8");
+      writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), "utf-8");
       return { saved: true };
     }),
 
@@ -93,8 +117,91 @@ export const systemRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      // Stub for saving API keys
+      const current = (readSettingsFile() as any) || {};
+      // Map frontend key names to internal setting names if necessary
+      const keyMap: Record<string, string> = {
+        openai: "openaiApiKey",
+        OPENAI_API_KEY: "openaiApiKey",
+        openaiApiKey: "openaiApiKey",
+
+        anthropic: "anthropicApiKey",
+        ANTHROPIC_API_KEY: "anthropicApiKey",
+        anthropicApiKey: "anthropicApiKey",
+
+        gemini: "geminiApiKey",
+        GEMINI_API_KEY: "geminiApiKey",
+        geminiApiKey: "geminiApiKey",
+
+        grok: "xaiApiKey",
+        GROK_API_KEY: "xaiApiKey",
+        xaiApiKey: "xaiApiKey",
+
+        huggingface: "huggingfaceApiKey",
+        HUGGINGFACE_API_KEY: "huggingfaceApiKey",
+        huggingfaceApiKey: "huggingfaceApiKey",
+
+        elevenlabs: "elevenLabsApiKey",
+        ELEVENLABS_API_KEY: "elevenLabsApiKey",
+        elevenLabsApiKey: "elevenLabsApiKey",
+
+        falai: "falaiApiKey",
+        FAL_API_KEY: "falaiApiKey",
+        falaiApiKey: "falaiApiKey",
+
+        forge: "forgeApiKey",
+        FORGE_API_KEY: "forgeApiKey",
+        forgeApiKey: "forgeApiKey",
+
+        OLLAMA_BASE_URL: "OLLAMA_BASE_URL",
+        ollamaUrl: "OLLAMA_BASE_URL",
+
+        n8nUrl: "n8nUrl",
+        comfyUrl: "comfyUrl",
+
+        googleClientId: "googleClientId",
+        googleClientSecret: "googleClientSecret",
+        microsoftClientId: "microsoftClientId",
+        microsoftClientSecret: "microsoftClientSecret",
+      };
+
+      const updated = { ...current };
+      for (const [k, v] of Object.entries(input.keys)) {
+        const target = keyMap[k] || k;
+        if (v) updated[target] = v;
+      }
+
+      const dir = join(homedir(), ".omnecor");
+      if (!existsSync(dir)) {
+        mkdirSync(dir, { recursive: true });
+      }
+      writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), "utf-8");
       return { success: true };
+    }),
+
+  applyOptimizations: adminProcedure
+    .mutation(async () => {
+      const settings = (readSettingsFile() as any) || {};
+      if (platform() !== "linux") {
+        throw new TRPCError({ code: "BAD_REQUEST", message: "Workstation optimizations are currently only supported on Linux." });
+      }
+
+      const results: string[] = [];
+
+      // ZRAM Setup
+      if (settings.zramEnabled) {
+        try {
+          const sizeGB = settings.zramSizeGB || 4;
+          // Attempt to initialize zram device (requires root/sudo, usually handled by workstation-setup script)
+          // Here we just verify availability and trigger if possible
+          await execAsync(`sudo modprobe zram && sudo zramctl --find --size ${sizeGB}G --algorithm zstd`);
+          results.push(`Initialized ${sizeGB}GB ZRAM device.`);
+        } catch (e) {
+          console.warn("[SystemRouter] ZRAM activation failed (likely missing sudo permissions):", e);
+          results.push("ZRAM activation failed: Permission denied or module missing.");
+        }
+      }
+
+      return { success: true, results };
     }),
 
   notifyOwner: adminProcedure
@@ -134,10 +241,7 @@ export const systemRouter = router({
   setExecutionMode: protectedProcedure
     .input(z.object({ mode: z.enum(["sovereign", "scrapper", "big_spender"]) }))
     .mutation(async ({ ctx, input }) => {
-      const db = await getDb();
-      if (db) {
-        await db.update(users).set({ executionMode: input.mode }).where(eq(users.id, ctx.user.id));
-      }
+      await updateUserExecutionMode(ctx.user.id, input.mode);
       return { mode: input.mode };
     }),
 
@@ -265,4 +369,100 @@ export const systemRouter = router({
     const { UpdateCheckerService } = await import("../phase2/services/UpdateCheckerService.js");
     return UpdateCheckerService.getInstance().checkForUpdates();
   }),
+
+  openTerminal: protectedProcedure
+    .input(z.object({
+      rootDir: z.string(),
+      prompt: z.string().optional(),
+      providerId: z.string().optional(),
+      modelId: z.string().optional(),
+      sessionId: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      if (platform() === "win32") {
+        return { wslPrompt: true };
+      }
+
+      // Write the prompt to data/cli_prompt.json
+      const dataDir = PATHS.data;
+      writeFileSync(
+        join(dataDir, "cli_prompt.json"),
+        JSON.stringify({
+          prompt: input.prompt ?? "",
+          providerId: input.providerId ?? "",
+          modelId: input.modelId ?? "",
+          sessionId: input.sessionId ?? "",
+        }, null, 2)
+      );
+
+      // Search for terminal emulator
+      const terminalCandidates = [
+        "gnome-terminal",
+        "konsole",
+        "xfce4-terminal",
+        "kitty",
+        "alacritty",
+        "xterm",
+      ];
+      const found = await findExecutable(terminalCandidates);
+      if (found) {
+        const scriptPath = join(process.cwd(), "scripts", "omnecor-cli.js");
+        const shellCmd = `OMNECOR_DATA_DIR='${dataDir}' node '${scriptPath}'; exec bash`;
+        // rootDir is passed as an argument array — never embedded in a shell string
+        if (found.endsWith("gnome-terminal")) {
+          execFile(found, ["--working-directory", input.rootDir, "--", "bash", "-c", shellCmd], (err) => {
+            if (err) console.error("[openTerminal] Failed to spawn terminal:", err);
+          });
+        } else if (found.endsWith("konsole")) {
+          execFile(found, ["--workdir", input.rootDir, "-e", "bash", "-c", shellCmd], (err) => {
+            if (err) console.error("[openTerminal] Failed to spawn terminal:", err);
+          });
+        } else if (found.endsWith("xfce4-terminal")) {
+          execFile(found, ["--working-directory", input.rootDir, "-x", "bash", "-c", shellCmd], (err) => {
+            if (err) console.error("[openTerminal] Failed to spawn terminal:", err);
+          });
+        } else {
+          // xterm/kitty/alacritty fallback — rootDir passed via env var, never in shell string
+          execFile(found, ["-e", "bash", "-c", `cd "$OMNECOR_ROOT_DIR" && ${shellCmd}`], {
+            env: { ...process.env, OMNECOR_ROOT_DIR: input.rootDir },
+          }, (err) => {
+            if (err) console.error("[openTerminal] Failed to spawn terminal:", err);
+          });
+        }
+        return { success: true };
+      } else {
+        throw new Error("No terminal emulator found. Please open terminal in the project directory manually and run: node scripts/omnecor-cli.js");
+      }
+    }),
+
+  getPendingCliOutput: protectedProcedure
+    .input(z.object({ sessionId: z.string() }))
+    .query(async ({ input }) => {
+      const dataDir = PATHS.data;
+      const outputPath = join(dataDir, "cli_output.json");
+      if (existsSync(outputPath)) {
+        try {
+          const content = readFileSync(outputPath, "utf8");
+          const data = JSON.parse(content);
+          if (data.sessionId === input.sessionId && data.output) {
+            // Clear the file after it is read
+            try { writeFileSync(outputPath, "{}"); } catch {}
+            return { output: data.output };
+          }
+        } catch (err) {
+          console.error("Error reading cli_output.json:", err);
+        }
+      }
+      return { output: null };
+    }),
+
+  clearPendingCliOutput: protectedProcedure
+    .mutation(async () => {
+      const dataDir = PATHS.data;
+      const outputPath = join(dataDir, "cli_output.json");
+      if (existsSync(outputPath)) {
+        try { writeFileSync(outputPath, "{}"); } catch {}
+      }
+      return { success: true };
+    }),
 });

@@ -11,7 +11,6 @@ export const pipelineRouter = router({
     .mutation(async ({ ctx, input }) => {
       return PipelineEngineService.getInstance().createPipeline(input.name, input.goal, ctx.user!.id);
     }),
-
   getPipeline: protectedProcedure
     .input(z.object({ pipelineId: z.string() }))
     .query(async ({ input }) => {
@@ -19,11 +18,9 @@ export const pipelineRouter = router({
       if (!result) throw new TRPCError({ code: "NOT_FOUND", message: "Pipeline not found" });
       return result;
     }),
-
   listPipelines: protectedProcedure.query(async ({ ctx }) => {
     return PipelineEngineService.getInstance().listPipelines(ctx.user!.id);
   }),
-
   approvePhase: protectedProcedure
     .input(z.object({
       pipelineId: z.string(),
@@ -47,7 +44,6 @@ export const pipelineRouter = router({
       }).catch(() => {});
       return PipelineEngineService.getInstance().approvePhase(input.pipelineId, input.phase, ctx.user!.id);
     }),
-
   abortPipeline: protectedProcedure
     .input(z.object({ pipelineId: z.string() }))
     .mutation(async ({ ctx, input }) => {

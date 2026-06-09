@@ -253,23 +253,27 @@ export function convertToAIModel(
  * Pass the real models fetched via tRPC as the second argument.
  */
 export function getAllModels(selectedId?: string, externalModels?: AIModel[]): AIModel[] {
-  if (!externalModels?.length) return [];
-  return externalModels.map(m => ({ ...m, isSelected: m.id === selectedId }));
+  if (externalModels?.length) {
+    return externalModels.map(m => ({ ...m, isSelected: m.id === selectedId }));
+  }
+  const local = mockLocalModels.map(m => convertToAIModel(m, m.id === selectedId));
+  const api = mockAPIModels.map(m => convertToAIModel(m, m.id === selectedId));
+  return [...local, ...api];
 }
 
 /**
  * Get models by source
  */
-export function getModelsBySource(source: ModelSource): AIModel[] {
-  const allModels = getAllModels();
+export function getModelsBySource(source: ModelSource, externalModels?: AIModel[]): AIModel[] {
+  const allModels = getAllModels(undefined, externalModels);
   return allModels.filter(m => m.source === source);
 }
 
 /**
  * Get models by type
  */
-export function getModelsByType(type: "local" | "api"): AIModel[] {
-  const allModels = getAllModels();
+export function getModelsByType(type: "local" | "api", externalModels?: AIModel[]): AIModel[] {
+  const allModels = getAllModels(undefined, externalModels);
   return allModels.filter(m => m.type === type);
 }
 
@@ -303,15 +307,15 @@ export async function checkModelHealth(model: AIModel): Promise<ModelStatus> {
 /**
  * Get model by ID
  */
-export function getModelById(id: string): AIModel | undefined {
-  const allModels = getAllModels();
+export function getModelById(id: string, externalModels?: AIModel[]): AIModel | undefined {
+  const allModels = getAllModels(undefined, externalModels);
   return allModels.find(m => m.id === id);
 }
 
 /**
  * Get selected model
  */
-export function getSelectedModel(): AIModel | undefined {
-  const allModels = getAllModels();
+export function getSelectedModel(externalModels?: AIModel[]): AIModel | undefined {
+  const allModels = getAllModels(undefined, externalModels);
   return allModels.find(m => m.isSelected);
 }

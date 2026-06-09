@@ -1,7 +1,7 @@
 [![CodeQL](https://github.com/Clarkescustomcreations/OmnecorV1-Beta/actions/workflows/codeql.yml/badge.svg)](https://github.com/Clarkescustomcreations/OmnecorV1-Beta/actions/workflows/codeql.yml)
 <div align="center">
 
-<img src="assets/Logo.png" alt="Omnecor Logo" width="600" />
+<img src="assets/logo.png" alt="Omnecor Logo" width="600" />
 
 **The Sovereign AI Workstation. Where imagination becomes infrastructure.**
 
@@ -94,6 +94,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 
 ### Developer Experience
 - **Command Palette** — `Ctrl+K` global search and action launcher.
+- **Chat Slash Commands** — `/compress` (token compression), `/btw <note>` (Honcho-backed persistent context notes), `/skill` (save workflow as reusable skill), `/plan` (Valet-guided project planning), plus `/clear`, `/new`, `/system`, `/export`, `/help`. Autocomplete popup on `/`.
 - **Fine-Tuning UI** — Unsloth/LoRA training pipeline with live loss/accuracy charts.
 - **Valet Dataset Builder** — One-click JSONL training data generation from real audit + spend log history.
 - **YARA Security Scanning** — Integrated malware/threat pattern scanning for uploaded files.

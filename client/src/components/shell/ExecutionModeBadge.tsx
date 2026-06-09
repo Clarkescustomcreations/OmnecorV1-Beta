@@ -1,6 +1,7 @@
 import { useAppStore } from "@/lib/store/app.store";
 import { Badge } from "@/components/ui/badge";
 import { Lock, Zap, Flame } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const MODE_CONFIG = {
   sovereign: { label: "Sovereign", icon: Lock, className: "bg-red-500/15 text-red-600 border-red-500/30" },
@@ -8,13 +9,37 @@ const MODE_CONFIG = {
   big_spender: { label: "Big Spender", icon: Flame, className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
 };
 
-export default function ExecutionModeBadge() {
+interface ExecutionModeBadgeProps {
+  collapsed?: boolean;
+}
+
+export default function ExecutionModeBadge({ collapsed = false }: ExecutionModeBadgeProps) {
   const mode = useAppStore((s) => s.executionMode);
   const config = MODE_CONFIG[mode];
   const Icon = config.icon;
+
+  if (collapsed) {
+    const collapsedStyles = {
+      sovereign: "bg-red-500 text-white border-red-600",
+      scrapper: "bg-green-500 text-white border-green-600",
+      big_spender: "bg-amber-500 text-white border-amber-600",
+    };
+    return (
+      <div 
+        className={cn(
+          "w-10 h-10 rounded-lg flex items-center justify-center transition-all duration-200 border shadow-md",
+          collapsedStyles[mode]
+        )}
+        title={config.label}
+      >
+        <Icon className="h-5 w-5" />
+      </div>
+    );
+  }
+
   return (
-    <Badge variant="outline" className={`flex items-center gap-1 text-xs px-2 py-0.5 ${config.className}`}>
-      <Icon className="h-3 w-3" />
+    <Badge variant="outline" className={`flex items-center justify-center w-full gap-2 text-[13px] font-semibold px-3 py-1.5 rounded-md ${config.className}`}>
+      <Icon className="h-4 w-4" />
       {config.label}
     </Badge>
   );

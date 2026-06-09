@@ -51,6 +51,8 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import PersonaCreationPanel from "@/components/settings/PersonaCreationPanel";
+import { useNeuralMap } from "@/contexts/NeuralMapContext";
+import { Brain } from "lucide-react";
 
 const PERSONA_STORE_KEY = "omnecor_personas";
 
@@ -179,6 +181,18 @@ export default function AgentNetworking() {
   const [editScheduledAt, setEditScheduledAt] = useState("");
   const personas = loadPersonaList();
 
+  // Neural map link — when on, content discovery and curation context is scoped to active map
+  const { activeMap } = useNeuralMap();
+  const [linkedToMap, setLinkedToMap] = useState<boolean>(() => {
+    try { return localStorage.getItem("omnecor:agent_net_linked_to_map") === "true"; } catch { return false; }
+  });
+  const handleLinkToggle = (v: boolean) => {
+    setLinkedToMap(v);
+    localStorage.setItem("omnecor:agent_net_linked_to_map", String(v));
+    if (v && activeMap) toast.success(`Agent Networking linked to "${activeMap.name}"`);
+    else toast.info("Agent Networking unlinked — working independently");
+  };
+
   // Queries
   const { data: scheduledPostsData, isLoading: isLoadingScheduled, refetch: refetchScheduled } = trpc.scheduling.listScheduledPosts.useQuery({ limit: 50 });
   const { data: accountsData, isLoading: isLoadingAccounts, refetch: refetchAccounts } = trpc.platforms.listAccounts.useQuery();
@@ -263,6 +277,25 @@ export default function AgentNetworking() {
             </p>
           </div>
           <div className="flex items-center gap-3 flex-wrap">
+            {/* Link To Neural Map toggle */}
+            <div className={cn(
+              "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
+              linkedToMap
+                ? "bg-accent/10 border-accent/40 text-accent"
+                : "border-border text-muted-foreground"
+            )}>
+              <Brain className="w-3.5 h-3.5 flex-shrink-0" />
+              <span className="text-xs font-medium whitespace-nowrap">
+                {linkedToMap && activeMap ? activeMap.name : "Link To Neural Map"}
+              </span>
+              <Switch
+                checked={linkedToMap}
+                onCheckedChange={handleLinkToggle}
+                className="scale-75"
+                aria-label="Link Agent Networking to active neural map"
+              />
+            </div>
+
             {/* Agent / Persona selector */}
             <div className="flex items-center gap-2">
               <UserCircle2 className="w-4 h-4 text-muted-foreground" />
@@ -287,7 +320,7 @@ export default function AgentNetworking() {
               </Select>
             </div>
             <Button
-              onClick={() => fetchDiscoveryMutation.mutate({})}
+              onClick={() => fetchDiscoveryMutation.mutate(linkedToMap && activeMap ? { mapId: activeMap.id } as any : {})}
               disabled={fetchDiscoveryMutation.isPending}
               className="gap-2"
             >
@@ -935,7 +968,7 @@ function PlatformOAuthButtons({
   );
 
   const handleConnect = (platform: string) => {
-    getAuthUrlMutation.mutate({ platform });
+    getAuthUrlMutation.mutate({ platform: platform as any });
   };
 
   return (

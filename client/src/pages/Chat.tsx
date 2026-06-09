@@ -1,10 +1,17 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
+import { useLocation } from "wouter";
+import { cn } from "@/lib/utils";
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
 import ChatIntegrationBar from "@/components/chat/ChatIntegrationBar";
 import ChatInterface from "@/components/ChatInterface";
 import ContextTransparencyIndicator from "@/components/ContextTransparencyIndicator";
 import VisualContextMap from "@/components/VisualContextMap";
 import ConversationList from "@/components/chat/ConversationList";
+import MemoryArchiverPanel from "@/components/chat/MemoryArchiverPanel";
+import TerminalPanel from "@/components/chat/TerminalPanel";
+import CliTerminalWindow from "@/components/chat/CliTerminalWindow";
+import EmbeddedTerminal from "@/components/terminal/EmbeddedTerminal";
+import HITLCommandApproval from "@/components/terminal/HITLCommandApproval";
 import { vanillaTrpc, trpc } from "@/lib/trpc";
 import {
   ChatMessage,
@@ -25,8 +32,15 @@ import {
   deleteConversationFromStorage,
   renameConversationInStorage,
 } from "@/lib/chatContext";
+import {
+  getSavedScripts,
+  deleteScript,
+  updateScript,
+  type SavedScript,
+} from "@/lib/scriptStorage";
 import type { SlashCommand } from "@/components/chat/ChatInput";
 import { toast } from "sonner";
+import { useAppStore } from "@/lib/store/app.store";
 import {
   Dialog,
   DialogContent,
@@ -36,6 +50,16 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
+import { useUserPeerCard, buildPeerCardContext } from "@/lib/userPeerCard";
+import { useNeuralMap } from "@/contexts/NeuralMapContext";
+import { useNeuralContextStore } from "@/lib/neuralContextStore";
+import { useFictionMode } from "@/contexts/FictionModeContext";
+import { ChevronLeft, ChevronRight, Coins, FolderOpen, Box, Cpu, Globe, Maximize2, X, UserCircle2 } from "lucide-react";
+
+import ThreeViewer from "@/components/designer/ThreeViewer";
+import EnhancedPCBEditor from "@/components/pcb/EnhancedPCBEditor";
+import WebPreview from "@/components/designer/WebPreview";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -94,6 +118,7 @@ function readFileAsDataURL(file: File): Promise<string> {
 // Component
 // ---------------------------------------------------------------------------
 export default function Chat() {
+  const [, setLocation] = useLocation();
   // ── Model selection ──────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<SelectedModel | undefined>(
     () => {
@@ -110,6 +135,24 @@ export default function Chat() {
     setSelectedModel(model);
     localStorage.setItem("omnecor:selectedModel", JSON.stringify(model));
   }, []);
+
+  // ── Peer card context ─────────────────────────────────────────────────────
+  const { card: userPeerCard } = useUserPeerCard();
+  const { activeMap } = useNeuralMap();
+  const { entries: neuralContextFiles } = useNeuralContextStore();
+  const { isFictionMode } = useFictionMode();
+
+  // Fiction mode persona selector — load from global persona store
+  const [fictionPersonaId, setFictionPersonaId] = useState<string>(() =>
+    localStorage.getItem("omnecor:fiction_persona_id") ?? ""
+  );
+  const [fictionPersonas] = useState<Array<{ id: string; name: string; agentSystemPrompt?: string; bio?: string }>>(() => {
+    try { return JSON.parse(localStorage.getItem("omnecor_personas") ?? "[]"); } catch { return []; }
+  });
+  const peerCardContext = buildPeerCardContext(
+    userPeerCard,
+    activeMap?.settings.enableAIContext ? activeMap.projectContext : null
+  );
 
   // ── System prompt ────────────────────────────────────────────────────────
   const [systemPrompt, setSystemPrompt] = useState(
@@ -207,7 +250,8 @@ export default function Chat() {
     return createConversation("New Conversation", "default");
   });
 
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const sidebarCollapsed = useAppStore((s) => s.chatHistoryCollapsed);
+  const setSidebarCollapsed = useAppStore((s) => s.setChatHistoryCollapsed);
 
   // Debounced auto-save
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -222,6 +266,36 @@ export default function Chat() {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
   }, [conversation]);
+
+  // ── Saved Scripts ───────────────────────────────────────────────────────
+  const [scripts, setScripts] = useState<SavedScript[]>(() => getSavedScripts());
+
+  const handleSelectScript = useCallback((script: SavedScript) => {
+    // Inject script into chat with a request to reuse it
+    const injection = `Reuse my saved script "${script.name}" (from project: ${script.project}):\n\n\`\`\`${script.language}\n${script.code}\n\`\`\``;
+    // We'll pass this via a ref or state to ChatInterface to populate the input
+    window.dispatchEvent(new CustomEvent("omnecor:inject_chat", { detail: injection }));
+    toast.success(`Injected script "${script.name}" into input`);
+  }, []);
+
+  const handleDeleteScript = useCallback((id: string) => {
+    if (!confirm("Are you sure you want to delete this saved script?")) return;
+    deleteScript(id);
+    setScripts(getSavedScripts());
+    toast.success("Script deleted");
+  }, []);
+
+  const handleRenameScript = useCallback((id: string, name: string) => {
+    updateScript(id, { name });
+    setScripts(getSavedScripts());
+  }, []);
+
+  // Listen for "script saved" events from message bubbles
+  useEffect(() => {
+    const handler = () => setScripts(getSavedScripts());
+    window.addEventListener("omnecor:scripts_updated", handler);
+    return () => window.removeEventListener("omnecor:scripts_updated", handler);
+  }, []);
 
   // ── Conversation actions ─────────────────────────────────────────────────
   const handleNewConversation = useCallback(() => {
@@ -359,7 +433,19 @@ export default function Chat() {
       const honchoContext = honchoFacts?.length
         ? honchoFacts.map(f => `[Long-term memory: ${f.content}]`).join("\n")
         : "";
-      const fullSystem = [systemPrompt.trim(), btwContext, honchoContext].filter(Boolean).join("\n\n");
+      const neuralContext = neuralContextFiles.length > 0
+        ? `<neural_map_context>\nThe following files/folders are pinned from the neural map:\n${neuralContextFiles.map(f => `- ${f.nodeType === "folder" ? "📁" : "📄"} ${f.name} (${f.path})`).join("\n")}\n</neural_map_context>`
+        : "";
+      const activePersona = isFictionMode && fictionPersonaId
+        ? fictionPersonas.find(p => p.id === fictionPersonaId)
+        : undefined;
+      const personaContext = activePersona
+        ? `<active_persona>\nYou are roleplaying as: ${activePersona.name}.\n${activePersona.bio ? `Background: ${activePersona.bio}\n` : ""}${activePersona.agentSystemPrompt ? `Persona instructions: ${activePersona.agentSystemPrompt}\n` : ""}</active_persona>`
+        : "";
+      const fictionGuardrail = isFictionMode
+        ? `<fiction_mode_guardrails>\nYou are operating in FICTION MODE. Your role is limited to creative storytelling, roleplay, fiction writing, song lyrics, and poetry.\n\nYou MUST:\n- Stay in character and maintain the current roleplay/fiction narrative at all times\n- Keep all creative work grounded in the active story/fiction world\n- Support the user's storytelling, worldbuilding, and creative writing goals\n\nYou MUST NOT (these capabilities are disabled for this session):\n- Execute terminal commands or access the local filesystem outside the neural fiction map\n- Perform agent networking, post to social media, or run autonomous agents\n- Access wallets, make financial transactions, or manage budgets\n- Spin up cloud compute jobs or perform cloud-side automation\n- Perform system administration tasks on the host machine\n\nWeb search IS permitted to support research for the story.\nFile saves are permitted only within the active neural fiction map.\n\nIf asked to perform any blocked action, gently redirect back to the creative fiction context.\n</fiction_mode_guardrails>`
+        : "";
+      const fullSystem = [peerCardContext, systemPrompt.trim(), btwContext, honchoContext, neuralContext, personaContext, fictionGuardrail].filter(Boolean).join("\n\n");
       if (fullSystem) {
         apiMessages.push({ role: "system", content: fullSystem });
       }
@@ -402,6 +488,24 @@ export default function Chat() {
               const sid = conversation.id;
               addHonchoMessage.mutate({ openId, sessionId: sid, role: "user", content: userMsg.content });
               addHonchoMessage.mutate({ openId, sessionId: sid, role: "ai", content: assistantContent });
+              // Rolling buffer: auto-compress when conversation exceeds 50 messages
+              setConversation(prev => {
+                const ROLLING_BUFFER_LIMIT = 50;
+                if (prev.messages.length > ROLLING_BUFFER_LIMIT) {
+                  const kept = prev.messages.slice(-6);
+                  const compressed = prev.messages.slice(0, prev.messages.length - 6);
+                  const summaryMsg: ChatMessage = {
+                    id: crypto.randomUUID(),
+                    role: "system" as const,
+                    content: `[Auto-compressed: ${compressed.length} older messages summarized to manage context. Last 6 messages retained.]`,
+                    timestamp: new Date(),
+                    tokens: estimateTokens(`${compressed.length} messages compressed`),
+                  };
+                  toast.info(`Context auto-compressed: ${compressed.length} older messages summarized.`, { duration: 4000 });
+                  return { ...prev, messages: [summaryMsg, ...kept], updatedAt: new Date() };
+                }
+                return prev;
+              });
             }
           },
           onError(err) {
@@ -426,7 +530,7 @@ export default function Chat() {
 
       streamRef.current = sub;
     },
-    [selectedModel, systemPrompt, btwNotes, honchoFacts, openId, addHonchoMessage, conversation.id, excludedMessageIds]
+    [selectedModel, systemPrompt, btwNotes, honchoFacts, openId, addHonchoMessage, conversation.id, excludedMessageIds, isFictionMode, neuralContextFiles, peerCardContext, fictionPersonaId, fictionPersonas]
   );
 
   // ── Send message ─────────────────────────────────────────────────────────
@@ -628,7 +732,57 @@ export default function Chat() {
     [handleClearHistory, handleNewConversation, conversation, setConversation, selectedModel]
   );
 
-  // ── Context panel ────────────────────────────────────────────────────────
+  // ── Context panel collapse ──────────────────────────────────────────────
+  const contextCollapsed = useAppStore((s) => s.chatContextCollapsed);
+  const setContextCollapsed = useAppStore((s) => s.setChatContextCollapsed);
+
+  // ── Live Preview Panel ──────────────────────────────────────────────────
+  const [previewMode, setPreviewMode] = useState<"3d" | "pcb" | "web" | "none">("none");
+  const [previewCode, setPreviewCode] = useState<string>("");
+  const [showMemoryArchiver, setShowMemoryArchiver] = useState(false);
+  const [showTerminal, setShowTerminal] = useState(false);
+  const [showCliTerminal, setShowCliTerminal] = useState(false);
+
+  // ── Terminal output → chat context bridge ────────────────────────────────
+  const terminalOutputBuf = useRef<string[]>([]);
+  const terminalFlushTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const chunk = (e as CustomEvent<string>).detail;
+      if (!chunk) return;
+      terminalOutputBuf.current.push(chunk);
+      if (terminalFlushTimer.current) clearTimeout(terminalFlushTimer.current);
+      terminalFlushTimer.current = setTimeout(() => {
+        const output = terminalOutputBuf.current.join("").trim();
+        terminalOutputBuf.current = [];
+        if (!output || output.length < 5) return;
+        const injected = `[Terminal output]\n\`\`\`\n${output.slice(0, 3000)}\n\`\`\``;
+        setConversation(prev => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            {
+              id: crypto.randomUUID(),
+              role: "system" as const,
+              content: injected,
+              timestamp: new Date(),
+              tokens: Math.ceil(injected.length / 4),
+            },
+          ],
+          updatedAt: new Date(),
+        }));
+      }, 2000);
+    };
+    window.addEventListener("omnecor:terminal_output", handler);
+    return () => window.removeEventListener("omnecor:terminal_output", handler);
+  }, []);
+
+  const handleOpenPreview = useCallback((mode: "3d" | "pcb" | "web", code: string) => {
+    setPreviewMode(mode);
+    setPreviewCode(code);
+    setContextCollapsed(true); // Auto collapse context to make room
+  }, []);
+
   const transparency = useMemo(
     () => calculateContextTransparency(conversation),
     [conversation]
@@ -647,7 +801,11 @@ export default function Chat() {
           onDelete={handleDeleteConversation}
           onRename={handleRenameConversation}
           collapsed={sidebarCollapsed}
-          onToggleCollapse={() => setSidebarCollapsed(v => !v)}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          scripts={scripts}
+          onSelectScript={handleSelectScript}
+          onDeleteScript={handleDeleteScript}
+          onRenameScript={handleRenameScript}
         />
 
         {/* Main chat area */}
@@ -685,6 +843,7 @@ export default function Chat() {
             isLoading={isStreaming}
             conversationTitle={conversation.title}
             selectedModel={selectedModel}
+            conversationId={conversation.id}
             contextFiles={conversation.contextFiles}
             systemPrompt={systemPrompt}
             showSystemPrompt={showSystemPrompt}
@@ -714,25 +873,152 @@ export default function Chat() {
             maxTokens={transparency.maxTokens}
             excludedMessageIds={excludedMessageIds}
             onToggleExclusion={handleToggleExclusion}
+            onOpenPreview={handleOpenPreview}
+            onToggleMemory={() => setShowMemoryArchiver(v => !v)}
+            onToggleTerminal={isFictionMode ? undefined : () => setShowTerminal(v => !v)}
+            onToggleCliTerminal={isFictionMode ? undefined : () => setShowCliTerminal(v => !v)}
+            isFictionMode={isFictionMode}
+            fictionPersonas={fictionPersonas}
+            fictionPersonaId={fictionPersonaId}
+            onFictionPersonaChange={(id) => {
+              setFictionPersonaId(id);
+              localStorage.setItem("omnecor:fiction_persona_id", id);
+            }}
           />
           </div>
 
-          {/* Context panel */}
-          <div className="w-72 flex flex-col gap-3 overflow-hidden flex-shrink-0 hidden xl:flex">
-            <ContextTransparencyIndicator
-              transparency={transparency}
-              className="flex-shrink-0"
+          {/* Memory Archiver Panel */}
+          {showMemoryArchiver && conversation.id && (
+            <MemoryArchiverPanel 
+              sessionId={conversation.id} 
+              projectId="default" 
+              selectedModel={selectedModel}
             />
-            <VisualContextMap
-              files={conversation.contextFiles}
-              onToggleFile={id =>
-                setConversation(prev => toggleFileInContext(prev, id))
-              }
-              onRemoveFile={id =>
-                setConversation(prev => removeFileFromContext(prev, id))
-              }
-              className="flex-1 min-h-0"
-            />
+          )}
+
+          {/* Live Preview Panel */}
+          {previewMode !== "none" && (
+            <div className="w-96 lg:w-[400px] xl:w-[500px] flex flex-col gap-2 overflow-hidden flex-shrink-0 border border-border rounded-xl bg-card shadow-xl animate-in slide-in-from-right-4 duration-300 relative z-10">
+              <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
+                <div className="flex items-center gap-2">
+                  {previewMode === "3d" && <Box className="w-4 h-4 text-accent" />}
+                  {previewMode === "pcb" && <Cpu className="w-4 h-4 text-accent" />}
+                  {previewMode === "web" && <Globe className="w-4 h-4 text-accent" />}
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Live Preview
+                  </span>
+                </div>
+                <div className="flex items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 hover:bg-accent/20 hover:text-accent"
+                    title="Edit in Designer (Current Tab)"
+                    onClick={() => {
+                      localStorage.setItem("omnecor:designer_code", previewCode);
+                      localStorage.setItem("omnecor:designer_mode", previewMode);
+                      setLocation("/3d-designer");
+                    }}
+                  >
+                    <ChevronRight className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="w-6 h-6 hover:bg-accent/20 hover:text-accent"
+                    title="Pop out to new window"
+                    onClick={() => {
+                      localStorage.setItem("omnecor:designer_code", previewCode);
+                      localStorage.setItem("omnecor:designer_mode", previewMode);
+                      window.open("/3d-designer", "_blank");
+                    }}
+                  >
+                    <Maximize2 className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="w-6 h-6 hover:bg-destructive/20 hover:text-destructive"
+                    onClick={() => setPreviewMode("none")}
+                  >
+                    <X className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </div>
+              <div className="flex-1 overflow-hidden relative bg-slate-950">
+                {previewMode === "3d" && <ThreeViewer code={previewCode} />}
+                {previewMode === "pcb" && <EnhancedPCBEditor />}
+                {previewMode === "web" && <WebPreview code={previewCode} />}
+              </div>
+            </div>
+          )}
+
+          {/* Context panel (Collapsible) */}
+          <div className={cn(
+            "flex flex-col gap-3 transition-all duration-300 overflow-hidden flex-shrink-0 hidden xl:flex",
+            contextCollapsed ? "w-10 items-center" : "w-72"
+          )}>
+            <HowToTooltip 
+              title={contextCollapsed ? "Expand Context" : "Collapse Context"} 
+              description="Toggle the visibility of real-time context transparency and file mapping panels."
+              side="left"
+            >
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 mb-1"
+                onClick={() => setContextCollapsed(!contextCollapsed)}
+              >
+                {contextCollapsed ? <ChevronLeft className="w-4 h-4" /> : <ChevronRight className="w-4 h-4" />}
+              </Button>
+            </HowToTooltip>
+            
+            {!contextCollapsed && (
+              <>
+                <HowToTooltip title="Context Transparency" description="Monitor exactly how many tokens are being used by the system prompt, chat history, and files." side="left">
+                  <div>
+                    <ContextTransparencyIndicator
+                      transparency={transparency}
+                      className="flex-shrink-0"
+                    />
+                  </div>
+                </HowToTooltip>
+                <HowToTooltip title="Visual Context Map" description="Manage which local files are currently being 'read' by the AI. Toggle files to keep context lean." side="left">
+                  <div>
+                    <VisualContextMap
+                      files={conversation.contextFiles}
+                      onToggleFile={id =>
+                        setConversation(prev => toggleFileInContext(prev, id))
+                      }
+                      onRemoveFile={id =>
+                        setConversation(prev => removeFileFromContext(prev, id))
+                      }
+                      className="flex-1 min-h-0"
+                    />
+                  </div>
+                </HowToTooltip>
+              </>
+            )}
+            {contextCollapsed && (
+              <div className="flex flex-col gap-6 pt-4 text-muted-foreground">
+                <HowToTooltip title="Tokens Used" description="Current total token usage across all context sources." side="left">
+                  <div className="flex flex-col items-center gap-1 cursor-help">
+                    <Coins className="w-4 h-4" />
+                    <span className="text-[10px] font-mono">
+                      {Math.round(transparency.totalTokens / 1000)}k
+                    </span>
+                  </div>
+                </HowToTooltip>
+                <HowToTooltip title="Active Files" description="Total number of local files currently injected into the AI's memory." side="left">
+                  <div className="flex flex-col items-center gap-1 cursor-help">
+                    <FolderOpen className="w-4 h-4" />
+                    <span className="text-[10px] font-mono">
+                      {conversation.contextFiles.length}
+                    </span>
+                  </div>
+                </HowToTooltip>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -790,6 +1076,23 @@ export default function Chat() {
           </DialogFooter>
         </DialogContent>
       </Dialog>
+    {!isFictionMode && (
+      <TerminalPanel
+        isOpen={showTerminal}
+        onToggle={() => setShowTerminal(v => !v)}
+        projectId={conversation.id}
+      />
+    )}
+    {!isFictionMode && (
+      <EmbeddedTerminal
+        isOpen={showCliTerminal}
+        onClose={() => setShowCliTerminal(false)}
+        projectId={conversation.id}
+      />
+    )}
+    {/* HITL command approval dialog — rendered at root so it floats above everything */}
+    <HITLCommandApproval />
     </OmnecorDashboardLayout>
+
   );
 }

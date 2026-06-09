@@ -2,34 +2,9 @@ packages:
   - "."
   - "packaging/electron-app"
 
-# Dependency `overrides` MUST live here, not in the root package.json's `pnpm`
-# field. In a pnpm workspace (this repo has a pnpm-workspace.yaml) pnpm 10.x
-# reads settings from this file and IGNORES the `pnpm` field in package.json —
-# pnpm prints "The 'pnpm' field in package.json is no longer read by pnpm" and
-# silently drops it. Keeping overrides here is what makes the tar/rollup/etc.
-# security pins actually apply.
-overrides:
-  # Build/tooling pins
-  "tailwindcss>nanoid": "3.3.7"
-  "@builder.io/vite-plugin-jsx-loc": "0.1.1"
-  "@esbuild-kit/core-utils>esbuild": ">=0.25.0"
-  # Security pins (CVE / GHSA remediation — keep floors, allow forward patches)
-  "fast-xml-parser": ">=5.5.6"
-  "tar": ">=7.5.11"
-  "rollup": ">=4.59.0"
-  "path-to-regexp": ">=0.1.13"
-  "dompurify": ">=3.4.0"
-  "lodash": ">=4.18.0"
-  "lodash-es": ">=4.18.0"
-  "mermaid": ">=11.15.0"
-  "mdast-util-to-hast": ">=13.2.1"
-  # Dev-tree advisories (build tooling): ReDoS, CSS-stringify XSS, pnpm lockfile/script bypass
-  "picomatch": ">=4.0.4"
-  "postcss": ">=8.5.10"
-  "pnpm": ">=10.28.2"
-
-patchedDependencies:
-  "wouter@3.7.1": patches/wouter@3.7.1.patch
+ignoredBuiltDependencies:
+  - "@tailwindcss/oxide"
+  - "esbuild"
 
 # Native modules whose install/build script MUST run so the compiled binding
 # (or downloaded prebuilt) is present. pnpm v10 blocks all build scripts by
@@ -38,8 +13,34 @@ patchedDependencies:
 onlyBuiltDependencies:
   - "better-sqlite3"
   - "electron"
+  - "node-pty"
   - "onnxruntime-node"
 
-ignoredBuiltDependencies:
-  - "@tailwindcss/oxide"
-  - "esbuild"
+# Dependency `overrides` MUST live here, not in the root package.json's `pnpm`
+# field. In a pnpm workspace (this repo has a pnpm-workspace.yaml) pnpm 10.x
+# reads settings from this file and IGNORES the `pnpm` field in package.json —
+# pnpm prints "The 'pnpm' field in package.json is no longer read by pnpm" and
+# silently drops it. Keeping overrides here is what makes the tar/rollup/etc.
+# security pins actually apply.
+overrides:
+  # Build/tooling pins
+  "@builder.io/vite-plugin-jsx-loc": "0.1.1"
+  "@esbuild-kit/core-utils>esbuild": ">=0.25.0"
+  "dompurify": ">=3.4.0"
+  # Security pins (CVE / GHSA remediation — keep floors, allow forward patches)
+  "fast-xml-parser": ">=5.5.6"
+  "lodash": ">=4.18.0"
+  "lodash-es": ">=4.18.0"
+  "mdast-util-to-hast": ">=13.2.1"
+  "mermaid": ">=11.15.0"
+  "path-to-regexp": ">=0.1.13"
+  # Dev-tree advisories (build tooling): ReDoS, CSS-stringify XSS, pnpm lockfile/script bypass
+  "picomatch": ">=4.0.4"
+  "pnpm": ">=10.28.2"
+  "postcss": ">=8.5.10"
+  "rollup": ">=4.59.0"
+  "tailwindcss>nanoid": "3.3.7"
+  "tar": ">=7.5.11"
+
+patchedDependencies:
+  "wouter@3.7.1": patches/wouter@3.7.1.patch

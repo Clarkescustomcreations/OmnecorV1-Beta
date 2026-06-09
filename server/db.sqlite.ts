@@ -22,6 +22,7 @@ import {
 import path from "path";
 import fs from "fs";
 import { createLogger } from "./_core/logger.js";
+import { PATHS } from "./_core/paths.js";
 
 const log = createLogger("db:sqlite");
 
@@ -29,7 +30,7 @@ const log = createLogger("db:sqlite");
 // Schema — mirrors MySQL schema using SQLite-compatible types
 // ---------------------------------------------------------------------------
 
-const users = sqliteTable("users", {
+export const users = sqliteTable("users", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   openId: text("openId").notNull().unique(),
   name: text("name"),
@@ -75,9 +76,7 @@ type SqliteInsertChatMessage = typeof chatMessages.$inferInsert;
 
 let _sqliteDb: ReturnType<typeof drizzle> | null = null;
 
-const SQLITE_PATH =
-  process.env.SQLITE_PATH ??
-  path.join(process.cwd(), "data", "omnecor.db");
+const SQLITE_PATH = process.env.SQLITE_PATH ?? PATHS.sqlite;
 
 export function getSqliteDb(): ReturnType<typeof drizzle> {
   if (_sqliteDb) return _sqliteDb;

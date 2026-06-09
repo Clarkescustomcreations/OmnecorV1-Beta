@@ -70,6 +70,8 @@ export const knowledgeBaseRouter = router({
   /**
    * Delete a project's memory collection entirely.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   deleteCollection: protectedProcedure
     .input(projectIdSchema)
     .mutation(async ({ ctx, input }) => {
@@ -86,6 +88,8 @@ export const knowledgeBaseRouter = router({
    * This is the primary mechanism for the "Add Folder as Knowledge Base"
    * feature in the Settings panel.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   ingestDirectory: protectedProcedure
     .input(ingestDirectorySchema)
     .mutation(async ({ ctx, input }) => {
@@ -118,6 +122,8 @@ export const knowledgeBaseRouter = router({
    * Ingest a single text document into project memory.
    * Useful for adding notes, summaries, or external content.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   ingestDocument: protectedProcedure
     .input(ingestDocumentSchema)
     .mutation(async ({ ctx, input }) => {
@@ -156,6 +162,8 @@ export const knowledgeBaseRouter = router({
    *
    * Returns a formatted string ready for prompt injection.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   retrieveContext: protectedProcedure
     .input(retrieveContextSchema)
     .query(async ({ ctx, input }) => {
@@ -179,6 +187,8 @@ export const knowledgeBaseRouter = router({
    * Bridges Layer 3 (Episodic/conversation history) → Layer 2 (Long-Term).
    * Called when a conversation session ends or at periodic intervals.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   consolidate: protectedProcedure
     .input(consolidateSchema)
     .mutation(async ({ ctx, input }) => {

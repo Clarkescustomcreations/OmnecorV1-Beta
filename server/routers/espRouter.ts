@@ -6,7 +6,7 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc.js";
+import { publicProcedure, protectedProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 
@@ -34,12 +34,12 @@ export const espRouter = router({
   }),
 
   /** Detect connected serial ports */
-  detectPorts: publicProcedure.query(async ({ ctx }) => {
+  detectPorts: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.esp.detectPorts();
   }),
 
   /** Get chip information from connected device */
-  getChipInfo: publicProcedure
+  getChipInfo: protectedProcedure
     .input(z.object({ port: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       try {
@@ -53,7 +53,7 @@ export const espRouter = router({
     }),
 
   /** Flash firmware to ESP device */
-  flash: publicProcedure
+  flash: protectedProcedure
     .input(espFlashSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -68,7 +68,7 @@ export const espRouter = router({
     }),
 
   /** Erase ESP flash memory */
-  erase: publicProcedure
+  erase: protectedProcedure
     .input(z.object({ port: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       try {
@@ -83,7 +83,9 @@ export const espRouter = router({
     }),
 
   /** Read ESP flash memory to a file */
-  read: publicProcedure
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
+  read: protectedProcedure
     .input(
       z.object({
         port: z.string().min(1),

@@ -34,7 +34,7 @@ PACKAGE_NAME="omnecor-hmci"
 ARCH="amd64"
 
 DIST_DIR="$PROJECT_ROOT/dist"
-BUILD_DIR="$DIST_DIR/deb-build"
+BUILD_DIR="$PROJECT_ROOT/packaging/deb-build"
 DEB_ROOT="$BUILD_DIR/${PACKAGE_NAME}_${VERSION}_${ARCH}"
 
 echo "═══════════════════════════════════════════════════════════════"
@@ -67,6 +67,8 @@ mkdir -p "$DEB_ROOT/opt/omnecor/scripts"
 mkdir -p "$DEB_ROOT/usr/bin"
 mkdir -p "$DEB_ROOT/usr/share/applications"
 mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/256x256/apps"
+mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/512x512/apps"
+mkdir -p "$DEB_ROOT/usr/share/icons/hicolor/1024x1024/apps"
 mkdir -p "$DEB_ROOT/etc/omnecor"
 mkdir -p "$DEB_ROOT/var/lib/omnecor"
 mkdir -p "$DEB_ROOT/var/log/omnecor"
@@ -76,6 +78,11 @@ mkdir -p "$DEB_ROOT/opt/omnecor/packaging/scripts"
 
 # --- Copy app files ---
 echo "[4/7] Copying application files..."
+
+# Icons
+cp "$PROJECT_ROOT/assets/logo_mark_256.png" "$DEB_ROOT/usr/share/icons/hicolor/256x256/apps/omnecor.png"
+cp "$PROJECT_ROOT/assets/logo_mark_512.png" "$DEB_ROOT/usr/share/icons/hicolor/512x512/apps/omnecor.png"
+cp "$PROJECT_ROOT/assets/app_icon_1024.png" "$DEB_ROOT/usr/share/icons/hicolor/1024x1024/apps/omnecor.png"
 
 # Backend (compiled dist + source)
 [ -d "$PROJECT_ROOT/dist" ] && cp -r "$PROJECT_ROOT/dist" "$DEB_ROOT/opt/omnecor/backend/"

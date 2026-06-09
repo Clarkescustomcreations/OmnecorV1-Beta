@@ -93,3 +93,19 @@ export async function getChatMessages(...args: Parameters<DbModule["getChatMessa
   const rows = await (await sqlite()).getChatMessages(...args);
   return rows as Awaited<ReturnType<DbModule["getChatMessages"]>>;
 }
+
+export async function updateUserExecutionMode(userId: number, mode: "sovereign" | "scrapper" | "big_spender") {
+  const { eq } = await import("drizzle-orm");
+  if (isMySql) {
+    const db = await (await mysql()).getDb();
+    if (db) {
+      const { users } = await import("../drizzle/schema.js");
+      await db.update(users).set({ executionMode: mode }).where(eq(users.id, userId));
+    }
+  } else {
+    const db = (await sqlite()).getSqliteDb();
+    const { users } = await import("./db.sqlite.js");
+    await db.update(users).set({ executionMode: mode }).where(eq(users.id, userId as any));
+  }
+}
+

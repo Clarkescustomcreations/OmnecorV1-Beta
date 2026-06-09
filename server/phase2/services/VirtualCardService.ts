@@ -114,6 +114,7 @@ export class VirtualCardService {
         body: JSON.stringify(body),
         circuitKey: "lithic",
         timeoutMs: 20_000,
+        noRetry: process.env.NODE_ENV === "test",
       });
     } catch (err) {
       if (err instanceof CircuitOpenError) {

@@ -5,8 +5,19 @@ import { SecurityManager } from './SecurityManager.js';
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("OMMESH:Discovery");
 
+interface PeerInfo {
+  name: string;
+  address: string;
+  port: number;
+  fingerprint: string;
+  capabilities: any[];
+  discoveredAt: Date;
+}
+
 export class DiscoveryService {
   private bonjourInstance: any;
+  private browser: any;
+  private peers = new Map<string, PeerInfo>();
 
   constructor(private identity: NodeIdentity, private security: SecurityManager) {
     this.bonjourInstance = (bonjour as any)();
@@ -14,7 +25,7 @@ export class DiscoveryService {
 
   async startMdnsBeacon() {
     log.info("Starting mDNS beacon", { nodeId: this.identity.id });
-    
+
     try {
       this.bonjourInstance.publish({
         name: this.identity.id,
@@ -26,9 +37,12 @@ export class DiscoveryService {
         }
       });
 
-      // Browse for peers
-      this.bonjourInstance.find({ type: 'omnecor' }, (service: any) => {
-        this.handlePeerDiscovery(service);
+      // Browse for peers using event-based browser for up/down tracking
+      this.browser = this.bonjourInstance.find({ type: 'omnecor' });
+      this.browser.on('up', (service: any) => this.handlePeerDiscovery(service));
+      this.browser.on('down', (service: any) => {
+        this.peers.delete(service.name);
+        log.info("Peer left mesh", { name: service.name });
       });
     } catch (err) {
       console.error('❌ Failed to start mDNS beacon:', err);
@@ -38,19 +52,27 @@ export class DiscoveryService {
   private handlePeerDiscovery(service: any) {
     // Basic validation: don't discover ourselves
     if (service.name === this.identity.id) return;
-    
-    log.info("Discovered OMMESH peer", { name: service.name, address: service.addresses[0], port: service.port });
-    // Further validation and trust logic would happen here or in MeshNode
+
+    const peerInfo: PeerInfo = {
+      name: service.name,
+      address: service.addresses?.[0] ?? service.host ?? "unknown",
+      port: service.port,
+      fingerprint: service.txt?.fingerprint ?? "",
+      capabilities: (() => {
+        try { return JSON.parse(service.txt?.capabilities ?? "[]"); } catch { return []; }
+      })(),
+      discoveredAt: new Date(),
+    };
+
+    this.peers.set(service.name, peerInfo);
+    log.info("Peer added to mesh", { name: service.name, address: peerInfo.address, port: peerInfo.port });
   }
 
   /**
    * Broadcast a fingerprint update to the mesh.
-   * This is a simplified version; in a real mesh, this might be a 
-   * signed message sent to all known peer WebSockets.
    */
   async broadcastFingerprintUpdate(newFingerprint: string) {
     log.info("Broadcasting fingerprint update", { fingerprint: newFingerprint });
-    // Re-publish the beacon with the new fingerprint
     try {
       this.bonjourInstance.unpublishAll(() => {
         this.startMdnsBeacon();
@@ -60,8 +82,7 @@ export class DiscoveryService {
     }
   }
 
-  getPeers() {
-    // Returns a list of currently discovered services
-    return []; // Implementation would track these in a Map
+  getPeers(): PeerInfo[] {
+    return Array.from(this.peers.values());
   }
 }

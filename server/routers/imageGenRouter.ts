@@ -10,7 +10,6 @@ export const imageGenRouter = router({
     fal: !!process.env.FAL_KEY,
     openart: OpenArtService.getInstance().isConfigured(),
   })),
-
   generate: protectedProcedure
     .input(z.object({
       prompt: z.string().min(1).max(500),

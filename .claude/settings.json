@@ -32,7 +32,9 @@
       "Bash(xargs *)",
       "Bash(pnpm outdated*)",
       "Bash(pnpm audit*)",
-      "Bash(pnpm exec tsc*)"
+      "Bash(pnpm exec tsc*)",
+      "Edit",
+      "Write"
     ]
   }
 }

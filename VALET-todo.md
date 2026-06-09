@@ -312,6 +312,8 @@ Legend: `[ ]` todo · `[x]` done · 🔴 blocker · ⚠️ risk · 💡 nice-to-
       - [ ] eval thresholds met and beat keyword baseline
       - [ ] docs match reality
 
+  *Status Update (2026-06-09):* Valet 1.5B router evaluation is running on another PC. Training has completed, and the model is being finalized for integration.
+
   *Implementation notes (2026-06-02):*
   - `.github/workflows/valet-build.yml` — new GPU-runner CI job (self-hosted, gpu label)
   - `scripts/check_valet_reproducibility.py` — deterministic dataset diff check

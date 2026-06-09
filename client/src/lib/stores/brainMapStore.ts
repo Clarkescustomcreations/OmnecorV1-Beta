@@ -5,7 +5,10 @@ interface BrainMapState {
   nodes: Node[];
   edges: Edge[];
   projectId: string | null;
-  
+
+  // Folder collapse/expand state — IDs of folders whose children are hidden
+  collapsedFolderIds: string[];
+
   // Actions
   setProjectId: (id: string | null) => void;
   setNodes: (nodes: Node[] | ((prev: Node[]) => Node[])) => void;
@@ -13,12 +16,14 @@ interface BrainMapState {
   onNodesChange: OnNodesChange;
   onEdgesChange: OnEdgesChange;
   onConnect: (connection: Connection) => void;
-  
+  toggleFolderCollapse: (id: string) => void;
+  isFolderCollapsed: (id: string) => boolean;
+
   // Window management state
   windowMode: 'embedded' | 'floating' | 'external';
   windowPosition: { x: number; y: number };
   windowSize: { width: number; height: number };
-  
+
   setWindowMode: (mode: 'embedded' | 'floating' | 'external') => void;
   setWindowPosition: (pos: { x: number; y: number }) => void;
   setWindowSize: (size: { width: number; height: number }) => void;
@@ -30,12 +35,13 @@ export const useBrainMapStore = create<BrainMapState>((set, get) => ({
   nodes: [],
   edges: [],
   projectId: null,
+  collapsedFolderIds: [],
   windowMode: 'embedded',
   windowPosition: { x: 100, y: 100 },
   windowSize: { width: 800, height: 600 },
 
   setProjectId: (id) => {
-    set({ projectId: id });
+    set({ projectId: id, collapsedFolderIds: [] }); // reset collapse state on project switch
     syncChannel.postMessage({ type: 'setProjectId', payload: id });
   },
 
@@ -69,11 +75,21 @@ export const useBrainMapStore = create<BrainMapState>((set, get) => ({
     syncChannel.postMessage({ type: 'setEdges', payload: nextEdges });
   },
 
+  toggleFolderCollapse: (id) => {
+    set(s => ({
+      collapsedFolderIds: s.collapsedFolderIds.includes(id)
+        ? s.collapsedFolderIds.filter(x => x !== id)
+        : [...s.collapsedFolderIds, id],
+    }));
+  },
+
+  isFolderCollapsed: (id) => get().collapsedFolderIds.includes(id),
+
   setWindowMode: (mode) => {
     set({ windowMode: mode });
     syncChannel.postMessage({ type: 'setWindowMode', payload: mode });
   },
-  
+
   setWindowPosition: (pos) => set({ windowPosition: pos }),
   setWindowSize: (size) => set({ windowSize: size }),
 }));
@@ -82,7 +98,7 @@ export const useBrainMapStore = create<BrainMapState>((set, get) => ({
 syncChannel.onmessage = (event) => {
   const { type, payload } = event.data;
   const store = useBrainMapStore.getState();
-  
+
   switch (type) {
     case 'setProjectId':
       if (store.projectId !== payload) useBrainMapStore.setState({ projectId: payload });

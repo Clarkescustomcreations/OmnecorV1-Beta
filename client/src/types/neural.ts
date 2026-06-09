@@ -11,12 +11,22 @@ export interface CloudProviderConfig {
   authRef: string;
 }
 
+export interface ProjectPeerCard {
+  description?: string;
+  techStack?: string[];
+  goals?: string[];
+  team?: string[];
+  notes?: string;
+}
+
 export interface NeuralBrainMap {
   id: string;
   name: string;
   mode: NeuralMapMode;
   rootDirectories: string[];
   cloudProviders?: CloudProviderConfig[];
+  projectContext?: ProjectPeerCard;
+  labelOverrides?: Record<string, string>;
   settings: {
     autoWatch: boolean;
     realtimeSync: boolean;

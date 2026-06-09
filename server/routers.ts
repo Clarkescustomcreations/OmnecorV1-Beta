@@ -45,11 +45,13 @@ import { blenderRouter } from "./routers/blenderRouter.js";
 import { kicadRouter } from "./routers/kicadRouter.js";
 import { espRouter } from "./routers/espRouter.js";
 import { voiceRouter } from "./routers/voiceRouter.js";
+import { podcastRouter } from "./routers/podcastRouter.js";
 import { trainingRouter } from "./routers/trainingRouter.js";
 import { projectRouter } from "./routers/projectRouter.js";
 import { agentRouter } from "./phase2/routers/agentRouter.js";
 import { securityRouter } from "./routers/securityRouter.js";
 import { ommeshRouter } from "./routers/ommesh.router.js";
+import { pcbEditorRouter } from "./routers/pcbEditorRouter.js";
 import { falRouter } from "./routers/falRouter.js";
 import { comfyRouter } from "./routers/comfyRouter.js";
 import { walletRouter } from "./routers/walletRouter.js";
@@ -70,6 +72,9 @@ import { platformsRouter } from "./routers/platformsRouter.js";
 import { analyticsRouter } from "./routers/analyticsRouter.js";
 import { agentSettingsRouter } from "./routers/agentSettingsRouter.js";
 import { oauthRouter } from "./routers/oauthRouter.js";
+import { attachmentsRouter } from "./routers/attachmentsRouter.js";
+import { neuralMapsRouter } from "./routers/neuralMapsRouter.js";
+import { personaRouter } from "./routers/personaRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -101,6 +106,7 @@ export const appRouter = router({
 
   // ─── Voice Services (Whisper + TTS + RVC FastAPI proxy) ───────────────────
   voice: voiceRouter,
+  podcast: podcastRouter,
 
   // ─── Training (LoRA fine-tuning job control) ──────────────────────────────
   training: trainingRouter,
@@ -112,7 +118,7 @@ export const appRouter = router({
   agent: agentRouter,
 
   // ─── Mesh Intelligence (OMMESH Node Discovery) ───────────────────────────
-  mesh: ommeshRouter,
+  ommesh: ommeshRouter,
 
   // ─── OpenArt AI (Video Clone / Character Gen) ─────────────────────────────
   fal: falRouter,
@@ -129,6 +135,7 @@ export const appRouter = router({
   // ─── Hardware (Specialized integration bridges) ───────────────────────────
   blender: blenderRouter,
   kicad: kicadRouter,
+  pcbEditor: pcbEditorRouter,
   esp: espRouter,
 
   // ─── Security (File scanning + Encryption + Backup/Restore) ───────────────
@@ -169,6 +176,15 @@ export const appRouter = router({
   analytics: analyticsRouter,
   settings: agentSettingsRouter,
   oauth: oauthRouter,
+
+  // ─── File Attachments (pre-upload before chat send) ───────────────────────
+  attachments: attachmentsRouter,
+
+  // ─── Neural Brain Maps (DB persistence) ──────────────────────────────────
+  neuralMaps: neuralMapsRouter,
+
+  // ─── Personas (DB persistence) ───────────────────────────────────────────
+  personas: personaRouter,
 });
 
 export type AppRouter = typeof appRouter;

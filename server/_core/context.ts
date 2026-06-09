@@ -24,6 +24,7 @@ import type { CreateExpressContextOptions } from "@trpc/server/adapters/express"
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import { ENV } from "./env.js";
+import { getUserByOpenId, upsertUser } from "../db.factory.js";
 
 // ─── Phase 2 Service Imports ────────────────────────────────────────────────
 // These are the singleton services from the Phase 2 backend.
@@ -116,17 +117,27 @@ export async function createContext(
   let user: User | null = null;
 
   if (ENV.zeroLoginMode) {
+    let dbUser = await getUserByOpenId("local-zero-login");
+    if (!dbUser) {
+      await upsertUser({
+        openId: "local-zero-login",
+        name: "Local Admin",
+        role: "admin",
+        executionMode: "scrapper",
+      });
+      dbUser = await getUserByOpenId("local-zero-login");
+    }
     user = {
-      id: 0,
+      id: dbUser?.id ?? 0,
       openId: "local-zero-login",
       name: "Local Admin",
       email: null,
       loginMethod: "zero-login",
       role: "admin",
-      executionMode: "sovereign",
-      createdAt: new Date(),
-      updatedAt: new Date(),
-      lastSignedIn: new Date(),
+      executionMode: dbUser?.executionMode ?? "scrapper",
+      createdAt: dbUser?.createdAt ?? new Date(),
+      updatedAt: dbUser?.updatedAt ?? new Date(),
+      lastSignedIn: dbUser?.lastSignedIn ?? new Date(),
     } satisfies User;
   } else {
     try {

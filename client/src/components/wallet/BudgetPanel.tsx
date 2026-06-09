@@ -51,21 +51,30 @@ export default function BudgetPanel({ projectId, className }: BudgetPanelProps) 
       </CardHeader>
       <CardContent>
         <div className="flex items-center gap-4">
-          <div className="w-24 h-24 flex-shrink-0">
-            <ResponsiveContainer width="100%" height="100%">
-              <RadialBarChart
-                cx="50%"
-                cy="50%"
-                innerRadius="60%"
-                outerRadius="100%"
-                data={chartData}
-                startAngle={90}
-                endAngle={-270}
-              >
-                <RadialBar dataKey="value" cornerRadius={4} background={{ fill: "oklch(0.2 0 0)" }} />
-                <Tooltip formatter={(v: number) => [`${v.toFixed(1)}%`, "Used"]} />
-              </RadialBarChart>
-            </ResponsiveContainer>
+          <div className="flex flex-col items-center gap-1">
+            <div className="w-24 h-24 flex-shrink-0">
+              <ResponsiveContainer width="100%" height="100%">
+                <RadialBarChart
+                  cx="50%"
+                  cy="50%"
+                  innerRadius="60%"
+                  outerRadius="100%"
+                  data={chartData}
+                  startAngle={90}
+                  endAngle={-270}
+                >
+                  <RadialBar 
+                    dataKey="value" 
+                    cornerRadius={4} 
+                    background={{ fill: "oklch(0.2 0 0)" }}
+                    isAnimationActive={false}
+                  />
+                </RadialBarChart>
+              </ResponsiveContainer>
+            </div>
+            <p className="text-[11px] font-bold font-mono text-accent tracking-tighter">
+              %{percentUsed.toFixed(1)}
+            </p>
           </div>
           <div className="flex-1 space-y-1">
             <p className="text-2xl font-bold">{formatCents(spentCents)}</p>

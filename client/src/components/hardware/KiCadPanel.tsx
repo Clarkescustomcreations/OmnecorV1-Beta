@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { trpc } from "../../lib/trpc";
 import { Button } from "../ui/button";
 import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
@@ -10,6 +10,7 @@ import { toast } from "sonner";
 
 export const KiCadPanel: React.FC = () => {
   const [activeProject, setActiveProject] = useState<string | null>(null);
+  const [bomDownloadEnabled, setBomDownloadEnabled] = useState(false);
 
   const statusQuery = trpc.kicad.status.useQuery();
   const drcMutation = trpc.kicad.runDRC.useMutation({
@@ -21,6 +22,23 @@ export const KiCadPanel: React.FC = () => {
   const bomMutation = trpc.kicad.exportBOM.useMutation({
     onError: (err) => toast.error("BOM export failed: " + err.message),
   });
+  const bomDownloadQuery = trpc.kicad.downloadBOM.useQuery(
+    { outputFile: "bom.csv" },
+    { enabled: bomDownloadEnabled }
+  );
+
+  useEffect(() => {
+    if (bomDownloadQuery.data?.content) {
+      const blob = new Blob([bomDownloadQuery.data.content], { type: "text/csv" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = bomDownloadQuery.data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      setBomDownloadEnabled(false);
+    }
+  }, [bomDownloadQuery.data]);
 
   const handleOpenProject = () => {
     setActiveProject("project.kicad_pro");
@@ -91,7 +109,14 @@ export const KiCadPanel: React.FC = () => {
             {bomMutation.isSuccess ? (
                 <div className="p-8 text-center bg-green-500/5 border border-green-500/20 rounded-lg">
                     <p className="text-sm font-medium text-green-600">BOM generated successfully!</p>
-                    <Button variant="link" className="text-xs">Download bom.csv</Button>
+                    <Button
+                      variant="link"
+                      className="text-xs"
+                      onClick={() => setBomDownloadEnabled(true)}
+                      disabled={bomDownloadQuery.isFetching}
+                    >
+                      {bomDownloadQuery.isFetching ? "Downloading..." : "Download bom.csv"}
+                    </Button>
                 </div>
             ) : (
                 <div className="py-12 text-center text-muted-foreground italic">No BOM generated yet</div>

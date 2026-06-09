@@ -2,12 +2,13 @@ import fs from "fs/promises";
 import path from "path";
 import { createHash } from "crypto";
 import { fileURLToPath } from "url";
+import { PATHS } from "../../_core/paths.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Resolves to <project-root>/models/valet-router/
-const REGISTRY_ROOT = path.resolve(__dirname, "../../../models/valet-router");
+// Resolves to centralized application data directory
+const REGISTRY_ROOT = PATHS.valetRouter;
 const CURRENT_JSON = path.join(REGISTRY_ROOT, "current.json");
 
 export interface ArtifactConfig {

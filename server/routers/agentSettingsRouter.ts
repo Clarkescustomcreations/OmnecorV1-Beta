@@ -1,16 +1,18 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
-import { getDb } from "../db";
+import { getDb } from "../db.factory.js";
 import { postingScheduleConfig } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 export const agentSettingsRouter = router({
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getScheduleConfig: protectedProcedure
     .input(z.object({ platform: z.string().optional() }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return [];
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const conditions = input.platform
@@ -23,7 +25,8 @@ export const agentSettingsRouter = router({
 
       return configs;
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateScheduleConfig: protectedProcedure
     .input(z.object({
       platform: z.string(),
@@ -34,7 +37,7 @@ export const agentSettingsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const existing = await db.select()
@@ -70,7 +73,8 @@ export const agentSettingsRouter = router({
 
       return { success: true };
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateBotTheme: protectedProcedure
     .input(z.object({ theme: z.string() }))
     .mutation(async () => {
@@ -78,7 +82,8 @@ export const agentSettingsRouter = router({
       // For now, just return success
       return { success: true };
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateDiscoveryKeywords: protectedProcedure
     .input(z.object({ keywords: z.array(z.string()) }))
     .mutation(async () => {

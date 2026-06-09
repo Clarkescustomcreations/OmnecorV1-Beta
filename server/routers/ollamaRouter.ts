@@ -26,7 +26,8 @@ export const ollamaRouter = router({
     const data = await res.json() as { models: Array<{ name: string; size: number; digest: string; modified_at: string }> };
     return { models: data.models ?? [] };
   }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   modelInfo: protectedProcedure
     .input(z.object({ name: z.string().min(1).max(256) }))
     .query(async ({ input }) => {
@@ -36,7 +37,6 @@ export const ollamaRouter = router({
       });
       return await res.json();
     }),
-
   pullModel: protectedProcedure
     .input(z.object({ name: z.string().min(1).max(256) }))
     .mutation(async ({ input }) => {
@@ -50,7 +50,6 @@ export const ollamaRouter = router({
       });
       return { started: true, name: input.name };
     }),
-
   searchModels: protectedProcedure
     .input(z.object({
       query: z.string().max(128).default(""),
@@ -123,7 +122,6 @@ export const ollamaRouter = router({
       });
       return { deleted: true, name: input.name };
     }),
-
   createModelfile: protectedProcedure
     .input(z.object({
       name: z.string().min(1).max(256),
@@ -136,7 +134,6 @@ export const ollamaRouter = router({
       });
       return { created: true, name: input.name };
     }),
-
   runningModels: protectedProcedure.query(async () => {
     const res = await ollamaFetch("/api/ps");
     const data = await res.json() as { models: Array<{ name: string; size: number; expires_at: string }> };

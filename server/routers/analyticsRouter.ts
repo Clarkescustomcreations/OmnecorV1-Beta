@@ -1,6 +1,6 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
-import { getDb } from "../db";
+import { getDb } from "../db.factory.js";
 import { postAnalytics, scheduledPosts, platformAccounts } from "../../drizzle/schema";
 import { eq, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -10,7 +10,7 @@ export const analyticsRouter = router({
     .input(z.object({}).optional())
     .query(async () => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return [];
 
       const accounts = await db.select()
         .from(platformAccounts)
@@ -44,12 +44,13 @@ export const analyticsRouter = router({
 
       return summaries;
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getPostAnalytics: protectedProcedure
     .input(z.object({ scheduledPostId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return null;
 
       const result = await db.select()
         .from(postAnalytics)
@@ -58,7 +59,8 @@ export const analyticsRouter = router({
 
       return result[0] || null;
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateAnalytics: protectedProcedure
     .input(z.object({
       scheduledPostId: z.number(),
@@ -71,7 +73,7 @@ export const analyticsRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, error: "Database not available" };
 
       const existing = await db.select()
         .from(postAnalytics)

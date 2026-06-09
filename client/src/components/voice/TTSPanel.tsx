@@ -91,7 +91,7 @@ export const TTSPanel: React.FC = () => {
               <p className="text-sm font-medium">Generated Output</p>
               <audio controls src={audioUrl} className="w-full h-8 mt-2" />
             </div>
-            <Button variant="outline" size="icon" asChild>
+                                            <Button variant="outline" size="icon" asChild>
               <a href={audioUrl} download="synthesis.wav">
                 <Download className="w-4 h-4" />
               </a>

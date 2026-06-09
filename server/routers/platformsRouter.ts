@@ -1,6 +1,6 @@
 import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
-import { getDb } from "../db";
+import { getDb } from "../db.factory.js";
 import { platformAccounts } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
@@ -26,7 +26,7 @@ export const platformsRouter = router({
     .input(z.object({}).optional())
     .query(async ({ ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return [];
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const accounts = await db.select(SAFE_ACCOUNT_COLUMNS)
@@ -38,12 +38,13 @@ export const platformsRouter = router({
 
       return accounts;
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getAccount: protectedProcedure
     .input(z.object({ accountId: z.number() }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return null;
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const result = await db.select(SAFE_ACCOUNT_COLUMNS)
@@ -56,7 +57,8 @@ export const platformsRouter = router({
 
       return result[0] || null;
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   addAccount: protectedProcedure
     .input(z.object({
       platform: z.string(),
@@ -67,7 +69,7 @@ export const platformsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       await db.insert(platformAccounts).values({
@@ -82,7 +84,8 @@ export const platformsRouter = router({
 
       return { success: true, accountId: input.platform };
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateAccount: protectedProcedure
     .input(z.object({
       accountId: z.number(),
@@ -93,7 +96,7 @@ export const platformsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       await assertAccountOwnership(db, input.accountId, ctx.user.id);
@@ -112,12 +115,11 @@ export const platformsRouter = router({
 
       return { success: true };
     }),
-
   disconnectAccount: protectedProcedure
     .input(z.object({ accountId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
+      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       await assertAccountOwnership(db, input.accountId, ctx.user.id);

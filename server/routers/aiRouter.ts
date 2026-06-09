@@ -22,6 +22,7 @@ import {
   updateChatSession,
 } from "../db.factory.js";
 import { validatePath } from "../_core/security.js";
+import { AuditLogService } from "../phase2/services/AuditLogService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -110,12 +111,15 @@ export const aiRouter = router({
   /**
    * Get a list of supported AI providers and their health status.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getProviders: publicProcedure.query(async ({ ctx }) => {
     const providers = [
       { id: "ollama", name: "Ollama" },
       { id: "openai", name: "OpenAI" },
       { id: "anthropic", name: "Anthropic" },
       { id: "gemini", name: "Gemini" },
+      { id: "grok", name: "Grok" },
       { id: "forge", name: "Forge" },
     ];
 
@@ -125,6 +129,8 @@ export const aiRouter = router({
   /**
    * Discover available local Ollama models.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   discoverOllamaModels: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.aiProvider.discoverOllamaModels();
   }),
@@ -132,7 +138,6 @@ export const aiRouter = router({
   // =========================================================================
   // Chat Persistence (D1)
   // =========================================================================
-
   createSession: protectedProcedure
     .input(createSessionSchema)
     .mutation(async ({ input }) => {
@@ -147,13 +152,15 @@ export const aiRouter = router({
       });
       return { sessionId };
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getSessions: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ input }) => {
       return await getChatSessions(input.projectId);
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getSession: protectedProcedure
     .input(z.object({ sessionId: z.string().uuid() }))
     .query(async ({ input }) => {
@@ -162,7 +169,8 @@ export const aiRouter = router({
       const messages = await getChatMessages(input.sessionId);
       return { session, messages };
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   saveMessage: protectedProcedure
     .input(saveMessageSchema)
     .mutation(async ({ input }) => {
@@ -264,6 +272,8 @@ ${transcript}
    * Send a chat completion request (Streaming).
    * Emits chunks as they are generated via WebSockets/Subscriptions.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   chatStream: protectedProcedure
     .input(chatInputSchema)
     .subscription(({ ctx, input }) => {
@@ -290,7 +300,8 @@ ${transcript}
   // =========================================================================
   // Web Scraping & RAG (references/scraping)
   // =========================================================================
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   scrape: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ ctx, input }) => {
@@ -300,7 +311,8 @@ ${transcript}
   // =========================================================================
   // Coding Context (references/coding)
   // =========================================================================
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getCodeContext: protectedProcedure
     .input(z.object({ filepath: z.string(), symbols: z.array(z.string()) }))
     .query(async ({ ctx, input }) => {
@@ -309,5 +321,41 @@ ${transcript}
         resolved,
         input.symbols
       );
+    }),
+
+  // =========================================================================
+  // Loop Detection Audit (HITL)
+  // =========================================================================
+
+  /**
+   * Report a client-detected action loop to the audit log.
+   * Called fire-and-forget from the client when the hash detector triggers a
+   * HITL alert; persists the event to audit_log for later review / analytics.
+   */
+  reportLoopViolation: protectedProcedure
+    .input(z.object({
+      sessionId: z.string(),
+      hash: z.string(),
+      consecutiveCount: z.number().int(),
+      lastActions: z.array(z.object({
+        tool: z.string(),
+        args: z.record(z.string(), z.any()),
+      })).max(10),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      await AuditLogService.getInstance().log({
+        eventType: "hitl:loop_detected",
+        actorId: ctx.user?.id ?? null,
+        actorType: ctx.user ? "user" : "system",
+        procedure: "ai.reportLoopViolation",
+        ipAddress: null,
+        args: {
+          sessionId: input.sessionId,
+          hash: input.hash,
+          consecutiveCount: input.consecutiveCount,
+        },
+        result: { status: "flagged", actionsCount: input.lastActions.length },
+      });
+      return { logged: true };
     }),
 });

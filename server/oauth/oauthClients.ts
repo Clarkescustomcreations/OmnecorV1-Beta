@@ -85,6 +85,43 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
       authorizePath: "https://accounts.google.com/o/oauth2/v2/auth",
     },
   },
+  // ---- Cloud storage providers ----
+  // Authorization-code flow only for now. Token exchange reuses
+  // exchangeCodeForToken(); TODO: implement post-auth file browser (list/read
+  // files) once tokens are stored. See Google/Dropbox/OneDrive HTTP API docs.
+  google_drive: {
+    client: {
+      id: process.env.GOOGLE_DRIVE_CLIENT_ID || "",
+      secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || "",
+    },
+    auth: {
+      tokenHost: "https://oauth2.googleapis.com",
+      tokenPath: "/token",
+      authorizePath: "https://accounts.google.com/o/oauth2/v2/auth",
+    },
+  },
+  dropbox: {
+    client: {
+      id: process.env.DROPBOX_CLIENT_ID || "",
+      secret: process.env.DROPBOX_CLIENT_SECRET || "",
+    },
+    auth: {
+      tokenHost: "https://api.dropboxapi.com",
+      tokenPath: "/oauth2/token",
+      authorizePath: "https://www.dropbox.com/oauth2/authorize",
+    },
+  },
+  onedrive: {
+    client: {
+      id: process.env.ONEDRIVE_CLIENT_ID || "",
+      secret: process.env.ONEDRIVE_CLIENT_SECRET || "",
+    },
+    auth: {
+      tokenHost: "https://login.microsoftonline.com",
+      tokenPath: "/common/oauth2/v2.0/token",
+      authorizePath: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    },
+  },
 };
 
 export function getOAuthClient(platform: string) {
@@ -121,6 +158,7 @@ export async function getOAuthAuthorizationUrl(
     redirect_uri: redirectUri,
     scope: scopes,
     state,
+    ...getProviderExtraAuthParams(platform),
     ...(codeChallenge && {
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
@@ -179,6 +217,21 @@ export async function refreshOAuthToken(
   };
 }
 
+/**
+ * Provider-specific extra authorize params. Cloud providers need these to issue
+ * a refresh token for long-lived file access:
+ *  - Google: access_type=offline + prompt=consent
+ *  - Microsoft (OneDrive): the offline_access scope (added in getPlatformScopes)
+ */
+function getProviderExtraAuthParams(platform: string): Record<string, string> {
+  switch (platform.toLowerCase()) {
+    case "google_drive":
+      return { access_type: "offline", prompt: "consent" };
+    default:
+      return {};
+  }
+}
+
 function getPlatformScopes(platform: string): string[] {
   const scopeMap: Record<string, string[]> = {
     twitter: [
@@ -204,6 +257,11 @@ function getPlatformScopes(platform: string): string[] {
       "https://www.googleapis.com/auth/youtube.force-ssl",
       "https://www.googleapis.com/auth/youtube.upload",
     ],
+    // ---- Cloud storage providers ----
+    google_drive: ["https://www.googleapis.com/auth/drive.file"],
+    dropbox: ["files.content.read"],
+    // offline_access is required to receive a refresh token from Microsoft.
+    onedrive: ["Files.Read.All", "offline_access"],
   };
 
   return scopeMap[platform.toLowerCase()] || [];
@@ -213,8 +271,30 @@ export async function fetchUserProfile(
   platform: string,
   accessToken: string
 ): Promise<Record<string, unknown>> {
-  const config = OAUTH_CONFIGS[platform.toLowerCase()];
+  const key = platform.toLowerCase();
+  const config = OAUTH_CONFIGS[key];
   if (!config) throw new Error(`Unsupported platform: ${platform}`);
+
+  // Dropbox's account endpoint is POST-only and returns a different shape; map
+  // it into the common { name } shape the callback handler expects.
+  if (key === "dropbox") {
+    const response = await fetch(
+      "https://api.dropboxapi.com/2/users/get_current_account",
+      {
+        method: "POST",
+        headers: { Authorization: `Bearer ${accessToken}` },
+      }
+    );
+    if (!response.ok) throw new Error("Failed to fetch profile from dropbox");
+    const data = (await response.json()) as {
+      name?: { display_name?: string };
+      email?: string;
+    };
+    return {
+      name: data.name?.display_name ?? data.email ?? "Dropbox Account",
+      ...data,
+    };
+  }
 
   const endpoints: Record<string, string> = {
     twitter: "https://api.twitter.com/2/users/me",
@@ -223,9 +303,14 @@ export async function fetchUserProfile(
     tiktok: "https://open.tiktokapis.com/v1/user/info/",
     facebook: "https://graph.facebook.com/me",
     youtube: "https://www.googleapis.com/youtube/v3/channels?part=snippet",
+    // ---- Cloud storage providers ----
+    google_drive:
+      "https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)",
+    onedrive:
+      "https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName",
   };
 
-  const endpoint = endpoints[platform.toLowerCase()];
+  const endpoint = endpoints[key];
   if (!endpoint) throw new Error(`No endpoint for ${platform}`);
 
   const response = await fetch(endpoint, {
@@ -235,5 +320,20 @@ export async function fetchUserProfile(
   });
 
   if (!response.ok) throw new Error(`Failed to fetch profile from ${platform}`);
-  return response.json();
+  const data = (await response.json()) as Record<string, unknown>;
+
+  // Normalize provider-specific shapes to a common { name } the caller reads.
+  if (key === "google_drive") {
+    const user = (data as { user?: { displayName?: string; emailAddress?: string } }).user;
+    return { name: user?.displayName ?? user?.emailAddress ?? "Google Drive Account", ...data };
+  }
+  if (key === "onedrive") {
+    const od = data as { displayName?: string; mail?: string; userPrincipalName?: string };
+    return {
+      name: od.displayName ?? od.mail ?? od.userPrincipalName ?? "OneDrive Account",
+      ...data,
+    };
+  }
+
+  return data;
 }

@@ -74,6 +74,8 @@ nsis:
   createStartMenuShortcut: true
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
+  installerHeaderImage: build/installer_header.bmp
+  installerSidebarImage: build/installer_sidebar.bmp
   runAfterFinish: true
   shortcutName: Omnecor HMCI
   warningsAsErrors: false
@@ -87,7 +89,6 @@ linux:
   target:
     - AppImage
     - deb
-    - rpm
   category: Development
   icon: build/icon.png
   maintainer: Omnecor Team <dev@omnecor.local>

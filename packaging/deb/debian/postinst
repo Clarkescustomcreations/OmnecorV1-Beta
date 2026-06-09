@@ -10,19 +10,35 @@ case "$1" in
             useradd --system --user-group --create-home --home-dir /var/lib/omnecor omnecor
         fi
 
-        # Set permissions for /opt/omnecor
-        chown -R omnecor:omnecor /opt/omnecor
+        # Set permissions for the installation directory (handles /opt/Omnecor and /opt/omnecor)
+        INSTALL_DIR="/opt/Omnecor"
+        if [ ! -d "$INSTALL_DIR" ]; then
+            INSTALL_DIR="/opt/omnecor"
+        fi
+
+        if [ -d "$INSTALL_DIR" ]; then
+            chown -R omnecor:omnecor "$INSTALL_DIR"
+        else
+            echo "Warning: Installation directory not found."
+        fi
 
         # Detect GPU and configure Ollama layer count
         if command -v python3 >/dev/null 2>&1; then
-            python3 /opt/omnecor/packaging/scripts/detect_gpu.py || true
+            if [ -f "$INSTALL_DIR/packaging/scripts/detect_gpu.py" ]; then
+                python3 "$INSTALL_DIR/packaging/scripts/detect_gpu.py" || true
+            elif [ -f "$INSTALL_DIR/backend/packaging/scripts/detect_gpu.py" ]; then
+                python3 "$INSTALL_DIR/backend/packaging/scripts/detect_gpu.py" || true
+            fi
         fi
 
-        # Reload systemd and enable service
-        systemctl daemon-reload
-        systemctl enable omnecor.service
-        
-        echo "Omnecor HMCI installed and service enabled."
+        # Reload systemd and enable service if the service file exists
+        if [ -f "/lib/systemd/system/omnecor.service" ] || [ -f "/etc/systemd/system/omnecor.service" ]; then
+            systemctl daemon-reload || true
+            systemctl enable omnecor.service || true
+            echo "Omnecor HMCI service enabled."
+        else
+            echo "Note: Standalone GUI package installed. Systemd service skipped."
+        fi
     ;;
 
     abort-upgrade|abort-remove|abort-deconfigure)

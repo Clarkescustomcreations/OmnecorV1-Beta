@@ -4,7 +4,7 @@ import { observable } from "@trpc/server/observable";
 import { AiProviderService } from "../services/AiProviderService.js";
 
 const chatInputSchema = z.object({
-  providerId: z.enum(["ollama", "anthropic", "openai", "gemini", "grok"]),
+  providerId: z.enum(["ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),
   modelId: z.string().min(1),
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),
@@ -53,7 +53,7 @@ export const aiProviderRouter = router({
   checkHealth: publicProcedure
     .input(
       z.object({
-        providerId: z.enum(["ollama", "anthropic", "openai", "gemini", "grok"]),
+        providerId: z.enum(["ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),
         modelId: z.string(),
         apiKey: z.string().optional(),
         baseUrl: z.string().optional(),

@@ -9,9 +9,10 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Cpu, Cloud, Check } from "lucide-react";
-import { getAllModels } from "@/lib/aiModels";
+import { getAllModels, type AIModel } from "@/lib/aiModels";
 import { cn } from "@/lib/utils";
 import type { SelectedModel } from "@/lib/chatContext";
+import { trpc } from "@/lib/trpc";
 
 interface ModelSelectorProps {
   selectedModel: SelectedModel | undefined;
@@ -36,7 +37,53 @@ export default function ModelSelector({
   onSelect,
   className,
 }: ModelSelectorProps) {
-  const models = getAllModels(selectedModel?.modelId);
+  const { data: ollamaModels = [] } = trpc.aiProvider.discoverOllamaModels.useQuery(undefined, {
+    refetchInterval: 30_000,
+  });
+  const { data: providerHealth = [] } = trpc.aiProvider.getProviders.useQuery(undefined, {
+    refetchInterval: 60_000,
+  });
+
+  const localModels: AIModel[] = ollamaModels.map(m => ({
+    id: m.name,
+    name: m.name,
+    displayName: m.name,
+    type: "local" as const,
+    source: "ollama" as const,
+    status: "available" as const,
+    metadata: { size: m.size ?? 0 },
+    capabilities: {
+      chat: true,
+      completion: true,
+      embedding: false,
+      vision: false,
+      functionCalling: false,
+    },
+  }));
+
+  const apiModels: AIModel[] = providerHealth
+    .filter(p => p.id !== "ollama" && p.status === "online")
+    .map(p => ({
+      id: p.id,
+      name: p.name,
+      displayName: p.name,
+      type: "api" as const,
+      source: p.id as AIModel["source"],
+      status: "available" as const,
+      capabilities: {
+        chat: true,
+        completion: true,
+        embedding: p.id === "openai",
+        vision: p.id === "openai" || p.id === "gemini",
+        functionCalling: p.id === "openai" || p.id === "anthropic",
+      },
+    }));
+
+  const fetchedModels = [...localModels, ...apiModels];
+
+  const models = fetchedModels.length > 0
+    ? getAllModels(selectedModel?.modelId, fetchedModels)
+    : getAllModels(selectedModel?.modelId);
   const local = models.filter(m => m.type === "local");
   const api = models.filter(m => m.type === "api");
 

@@ -35,6 +35,7 @@
 import { WebSocketServer as WSServer, WebSocket } from "ws";
 import { IncomingMessage, Server as HttpServer } from "http";
 import { v4 as uuidv4 } from "uuid";
+import { homedir } from "os";
 import {
   FileSystemWatcherService,
   FileEvent,
@@ -48,6 +49,15 @@ import { HashTrackerService } from "../services/HashTrackerService.js";
 import { VoiceService, VoiceEventData } from "../services/VoiceService.js";
 import { HITLApprovalService } from "../services/HITLApprovalService.js";
 import { AgentService } from "../services/AgentService.js";
+
+// Lazy-load node-pty so the server starts even if the native binding isn't built
+let ptyModule: typeof import("node-pty") | null = null;
+async function getPty() {
+  if (!ptyModule) {
+    try { ptyModule = await import("node-pty"); } catch { ptyModule = null; }
+  }
+  return ptyModule;
+}
 import { SERVER_CONFIG } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("WebSocket");
@@ -58,7 +68,7 @@ const log = createLogger("WebSocket");
 
 /** WebSocket message from client to server */
 interface ClientMessage {
-  type: "subscribe" | "unsubscribe" | "ping" | "getState";
+  type: "subscribe" | "unsubscribe" | "ping" | "getState" | "pty:spawn" | "pty:input" | "pty:resize" | "pty:kill" | "chat:toTerminal";
   channel?: string;
   data?: any;
 }
@@ -75,10 +85,20 @@ interface ServerMessage {
     | "subscribed"
     | "unsubscribed"
     | "state"
-    | "actionPending";
+    | "actionPending"
+    | "pty:output"
+    | "pty:ready"
+    | "pty:exit"
+    | "terminal:toChatOutput";
   channel?: string;
   data?: any;
   timestamp?: string;
+}
+
+/** Active PTY session keyed by clientId */
+interface PtySession {
+  proc: import("node-pty").IPty;
+  sessionId: string;
 }
 
 /** Extended WebSocket with metadata */
@@ -87,6 +107,7 @@ interface OmnecorSocket extends WebSocket {
   subscriptions: Set<string>;
   isAlive: boolean;
   connectedAt: string;
+  ptySession?: PtySession;
 }
 
 // ---------------------------------------------------------------------------
@@ -189,6 +210,7 @@ export class OmnecorWebSocketServer {
 
     // Handle disconnection
     ws.on("close", () => {
+      this.killPtySession(ws);
       this.clients.delete(ws.id);
       log.info("Client disconnected", { id: ws.id, total: this.clients.size });
     });
@@ -233,11 +255,92 @@ export class OmnecorWebSocketServer {
         this.sendCurrentState(ws, message.channel);
         break;
 
+      // ── PTY Shell Sessions ────────────────────────────────────────────────
+      case "pty:spawn":
+        this.handlePtySpawn(ws, message.data).catch(err =>
+          this.sendToClient(ws, { type: "error", data: { message: String(err) } })
+        );
+        break;
+
+      case "pty:input":
+        if (ws.ptySession && message.data?.input !== undefined) {
+          ws.ptySession.proc.write(message.data.input as string);
+        }
+        break;
+
+      case "pty:resize":
+        if (ws.ptySession && message.data) {
+          const { cols, rows } = message.data as { cols: number; rows: number };
+          ws.ptySession.proc.resize(cols, rows);
+        }
+        break;
+
+      case "pty:kill":
+        this.killPtySession(ws);
+        break;
+
+      // ── Chat ↔ Terminal Bridge ────────────────────────────────────────────
+      case "chat:toTerminal":
+        // AI/chat sends a command to this client's PTY
+        if (ws.ptySession && message.data?.input) {
+          ws.ptySession.proc.write((message.data.input as string) + "\r");
+        }
+        break;
+
       default:
         this.sendToClient(ws, {
           type: "error",
           data: { message: `Unknown message type: ${message.type}` },
         });
+    }
+  }
+
+  private async handlePtySpawn(ws: OmnecorSocket, data: any): Promise<void> {
+    const pty = await getPty();
+    if (!pty) {
+      this.sendToClient(ws, { type: "error", data: { message: "PTY (node-pty) native binding not available on this server." } });
+      return;
+    }
+
+    // Kill any existing session first
+    this.killPtySession(ws);
+
+    const shell = (data?.shell as string) || process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "bash");
+    const cwd = (data?.cwd as string) || homedir();
+    const cols = (data?.cols as number) || 80;
+    const rows = (data?.rows as number) || 24;
+    const sessionId = uuidv4();
+
+    const proc = pty.spawn(shell, [], {
+      name: "xterm-256color",
+      cols,
+      rows,
+      cwd,
+      env: { ...process.env as Record<string, string>, TERM: "xterm-256color", COLORTERM: "truecolor" },
+    });
+
+    ws.ptySession = { proc, sessionId };
+
+    proc.onData(data => {
+      if (ws.readyState === WebSocket.OPEN) {
+        this.sendToClient(ws, { type: "pty:output", data: { output: data, sessionId } });
+      }
+    });
+
+    proc.onExit(({ exitCode, signal }) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        this.sendToClient(ws, { type: "pty:exit", data: { exitCode, signal, sessionId } });
+      }
+      ws.ptySession = undefined;
+    });
+
+    this.sendToClient(ws, { type: "pty:ready", data: { sessionId, shell, cwd } });
+  }
+
+  private killPtySession(ws: OmnecorSocket): void {
+    if (ws.ptySession) {
+      try { ws.ptySession.proc.kill(); } catch {}
+      ws.ptySession = undefined;
     }
   }
 

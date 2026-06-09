@@ -40,6 +40,8 @@ export const jobRouter = router({
    * Get the current status of a specific job.
    * Includes last progress data, stderr output, and timing info.
    */
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getStatus: publicProcedure
     .input(jobIdSchema)
     .query(async ({ ctx, input }) => {
@@ -94,6 +96,26 @@ export const jobRouter = router({
       return {
         success: true,
         message: `Job "${input.jobId}" cancellation initiated.`,
+      };
+    }),
+
+  /**
+   * Run a command in a sandboxed Docker container.
+   */
+  runSandboxCommand: publicProcedure
+    .input(z.object({
+      command: z.string(),
+      image: z.string().default("alpine:latest"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      // Split command into args
+      const args = input.command.split(" ");
+      const jobId = await ctx.services.docker.runInSandbox(input.image, args);
+      
+      return {
+        success: true,
+        jobId,
+        message: `Command queued in sandbox: ${input.image}`,
       };
     }),
 

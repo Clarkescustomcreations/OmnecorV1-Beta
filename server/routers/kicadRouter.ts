@@ -13,6 +13,7 @@ import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import os from "os";
 import path from "path";
+import { spawn } from "child_process";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -55,8 +56,46 @@ export const kicadRouter = router({
     return ctx.services.kicad.checkInstallation();
   }),
 
+  /**
+   * Open a KiCad project/PCB/schematic file in the KiCad GUI as a detached process.
+   * Accepts .kicad_pro, .kicad_pcb, or .kicad_sch files — or launches KiCad empty.
+   * The spawned KiCad process is independent of the server and persists after response.
+   */
+  openProject: protectedProcedure
+    .input(z.object({ filePath: z.string().optional() }))
+    .mutation(async ({ input }) => {
+      const kicadBin = process.env.KICAD_BIN || "kicad";
+      const args: string[] = input.filePath ? [input.filePath] : [];
+
+      if (input.filePath) {
+        const ext = path.extname(input.filePath).toLowerCase();
+        const allowed = [".kicad_pro", ".kicad_pcb", ".kicad_sch"];
+        if (!allowed.includes(ext)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `Invalid file type: ${ext}. KiCad accepts: ${allowed.join(", ")}`,
+          });
+        }
+      }
+
+      const proc = spawn(kicadBin, args, {
+        detached: true,
+        stdio: "ignore",
+      });
+      proc.unref();
+
+      if (proc.pid === undefined) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: "Failed to launch KiCad GUI — is KiCad installed?",
+        });
+      }
+
+      return { success: true, pid: proc.pid, file: input.filePath ?? null };
+    }),
+
   /** Export schematic to PDF/SVG/DXF */
-  exportSchematic: publicProcedure
+  exportSchematic: protectedProcedure
     .input(kicadSchematicExportSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -70,7 +109,9 @@ export const kicadRouter = router({
     }),
 
   /** Export PCB to Gerber files */
-  exportGerbers: publicProcedure
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
+  exportGerbers: protectedProcedure
     .input(kicadGerberExportSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -84,7 +125,7 @@ export const kicadRouter = router({
     }),
 
   /** Run Design Rule Check on PCB */
-  runDRC: publicProcedure
+  runDRC: protectedProcedure
     .input(kicadDRCSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -98,7 +139,9 @@ export const kicadRouter = router({
     }),
 
   /** Run Electrical Rule Check on schematic */
-  runERC: publicProcedure
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
+  runERC: protectedProcedure
     .input(kicadERCSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -112,7 +155,9 @@ export const kicadRouter = router({
     }),
 
   /** Export PCB to 3D STEP file */
-  exportSTEP: publicProcedure
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
+  exportSTEP: protectedProcedure
     .input(
       z.object({
         inputFile: z.string().min(1),
@@ -131,7 +176,7 @@ export const kicadRouter = router({
     }),
 
   /** Export Bill of Materials (BOM) from schematic */
-  exportBOM: publicProcedure
+  exportBOM: protectedProcedure
     .input(kicadBOMSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -143,20 +188,31 @@ export const kicadRouter = router({
         });
       }
     }),
-
+  downloadBOM: protectedProcedure
+    .input(z.object({ outputFile: z.string().default("bom.csv") }))
+    .query(async ({ input }) => {
+      try {
+        const safePath = path.resolve(process.cwd(), path.basename(input.outputFile));
+        const fs = await import("fs/promises");
+        const content = await fs.readFile(safePath, "utf-8");
+        return { content, filename: path.basename(input.outputFile) };
+      } catch {
+        return { content: null as string | null, filename: path.basename(input.outputFile) };
+      }
+    }),
   getQuote: protectedProcedure
     .input(z.object({ pcbPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       return PCBWayService.getInstance().getQuote(input.pcbPath);
     }),
-
+  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
+  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   exportForManufacturing: protectedProcedure
     .input(z.object({ pcbPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const gerberDir = path.join(os.tmpdir(), "omnecor_gerbers");
       return ctx.services.kicad.exportGerbers({ inputFile: input.pcbPath, outputDir: gerberDir });
     }),
-
   placeOrder: protectedProcedure
     .input(z.object({
       quoteId: z.string().min(1),

@@ -1,3 +1,10 @@
+/**
+ * Model Hub
+ *
+ * Displays local Ollama models + API provider status loaded from Settings.
+ * API keys are managed exclusively in Settings > AI Providers — not here.
+ * "Configure Providers" navigates there directly.
+ */
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
 import {
   Card,
@@ -7,36 +14,33 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Zap, Plus, RefreshCw, Download } from "lucide-react";
-import { useState } from "react";
+import { Label } from "@/components/ui/label";
+import { Zap, RefreshCw, Download, Settings, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
+import { useState, useEffect } from "react";
 import ModelHubPanel from "@/components/ModelHubPanel";
 import { type AIModel, type ModelMarketplaceItem } from "@/lib/aiModels";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useLocation } from "wouter";
-
-const PROVIDER_TYPES = [
-  { id: "openai", label: "OpenAI", placeholder: "sk-..." },
-  { id: "anthropic", label: "Anthropic", placeholder: "sk-ant-..." },
-  { id: "gemini", label: "Google Gemini", placeholder: "AIza..." },
-  { id: "ollama", label: "Ollama (Local)", placeholder: "http://localhost:11434" },
-  { id: "custom", label: "Custom / Other", placeholder: "https://..." },
-];
 
 export default function ModelHub() {
   const [selectedModel, setSelectedModel] = useState<AIModel | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [showAddProviderDialog, setShowAddProviderDialog] = useState(false);
-  const [providerType, setProviderType] = useState("openai");
-  const [providerApiKey, setProviderApiKey] = useState("");
-  const [providerBaseUrl, setProviderBaseUrl] = useState("");
+  const [preferredQuantization, setPreferredQuantization] = useState("q4_k_m");
 
   const [, setLocation] = useLocation();
+
+  const { data: hubSettings } = trpc.system.getSettings.useQuery();
+  const saveQuantMutation = trpc.system.saveSettings.useMutation({
+    onSuccess: () => toast.success("Quantization preference saved"),
+    onError: (e) => toast.error(e.message),
+  });
+
+  useEffect(() => {
+    if (hubSettings) setPreferredQuantization((hubSettings as any).preferredQuantization || "q4_k_m");
+  }, [hubSettings]);
 
   const {
     data: ollamaModels = [],
@@ -46,26 +50,20 @@ export default function ModelHub() {
     refetchInterval: 30_000,
   });
 
+  // Load provider health — configured providers come from Settings
   const { data: providerHealth = [] } = trpc.aiProvider.getProviders.useQuery(
     undefined,
     { refetchInterval: 60_000 }
   );
+
+  // Load the actual API key config status from Settings backend
+  const { data: aiProviders } = trpc.system.aiProviders.useQuery();
 
   const pullMutation = trpc.ollama.pullModel.useMutation({
     onSuccess: ({ name }) => {
       toast.success(`Pulling model: ${name}. Refresh in a moment to see it.`);
     },
     onError: (err) => toast.error("Pull failed: " + err.message),
-  });
-
-  const saveKeysMutation = trpc.system.saveKeys.useMutation({
-    onSuccess: () => {
-      toast.success("Provider configured successfully");
-      setShowAddProviderDialog(false);
-      setProviderApiKey("");
-      setProviderBaseUrl("");
-    },
-    onError: (err) => toast.error("Failed to save provider: " + err.message),
   });
 
   const handleRefresh = async () => {
@@ -96,21 +94,6 @@ export default function ModelHub() {
     setLocation("/chat");
   };
 
-  const handleAddProvider = () => {
-    const chosen = PROVIDER_TYPES.find(p => p.id === providerType)!;
-    const keys: Record<string, string> = {};
-    if (providerType === "ollama") {
-      keys["OLLAMA_BASE_URL"] = providerBaseUrl || "http://localhost:11434";
-    } else if (providerApiKey) {
-      keys[`${providerType.toUpperCase()}_API_KEY`] = providerApiKey;
-      if (providerBaseUrl) keys[`${providerType.toUpperCase()}_BASE_URL`] = providerBaseUrl;
-    } else {
-      toast.error("Please enter an API key");
-      return;
-    }
-    saveKeysMutation.mutate({ keys });
-  };
-
   const localModels: AIModel[] = ollamaModels.map(m => ({
     id: m.name,
     name: m.name,
@@ -119,7 +102,6 @@ export default function ModelHub() {
     source: "ollama" as const,
     status: "available" as const,
     size: m.size ?? 0,
-    // context window is not available from /api/tags — omit rather than show wrong data
   }));
 
   const apiModels: AIModel[] = providerHealth
@@ -134,6 +116,15 @@ export default function ModelHub() {
     }));
 
   const allModels = [...localModels, ...apiModels];
+
+  // Build a readable list of configured API providers from Settings
+  const configuredProviders: { id: string; label: string; configured: boolean }[] = [
+    { id: "openai",     label: "OpenAI",           configured: !!(aiProviders as any)?.openai },
+    { id: "anthropic",  label: "Anthropic (Claude)", configured: !!(aiProviders as any)?.anthropic },
+    { id: "gemini",     label: "Google Gemini",     configured: !!(aiProviders as any)?.gemini },
+    { id: "grok",       label: "Grok (xAI)",        configured: !!(aiProviders as any)?.grok },
+    { id: "ollama",     label: "Ollama (Local)",    configured: true },
+  ];
 
   return (
     <OmnecorDashboardLayout>
@@ -153,9 +144,15 @@ export default function ModelHub() {
                 <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
                 {isRefreshing ? "Refreshing..." : "Refresh"}
               </Button>
-              <Button size="sm" onClick={() => setShowAddProviderDialog(true)}>
-                <Plus className="w-4 h-4 mr-2" />
-                Add Provider
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setLocation("/settings")}
+                className="gap-1.5"
+              >
+                <Settings className="w-4 h-4" />
+                Configure Providers
+                <ExternalLink className="w-3 h-3 opacity-60" />
               </Button>
             </div>
           </div>
@@ -183,6 +180,7 @@ export default function ModelHub() {
 
           {/* Right Sidebar */}
           <div className="w-80 flex flex-col gap-4">
+            {/* Selected Model */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Selected Model</CardTitle>
@@ -211,11 +209,7 @@ export default function ModelHub() {
                         <p className="font-mono">{selectedModel.contextWindow.toLocaleString()} tokens</p>
                       </div>
                     )}
-                    <Button
-                      className="w-full mt-4"
-                      size="sm"
-                      onClick={handleUseThisModel}
-                    >
+                    <Button className="w-full mt-4" size="sm" onClick={handleUseThisModel}>
                       Use This Model
                     </Button>
                   </div>
@@ -227,6 +221,91 @@ export default function ModelHub() {
               </CardContent>
             </Card>
 
+            {/* API Provider Status — loaded from Settings */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">API Providers</CardTitle>
+                <CardDescription className="text-xs">
+                  Keys are managed in{" "}
+                  <button
+                    className="underline text-accent hover:text-accent/80 transition-colors"
+                    onClick={() => setLocation("/settings")}
+                  >
+                    Settings → AI Providers
+                  </button>
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {configuredProviders.map(p => (
+                  <div key={p.id} className="flex items-center justify-between text-sm">
+                    <span className="text-muted-foreground">{p.label}</span>
+                    {p.configured ? (
+                      <span className="flex items-center gap-1 text-emerald-500 text-xs font-medium">
+                        <CheckCircle2 className="w-3.5 h-3.5" /> Configured
+                      </span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-muted-foreground/50 text-xs">
+                        <XCircle className="w-3.5 h-3.5" /> Not set
+                      </span>
+                    )}
+                  </div>
+                ))}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="w-full mt-3 gap-1.5 text-xs"
+                  onClick={() => setLocation("/settings")}
+                >
+                  <Settings className="w-3.5 h-3.5" />
+                  Add / Edit API Keys
+                </Button>
+              </CardContent>
+            </Card>
+
+            {/* Model Lifecycle */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">Model Lifecycle</CardTitle>
+                <CardDescription className="text-xs">Preferences for local model management</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="space-y-2">
+                  <Label className="text-[11px]">Preferred Quantization</Label>
+                  <Select
+                    value={preferredQuantization}
+                    onValueChange={(v) => {
+                      setPreferredQuantization(v);
+                      saveQuantMutation.mutate({ settings: { preferredQuantization: v } });
+                    }}
+                  >
+                    <SelectTrigger className="h-8 text-xs">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="q2_k">Q2_K (Lightest)</SelectItem>
+                      <SelectItem value="q4_k_m">Q4_K_M (Balanced)</SelectItem>
+                      <SelectItem value="q8_0">Q8_0 (Heavy)</SelectItem>
+                      <SelectItem value="fp16">F16 (Original)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2 pt-2 border-t">
+                  <Label className="text-[11px]">Role Assignments</Label>
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-muted-foreground">Default Chat:</span>
+                      <span className="font-mono text-accent">Auto</span>
+                    </div>
+                    <div className="flex items-center justify-between text-[10px]">
+                      <span className="text-muted-foreground">Default Code:</span>
+                      <span className="font-mono text-accent">Auto</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Statistics */}
             <Card>
               <CardHeader>
                 <CardTitle className="text-base">Statistics</CardTitle>
@@ -258,57 +337,6 @@ export default function ModelHub() {
           </div>
         </div>
       </div>
-
-      {/* Add Provider Dialog */}
-      <Dialog open={showAddProviderDialog} onOpenChange={setShowAddProviderDialog}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Add AI Provider</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 py-2">
-            <div className="space-y-2">
-              <Label>Provider Type</Label>
-              <Select value={providerType} onValueChange={setProviderType}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {PROVIDER_TYPES.map(p => (
-                    <SelectItem key={p.id} value={p.id}>{p.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            {providerType !== "ollama" && (
-              <div className="space-y-2">
-                <Label>API Key</Label>
-                <Input
-                  type="password"
-                  placeholder={PROVIDER_TYPES.find(p => p.id === providerType)?.placeholder ?? ""}
-                  value={providerApiKey}
-                  onChange={e => setProviderApiKey(e.target.value)}
-                />
-              </div>
-            )}
-
-            <div className="space-y-2">
-              <Label>{providerType === "ollama" ? "Ollama URL" : "Base URL (optional)"}</Label>
-              <Input
-                placeholder={providerType === "ollama" ? "http://localhost:11434" : "https://api.example.com/v1"}
-                value={providerBaseUrl}
-                onChange={e => setProviderBaseUrl(e.target.value)}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button variant="outline" onClick={() => setShowAddProviderDialog(false)}>Cancel</Button>
-            <Button onClick={handleAddProvider} disabled={saveKeysMutation.isPending}>
-              {saveKeysMutation.isPending ? "Saving..." : "Add Provider"}
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </OmnecorDashboardLayout>
   );
 }

@@ -43,6 +43,7 @@ import { pipeline } from "stream/promises";
 import { createGzip, createGunzip } from "zlib";
 import { spawn, type SpawnOptions } from "child_process";
 import { createLogger } from "../../_core/logger.js";
+import { PATHS } from "../../_core/paths.js";
 const log = createLogger("Security");
 
 type CommandOptions = SpawnOptions & { allowNonZero?: boolean };
@@ -372,17 +373,8 @@ export class SecurityService {
   private yaraRulesPath: string;
 
   private constructor() {
-    this.keyStorePath = path.join(
-      process.env.HOME || "/tmp",
-      ".omnecor",
-      "keystore"
-    );
-    this.yaraRulesPath = path.join(
-      process.env.HOME || "/tmp",
-      ".omnecor",
-      "security",
-      "rules.yar"
-    );
+    this.keyStorePath = PATHS.keystore;
+    this.yaraRulesPath = path.join(PATHS.security, "rules.yar");
   }
 
   /** Retrieve the singleton instance */
@@ -711,11 +703,7 @@ export class SecurityService {
   ): Promise<BackupResult> {
     const startTime = Date.now();
     const backupId = `backup_${projectId}_${Date.now()}`;
-    const backupDir = path.join(
-      process.env.HOME || "/tmp",
-      ".omnecor",
-      "backups"
-    );
+    const backupDir = PATHS.backups;
     await fs.mkdir(backupDir, { recursive: true });
 
     // Build manifest by scanning source directory
@@ -849,11 +837,7 @@ export class SecurityService {
    * List all available backups for a project.
    */
   async listBackups(projectId: string): Promise<BackupManifest[]> {
-    const backupDir = path.join(
-      process.env.HOME || "/tmp",
-      ".omnecor",
-      "backups"
-    );
+    const backupDir = PATHS.backups;
 
     try {
       const files = await fs.readdir(backupDir);
