@@ -75,6 +75,7 @@ import { oauthRouter } from "./routers/oauthRouter.js";
 import { attachmentsRouter } from "./routers/attachmentsRouter.js";
 import { neuralMapsRouter } from "./routers/neuralMapsRouter.js";
 import { personaRouter } from "./routers/personaRouter.js";
+import { brainmapRouter } from "./routers/brainmapRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -185,6 +186,9 @@ export const appRouter = router({
 
   // ─── Personas (DB persistence) ───────────────────────────────────────────
   personas: personaRouter,
+
+  // ─── Brain Map (Layout preference persistence) ────────────────────────────
+  brainmap: brainmapRouter,
 });
 
 export type AppRouter = typeof appRouter;
