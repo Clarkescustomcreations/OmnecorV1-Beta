@@ -102,15 +102,14 @@ export function RecursiveMASPanel() {
     });
   }
 
-  async function handleStop() {
+  function handleStop() {
     if (!jobId) return;
-    try {
-      await fetch(`/api/mas/stop/${encodeURIComponent(jobId)}`, { method: "POST" });
-      // NOTE: A dedicated tRPC stopRecursiveMAS procedure can be wired here
-      // once Phase 27 adds it. For now we call the bridge directly via fetch.
-    } catch {
-      // Silently ignore — the polling will detect the stopped state
-    }
+    // TODO: Implement trpc.agent.stopRecursiveMAS on backend
+    // For now, use raw fetch to stop the job
+    fetch(`/api/mas/stop/${jobId}`, { method: "POST" }).catch((err) => {
+      console.error("Stop request error (non-fatal):", err.message);
+      // Polling will catch the stopped state automatically
+    });
   }
 
   // ── Render ────────────────────────────────────────────────────────────────

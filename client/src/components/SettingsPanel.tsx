@@ -38,6 +38,7 @@ import { cn } from "@/lib/utils";
 import { getDefaultSettings, type AppSettings } from "@/lib/settings";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useAppStore } from "@/lib/store/app.store";
 
 interface SettingsPanelProps {
   className?: string;
@@ -90,6 +91,63 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
     a.href = url;
     a.download = `omnecor-settings-${new Date().toISOString().split("T")[0]}.json`;
     a.click();
+  };
+
+  const handleImport = () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = "application/json";
+    input.onchange = (e) => {
+      const file = (e.target as HTMLInputElement).files?.[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const imported = JSON.parse(e.target?.result as string);
+          setSettings(imported);
+          setHasChanges(true);
+          toast.success("Settings imported. Click Save to apply.");
+        } catch (err) {
+          toast.error("Invalid settings file");
+        }
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const handleAddFolder = () => {
+    const name = window.prompt("Folder Name:");
+    const path = window.prompt("Folder Path:");
+    if (name && path) {
+      const newFolder = {
+        id: Math.random().toString(36).substring(7),
+        name,
+        path,
+        enabled: true,
+        fileCount: 0,
+        totalSize: 0
+      };
+      setSettings({
+        ...settings,
+        knowledge: {
+          ...settings.knowledge,
+          folders: [...settings.knowledge.folders, newFolder]
+        }
+      });
+      handleSettingChange();
+    }
+  };
+
+  const handleRemoveFolder = (id: string) => {
+    setSettings({
+      ...settings,
+      knowledge: {
+        ...settings.knowledge,
+        folders: settings.knowledge.folders.filter(f => f.id !== id)
+      }
+    });
+    handleSettingChange();
   };
 
   return (
@@ -220,6 +278,17 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                 />
               </div>
 
+              <div className="flex items-center justify-between">
+                <div className="space-y-0.5">
+                  <label className="text-sm font-semibold">Global "How To" Tooltips</label>
+                  <p className="text-xs text-muted-foreground">Show helpful hints on UI elements</p>
+                </div>
+                <Switch
+                  checked={useAppStore((s) => s.showTooltips)}
+                  onCheckedChange={(checked) => useAppStore.setState({ showTooltips: checked })}
+                />
+              </div>
+
               <div className="space-y-2">
                 <label className="text-sm font-semibold">
                   Startup Behavior
@@ -254,7 +323,7 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                     Manage indexed project folders
                   </CardDescription>
                 </div>
-                <Button size="sm">
+                <Button size="sm" onClick={handleAddFolder}>
                   <Plus className="w-4 h-4 mr-2" />
                   Add Folder
                 </Button>
@@ -280,7 +349,7 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Switch checked={folder.enabled} />
-                        <Button size="sm" variant="ghost">
+                        <Button size="sm" variant="ghost" onClick={() => handleRemoveFolder(folder.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
                       </div>
@@ -375,6 +444,15 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                       key={type}
                       variant="secondary"
                       className="cursor-pointer"
+                      onClick={() => {
+                        const updated = settings.security.fileTypeBlacklist.filter(t => t !== type);
+                        setSettings({
+                          ...settings,
+                          security: { ...settings.security, fileTypeBlacklist: updated }
+                        });
+                        handleSettingChange();
+                        saveSettingsMutation.mutate({ settings: { ...settings, security: { ...settings.security, fileTypeBlacklist: updated } } as unknown as Record<string, unknown> });
+                      }}
                     >
                       {type}
                       <Trash2 className="w-3 h-3 ml-1" />
@@ -641,7 +719,7 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Button variant="outline" size="sm">
+          <Button variant="outline" size="sm" onClick={handleImport}>
             <Upload className="w-4 h-4 mr-2" />
             Import
           </Button>

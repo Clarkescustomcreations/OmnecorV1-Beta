@@ -24,6 +24,23 @@ export const UnslothPanel: React.FC = () => {
     onError: (err) => toast.error("Dataset generation error: " + err.message),
   });
 
+  // TODO: Wire to trpc.training.saveLoraConfig mutation when backend is ready
+  // Currently stubbing with local toast notification
+  const handleSaveConfig = () => {
+    const config = {
+      loraRank: loraRank,
+      loraAlpha: 32,
+      targetModules: ["q_proj", "v_proj"],
+      modelName: "unsloth/llama-3-8b-bnb-4bit",
+      maxSeqLength: 2048,
+      saveMethod: "gguf"
+    };
+    // Once backend mutation exists, replace with:
+    // saveConfigMutation.mutate(config);
+    toast.info("LoRA config saved locally (backend mutation pending)");
+    console.log("Config to save:", config);
+  };
+
   return (
     <div className="p-6 space-y-8">
       <div>
@@ -65,7 +82,7 @@ export const UnslothPanel: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
-               <Button className="flex-1 bg-yellow-600 hover:bg-yellow-700" onClick={() => startFineTuning.mutate({ 
+               <Button className="flex-1 bg-yellow-600 hover:bg-yellow-700" onClick={() => startFineTuning.mutate({
                  datasetPath: "/path/to/dataset.jsonl",
                  r: loraRank,
                  loraAlpha: 32,
@@ -74,7 +91,7 @@ export const UnslothPanel: React.FC = () => {
                })}>
                  <Activity className="w-4 h-4 mr-2" /> Start Training Pass
                </Button>
-               <Button variant="outline"><Save className="w-4 h-4 mr-2" /> Save Config</Button>
+               <Button variant="outline" onClick={handleSaveConfig}><Save className="w-4 h-4 mr-2" /> Save Config</Button>
             </div>
           </CardContent>
         </Card>

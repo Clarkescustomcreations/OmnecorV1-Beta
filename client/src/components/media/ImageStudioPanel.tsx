@@ -9,7 +9,8 @@ import { toast } from "sonner";
 
 export const ImageStudioPanel: React.FC = () => {
   const [prompt, setPrompt] = useState("");
-  
+  const [gallerySearch, setGallerySearch] = useState("");
+
   const imagesQuery = trpc.fal.listImages.useQuery();
   const generateMutation = trpc.fal.generateImage.useMutation({
     onSuccess: () => {
@@ -55,19 +56,37 @@ export const ImageStudioPanel: React.FC = () => {
             <div className="flex gap-2">
                <div className="relative">
                  <Search className="absolute left-3 top-2.5 w-4 h-4 text-muted-foreground" />
-                 <Input className="pl-9 h-9 w-64 bg-muted/50 border-none" placeholder="Search your creations..." />
+                 <Input
+                   className="pl-9 h-9 w-64 bg-muted/50 border-none"
+                   placeholder="Search your creations..."
+                   value={gallerySearch}
+                   onChange={(e) => setGallerySearch(e.target.value)}
+                 />
                </div>
             </div>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
-            {(imagesQuery.data as unknown as Array<{ id: string; url: string; prompt: string }>)?.map((img) => (
+            {(imagesQuery.data as unknown as Array<{ id: string; url: string; prompt: string }>)
+              ?.filter(img => !gallerySearch || img.prompt?.toLowerCase().includes(gallerySearch.toLowerCase()))
+              .map((img) => (
               <Card key={img.id} className="group relative overflow-hidden aspect-square border-none bg-muted rounded-xl transition-all hover:ring-2 hover:ring-purple-500 shadow-sm">
                 <img src={img.url} alt={img.prompt} className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
                   <p className="text-[10px] text-white/90 line-clamp-2 leading-relaxed mb-3">{img.prompt}</p>
                   <div className="flex gap-2">
-                    <Button variant="secondary" size="icon" className="h-7 w-7 rounded-full bg-white/20 backdrop-blur hover:bg-white/40 border-none">
+                    <Button
+                      variant="secondary"
+                      size="icon"
+                      className="h-7 w-7 rounded-full bg-white/20 backdrop-blur hover:bg-white/40 border-none"
+                      onClick={() => {
+                        const a = document.createElement("a");
+                        a.href = img.url;
+                        a.download = `omnecor-${img.id}.png`;
+                        a.target = "_blank";
+                        a.click();
+                      }}
+                    >
                       <Download className="h-3.5 w-3.5 text-white" />
                     </Button>
                   </div>

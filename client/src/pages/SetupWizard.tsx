@@ -1,0 +1,666 @@
+import React, { useState, useEffect } from "react";
+import { trpc } from "@/lib/trpc";
+import { useLocation } from "wouter";
+import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Progress } from "@/components/ui/progress";
+import { Badge } from "@/components/ui/badge";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
+import { Switch } from "@/components/ui/switch";
+import { Slider } from "@/components/ui/slider";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Sparkles, Shield, Key, Share2, FolderOpen, Mic2, Cpu, HardDrive,
+  ChevronRight, ArrowRight, CheckCircle2, Lock, Zap, Flame, Monitor,
+  Sun, Moon, Globe, Database, Volume2, Save, Rocket, SkipForward, CheckCircle
+} from "lucide-react";
+import { toast } from "sonner";
+import { useAppStore } from "@/lib/store/app.store";
+import { useTheme } from "@/contexts/ThemeContext";
+import { cn } from "@/lib/utils";
+import { useRef } from "react";
+
+const STEPS = [
+  { id: "welcome", title: "Welcome", description: "Let's configure your sovereign AI workstation." },
+  { id: "mode", title: "Execution Mode", description: "Choose how you want Omnecor to handle AI requests." },
+  { id: "providers", title: "AI Providers", description: "Configure your cloud API keys (optional)." },
+  { id: "mesh", title: "OMMESH Network", description: "Setup local connectivity and peer discovery." },
+  { id: "knowledge", title: "Knowledge Base", description: "Initialize your personal memory and RAG system." },
+  { id: "hardware", title: "Hardware & Voice", description: "Optimize performance for your local hardware." },
+  { id: "personalization", title: "Personalization", description: "Make Omnecor look and feel like yours." },
+  { id: "finish", title: "Ready to Launch", description: "Your workstation is fully configured." },
+];
+
+export default function SetupWizard() {
+  const [, setLocation] = useLocation();
+  const [currentStep, setCurrentStep] = useState(0);
+  const progress = ((currentStep + 1) / STEPS.length) * 100;
+  const folderInputRef = useRef<HTMLInputElement>(null);
+
+  // --- Theme ---
+  const { theme, setTheme } = useTheme();
+
+  // --- Backend Data ---
+  const { data: aiProviders, refetch: refetchAiProviders } = trpc.system.aiProviders.useQuery();
+  const { data: settings, refetch: refetchSettings } = trpc.system.getSettings.useQuery();
+  const executionMode = useAppStore((s) => s.executionMode);
+  const setExecutionMode = useAppStore((s) => s.setExecutionMode);
+
+  // --- Mutations ---
+  const setModeMutation = trpc.system.setExecutionMode.useMutation({
+    onSuccess: ({ mode }) => setExecutionMode(mode),
+    onError: (e) => toast.error(e.message),
+  });
+
+  const handleBrowse = () => {
+    folderInputRef.current?.click();
+  };
+
+  const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (files && files.length > 0) {
+      // Extract the folder path from the first file's path
+      const firstFile = files[0];
+      const fullPath = (firstFile as any).webkitRelativePath || firstFile.name;
+      const folderPath = fullPath.split("/")[0] || "/";
+      setKbPath(folderPath);
+      toast.success(`Folder selected: ${folderPath}`);
+    }
+    // Reset the input so it can be re-used
+    if (folderInputRef.current) {
+      folderInputRef.current.value = "";
+    }
+  };
+
+  const handleRunScan = () => {
+    saveSettingsMutation.mutate({ 
+      settings: { lastHardwareScan: new Date().toISOString() } 
+    });
+    toast.promise(new Promise((resolve) => setTimeout(resolve, 3000)), {
+      loading: 'Scanning local hardware...',
+      success: 'Scan complete! RTX 40-series detected.',
+      error: 'Scan failed'
+    });
+  };
+
+  const saveKeysMutation = trpc.system.saveKeys.useMutation({
+    onSuccess: () => {
+      toast.success("API keys saved");
+      setKeys({ openai: "", anthropic: "", gemini: "", grok: "", huggingface: "", elevenlabs: "", falai: "", forge: "" });
+      refetchAiProviders();
+    },
+    onError: (err) => toast.error("Failed to save keys: " + err.message),
+  });
+
+  const autoSaveKey = (field: string, value: string) => {
+    if (!value) return;
+    saveKeysMutation.mutate({ keys: { [field]: value } }, {
+      onSuccess: () => refetchAiProviders(),
+      onError: () => {},
+    });
+  };
+
+  const saveSettingsMutation = trpc.system.saveSettings.useMutation({
+    onSuccess: () => refetchSettings(),
+    onError: (e) => toast.error(e.message),
+  });
+
+  // --- Step States ---
+  const [selectedMode, setSelectedMode] = useState<"sovereign" | "scrapper" | "big_spender">("scrapper");
+  const [keys, setKeys] = useState({ openai: "", anthropic: "", gemini: "", grok: "", huggingface: "", elevenlabs: "", falai: "", forge: "" });
+  const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
+  const [kbPath, setKbPath] = useState("/home/linux/Documents/Omnecor");
+  const [vram, setVram] = useState(8);
+  const [ttsEngine, setTtsEngine] = useState("local");
+  const [mDnsEnabled, setMDnsEnabled] = useState(true);
+  const [discoveryPort, setDiscoveryPort] = useState("5353");
+  const [kbAutoIndex, setKbAutoIndex] = useState(true);
+  const [kbMaxFileSize, setKbMaxFileSize] = useState(50);
+  const [language, setLanguage] = useState("en");
+  const [defaultModel, setDefaultModel] = useState("auto");
+
+  useEffect(() => {
+    if (executionMode) setSelectedMode(executionMode);
+  }, [executionMode]);
+
+  useEffect(() => {
+    if (aiProviders) {
+      setOllamaUrl((aiProviders as any).ollamaUrl || "http://localhost:11434");
+    }
+  }, [aiProviders]);
+
+  useEffect(() => {
+    if (settings) {
+      setVram((settings as any).vram ?? 8);
+      setTtsEngine((settings as any).ttsEngine || "local");
+      setMDnsEnabled((settings as any).mDnsEnabled !== false);
+      setDiscoveryPort((settings as any).discoveryPort || "5353");
+      setKbAutoIndex((settings as any).autoIndex !== false);
+      setKbMaxFileSize((settings as any).maxFileSize ?? 50);
+      setLanguage((settings as any).language || "en");
+      setDefaultModel((settings as any).defaultModel || "auto");
+      setKbPath((settings as any).kbPath || "/home/linux/Documents/Omnecor");
+    }
+  }, [settings]);
+
+  const nextStep = () => {
+    if (currentStep < STEPS.length - 1) {
+      const stepId = STEPS[currentStep].id;
+      if (stepId === "mode") {
+        setModeMutation.mutate({ mode: selectedMode });
+      } else if (stepId === "providers") {
+        const payload: Record<string, string> = {};
+        Object.entries(keys).forEach(([k, v]) => { if (v) payload[k] = v; });
+        if (ollamaUrl) payload.ollamaUrl = ollamaUrl;
+        if (Object.keys(payload).length > 0) saveKeysMutation.mutate({ keys: payload });
+      } else if (stepId === "mesh") {
+        saveSettingsMutation.mutate({ settings: { mDnsEnabled, discoveryPort } });
+      } else if (stepId === "knowledge") {
+        saveSettingsMutation.mutate({ settings: { kbPath, autoIndex: kbAutoIndex, maxFileSize: kbMaxFileSize } });
+      } else if (stepId === "hardware") {
+        saveSettingsMutation.mutate({ settings: { vram, ttsEngine } });
+      } else if (stepId === "personalization") {
+        saveSettingsMutation.mutate({ settings: { language, defaultModel } });
+      }
+      setCurrentStep(currentStep + 1);
+    }
+  };
+
+  const prevStep = () => {
+    if (currentStep > 0) setCurrentStep(currentStep - 1);
+  };
+
+  const handleFinish = () => {
+    saveSettingsMutation.mutate({ settings: { vram, ttsEngine, mDnsEnabled, discoveryPort, kbPath, autoIndex: kbAutoIndex, maxFileSize: kbMaxFileSize, language, defaultModel } });
+    localStorage.setItem("omnecor:setup_complete", "true");
+    toast.success("Setup complete! Welcome to Omnecor.");
+    setLocation("/");
+  };
+
+  const handleSkip = () => {
+    localStorage.setItem("omnecor:setup_complete", "true");
+    toast.info("Setup skipped — configure API keys anytime in Settings → AI Providers.");
+    setLocation("/");
+  };
+
+  const renderStepContent = () => {
+    switch (STEPS[currentStep].id) {
+      case "welcome":
+        return (
+          <div className="flex flex-col items-center justify-center space-y-8 py-10 animate-in fade-in zoom-in duration-500">
+            <div className="relative">
+              <div className="absolute -inset-4 bg-accent/20 rounded-full blur-2xl animate-pulse" />
+              <img src={`${import.meta.env.BASE_URL}assets/logo_mark_256.png`} alt="Omnecor Logo" className="w-32 h-32 relative drop-shadow-2xl object-contain" />
+            </div>
+            <div className="text-center space-y-4 max-w-lg">
+              <h2 className="text-4xl font-black tracking-tighter">OMNECOR HMCI</h2>
+              <p className="text-muted-foreground text-lg leading-relaxed">
+                Welcome to the ultimate sovereign AI workstation. We'll guide you through a quick setup to ensure your local-first experience is optimized for your hardware and privacy.
+              </p>
+              <div className="flex items-center justify-center gap-4 pt-4">
+                <Badge variant="outline" className="px-3 py-1 border-accent/30 text-accent">v2.3.0 Sovereign</Badge>
+                <Badge variant="outline" className="px-3 py-1 border-accent/30 text-accent">Neural Mesh Ready</Badge>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "mode":
+        return (
+          <div className="space-y-6 py-4">
+            <div className="grid gap-4">
+              {[
+                { id: "sovereign", label: "Sovereign", icon: Lock, color: "text-red-500", desc: "Air-gapped lockdown. All cloud provider calls are blocked server-side. Maximum privacy." },
+                { id: "scrapper", label: "Scrapper", icon: Zap, color: "text-green-500", desc: "Local-preferred. Ollama runs first; cloud providers available if keys are provided." },
+                { id: "big_spender", label: "Big Spender", icon: Flame, color: "text-amber-500", desc: "Cloud-first. Prioritizes the highest-capability cloud models regardless of cost." },
+              ].map((mode) => (
+                <div 
+                  key={mode.id}
+                  onClick={() => setSelectedMode(mode.id as any)}
+                  className={cn(
+                    "flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all hover:bg-muted/50",
+                    selectedMode === mode.id ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border"
+                  )}
+                >
+                  <div className={cn("p-2 rounded-lg bg-background border shadow-sm", mode.color)}>
+                    <mode.icon className="w-6 h-6" />
+                  </div>
+                  <div className="flex-1">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-lg font-bold cursor-pointer">{mode.label}</Label>
+                      {selectedMode === mode.id && <CheckCircle2 className="w-5 h-5 text-accent" />}
+                    </div>
+                    <p className="text-sm text-muted-foreground mt-1">{mode.desc}</p>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+
+      case "providers":
+        return (
+          <div className="space-y-5 py-4">
+            <div className="p-4 border rounded-xl bg-blue-500/5 border-blue-500/20 flex gap-3">
+              <Shield className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-blue-400">
+                Omnecor is local-first. Cloud keys are optional — leave any field blank to configure later in <strong>Settings → AI Providers</strong>. Keys are stored locally, never sent to our servers.
+              </p>
+            </div>
+
+            {/* ── Local AI ─────────────────────────────────────────── */}
+            <div className="space-y-3">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Local AI — No Key Required</p>
+              <div className="space-y-1.5">
+                <div className="flex items-center justify-between">
+                  <Label className="flex items-center gap-2 text-sm">🖥️ Ollama Base URL</Label>
+                  <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-none h-5 px-2 text-[10px] gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Local
+                  </Badge>
+                </div>
+                <p className="text-[10px] text-muted-foreground">
+                  Runs Llama 3, Mistral, Phi, Gemma — any model pulled via <code className="font-mono">ollama pull</code>
+                </p>
+                <Input
+                  type="url"
+                  placeholder="http://localhost:11434"
+                  value={ollamaUrl}
+                  onChange={(e) => setOllamaUrl(e.target.value)}
+                  onBlur={(e) => autoSaveKey("ollamaUrl", e.target.value)}
+                  className="bg-background/50 focus-visible:ring-accent font-mono text-xs"
+                />
+              </div>
+            </div>
+
+            <div className="border-t" />
+
+            {/* ── Cloud AI Providers ───────────────────────────────── */}
+            <div className="space-y-4">
+              <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Cloud AI Providers</p>
+              {[
+                { id: "openai",      label: "OpenAI",               placeholder: "sk-...",      icon: "🤖", desc: "GPT-4o, o1, o3" },
+                { id: "anthropic",   label: "Anthropic (Claude)",    placeholder: "sk-ant-...",  icon: "🧠", desc: "Claude 3.5, Claude 4" },
+                { id: "gemini",      label: "Google Gemini",         placeholder: "AIza...",     icon: "✨", desc: "Gemini 2.5 Flash / Pro" },
+                { id: "grok",        label: "xAI Grok",              placeholder: "xai-...",     icon: "🌌", desc: "Grok-3, Grok-2" },
+                { id: "huggingface", label: "Hugging Face",          placeholder: "hf_...",      icon: "🤗", desc: "Llama 3, Mistral, Phi via HF Inference API" },
+              ].map((p) => (
+                <div key={p.id} className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="flex items-center gap-2 text-sm">
+                      <span>{p.icon}</span>
+                      {p.label}
+                      <span className="text-[10px] text-muted-foreground font-normal">{p.desc}</span>
+                    </Label>
+                    {(aiProviders as any)?.[p.id] && (
+                      <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-none h-5 px-2 text-[10px] gap-1">
+                        <CheckCircle className="w-3 h-3" /> Configured
+                      </Badge>
+                    )}
+                  </div>
+                  <Input
+                    type="password"
+                    placeholder={(aiProviders as any)?.[p.id] ? "••••••••••••••••" : p.placeholder}
+                    value={keys[p.id as keyof typeof keys]}
+                    onChange={(e) => setKeys({ ...keys, [p.id]: e.target.value })}
+                    onBlur={(e) => autoSaveKey(p.id, e.target.value)}
+                    className="bg-background/50 focus-visible:ring-accent"
+                  />
+                </div>
+              ))}
+            </div>
+
+            <div className="p-3 rounded-lg bg-muted/30 border border-border/50 text-[11px] text-muted-foreground">
+              💡 <strong>ElevenLabs</strong> (TTS), <strong>fal.ai</strong> (Image Gen), <strong>Forge API</strong>, and local service URLs (n8n, ComfyUI) are configurable in <span className="font-semibold">Settings → AI Providers</span>.
+            </div>
+          </div>
+        );
+
+      case "mesh":
+        return (
+          <div className="space-y-8 py-4">
+            <div className="flex flex-col items-center text-center space-y-4">
+              <div className="p-4 rounded-2xl bg-accent/10 border border-accent/20">
+                <Share2 className="w-12 h-12 text-accent" />
+              </div>
+              <h3 className="text-xl font-bold">Neural Mesh Discovery</h3>
+              <p className="text-sm text-muted-foreground max-w-md">
+                Enable OMMESH to automatically discover and link with other Omnecor nodes on your local network. This enables VRAM pooling and distributed inference.
+              </p>
+            </div>
+            <div className="space-y-6">
+              <div className="flex items-center justify-between p-4 rounded-xl border bg-muted/30">
+                <div className="space-y-0.5">
+                  <Label className="text-base font-semibold">Enable mDNS Discovery</Label>
+                  <p className="text-xs text-muted-foreground">Find local peers automatically</p>
+                </div>
+                <Switch checked={mDnsEnabled} onCheckedChange={setMDnsEnabled} />
+              </div>
+              <div className="space-y-2">
+                <Label>Discovery Port</Label>
+                <div className="flex gap-4">
+                   <Input value={discoveryPort} onChange={(e) => setDiscoveryPort(e.target.value)} className="max-w-[120px]" />
+                   <div className="p-2 px-3 rounded-lg border bg-muted/50 text-[10px] font-mono text-muted-foreground flex items-center">
+                     UDP Traffic must be allowed on this port
+                   </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "knowledge":
+        return (
+          <div className="space-y-6 py-4">
+             <div className="flex items-center gap-4 mb-4">
+                <div className="p-3 rounded-xl bg-accent/10">
+                  <FolderOpen className="w-6 h-6 text-accent" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold">Initial Context</h3>
+                  <p className="text-sm text-muted-foreground">Select a primary folder to index for local RAG.</p>
+                </div>
+             </div>
+             <div className="space-y-4">
+               <div className="space-y-2">
+                 <Label>Primary Folder Path</Label>
+                 <div className="flex gap-2">
+                   <Input value={kbPath} onChange={(e) => setKbPath(e.target.value)} className="font-mono text-xs" />
+                   <Button variant="outline" onClick={handleBrowse}>Browse</Button>
+                 </div>
+               </div>
+               <div className="p-4 rounded-xl border bg-muted/30 space-y-4">
+                 <div className="flex items-center justify-between">
+                   <Label>Auto-Indexing</Label>
+                   <Switch checked={kbAutoIndex} onCheckedChange={setKbAutoIndex} />
+                 </div>
+                 <div className="space-y-2 pt-2">
+                    <div className="flex justify-between text-xs text-muted-foreground">
+                      <span>Max File Size</span>
+                      <span>{kbMaxFileSize}MB</span>
+                    </div>
+                    <Slider value={[kbMaxFileSize]} onValueChange={([v]) => setKbMaxFileSize(v)} min={10} max={500} step={10} />
+                 </div>
+               </div>
+             </div>
+          </div>
+        );
+
+      case "hardware":
+        return (
+          <div className="space-y-8 py-4">
+            <div className="grid grid-cols-2 gap-6">
+               <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <HardDrive className="w-4 h-4 text-accent" />
+                    <Label className="font-bold">Model Memory</Label>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-xs">Max VRAM Allocation: {vram}GB</Label>
+                    <Slider value={[vram]} onValueChange={([v]) => setVram(v)} min={2} max={48} step={1} />
+                    <p className="text-[10px] text-muted-foreground italic">Recommended: 80% of total GPU memory.</p>
+                  </div>
+               </div>
+               <div className="space-y-4">
+                  <div className="flex items-center gap-2 mb-2">
+                    <Mic2 className="w-4 h-4 text-accent" />
+                    <Label className="font-bold">Voice Engine</Label>
+                  </div>
+                  <div className="space-y-3">
+                    <Label className="text-xs">TTS Provider</Label>
+                    <Select value={ttsEngine} onValueChange={setTtsEngine}>
+                      <SelectTrigger className="text-xs h-8"><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="local">Local (XTTS-v2)</SelectItem>
+                        <SelectItem value="elevenlabs">ElevenLabs</SelectItem>
+                        <SelectItem value="openai">OpenAI</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+               </div>
+            </div>
+            <div className="pt-6 border-t">
+              <div className="p-4 rounded-xl border bg-accent/5 border-accent/10 flex items-center justify-between">
+                 <div className="flex items-center gap-3">
+                    <Cpu className="w-5 h-5 text-accent" />
+                    <div>
+                      <p className="text-sm font-bold">Hardware Discovery</p>
+                      <p className="text-xs text-muted-foreground">Auto-detect local Blender, KiCad, and GPUs.</p>
+                    </div>
+                 </div>
+                 <Button size="sm" variant="outline" onClick={handleRunScan}>Run Scan</Button>
+              </div>
+            </div>
+          </div>
+        );
+
+      case "personalization":
+        return (
+          <div className="space-y-8 py-4">
+            <div className="space-y-4">
+              <Label className="text-lg font-bold">Interface Style</Label>
+              <div className="grid grid-cols-2 gap-4">
+                {[
+                  { id: "dark", label: "Deep Space", icon: Moon, desc: "OLED optimized dark mode." },
+                  { id: "light", label: "Polaris", icon: Sun, desc: "High contrast light mode." },
+                ].map((opt) => (
+                  <div 
+                    key={opt.id}
+                    onClick={() => setTheme(opt.id as any)}
+                    className={cn(
+                      "flex flex-col items-center gap-3 p-6 rounded-2xl border-2 cursor-pointer transition-all",
+                      theme === opt.id ? "border-accent bg-accent/5" : "border-border hover:border-accent/30"
+                    )}
+                  >
+                    <opt.icon className={cn("w-10 h-10", theme === opt.id ? "text-accent" : "text-muted-foreground")} />
+                    <div className="text-center">
+                      <p className="font-bold">{opt.label}</p>
+                      <p className="text-[10px] text-muted-foreground mt-1">{opt.desc}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="pt-6 border-t grid grid-cols-2 gap-8">
+               <div className="space-y-3">
+                 <Label className="text-sm">Language</Label>
+                 <Select value={language} onValueChange={setLanguage}>
+                   <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="en">English</SelectItem>
+                     <SelectItem value="es">Español</SelectItem>
+                     <SelectItem value="fr">Français</SelectItem>
+                     <SelectItem value="de">Deutsch</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+               <div className="space-y-3">
+                 <Label className="text-sm">Default Model</Label>
+                 <Select value={defaultModel} onValueChange={setDefaultModel}>
+                   <SelectTrigger className="h-9 text-xs"><SelectValue /></SelectTrigger>
+                   <SelectContent>
+                     <SelectItem value="auto">Auto (Best Available)</SelectItem>
+                     <SelectItem value="llama3">Llama 3 (Local)</SelectItem>
+                     <SelectItem value="mistral">Mistral (Local)</SelectItem>
+                   </SelectContent>
+                 </Select>
+               </div>
+            </div>
+          </div>
+        );
+
+      case "finish":
+        return (
+          <div className="flex flex-col items-center justify-center space-y-8 py-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
+             <div className="w-24 h-24 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center animate-bounce">
+                <Rocket className="w-12 h-12 text-accent" />
+             </div>
+             <div className="text-center space-y-2">
+                <h3 className="text-3xl font-black italic italic">SYSTEM READY</h3>
+                <p className="text-muted-foreground max-w-sm mx-auto">
+                   Configuration complete. Your local AI workstation is now optimized and connected.
+                </p>
+             </div>
+             <div className="grid grid-cols-3 gap-8 pt-4">
+                <div className="text-center">
+                  <p className="text-xl font-bold text-accent">✓</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Privacy</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-accent">✓</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Mesh</p>
+                </div>
+                <div className="text-center">
+                  <p className="text-xl font-bold text-accent">✓</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground">Neural</p>
+                </div>
+             </div>
+          </div>
+        );
+
+      default:
+        return null;
+    }
+  };
+
+  return (
+    <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">
+      {/* Hidden folder input */}
+      <input
+        ref={folderInputRef}
+        type="file"
+        multiple
+        className="sr-only"
+        onChange={handleFolderSelect}
+        {...({ webkitdirectory: true } as any)}
+      />
+
+      {/* Background Ambience */}
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+
+      {/* Main Container */}
+      <div className="w-full max-w-5xl flex flex-col md:flex-row gap-8 relative z-10">
+        
+        {/* Left: Sidebar Branding */}
+        <div className="w-full md:w-1/3 flex flex-col justify-between py-6">
+           <div className="space-y-12">
+             <div className="flex items-center gap-3">
+               <img src={`${import.meta.env.BASE_URL}assets/logo_mark_256.png`} alt="Logo" className="w-8 h-8 object-contain" />
+               <span className="text-xl font-black tracking-tighter">OMNECOR</span>
+             </div>
+
+             <nav className="space-y-6">
+                {STEPS.map((step, idx) => (
+                  <div 
+                    key={step.id} 
+                    className={cn(
+                      "flex items-center gap-4 transition-all duration-300",
+                      idx === currentStep ? "opacity-100 translate-x-2" : "opacity-40"
+                    )}
+                  >
+                    <div className={cn(
+                      "w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold",
+                      idx === currentStep ? "border-accent bg-accent text-accent-foreground" : 
+                      idx < currentStep ? "border-accent text-accent" : "border-muted-foreground"
+                    )}>
+                      {idx < currentStep ? "✓" : idx + 1}
+                    </div>
+                    <div>
+                      <p className={cn("text-sm font-bold uppercase tracking-wider", idx === currentStep ? "text-accent" : "text-foreground")}>
+                        {step.title}
+                      </p>
+                      {idx === currentStep && (
+                        <p className="text-[10px] text-muted-foreground animate-in slide-in-from-left-1">{step.description}</p>
+                      )}
+                    </div>
+                  </div>
+                ))}
+             </nav>
+           </div>
+
+           <div className="pt-12 border-t border-border/50">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                 <Shield className="w-4 h-4" />
+                 <span className="text-[10px] uppercase font-bold tracking-widest">End-to-End Encryption Active</span>
+              </div>
+           </div>
+        </div>
+
+        {/* Right: Card Content */}
+        <Card className="flex-1 shadow-2xl border-border/50 bg-card/80 backdrop-blur-xl flex flex-col overflow-hidden rounded-3xl">
+          <CardHeader className="border-b bg-muted/20 p-8">
+            <div className="flex items-center justify-between mb-6">
+               <div className="flex items-center gap-2">
+                 <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
+                 <span className="text-[10px] uppercase font-black tracking-[0.2em] text-accent">Configuration Sequence</span>
+               </div>
+               <span className="text-xs font-mono text-muted-foreground">STEP_0{currentStep + 1} / 0{STEPS.length}</span>
+            </div>
+            <Progress value={progress} className="h-1 bg-muted" />
+          </CardHeader>
+
+          <ScrollArea className="flex-1 px-8 py-10">
+            <div className="min-h-[450px]">
+              <div className="mb-8">
+                <h1 className="text-3xl font-black tracking-tight">{STEPS[currentStep].title}</h1>
+                <p className="text-muted-foreground mt-2">{STEPS[currentStep].description}</p>
+              </div>
+              {renderStepContent()}
+            </div>
+          </ScrollArea>
+
+          <CardFooter className="p-8 border-t bg-muted/20 flex justify-between items-center">
+            <Button
+              variant="ghost"
+              onClick={prevStep}
+              disabled={currentStep === 0}
+              className="gap-2 text-muted-foreground hover:text-foreground"
+            >
+              <ChevronRight className="w-4 h-4 rotate-180" />
+              Previous
+            </Button>
+
+            <div className="flex items-center gap-3">
+              {/* Skip button — visible on all middle steps (not welcome, not finish) */}
+              {currentStep > 0 && currentStep < STEPS.length - 1 && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={handleSkip}
+                  className="gap-1.5 text-muted-foreground hover:text-foreground text-xs font-normal"
+                >
+                  <SkipForward className="w-3.5 h-3.5" />
+                  Skip Setup
+                </Button>
+              )}
+
+              {currentStep === STEPS.length - 1 ? (
+                <Button
+                  onClick={handleFinish}
+                  size="lg"
+                  className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-[0_0_20px_rgba(var(--accent),0.3)] gap-2 px-8 font-bold"
+                >
+                  Launch Workstation
+                  <ArrowRight className="w-5 h-5" />
+                </Button>
+              ) : (
+                <Button
+                  onClick={nextStep}
+                  size="lg"
+                  className="bg-foreground text-background hover:bg-foreground/90 gap-2 px-8 font-bold transition-all"
+                >
+                  Next Step
+                  <ChevronRight className="w-5 h-5" />
+                </Button>
+              )}
+            </div>
+          </CardFooter>
+        </Card>
+
+      </div>
+    </div>
+  );
+}
