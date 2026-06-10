@@ -937,6 +937,8 @@ function MeshFederationPanel() {
             </div>
     {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
     {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
                             <Button variant="outline" size="sm" className="w-full mt-2 text-[10px] h-8 gap-2">
               <Share2 className="w-3 h-3" /> Export Identity
             </Button>
@@ -1196,7 +1198,11 @@ function CurationPanel() {
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
     {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
     {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
                               <Button size="icon" variant="ghost" className="h-7 w-7"><ExternalLink className="w-3 h-3" /></Button>
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
     {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
     {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
                               <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive"><XCircle className="w-3 h-3" /></Button>
@@ -1236,6 +1242,8 @@ function CurationPanel() {
                           {tag} <XCircle className="w-3 h-3 ml-1.5" />
                         </Badge>
                       ))}
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
     {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
     {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
                       <Button variant="ghost" size="sm" className="h-6 px-2 text-[10px] border border-dashed border-border"><Plus className="w-3 h-3 mr-1" /> Add</Button>
@@ -1373,6 +1381,8 @@ function CurationPanel() {
                       <div className="pt-6">
     {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
     {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
                         <Button variant="link" className="text-accent p-0 h-auto text-xs gap-1">
                           <ExternalLink className="w-3 h-3" /> View Original Source
                         </Button>
@@ -1412,6 +1422,8 @@ function CurationPanel() {
                         <p className="text-xs font-bold">42</p>
                         <p className="text-[10px] text-muted-foreground">Interactions</p>
                       </div>
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
     {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
     {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
                       <Button variant="ghost" size="icon" className="h-8 w-8"><ExternalLink className="w-4 h-4" /></Button>
