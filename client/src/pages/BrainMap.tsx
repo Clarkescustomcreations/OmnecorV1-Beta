@@ -36,7 +36,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useVisualControlStore } from "@/lib/stores/visualControlStore";
-import { ScrollArea } from "@/components/ui/scroll-area";
 
 // ---------------------------------------------------------------------------
 // Node description helper
@@ -938,7 +937,7 @@ function BrainMapContent() {
                                     <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1">
                                       <FolderOpen className="w-3 h-3" /> Contents ({children.length})
                                     </span>
-                                    <ScrollArea className="max-h-32 rounded border border-border/50">
+                                    <div className="max-h-40 overflow-y-auto overflow-x-hidden rounded border border-border/50">
                                       <ul className="p-1 space-y-0.5">
                                         {children.map(child => (
                                           <li
@@ -951,7 +950,7 @@ function BrainMapContent() {
                                           </li>
                                         ))}
                                       </ul>
-                                    </ScrollArea>
+                                    </div>
                                   </div>
                                 );
                               })()}
@@ -1047,29 +1046,31 @@ function BrainMapContent() {
 
                           {/* Current context entries */}
                           {contextEntries.length > 0 && (
-                            <ul className="space-y-1 mt-1">
-                              {contextEntries.map(entry => (
-                                <li
-                                  key={entry.id}
-                                  className="flex items-center gap-2 px-2 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 group"
-                                >
-                                  <span className={cn(
-                                    "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                                    entry.nodeType === "folder" ? "bg-blue-400" : "bg-emerald-400"
-                                  )} />
-                                  <span className="flex-1 text-[10px] font-mono truncate text-foreground">
-                                    {entry.name}
-                                  </span>
-                                  <button
-                                    onClick={() => removeFromContext(entry.id)}
-                                    className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
-                                    title="Remove from context"
+                            <div className="max-h-52 overflow-y-auto overflow-x-hidden mt-1">
+                              <ul className="space-y-1 pr-0.5">
+                                {contextEntries.map(entry => (
+                                  <li
+                                    key={entry.id}
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 group"
                                   >
-                                    <XIcon className="w-3 h-3" />
-                                  </button>
-                                </li>
-                              ))}
-                            </ul>
+                                    <span className={cn(
+                                      "w-1.5 h-1.5 rounded-full flex-shrink-0",
+                                      entry.nodeType === "folder" ? "bg-blue-400" : "bg-emerald-400"
+                                    )} />
+                                    <span className="flex-1 text-[10px] font-mono truncate text-foreground">
+                                      {entry.name}
+                                    </span>
+                                    <button
+                                      onClick={() => removeFromContext(entry.id)}
+                                      className="opacity-0 group-hover:opacity-100 text-muted-foreground hover:text-destructive transition-opacity"
+                                      title="Remove from context"
+                                    >
+                                      <XIcon className="w-3 h-3" />
+                                    </button>
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
                           )}
 
                           {contextEntries.length > 0 && (
