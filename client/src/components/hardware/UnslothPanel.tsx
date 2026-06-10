@@ -42,21 +42,18 @@ export const UnslothPanel: React.FC = () => {
     onError: (err) => toast.error("Dataset generation error: " + err.message),
   });
 
-  // TODO: Wire to trpc.training.saveLoraConfig mutation when backend is ready
-  // Currently stubbing with local toast notification
+  const saveConfig = trpc.training.saveLoraConfig.useMutation({
+    onSuccess: () => toast.success("LoRA config saved"),
+    onError: (err) => toast.error("Save failed: " + err.message),
+  });
+
   const handleSaveConfig = () => {
-    const config = {
-      loraRank: loraRank,
-      loraAlpha: 32,
+    saveConfig.mutate({
+      r: loraRank,
+      alpha: 32,
+      dropout: 0.05,
       targetModules: ["q_proj", "v_proj"],
-      modelName: "unsloth/llama-3-8b-bnb-4bit",
-      maxSeqLength: 2048,
-      saveMethod: "gguf"
-    };
-    // Once backend mutation exists, replace with:
-    // saveConfigMutation.mutate(config);
-    toast.info("LoRA config saved locally (backend mutation pending)");
-    console.log("Config to save:", config);
+    });
   };
 
   return (

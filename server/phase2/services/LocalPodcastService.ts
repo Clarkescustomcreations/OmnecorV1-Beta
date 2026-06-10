@@ -13,9 +13,12 @@
 
 import { VoiceService } from "./VoiceService.js";
 import { meshNode } from "../../ommesh/core/MeshNode.js";
+import { createLogger } from "../../_core/logger.js";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import path from "path";
+
+const log = createLogger("PodcastEngine");
 
 export interface DialogueTurn {
   speakerId: string;
@@ -63,7 +66,7 @@ export class LocalPodcastService {
     const tempDir = path.join(process.env.HOME || "/tmp", ".omnecor", "podcasts", jobId);
     await fs.mkdir(tempDir, { recursive: true });
 
-    console.log(`[EnhancedPodcastEngine] Initiating release-quality synthesis for: ${config.title}`);
+    log.info("Initiating podcast synthesis", { title: config.title });
 
     // Phase 9: wire to Python bridge via MeshNode when implemented
     throw new Error("LocalPodcastService requires Phase 9 Python bridge integration (not yet implemented)");

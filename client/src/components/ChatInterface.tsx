@@ -579,7 +579,14 @@ export default function ChatInterface({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Chat-specific display settings
-  const [chatSettings, setChatSettings] = useState(() => {
+  interface ChatDisplaySettings {
+    showTimestamps: boolean;
+    showTokenCounts: boolean;
+    showModelName: boolean;
+    showLatency: boolean;
+    autoStoreMemory: boolean;
+  }
+  const [chatSettings, setChatSettings] = useState<ChatDisplaySettings>(() => {
     try {
       const saved = localStorage.getItem("omnecor:chat_display_settings");
       return saved ? JSON.parse(saved) : {
@@ -605,7 +612,7 @@ export default function ChatInterface({
   }, [chatSettings]);
 
   const toggleSetting = (key: keyof typeof chatSettings) => {
-    setChatSettings((prev: any) => ({ ...prev, [key]: !prev[key] }));
+    setChatSettings((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Sync title draft when prop changes (switching conversations)

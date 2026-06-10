@@ -162,7 +162,7 @@ export default function AgenticWalletPanel() {
 
               <div className="space-y-3">
                 <Label className="text-xs font-semibold uppercase text-muted-foreground">Enforcement Mode</Label>
-                <RadioGroup value={mode} onValueChange={(v: any) => setMode(v)} className="space-y-2">
+                <RadioGroup value={mode} onValueChange={(v) => setMode(v as "soft" | "hard")} className="space-y-2">
                   <div className={cn(
                     "flex items-start gap-3 rounded-md border p-3 cursor-pointer transition-colors",
                     mode === "soft" ? "border-primary bg-primary/5" : "hover:bg-muted/50 border-transparent bg-muted/20"

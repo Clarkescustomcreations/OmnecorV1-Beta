@@ -26,7 +26,7 @@ import { cn } from "@/lib/utils";
 interface MemoryArchiverPanelProps {
   sessionId: string;
   projectId: string;
-  selectedModel: any;
+  selectedModel: { providerId: string; modelId: string; apiKey?: string; baseUrl?: string } | null | undefined;
 }
 
 export default function MemoryArchiverPanel({ sessionId, projectId, selectedModel }: MemoryArchiverPanelProps) {

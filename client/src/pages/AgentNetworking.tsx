@@ -320,7 +320,7 @@ export default function AgentNetworking() {
               </Select>
             </div>
             <Button
-              onClick={() => fetchDiscoveryMutation.mutate(linkedToMap && activeMap ? { mapId: activeMap.id } as any : {})}
+              onClick={() => fetchDiscoveryMutation.mutate({})}
               disabled={fetchDiscoveryMutation.isPending}
               className="gap-2"
             >
@@ -434,8 +434,8 @@ export default function AgentNetworking() {
                       onChange={e => setNewPostForm(f => ({ ...f, platformAccountId: e.target.value }))}
                     >
                       <option value="">Select account…</option>
-                      {accountsData?.map((a: any) => (
-                        <option key={a.id} value={a.id}>{a.platform} — {a.username}</option>
+                      {accountsData?.map((a) => (
+                        <option key={a.id} value={a.id}>{a.platform} — {a.accountName}</option>
                       ))}
                     </select>
                   </div>
@@ -754,12 +754,22 @@ export default function AgentNetworking() {
   );
 }
 
+interface MeshPeer {
+  id: string;
+  name: string;
+  address: string;
+  port: number;
+  fingerprint: string;
+  isApproved?: boolean;
+}
+
 function MeshFederationPanel() {
   const utils = trpc.useUtils();
   const { data: identity } = trpc.ommesh.getIdentity.useQuery();
-  const { data: peers, isLoading: loadingPeers } = trpc.ommesh.discover.useQuery(undefined, {
+  const { data: peersRaw, isLoading: loadingPeers } = trpc.ommesh.discover.useQuery(undefined, {
     refetchInterval: 5000,
   });
+  const peers = peersRaw as unknown as MeshPeer[] | undefined;
 
   const approveMutation = trpc.ommesh.approvePeer.useMutation({
     onSuccess: () => {
@@ -772,7 +782,7 @@ function MeshFederationPanel() {
   const renderMeshGraph = () => {
     const nodes = [
       { id: "local", name: identity?.hostname || "Local Node", type: "local", isApproved: true as boolean, x: 150, y: 150 },
-      ...(peers?.map((p: any, i: number) => {
+      ...(peers?.map((p, i) => {
         const angle = (i / (peers.length || 1)) * Math.PI * 2;
         return {
           id: p.id,
@@ -863,7 +873,7 @@ function MeshFederationPanel() {
                   {(!peers || peers.length === 0) ? (
                     <p className="text-xs italic text-muted-foreground py-4">No peers detected on local network...</p>
                   ) : (
-                    peers.map((peer: any) => (
+                    peers.map((peer) => (
                       <div key={peer.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                         <div className="flex items-center gap-3">
                           <Server className="w-4 h-4 text-muted-foreground" />
@@ -938,7 +948,7 @@ function MeshFederationPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(peers?.filter((p: any) => p.isApproved).length || 0) + 1} Nodes</div>
+            <div className="text-2xl font-bold">{(peers?.filter((p) => p.isApproved).length || 0) + 1} Nodes</div>
             <p className="text-xs text-muted-foreground">Active in distributed cloud</p>
             <div className="mt-4 h-1.5 w-full bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-accent" style={{ width: '45%' }} />
@@ -963,7 +973,7 @@ function PlatformOAuthButtons({
   accountsData,
   refetch,
 }: {
-  accountsData: unknown[] | undefined;
+  accountsData: { platform: string; [key: string]: unknown }[] | undefined;
   refetch: () => void;
 }) {
   const getAuthUrlMutation = trpc.oauth.getAuthorizationUrl.useMutation({
@@ -974,11 +984,11 @@ function PlatformOAuthButtons({
   });
 
   const connectedPlatforms = new Set(
-    accountsData?.map((a) => (a as any).platform?.toLowerCase() ?? "") || []
+    accountsData?.map((a) => a.platform?.toLowerCase() ?? "") || []
   );
 
   const handleConnect = (platform: string) => {
-    getAuthUrlMutation.mutate({ platform: platform as any });
+    getAuthUrlMutation.mutate({ platform: platform as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] });
   };
 
   return (
@@ -1022,7 +1032,8 @@ function CurationPanel() {
     onSuccess: (data) => {
       toast.success(`Discovered ${data.articlesAdded} new insights`);
       utils.discovery.listUnprocessed.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Sync failed: " + err.message),
   });
 
   const curateMutation = trpc.curator.curateArticle.useMutation({
@@ -1030,7 +1041,8 @@ function CurationPanel() {
       toast.success("Article processed and queued for review");
       utils.discovery.listUnprocessed.invalidate();
       utils.curator.listByStatus.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Curation failed: " + err.message),
   });
 
   const approveMutation = trpc.curator.approvePosts.useMutation({
@@ -1038,7 +1050,8 @@ function CurationPanel() {
       toast.success("Post approved and scheduled");
       utils.curator.listByStatus.invalidate();
       utils.scheduling.listScheduledPosts.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Approval failed: " + err.message),
   });
 
   return (

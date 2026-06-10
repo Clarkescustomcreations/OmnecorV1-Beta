@@ -26,6 +26,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
+import { toast } from "sonner";
 
 // ── Types (mirrored from server for self-containment) ─────────────────────────
 
@@ -102,14 +103,14 @@ export function RecursiveMASPanel() {
     });
   }
 
+  const stopMutation = trpc.agent.stopRecursiveMAS.useMutation({
+    onSuccess: () => toast.success("Agent crew stopped"),
+    onError: (err) => toast.error("Failed to stop: " + err.message),
+  });
+
   function handleStop() {
     if (!jobId) return;
-    // TODO: Implement trpc.agent.stopRecursiveMAS on backend
-    // For now, use raw fetch to stop the job
-    fetch(`/api/mas/stop/${jobId}`, { method: "POST" }).catch((err) => {
-      console.error("Stop request error (non-fatal):", err.message);
-      // Polling will catch the stopped state automatically
-    });
+    stopMutation.mutate({ jobId });
   }
 
   // ── Render ────────────────────────────────────────────────────────────────

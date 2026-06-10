@@ -107,7 +107,8 @@ export default function MapManager() {
   const pickFolder = async () => {
     if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
       try {
-        const handle = await (window as any).showDirectoryPicker({ mode: "read" });
+        const handle = await (window as Window & { showDirectoryPicker?: (opts?: { mode?: string }) => Promise<{ name: string }> }).showDirectoryPicker?.({ mode: "read" });
+        if (!handle) return;
         addLocalFolder(handle.name); // name is the dir name; server needs full path
         toast.info(`Folder selected: ${handle.name}. If the full path differs, edit it below.`);
         setFolderInput(handle.name);
