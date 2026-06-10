@@ -116,4 +116,42 @@ export const curatorRouter = router({
 
       return { success: true };
     }),
+  regenerateDraft: protectedProcedure
+    .input(z.object({ articleId: z.number() }))
+    .mutation(async ({ input, ctx }) => {
+      const db = await getDb();
+      if (!db) return { success: false, draft: "Database not available" };
+
+      const article = await db.select()
+        .from(discoveredArticles)
+        .where(eq(discoveredArticles.id, input.articleId))
+        .limit(1);
+
+      if (!article.length) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
+      }
+
+      const articleData = article[0];
+      const prompt = `You are a social media content curator. Generate a concise, engaging social media post (max 280 characters for X/Twitter) based on the following article.
+
+Article Title: ${articleData.title || "Untitled"}
+Content: ${(articleData.content || articleData.summary || "").slice(0, 1000)}
+
+Create a single social media post that captures the essence of this article in an engaging way.`;
+
+      try {
+        const draft = await ctx.services.aiProvider.chat({
+          providerId: "anthropic",
+          modelId: "claude-opus-4-1",
+          messages: [{ role: "user", content: prompt }],
+          maxTokens: 300,
+        });
+
+        return { success: true, draft };
+      } catch (err) {
+        // If AI unavailable, return template
+        const fallback = `Check out: "${articleData.title || "New article"}" - ${(articleData.summary || articleData.content || "").slice(0, 80).trim()}...`;
+        return { success: true, draft: fallback };
+      }
+    }),
 });

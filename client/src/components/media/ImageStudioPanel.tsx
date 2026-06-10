@@ -10,6 +10,9 @@ import { toast } from "sonner";
 export const ImageStudioPanel: React.FC = () => {
   const [prompt, setPrompt] = useState("");
   const [gallerySearch, setGallerySearch] = useState("");
+  const [showSettings, setShowSettings] = useState(false);
+  const [defaultStyle, setDefaultStyle] = useState("Realistic");
+  const [imageSize, setImageSize] = useState("768x768");
 
   const imagesQuery = trpc.fal.listImages.useQuery();
   const generateMutation = trpc.fal.generateImage.useMutation({
@@ -30,13 +33,16 @@ export const ImageStudioPanel: React.FC = () => {
           </div>
           <div className="flex gap-2">
             <div className="relative flex-1">
-              <Input 
-                placeholder="A futuristic cybernetic interface with neural networks..." 
+              <Input
+                placeholder="A futuristic cybernetic interface with neural networks..."
                 className="pr-12 h-12 shadow-inner"
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
               />
-              <Settings2 className="absolute right-4 top-3.5 w-5 h-5 text-muted-foreground cursor-pointer hover:text-foreground transition-colors" />
+              <Settings2
+                className="absolute right-4 top-3.5 w-5 h-5 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                onClick={() => setShowSettings(s => !s)}
+              />
             </div>
             <Button 
               className="h-12 px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg"
@@ -46,6 +52,50 @@ export const ImageStudioPanel: React.FC = () => {
               {generateMutation.isPending ? "Dreaming..." : <><Wand2 className="w-4 h-4 mr-2" /> Generate</>}
             </Button>
           </div>
+          {showSettings && (
+            <div className="mt-4 p-4 rounded-lg border bg-muted/30 space-y-4">
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase text-muted-foreground">Default Style</label>
+                <div className="flex gap-2 flex-wrap">
+                  {["Realistic", "Anime", "Digital Art", "Oil Painting"].map((style) => (
+                    <button
+                      key={style}
+                      onClick={() => setDefaultStyle(style)}
+                      className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
+                        defaultStyle === style
+                          ? "bg-purple-600 text-white"
+                          : "bg-muted border hover:bg-muted/80"
+                      }`}
+                    >
+                      {style}
+                    </button>
+                  ))}
+                </div>
+              </div>
+              <div className="space-y-2">
+                <label className="text-xs font-bold uppercase text-muted-foreground">Image Size</label>
+                <select
+                  value={imageSize}
+                  onChange={(e) => setImageSize(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded border bg-background"
+                >
+                  <option value="512x512">512x512</option>
+                  <option value="768x768">768x768</option>
+                  <option value="1024x1024">1024x1024</option>
+                </select>
+              </div>
+              <Button
+                size="sm"
+                className="w-full bg-purple-600 hover:bg-purple-700"
+                onClick={() => {
+                  toast.success("Settings saved");
+                  setShowSettings(false);
+                }}
+              >
+                Save Settings
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 

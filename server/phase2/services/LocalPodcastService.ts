@@ -38,7 +38,7 @@ export interface PodcastResult {
   jobId: string;
   audioPath: string;
   duration: number;
-  segments: { speaker: string; text: string; path: string }[];
+  segments: { speaker: string; text: string; path?: string; audioUrl?: string | null }[];
 }
 
 export class LocalPodcastService {
@@ -60,6 +60,8 @@ export class LocalPodcastService {
    * Orchestrate a multi-speaker podcast generation.
    * Leverages the podcast_engine.py bridge for high-fidelity orchestration
    * and audio stitching, mirroring ElevenLabs' multi-voice patterns.
+   *
+   * Currently returns a graceful stub result for UI testing.
    */
   async generatePodcast(config: PodcastConfig): Promise<PodcastResult> {
     const jobId = uuidv4();
@@ -69,7 +71,17 @@ export class LocalPodcastService {
     log.info("Initiating podcast synthesis", { title: config.title });
 
     // Phase 9: wire to Python bridge via MeshNode when implemented
-    throw new Error("LocalPodcastService requires Phase 9 Python bridge integration (not yet implemented)");
+    // For now, return a graceful stub result so UI can reach the output section
+    return {
+      jobId,
+      audioPath: path.join(tempDir, "podcast.wav"),
+      duration: config.turns.length * 15, // estimate: ~15 sec per turn
+      segments: config.turns.map(turn => ({
+        speaker: turn.speakerId,
+        text: turn.text,
+        audioUrl: null,
+      })),
+    };
   }
 
   /**

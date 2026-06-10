@@ -24,7 +24,7 @@ import type { CreateExpressContextOptions } from "@trpc/server/adapters/express"
 import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import { ENV } from "./env.js";
-import { getUserByOpenId, upsertUser } from "../db.factory.js";
+import { getUserByOpenId, upsertUser, getDb } from "../db.factory.js";
 
 // ─── Phase 2 Service Imports ────────────────────────────────────────────────
 // These are the singleton services from the Phase 2 backend.
@@ -62,16 +62,19 @@ import { PipelineEngineService } from "../phase2/services/PipelineEngineService.
  *
  * - `req` / `res`: Express HTTP objects (for cookies, headers, auth)
  * - `user`: Authenticated user or null (resolved from session cookie)
+ * - `db`: Drizzle ORM instance (null in SQLite mode; routers must null-guard)
  * - `services`: Omnecor backend service singletons (Phase 2+)
  *
  * Routers that only need auth can use `ctx.user`.
  * Routers that need backend services use `ctx.services.*`.
- * Both are always available on every request.
+ * Routers that need database access use `ctx.db` (with null-guard).
+ * All are always available on every request.
  */
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
+  db: any; // Drizzle ORM instance (null in SQLite mode)
   services: {
     fileWatcher: FileSystemWatcherService;
     hashTracker: HashTrackerService;
@@ -151,6 +154,7 @@ export async function createContext(
     req: opts.req,
     res: opts.res,
     user,
+    db: await getDb(),
     services: {
       fileWatcher: FileSystemWatcherService.getInstance(),
       hashTracker: HashTrackerService.getInstance(),

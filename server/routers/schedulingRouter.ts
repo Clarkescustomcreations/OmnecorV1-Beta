@@ -2,7 +2,7 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { getDb } from "../db.factory.js";
 import { scheduledPosts, curatedPosts, platformAccounts } from "../../drizzle/schema";
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 export const schedulingRouter = router({
@@ -105,5 +105,20 @@ export const schedulingRouter = router({
         .where(eq(scheduledPosts.id, input.scheduledPostId));
 
       return { success: true };
+    }),
+  publishNow: protectedProcedure
+    .input(z.object({ postIds: z.array(z.number()) }))
+    .mutation(async ({ input }) => {
+      const db = await getDb();
+      if (!db) return { success: false, error: "Database not available" };
+
+      await db.update(scheduledPosts)
+        .set({
+          status: "published",
+          publishedAt: new Date(),
+        })
+        .where(inArray(scheduledPosts.id, input.postIds));
+
+      return { success: true, publishedCount: input.postIds.length };
     }),
 });

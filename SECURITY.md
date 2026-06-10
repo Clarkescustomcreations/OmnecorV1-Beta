@@ -20,6 +20,8 @@ Omnecor incorporates several security features to protect your data and system:
 
 -   **Immutable Audit Log**: Every `protectedProcedure` call is automatically logged to the `audit_log` table via `auditMiddleware`. PII and secrets are redacted before insertion via `PromptSanitizer`. Logs are accessible via `auditRouter` and displayed in the Settings → Audit Log panel.
 
+-   **Integration Lifecycle Management**: All third-party OAuth integrations (GitHub, Notion, Slack, Google Drive, Dropbox, OneDrive, social platforms) are managed by `IntegrationManagementService`. Users can inspect health status, refresh OAuth tokens, and fully disconnect any integration via `trpc.integrationManagement.*` — no orphaned tokens left in the database. Health state is cached (60s TTL) to prevent API throttling. All operations are scoped to the authenticated user.
+
 -   **Secure Storage Proxy**: A secure storage proxy is implemented to handle interactions with external storage, ensuring that data transfers are managed safely.
 
 -   **OMMESH Security**: The OMMESH distributed mesh intelligence layer federates securely via mTLS (mutual Transport Layer Security), ensuring authenticated and encrypted communication between Omnecor nodes.

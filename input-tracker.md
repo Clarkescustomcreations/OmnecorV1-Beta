@@ -1808,23 +1808,95 @@ The following interactions exist in the UI but have no working connection (as of
 |---|---|
 | VoiceProviderSelector.tsx | **Does not exist in filesystem.** Tracker entry is phantom — verify if component was removed or renamed. |
 
-### TSX files in filesystem NOT yet audited
-These exist but were not covered by any audit session. Most are likely infrastructure/utility with no interactive elements, but should be verified:
-| File | Likely Status |
-|---|---|
-| `components/CriticalActionChecklist.tsx` | Unknown — needs audit |
-| `components/ManusDialog.tsx` | Unknown — likely has interactive elements |
-| `components/Map.tsx` | Unknown |
-| `components/pcb/CustomEdge.tsx` | Likely presentational (ReactFlow edge) |
-| `components/pcb/PCBNode.tsx` | Likely presentational (ReactFlow node) |
-| `components/pcb/PCBSchematicEditor.tsx` | **Parallel PCB editor** — may duplicate EnhancedPCBEditor interactions |
-| `components/pcb/SchematicNode.tsx` | Likely presentational |
-| `components/ErrorBoundary.tsx` | No interactive elements expected |
-| `components/PageSkeleton.tsx` | No interactive elements expected |
-| `components/RouteErrorBoundary.tsx` | No interactive elements expected |
-| `contexts/FictionModeContext.tsx` | Context provider — verify if mutations are LOCAL or hit tRPC |
-| `contexts/NeuralMapContext.tsx` | Context provider — FictionModePanel CONNECTED claims depend on this |
-| `pages/NotFound.tsx` | Minimal — likely just a back-button |
+### TSX files in filesystem — AUDITED (Session 12)
+
+#### COMPONENT: CriticalActionChecklist.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Button | "Reject" | `onClick={() => onReject(action.id)}` | Parent callback | CONNECTED |
+| Button | "Approve Critical Action" | `onClick={() => onApprove(action.id)}` | Parent callback | CONNECTED |
+| Dialog | None | Dialog state controlled by `open` / `onOpenChange` | Parent callback | CONNECTED |
+
+#### COMPONENT: ManusDialog.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Button | "Login with Manus" | `onClick={onLogin}` | Parent callback | CONNECTED |
+| Dialog | None | Dialog state controlled by `open` / `onOpenChange` | Parent callback | CONNECTED |
+
+#### COMPONENT: Map.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| DIV | map container | `useRef` + Google Maps API | Google Maps (external service) | CONNECTED (external API) |
+
+#### COMPONENT: CustomEdge.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| None | None | Pure presentational (ReactFlow edge) | None | N/A |
+
+#### COMPONENT: PCBNode.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| None | None | Pure presentational (ReactFlow node with handles) | None | N/A |
+
+#### COMPONENT: PCBSchematicEditor.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| EditorToolbar | mode toggle | `setMode()` | LOCAL state | LOCAL |
+| EditorToolbar | grid toggle | `setGridVisible()` | LOCAL state | LOCAL |
+| EditorToolbar | snap toggle | `setSnapToGrid()` | LOCAL state | LOCAL |
+| EditorToolbar | rotate | `handleRotateNode()` | LOCAL state | LOCAL |
+| EditorToolbar | flip | `handleFlipNode()` | LOCAL state | LOCAL |
+| EditorToolbar | delete | `handleDeleteNode()` | LOCAL state | LOCAL |
+| EditorToolbar | library panel toggle | `setShowLibrary()` | LOCAL state | LOCAL |
+| EditorToolbar | properties panel toggle | `setShowProperties()` | LOCAL state | LOCAL |
+| EditorToolbar | AI panel toggle | `setShowAI()` | LOCAL state | LOCAL |
+| EditorToolbar | netlist panel toggle | `setShowNetlist()` | LOCAL state | LOCAL |
+| ReactFlow Canvas | node click | `setSelectedNodeId()` | LOCAL state | LOCAL |
+| ReactFlow Canvas | canvas click | deselect node | LOCAL state | LOCAL |
+| ReactFlow Canvas | edge connection | `handleConnect()` adds edge | LOCAL state | LOCAL |
+| ComponentLibraryPanel | add component | `handleAddComponent()` | LOCAL state | LOCAL |
+
+#### COMPONENT: SchematicNode.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| None | None | Pure presentational (ReactFlow node with handles) | None | N/A |
+
+#### COMPONENT: ErrorBoundary.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Button | "Reload Page" | `onClick={() => window.location.reload()}` | Browser API | CONNECTED (browser) |
+
+#### COMPONENT: PageSkeleton.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| None | None | Pure presentational (Skeleton loaders) | None | N/A |
+
+#### COMPONENT: FictionModeContext.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Context | toggleFictionMode | `setState()` | LOCAL state | LOCAL |
+| Context | setFictionMode | `setState()` | LOCAL state | LOCAL |
+| Context | addFictionNode | `setState()` | LOCAL state | LOCAL |
+| Context | updateFictionNode | `setState()` | LOCAL state | LOCAL |
+| Context | removeFictionNode | `setState()` | LOCAL state | LOCAL |
+| Context | addRelationship | `setState()` | LOCAL state | LOCAL |
+| Context | addTimelineEvent | `setState()` | LOCAL state | LOCAL |
+| Context | updateLore | `setState()` | LOCAL state | LOCAL |
+| Context | clearFictionState | `setState()` | LOCAL state | LOCAL |
+
+#### COMPONENT: NeuralMapContext.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Context | createMap | `createMutation.mutate()` + LOCAL state | `trpc.neuralMaps.create` | CONNECTED |
+| Context | deleteMap | `deleteMutation.mutate()` + LOCAL state | `trpc.neuralMaps.delete` | CONNECTED |
+| Context | updateMap | `updateMutation.mutate()` + LOCAL state | `trpc.neuralMaps.update` | CONNECTED |
+| Context | setActiveMap | LOCAL state only | None | LOCAL |
+| Context | duplicateMap | `createMutation.mutate()` + LOCAL state | `trpc.neuralMaps.create` | CONNECTED |
+
+#### COMPONENT: NotFound.tsx (Audited Session 12)
+| Element | Label/ID | Handler | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Button | "Go Home" | `onClick={handleGoHome}` → `setLocation("/")` | wouter navigation | LOCAL |
 
 ---
 

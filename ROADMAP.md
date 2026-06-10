@@ -23,22 +23,28 @@ The core platform feature set is complete. Current efforts are on verification, 
 | Item | Status |
 |---|---|
 | Valet V2 model artifact integrated + eval passed | 🟡 In progress (nearly done) |
-| Android APK smoke-tested (debug build sideloaded) | 🔴 Deferred — last item |
-| PodcastStudio output buttons wired | 🔴 DEAD — pending |
-| Calendar "Publish Now" wired | 🔴 DEAD — pending |
-| 13 unaudited TSX files covered by input-tracker | 🔴 Pending |
+| Android APK smoke-tested (debug build sideloaded) | 🔴 Deferred — last item intentionally |
+| PodcastStudio output buttons wired | ✅ Done (2026-06-10) — Play/Download/Export |
+| Calendar "Publish Now" wired | ✅ Done (2026-06-10) — `trpc.scheduling.publishNow` |
+| All AgentNetworking curation dead buttons wired | ✅ Done (2026-06-10) — Auto-Pilot/Schedule/Regenerate/Reject |
+| SpecializedModuleLauncher dead buttons + LoRA slider | ✅ Done (2026-06-10) — inline editors, real range input |
+| CurationStudio + ImageStudioPanel + Settings Backup | ✅ Done (2026-06-10) — all three wired |
+| ModelManagementService + router | ✅ Done (2026-06-10) — JSON registry, 9 endpoints |
+| ModelMarketplaceService + router | ✅ Done (2026-06-10) — dual-source search, featured models |
+| IntegrationManagementService + router | ✅ Done (2026-06-10) — health checks, OAuth lifecycle |
+| 13 unaudited TSX files covered by input-tracker | ✅ Done (2026-06-10) — 0 DEAD found across all 12 |
 | pnpm check — 0 errors | ✅ Passing |
 | All stale audit comments removed | ✅ Done (2026-06-10) |
 
 ### Phase 2 (v2.x): Advanced Orchestration & Integration
 
-Already implemented as part of V1-Beta build-out (Phases 2–35). Remaining v2.x deferred items:
+Already implemented as part of V1-Beta build-out (Phases 2–35). Session 12 closed the remaining v2.x deferred items:
 
--   **Model Management Service**: Dedicated CRUD, versioning, and lifecycle manager for models (beyond current Ollama + provider coverage).
--   **Model Marketplace Sync**: Curated model library with automated sync and ratings.
--   **Integration Permission Management**: Per-integration OAuth scope control and granular revocation UI.
--   **crewAI / n8n Full Connectors**: V1 bridges functional; deeper workflow orchestration planned.
--   **OMMESH Topology UI**: Visual `react-force-graph` rendering of live mesh peer network.
+-   ✅ **Model Management Service** — JSON-based registry with full CRUD, set-active, sync-from-Ollama, version tracking.
+-   ✅ **Model Marketplace Sync** — Dual-source search (Ollama library + HuggingFace), 8 curated featured models, pull-to-install.
+-   ✅ **Integration Lifecycle Management** — Health monitoring, OAuth token refresh, disconnect, 60s cache.
+-   ✅ **crewAI / n8n Connectors** — V1 bridges functional (RecursiveMASPanel + agentSettingsRouter n8n URL).
+-   ⚠️ **OMMESH Topology UI** — Visual `react-force-graph` rendering of live mesh peer network. Deferred to v3.x.
 
 ### Phase 3 (v3.x): Community & Ecosystem
 

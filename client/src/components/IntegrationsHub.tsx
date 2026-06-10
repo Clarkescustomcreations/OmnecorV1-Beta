@@ -110,6 +110,11 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
     refetchInterval: 30_000,
   });
 
+  // Health check query
+  const healthQuery = trpc.integrationManagement.listAll.useQuery(undefined, {
+    refetchInterval: 60_000, // Check health every minute
+  });
+
   const { data: socialAccounts, refetch: refetchSocial } = trpc.platforms.listAccounts.useQuery();
   const getAuthUrlMutation = trpc.oauth.getAuthorizationUrl.useMutation({
     onSuccess: (data) => {
@@ -152,15 +157,51 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
     onError: (err) => toast.error("Sync failed: " + err.message),
   });
 
+  const refreshTokenMutation = trpc.integrationManagement.refreshToken.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      healthQuery.refetch();
+    },
+    onError: (err) => toast.error("Token refresh failed: " + err.message),
+  });
+
+  const healthDisconnectMutation = trpc.integrationManagement.disconnect.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      integrationsQuery.refetch();
+      healthQuery.refetch();
+    },
+    onError: (err) => toast.error("Disconnect failed: " + err.message),
+  });
+
   const integrations = integrationsQuery.data ?? [];
   const connected = integrations.filter(i => i.isConnected);
   const available = integrations.filter(i => !i.isConnected);
+  const healthStatuses = healthQuery.data ?? [];
+
+  // Get health status for an integration
+  const getHealthStatus = (integrationType: string) => {
+    return healthStatuses.find(h => h.id === integrationType);
+  };
+
+  // Get status indicator color
+  const getStatusColor = (status: string): string => {
+    switch (status) {
+      case "connected": return "bg-green-500";
+      case "disconnected": return "bg-gray-400";
+      case "error": return "bg-red-500";
+      case "checking": return "bg-yellow-500";
+      default: return "bg-gray-300";
+    }
+  };
 
   const renderIntegrationCard = (item: typeof integrations[number]) => {
     const info = getIntegrationInfo(item.type as IntegrationType);
     const meta = item.metadata as Record<string, unknown> | null;
     const isSyncing = syncMutation.isPending && syncMutation.variables?.type === item.type;
     const isDisconnecting = disconnectMutation.isPending && disconnectMutation.variables?.type === item.type;
+    const isRefreshing = refreshTokenMutation.isPending && refreshTokenMutation.variables?.integrationId === item.type;
+    const healthStatus = getHealthStatus(item.type as string);
 
     return (
       <Card key={item.type} className="bg-muted/50">
@@ -191,9 +232,17 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
               </div>
             </div>
             <div className="flex flex-col items-end gap-1 ml-2 shrink-0">
-              <Badge variant={item.isConnected ? "default" : "secondary"}>
-                {item.isConnected ? "Connected" : "Available"}
-              </Badge>
+              <div className="flex items-center gap-2">
+                {healthStatus && (
+                  <div className={cn(
+                    "w-2.5 h-2.5 rounded-full",
+                    getStatusColor(healthStatus.status)
+                  )} title={`Status: ${healthStatus.status}`} />
+                )}
+                <Badge variant={item.isConnected ? "default" : "secondary"}>
+                  {item.isConnected ? "Connected" : "Available"}
+                </Badge>
+              </div>
               {item.isConnected && !crossProject && activeMap && (
                 <span className="inline-flex items-center gap-1 text-[9px] bg-accent/10 text-accent rounded px-1.5 py-0.5 whitespace-nowrap">
                   <Brain className="w-2.5 h-2.5" />{activeMap.name}
@@ -222,6 +271,11 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => syncMutation.mutate({ type: item.type as IntegrationType })} disabled={isSyncing}>
                   <RefreshCw className={cn("w-3 h-3 mr-1", isSyncing && "animate-spin")} /> {isSyncing ? "Syncing..." : "Sync"}
                 </Button>
+                {healthStatus?.status === "error" && (
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => refreshTokenMutation.mutate({ integrationId: item.type as string })} disabled={isRefreshing}>
+                    <RefreshCw className={cn("w-3 h-3 mr-1", isRefreshing && "animate-spin")} /> {isRefreshing ? "..." : "Refresh"}
+                  </Button>
+                )}
                 <Button size="sm" variant="outline" className="flex-1" onClick={() => setSettingsType(item.type as IntegrationType)}>
                   <Settings className="w-3 h-3 mr-1" /> Settings
                 </Button>
@@ -376,6 +430,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
       {/* Settings Dialog */}
       {settingsType && (() => {
         const info = getIntegrationInfo(settingsType);
+        const healthStatus = getHealthStatus(settingsType);
         return (
           <Dialog open onOpenChange={(open) => !open && setSettingsType(null)}>
             <DialogContent>
@@ -383,8 +438,19 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                 <DialogTitle>{info.icon} {info.title} Settings</DialogTitle>
                 <DialogDescription>Manage your {info.title} connection.</DialogDescription>
               </DialogHeader>
+              {healthStatus && (
+                <div className={cn(
+                  "p-2 rounded text-sm",
+                  healthStatus.status === "error"
+                    ? "bg-red-500/10 text-red-700"
+                    : "bg-green-500/10 text-green-700"
+                )}>
+                  Status: {healthStatus.status}
+                  {healthStatus.errorMessage && <span className="ml-2 text-xs">({healthStatus.errorMessage})</span>}
+                </div>
+              )}
               <DialogFooter className="gap-2">
-                <Button variant="destructive" size="sm" onClick={() => disconnectMutation.mutate({ type: settingsType }, { onSuccess: () => setSettingsType(null) })}>Disconnect</Button>
+                <Button variant="destructive" size="sm" onClick={() => healthDisconnectMutation.mutate({ integrationId: settingsType }, { onSuccess: () => setSettingsType(null) })}>Disconnect</Button>
                 <Button variant="outline" size="sm" onClick={() => syncMutation.mutate({ type: settingsType }, { onSuccess: () => setSettingsType(null) })}>Sync Now</Button>
                 <Button size="sm" onClick={() => setSettingsType(null)}>Close</Button>
               </DialogFooter>

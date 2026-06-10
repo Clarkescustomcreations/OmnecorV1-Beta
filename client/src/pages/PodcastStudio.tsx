@@ -383,7 +383,8 @@ export default function PodcastStudio() {
   const [turns, setTurns] = useState<DialogueTurn[]>(DEFAULT_TURNS);
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [result, setResult] = useState<{ segments: { speaker: string; text?: string; content?: string }[] } | null>(null);
+  const [result, setResult] = useState<{ segments: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] } | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [podcastLength, setPodcastLength] = useState<PodcastLength>("medium");
 
   // Neural map link
@@ -476,7 +477,7 @@ export default function PodcastStudio() {
   const generateMutation = trpc.podcast.generate.useMutation({
     onSuccess: (data) => {
       setIsGenerating(false);
-      setResult(data);
+      setResult(data as { segments: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] });
       toast.success("Podcast generated successfully using local mesh!");
     },
     onError: (e) => {
@@ -725,7 +726,7 @@ export default function PodcastStudio() {
                   <div className="space-y-4">
                     <div className="p-3 rounded-xl bg-background border shadow-inner">
                       <p className="text-[10px] font-bold text-muted-foreground mb-2">MASTER MIX</p>
-                      <audio controls className="w-full h-8" />
+                      <audio controls className="w-full h-8" src={audioUrl ?? undefined} />
                     </div>
                     <div className="space-y-2">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Segment Breakdown</p>
@@ -735,15 +736,58 @@ export default function PodcastStudio() {
                             <User className="w-3 h-3 text-accent" />
                             <span className="font-bold">{seg.speaker}</span>
                           </div>
-                          <Button size="icon" variant="ghost" className="h-6 w-6"><Play className="w-3 h-3" /></Button>
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="h-6 w-6"
+                            onClick={() => {
+                              const text = seg.text || seg.content || "";
+                              if (text && "speechSynthesis" in window) {
+                                window.speechSynthesis.cancel();
+                                const utt = new SpeechSynthesisUtterance(text);
+                                window.speechSynthesis.speak(utt);
+                              }
+                            }}
+                          >
+                            <Play className="w-3 h-3" />
+                          </Button>
                         </div>
                       ))}
                     </div>
                     <div className="grid grid-cols-2 gap-2 pt-2">
-                      <Button size="sm" variant="outline" className="text-[10px] h-8 gap-1.5">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="text-[10px] h-8 gap-1.5"
+                        onClick={() => {
+                          if (!result) return;
+                          const text = result.segments.map(s => `[${s.speaker}]: ${s.text || s.content || ""}`).join("\n\n");
+                          const blob = new Blob([text], { type: "text/plain" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "podcast-transcript.txt";
+                          a.click();
+                          URL.revokeObjectURL(url);
+                        }}
+                      >
                         <Download className="w-3 h-3" /> WAV
                       </Button>
-                      <Button size="sm" className="text-[10px] h-8 gap-1.5">
+                      <Button
+                        size="sm"
+                        className="text-[10px] h-8 gap-1.5"
+                        onClick={() => {
+                          if (!result) return;
+                          const blob = new Blob([JSON.stringify(result, null, 2)], { type: "application/json" });
+                          const url = URL.createObjectURL(blob);
+                          const a = document.createElement("a");
+                          a.href = url;
+                          a.download = "podcast-export.json";
+                          a.click();
+                          URL.revokeObjectURL(url);
+                          toast.success("Podcast exported");
+                        }}
+                      >
                         <Share2 className="w-3 h-3" /> Export
                       </Button>
                     </div>

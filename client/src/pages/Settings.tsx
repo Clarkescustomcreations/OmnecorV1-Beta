@@ -1680,9 +1680,28 @@ const GeneralPanel: React.FC = () => {
           </div>
           <Button
             className="w-full gap-2"
-            onClick={() => toast.info("Copy the Omnecor data directory to back up your workspace. See INSTALL.md for data paths.")}
+            onClick={() => {
+              const backup: Record<string, string> = {};
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key) backup[key] = localStorage.getItem(key) ?? "";
+              }
+              const blob = new Blob(
+                [JSON.stringify({ version: "2.3.0-beta.1", backupAt: new Date().toISOString(), localStorage: backup }, null, 2)],
+                { type: "application/json" }
+              );
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement("a");
+              a.href = url;
+              a.download = `omnecor-backup-${new Date().toISOString().slice(0,10)}.json`;
+              document.body.appendChild(a);
+              a.click();
+              document.body.removeChild(a);
+              URL.revokeObjectURL(url);
+              toast.success("Workspace backup downloaded");
+            }}
           >
-            <FileJson className="w-4 h-4" /> Full Workspace Backup (.zip)
+            <FileJson className="w-4 h-4" /> Full Workspace Backup
           </Button>
         </CardContent>
       </Card>

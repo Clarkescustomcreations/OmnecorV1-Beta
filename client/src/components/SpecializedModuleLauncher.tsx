@@ -16,9 +16,11 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import {
   getModuleInfo,
+  createLoRAConfig,
   type LLMBuilderSession,
   type BlenderProject,
   type PCBProject,
+  type LoRAConfig,
 } from "@/lib/specializedModules";
 
 interface SpecializedModuleLauncherProps {
@@ -40,6 +42,8 @@ export default function SpecializedModuleLauncher({
   const [llmSession, setLLMSession] = useState<LLMBuilderSession | null>(null);
   const [blenderProject, setBlenderProject] = useState<BlenderProject | null>(null);
   const [pcbProject, setPCBProject] = useState<PCBProject | null>(null);
+  const [editingLoraConfig, setEditingLoraConfig] = useState<LoRAConfig | null>(null);
+  const [selectedObject, setSelectedObject] = useState<BlenderProject["objects"][0] | null>(null);
 
   const openInBlenderMutation = trpc.blender.openFile.useMutation({
     onSuccess: (d) => {
@@ -185,7 +189,17 @@ export default function SpecializedModuleLauncher({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">LoRA Configurations</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => toast.info("LoRA config creation — open UnslothPanel from the 3D Designer page to configure training parameters")}>
+            <Button size="sm" variant="outline" onClick={() => {
+              if (!llmSession) return;
+              const newConfig = createLoRAConfig(
+                `new-config-${llmSession.loraConfigs.length + 1}`,
+                llmSession.baseModel,
+                "/path/to/dataset.jsonl",
+                { rank: 16, alpha: 16, epochs: 3 }
+              );
+              setLLMSession({ ...llmSession, loraConfigs: [...llmSession.loraConfigs, newConfig] });
+              setEditingLoraConfig(newConfig);
+            }}>
               <Plus className="w-4 h-4 mr-2" />
               New Config
             </Button>
@@ -206,7 +220,7 @@ export default function SpecializedModuleLauncher({
                       {config.epochs}
                     </p>
                   </div>
-                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${config.name}`} onClick={() => toast.info(`Editing LoRA config: ${config.name} — rank ${config.rank}, alpha ${config.alpha}`)}>
+                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${config.name}`} onClick={() => setEditingLoraConfig(config)}>
                     <Settings className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
@@ -250,6 +264,50 @@ export default function SpecializedModuleLauncher({
                 ))}
               </div>
             </ScrollArea>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* LoRA Config Editor */}
+      {editingLoraConfig && (
+        <Card className="bg-accent/5 border-accent/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">Edit LoRA Config</CardTitle>
+              <Button size="sm" variant="ghost" onClick={() => setEditingLoraConfig(null)}>✕</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Config Name</label>
+                <input type="text" value={editingLoraConfig.name} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, name: e.target.value })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Rank</label>
+                <input type="number" min="4" max="256" value={editingLoraConfig.rank} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, rank: Number(e.target.value) })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Alpha</label>
+                <input type="number" min="1" max="256" value={editingLoraConfig.alpha} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, alpha: Number(e.target.value) })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Epochs</label>
+                <input type="number" min="1" max="100" value={editingLoraConfig.epochs} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, epochs: Number(e.target.value) })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+            </div>
+            <Button className="w-full" size="sm" onClick={() => {
+              if (!llmSession) return;
+              setLLMSession({
+                ...llmSession,
+                loraConfigs: llmSession.loraConfigs.map(c => c.id === editingLoraConfig.id ? editingLoraConfig : c)
+              });
+              setEditingLoraConfig(null);
+              toast.success("LoRA config updated");
+            }}>
+              <Settings className="w-4 h-4 mr-2" />
+              Save Config
+            </Button>
           </CardContent>
         </Card>
       )}
@@ -372,7 +430,7 @@ export default function SpecializedModuleLauncher({
                       Type: {obj.type} | Pos: ({obj.position.join(", ")})
                     </p>
                   </div>
-                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${obj.name}`} onClick={() => toast.info(`${obj.name}: type=${obj.type}, pos=(${obj.position.join(", ")})`)}>
+                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${obj.name}`} onClick={() => setSelectedObject(obj)}>
                     <Settings className="w-4 h-4" aria-hidden="true" />
                   </Button>
                 </div>
@@ -383,6 +441,64 @@ export default function SpecializedModuleLauncher({
           )}
         </CardContent>
       </Card>
+
+      {/* Object Editor */}
+      {selectedObject && (
+        <Card className="bg-accent/5 border-accent/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <CardTitle className="text-sm">Edit Object Properties</CardTitle>
+              <Button size="sm" variant="ghost" onClick={() => setSelectedObject(null)}>✕</Button>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <label className="text-xs font-semibold mb-1 block">Name</label>
+              <input type="text" value={selectedObject.name} onChange={(e) => setSelectedObject({ ...selectedObject, name: e.target.value })} className="w-full px-2 py-1 border rounded text-sm" />
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Position X</label>
+                <input type="number" step="0.1" value={selectedObject.position[0]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [Number(e.target.value), selectedObject.position[1], selectedObject.position[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Position Y</label>
+                <input type="number" step="0.1" value={selectedObject.position[1]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [selectedObject.position[0], Number(e.target.value), selectedObject.position[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Position Z</label>
+                <input type="number" step="0.1" value={selectedObject.position[2]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [selectedObject.position[0], selectedObject.position[1], Number(e.target.value)] })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+            </div>
+            <div className="grid grid-cols-3 gap-2">
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Scale X</label>
+                <input type="number" step="0.1" min="0.1" value={selectedObject.scale[0]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [Number(e.target.value), selectedObject.scale[1], selectedObject.scale[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Scale Y</label>
+                <input type="number" step="0.1" min="0.1" value={selectedObject.scale[1]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [selectedObject.scale[0], Number(e.target.value), selectedObject.scale[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+              <div>
+                <label className="text-xs font-semibold mb-1 block">Scale Z</label>
+                <input type="number" step="0.1" min="0.1" value={selectedObject.scale[2]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [selectedObject.scale[0], selectedObject.scale[1], Number(e.target.value)] })} className="w-full px-2 py-1 border rounded text-sm" />
+              </div>
+            </div>
+            <Button className="w-full" size="sm" onClick={() => {
+              if (!blenderProject) return;
+              setBlenderProject({
+                ...blenderProject,
+                objects: blenderProject.objects.map((o, idx) => o.name === selectedObject.name ? selectedObject : o)
+              });
+              setSelectedObject(null);
+              toast.success("Object properties updated");
+            }}>
+              <Settings className="w-4 h-4 mr-2" />
+              Save Object
+            </Button>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Actions */}
       <div className="flex gap-2">

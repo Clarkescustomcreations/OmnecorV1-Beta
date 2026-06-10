@@ -251,6 +251,14 @@ export default function AgentNetworking() {
     onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
+  const publishNowMutation = trpc.scheduling.publishNow.useMutation({
+    onSuccess: () => {
+      toast.success("Post published successfully");
+      refetchScheduled();
+    },
+    onError: (error) => toast.error(`Error: ${error.message}`),
+  });
+
   const fetchDiscoveryMutation = trpc.discovery.fetchArticles.useMutation({
     onSuccess: (data) => {
       toast.success(`Found ${data.articlesAdded} articles`);
@@ -522,9 +530,10 @@ export default function AgentNetworking() {
                           )}
                           <Button
                             size="sm"
-                            onClick={() => toast.info("Publish Now: feature pending backend implementation (trpc.scheduling.publishNow)")}
+                            onClick={() => publishNowMutation.mutate({ postIds: [post.id] })}
+                            disabled={publishNowMutation.isPending}
                           >
-                            Publish Now
+                            {publishNowMutation.isPending ? "Publishing..." : "Publish Now"}
                           </Button>
                           {post.status === "scheduled" && (
                             <Button 
@@ -1013,11 +1022,13 @@ function PlatformOAuthButtons({
 
 function CurationPanel() {
   const [curationTab, setCurationTab] = useState("discovery");
+  const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
   const utils = trpc.useUtils();
 
   const { data: articles, isLoading: loadingArticles } = trpc.discovery.listUnprocessed.useQuery({ limit: 20 });
   const { data: pendingPosts, isLoading: loadingPending } = trpc.curator.listByStatus.useQuery({ status: "pending_review" });
   const { data: scheduledPosts } = trpc.scheduling.listScheduledPosts.useQuery({ limit: 20 });
+  const { data: accountsData } = trpc.platforms.listAccounts.useQuery();
 
   const syncMutation = trpc.discovery.fetchArticles.useMutation({
     onSuccess: (data) => {
@@ -1045,6 +1056,38 @@ function CurationPanel() {
     onError: (err) => toast.error("Approval failed: " + err.message),
   });
 
+  const schedulePostMutation = trpc.scheduling.schedulePost.useMutation({
+    onSuccess: () => {
+      toast.success("Post scheduled successfully");
+      utils.scheduling.listScheduledPosts.invalidate();
+      utils.curator.listByStatus.invalidate();
+    },
+    onError: (err) => toast.error("Scheduling failed: " + err.message),
+  });
+
+  const regenerateDraftMutation = trpc.curator.regenerateDraft.useMutation({
+    onSuccess: (data) => {
+      toast.success("Draft regenerated");
+      utils.curator.listByStatus.invalidate();
+    },
+    onError: (err) => toast.error("Regeneration failed: " + err.message),
+  });
+
+  const rejectMutation = trpc.curator.rejectPosts.useMutation({
+    onSuccess: () => {
+      toast.success("Post rejected");
+      utils.curator.listByStatus.invalidate();
+    },
+    onError: (err) => toast.error("Rejection failed: " + err.message),
+  });
+
+  const updateAutoPilotMutation = trpc.settings.updateScheduleConfig.useMutation({
+    onSuccess: () => {
+      toast.success(`Auto-Pilot ${autoPilotEnabled ? "enabled" : "disabled"}`);
+    },
+    onError: (err) => toast.error(`Error: ${err.message}`),
+  });
+
   return (
     <div className="space-y-8">
       <div className="flex justify-between items-end">
@@ -1062,9 +1105,18 @@ function CurationPanel() {
             {syncMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sync Feeds
           </Button>
-          <Button className="gap-2">
-            <Calendar className="w-4 h-4" />
-            Auto-Pilot Settings
+          <Button
+            className="gap-2"
+            variant={autoPilotEnabled ? "default" : "outline"}
+            onClick={() => {
+              const newState = !autoPilotEnabled;
+              setAutoPilotEnabled(newState);
+              updateAutoPilotMutation.mutate({ platform: "auto", autoApprove: newState ? 1 : 0 });
+            }}
+            disabled={updateAutoPilotMutation.isPending}
+          >
+            <Zap className="w-4 h-4" />
+            Auto-Pilot {autoPilotEnabled ? "On" : "Off"}
           </Button>
         </div>
       </div>
@@ -1242,13 +1294,46 @@ function CurationPanel() {
                           <Badge className="bg-black text-white uppercase text-[10px]">{post.platform}</Badge>
                           <span className="text-xs text-muted-foreground font-mono">Draft #{post.id}</span>
                         </div>
-                        <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs">
-                          <Clock className="w-3 h-3" /> Schedule
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className="h-8 gap-2 text-xs"
+                          onClick={() => {
+                            // Get first available platform account ID or use default platform
+                            const defaultAccountId = accountsData?.[0]?.id || 1;
+                            schedulePostMutation.mutate({
+                              curatedPostId: post.id,
+                              platformAccountId: defaultAccountId,
+                              scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000), // 24 hours from now
+                              autoPublish: true,
+                            });
+                          }}
+                          disabled={schedulePostMutation.isPending}
+                        >
+                          <Clock className="w-3 h-3" /> {schedulePostMutation.isPending ? "Scheduling..." : "Schedule"}
                         </Button>
                       </div>
                       <div className="p-4 rounded-xl bg-muted/50 border min-h-[100px] relative">
                         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
-                        <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6"><RefreshCw className="w-3 h-3" /></Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="absolute top-2 right-2 h-6 w-6"
+                          onClick={() => {
+                            if (post.articleId) {
+                              regenerateDraftMutation.mutate({ articleId: post.articleId });
+                            } else {
+                              toast.error("Article ID not available for regeneration");
+                            }
+                          }}
+                          disabled={regenerateDraftMutation.isPending}
+                        >
+                          {regenerateDraftMutation.isPending ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                          ) : (
+                            <RefreshCw className="w-3 h-3" />
+                          )}
+                        </Button>
                       </div>
                       <div className="flex gap-3 pt-2">
                         <Button
@@ -1259,9 +1344,14 @@ function CurationPanel() {
                           <CheckCircle2 className="w-4 h-4" />
                           Approve & Publish
                         </Button>
-                        <Button variant="outline" className="flex-1 h-10 gap-2 border-red-500/20 text-red-500 hover:bg-red-500/10">
+                        <Button
+                          variant="outline"
+                          className="flex-1 h-10 gap-2 border-red-500/20 text-red-500 hover:bg-red-500/10"
+                          onClick={() => rejectMutation.mutate({ postIds: [post.id], rejectionReason: "Manual rejection" })}
+                          disabled={rejectMutation.isPending}
+                        >
                           <XCircle className="w-4 h-4" />
-                          Reject
+                          {rejectMutation.isPending ? "Rejecting..." : "Reject"}
                         </Button>
                       </div>
                     </div>

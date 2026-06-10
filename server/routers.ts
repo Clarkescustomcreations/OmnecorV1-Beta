@@ -49,6 +49,7 @@ import { podcastRouter } from "./routers/podcastRouter.js";
 import { trainingRouter } from "./routers/trainingRouter.js";
 import { projectRouter } from "./routers/projectRouter.js";
 import { agentRouter } from "./phase2/routers/agentRouter.js";
+import { modelMarketplaceRouter } from "./phase2/routers/modelMarketplaceRouter.js";
 import { securityRouter } from "./routers/securityRouter.js";
 import { ommeshRouter } from "./routers/ommesh.router.js";
 import { pcbEditorRouter } from "./routers/pcbEditorRouter.js";
@@ -59,6 +60,7 @@ import { virtualCardRouter } from "./routers/virtualCardRouter.js";
 import { auditRouter } from "./routers/auditRouter.js";
 import { valetRouter } from "./routers/valetRouter.js";
 import { ollamaRouter } from "./routers/ollamaRouter.js";
+import { modelManagementRouter } from "./routers/modelManagementRouter.js";
 import { mcpRouter } from "./routers/mcpRouter.js";
 import { pipelineRouter } from "./routers/pipelineRouter.js";
 import { imageGenRouter } from "./routers/imageGenRouter.js";
@@ -76,6 +78,7 @@ import { attachmentsRouter } from "./routers/attachmentsRouter.js";
 import { neuralMapsRouter } from "./routers/neuralMapsRouter.js";
 import { personaRouter } from "./routers/personaRouter.js";
 import { brainmapRouter } from "./routers/brainmapRouter.js";
+import { integrationManagementRouter } from "./routers/integrationManagementRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -151,6 +154,12 @@ export const appRouter = router({
   // ─── Ollama (Local model management) ──────────────────────────────────────
   ollama: ollamaRouter,
 
+  // ─── Model Marketplace (Curated model library with automated sync) ────────
+  modelMarketplace: modelMarketplaceRouter,
+
+  // ─── Model Management (Registry, versioning, lifecycle) ───────────────────
+  modelManagement: modelManagementRouter,
+
   // ─── MCP Client (Model Context Protocol tool directory) ───────────────────
   mcp: mcpRouter,
 
@@ -165,6 +174,9 @@ export const appRouter = router({
 
   // ─── Third-Party Integrations (GitHub / Notion / Slack / Google Drive) ───
   integrations: integrationsRouter,
+
+  // ─── Integration Management (Health checks, lifecycle, token refresh) ────
+  integrationManagement: integrationManagementRouter,
 
   // ─── Honcho Memory Layer (User facts, long-term session memory) ───────────
   honcho: honchoRouter,

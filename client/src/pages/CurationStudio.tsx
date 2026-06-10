@@ -35,6 +35,7 @@ import { Input } from "@/components/ui/input";
 
 export default function CurationStudio() {
   const [activeTab, setActiveTab] = useState("discovery");
+  const [autoPilot, setAutoPilot] = useState(false);
   const utils = trpc.useUtils();
 
   // Queries
@@ -88,6 +89,13 @@ export default function CurationStudio() {
     onError: (e) => toast.error("Regenerate failed: " + e.message),
   });
 
+  const updateScheduleConfigMutation = trpc.settings.updateScheduleConfig.useMutation({
+    onSuccess: () => {
+      toast.success(autoPilot ? "Auto-Pilot enabled" : "Auto-Pilot disabled");
+    },
+    onError: (err: any) => toast.error("Auto-Pilot update failed: " + err.message),
+  });
+
   return (
     <OmnecorDashboardLayout>
       <div className="p-8 max-w-7xl mx-auto space-y-8">
@@ -106,9 +114,20 @@ export default function CurationStudio() {
               {syncMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               Sync Feeds
             </Button>
-                            <Button className="gap-2" onClick={() => toast.info("Auto-Pilot Settings: configure sync frequency and keyword filters in the Discovery tab below")}>
+                            <Button
+              className={`gap-2 ${autoPilot ? "bg-green-600 hover:bg-green-700" : ""}`}
+              onClick={() => {
+                const newState = !autoPilot;
+                setAutoPilot(newState);
+                updateScheduleConfigMutation.mutate({
+                  platform: "all",
+                  autoApprove: newState ? 1 : 0
+                });
+              }}
+              disabled={updateScheduleConfigMutation.isPending}
+            >
               <CalendarIcon className="w-4 h-4" />
-              Auto-Pilot Settings
+              {autoPilot ? "Auto-Pilot: ON" : "Auto-Pilot: OFF"}
             </Button>
           </div>
         </div>

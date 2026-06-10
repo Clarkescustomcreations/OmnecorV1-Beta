@@ -126,11 +126,15 @@ export const UnslothPanel: React.FC = () => {
                 <Label>LoRA Rank (R)</Label>
                 <span className="text-xs font-mono">{loraRank}</span>
               </div>
-              <div className="h-6 flex items-center">
-                 <div className="w-full h-2 bg-muted rounded-full relative overflow-hidden">
-                    <div className="h-full bg-yellow-500" style={{ width: `${(loraRank / 128) * 100}%` }} />
-                 </div>
-              </div>
+              <input
+                type="range"
+                min="4"
+                max="128"
+                step="4"
+                value={loraRank}
+                onChange={(e) => setLoraRank(Number(e.target.value))}
+                className="w-full h-2 bg-muted rounded-full appearance-none cursor-pointer accent-yellow-500"
+              />
               <p className="text-[10px] text-muted-foreground italic">Higher rank allows more complex learning but increases VRAM usage.</p>
             </div>
 
