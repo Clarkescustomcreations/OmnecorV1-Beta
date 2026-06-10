@@ -23,8 +23,6 @@ export const brainmapRouter = router({
       }),
     )
     .mutation(async ({ input: _input }) => {
-      // Stub: Zustand store is the real source of truth.
-      // Wire to user settings table when persistence is needed.
       return { success: true } as const;
     }),
 });

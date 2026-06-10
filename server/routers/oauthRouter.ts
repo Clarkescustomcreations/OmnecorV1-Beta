@@ -76,8 +76,6 @@ export const oauthRouter = router({
         });
       }
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   handleCallback: protectedProcedure
     .input(
       z.object({
@@ -167,8 +165,6 @@ export const oauthRouter = router({
         });
       }
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   disconnectAccount: protectedProcedure
     .input(z.object({ accountId: z.number() }))
     .mutation(async ({ input, ctx }) => {

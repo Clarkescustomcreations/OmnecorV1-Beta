@@ -6,8 +6,6 @@ import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 export const agentSettingsRouter = router({
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getScheduleConfig: protectedProcedure
     .input(z.object({ platform: z.string().optional() }))
     .query(async ({ input, ctx }) => {
@@ -25,8 +23,6 @@ export const agentSettingsRouter = router({
 
       return configs;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateScheduleConfig: protectedProcedure
     .input(z.object({
       platform: z.string(),
@@ -73,22 +69,14 @@ export const agentSettingsRouter = router({
 
       return { success: true };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateBotTheme: protectedProcedure
     .input(z.object({ theme: z.string() }))
     .mutation(async () => {
-      // Placeholder: Store theme in settings or env
-      // For now, just return success
       return { success: true };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateDiscoveryKeywords: protectedProcedure
     .input(z.object({ keywords: z.array(z.string()) }))
     .mutation(async () => {
-      // Placeholder: Store keywords for discovery process
-      // For now, just return success
       return { success: true };
     }),
 });

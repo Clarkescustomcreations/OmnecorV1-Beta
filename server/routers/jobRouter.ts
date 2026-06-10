@@ -40,8 +40,6 @@ export const jobRouter = router({
    * Get the current status of a specific job.
    * Includes last progress data, stderr output, and timing info.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getStatus: publicProcedure
     .input(jobIdSchema)
     .query(async ({ ctx, input }) => {

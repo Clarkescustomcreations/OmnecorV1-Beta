@@ -72,8 +72,6 @@ export const securityRouter = router({
   // =========================================================================
 
   /** Scan a single file for security threats */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   scanFile: protectedProcedure
     .input(scanFileSchema)
     .mutation(async ({ ctx, input }) => {
@@ -115,8 +113,6 @@ export const securityRouter = router({
   // =========================================================================
 
   /** Encrypt a file with a passphrase */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   encryptFile: protectedProcedure
     .input(encryptFileSchema)
     .mutation(async ({ ctx, input }) => {
@@ -136,8 +132,6 @@ export const securityRouter = router({
     }),
 
   /** Decrypt a file with a passphrase */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   decryptFile: protectedProcedure
     .input(decryptFileSchema)
     .mutation(async ({ ctx, input }) => {
@@ -157,8 +151,6 @@ export const securityRouter = router({
     }),
 
   /** Generate and store an encryption key for a project */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   generateProjectKey: protectedProcedure
     .input(generateKeySchema)
     .mutation(async ({ ctx, input }) => {
@@ -186,8 +178,6 @@ export const securityRouter = router({
   // =========================================================================
 
   /** Create a backup of a project directory */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   createBackup: protectedProcedure
     .input(createBackupSchema)
     .mutation(async ({ ctx, input }) => {
@@ -207,8 +197,6 @@ export const securityRouter = router({
     }),
 
   /** Restore a project from a backup archive */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   restoreBackup: protectedProcedure
     .input(restoreBackupSchema)
     .mutation(async ({ ctx, input }) => {
@@ -229,15 +217,11 @@ export const securityRouter = router({
     }),
 
   /** List all backups for a project */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   listBackups: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       return ctx.services.security.listBackups(input.projectId);
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   forceRefresh: protectedProcedure
     .input(z.object({ provider: z.string() }))
     .mutation(async ({ input }) => {

@@ -86,8 +86,6 @@ export const voiceRouter = router({
   /**
    * Check Whisper server health specifically.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   whisperHealth: publicProcedure.query(async ({ ctx }) => {
     return ctx.services.voice.checkWhisperHealth();
   }),
@@ -95,8 +93,6 @@ export const voiceRouter = router({
   /**
    * Check TTS server health specifically.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   ttsHealth: publicProcedure.query(async ({ ctx }) => {
     return ctx.services.voice.checkTTSHealth();
   }),
@@ -104,8 +100,6 @@ export const voiceRouter = router({
   /**
    * Check RVC server health specifically.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   rvcHealth: publicProcedure.query(async ({ ctx }) => {
     return ctx.services.voice.checkRVCHealth();
   }),
@@ -128,8 +122,6 @@ export const voiceRouter = router({
   /**
    * Convert voice using RVC model.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   convertVoice: publicProcedure
     .input(rvcConvertInputSchema)
     .mutation(async ({ ctx, input }) => {
@@ -156,8 +148,6 @@ export const voiceRouter = router({
    *
    * Returns full transcription with word-level timestamps.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   transcribe: publicProcedure
     .input(transcribeInputSchema)
     .mutation(async ({ ctx, input }) => {

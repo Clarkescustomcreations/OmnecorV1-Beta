@@ -111,8 +111,6 @@ export const aiRouter = router({
   /**
    * Get a list of supported AI providers and their health status.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getProviders: publicProcedure.query(async ({ ctx }) => {
     const providers = [
       { id: "ollama", name: "Ollama" },
@@ -129,8 +127,6 @@ export const aiRouter = router({
   /**
    * Discover available local Ollama models.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   discoverOllamaModels: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.aiProvider.discoverOllamaModels();
   }),
@@ -152,15 +148,11 @@ export const aiRouter = router({
       });
       return { sessionId };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getSessions: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ input }) => {
       return await getChatSessions(input.projectId);
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getSession: protectedProcedure
     .input(z.object({ sessionId: z.string().uuid() }))
     .query(async ({ input }) => {
@@ -169,8 +161,6 @@ export const aiRouter = router({
       const messages = await getChatMessages(input.sessionId);
       return { session, messages };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   saveMessage: protectedProcedure
     .input(saveMessageSchema)
     .mutation(async ({ input }) => {
@@ -272,8 +262,6 @@ ${transcript}
    * Send a chat completion request (Streaming).
    * Emits chunks as they are generated via WebSockets/Subscriptions.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   chatStream: protectedProcedure
     .input(chatInputSchema)
     .subscription(({ ctx, input }) => {
@@ -300,8 +288,6 @@ ${transcript}
   // =========================================================================
   // Web Scraping & RAG (references/scraping)
   // =========================================================================
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   scrape: protectedProcedure
     .input(z.object({ url: z.string().url() }))
     .mutation(async ({ ctx, input }) => {
@@ -311,8 +297,6 @@ ${transcript}
   // =========================================================================
   // Coding Context (references/coding)
   // =========================================================================
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getCodeContext: protectedProcedure
     .input(z.object({ filepath: z.string(), symbols: z.array(z.string()) }))
     .query(async ({ ctx, input }) => {

@@ -74,7 +74,9 @@
 - [x] 5.4 CI: add build jobs for each target.
 - [x] 5.5 Security pass.
 - [x] 5.6 Final matrix sign-off.
-- [x] 5.7 Agentic oversight complete — 8-agent swarm maze-run across all 150+ TSX files (Sessions 1–10, 2026-06-07 → 2026-06-09). All 795+ interactive elements audited; 0 DEAD, 0 PARTIAL remaining.
+- [x] 5.7 Agentic oversight complete — 8-agent swarm maze-run across all 150+ TSX files (Sessions 1–10, 2026-06-07 → 2026-06-09). All 795+ interactive elements audited.
+- [x] 5.8 Session 11 (2026-06-10): 9-agent Haiku verification swarm cross-checked every tracked file against actual source code. Corrected 2 false positives, 4 false negatives, 2 stale tables. Net totals: **~820+ elements, ~301 CONNECTED, ~485 LOCAL, ~9 DEAD, ~1 PARTIAL**. Input tracker updated to reflect verified ground truth.
+- [x] 5.9 Stale audit comment sweep (2026-06-10): Removed 484 `UI-AUDIT-FINDING/SUGGESTION` lines from 6 client files and 140 `UI-LOGIC-AUDIT` lines from 24 server router files. Also removed 4 misleading placeholder comments from `discoveryRouter.ts`, `agentSettingsRouter.ts`, `brainmapRouter.ts`. `pnpm check` passes clean — 0 TypeScript errors.
 
 ## Omnecor Implementation (todo.md)
 - [x] Define dark-themed color palette (OKLCH format) with semantic tokens
@@ -461,11 +463,12 @@
 > **2nd-Pass Audit — 2026-06-07.** Items confirmed DONE are promoted to the Done section above. Items below are verified incomplete or newly discovered. Bugs found by swarm audit are marked 🐛.
 
 ## PKG-todo (Android & Final Verification)
+> **Intentionally deferred — APK build is being saved for last.** All other platform targets (Linux, Windows) complete. Android will be the final deliverable after Valet V2 integration is confirmed.
 - [ ] 4.3.1 `pnpm build:android` + `./gradlew assembleDebug`.
 - [ ] 4.3.2 Configure keystore and `assembleRelease`.
 - [ ] 4.4.1 Sideload the APK on a device/emulator.
 - [ ] 4.4.2 App launches, network step accepts desktop IP, connects to backend.
-- 🔴 `packaging/android/` groundwork present but no smoke-tested native APK build.
+- 🔴 `packaging/android/` groundwork present but no smoke-tested native APK build. **Will be addressed after Valet V2 sign-off.**
 
 ## OMMESH / Agent Networking — Critical Bugs 🐛
 - [x] ~~🐛 **`DiscoveryService.getPeers()` returns `[]`**~~ — **FIXED 2026-06-07.** Added `Map<string, PeerInfo>` with bonjour `'up'`/`'down'` browser events. Peers now tracked and returned by `getPeers()`.
@@ -525,6 +528,7 @@
     - [ ] eval thresholds met and beat keyword baseline
     - [ ] docs match reality
     *Status Update (2026-06-09):* Valet 1.5B router evaluation is running on another PC. Training has completed, and the model is being finalized for integration.
+    *Status Update (2026-06-10):* **Valet V2 run is nearly complete.** V1 training outputs, Kaggle bundle, V2 dataset, and pipeline scripts committed (commit `1f43797`). V2 model artifact expected imminently — final sign-off checklist above will be executed once artifact is available. Rule-based fallback remains active until model is confirmed loaded.
 
 ## General Risks & Blockers
 - 🔴 **MySQL Requirement**: App hard-requires MySQL in production unless `OMNECOR_DB=sqlite` is set (SQLite fallback IS implemented via `db.factory.ts`).

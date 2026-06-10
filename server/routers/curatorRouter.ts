@@ -24,8 +24,6 @@ export const curatorRouter = router({
 
       return posts;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getPost: protectedProcedure
     .input(z.object({ postId: z.number() }))
     .query(async ({ input }) => {
@@ -99,8 +97,6 @@ export const curatorRouter = router({
 
       return { success: true, rejectedCount: input.postIds.length };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updatePost: protectedProcedure
     .input(z.object({
       postId: z.number(),

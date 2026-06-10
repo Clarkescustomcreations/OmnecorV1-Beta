@@ -31,8 +31,6 @@ export const schedulingRouter = router({
         .limit(input.limit);
       return posts;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   schedulePost: protectedProcedure
     .input(z.object({
       curatedPostId: z.number(),
@@ -56,8 +54,6 @@ export const schedulingRouter = router({
         postId: input.curatedPostId,
       };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   reschedulePost: protectedProcedure
     .input(z.object({
       scheduledPostId: z.number(),

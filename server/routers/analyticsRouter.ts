@@ -44,8 +44,6 @@ export const analyticsRouter = router({
 
       return summaries;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getPostAnalytics: protectedProcedure
     .input(z.object({ scheduledPostId: z.number() }))
     .query(async ({ input }) => {
@@ -59,8 +57,6 @@ export const analyticsRouter = router({
 
       return result[0] || null;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateAnalytics: protectedProcedure
     .input(z.object({
       scheduledPostId: z.number(),

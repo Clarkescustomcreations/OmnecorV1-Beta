@@ -14,8 +14,6 @@ export const ommeshRouter = router({
   /**
    * Route an inference task through the mesh.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   routeInference: publicProcedure
     .input(z.object({
       prompt: z.string(),

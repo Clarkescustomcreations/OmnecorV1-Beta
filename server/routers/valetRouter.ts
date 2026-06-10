@@ -77,8 +77,6 @@ export const valetRouter = router({
     } catch { /* server offline */ }
     return { available: false, modelLoaded: false, backend: null, url };
   }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getModes: protectedProcedure.query(async () => {
     const svc = ValetRouterService.getInstance();
     const modes = await svc.getModes();
@@ -99,8 +97,6 @@ export const valetRouter = router({
   mlVenvStatus: protectedProcedure.query(async () => {
     return detectMlVenv();
   }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   testRoute: protectedProcedure
     .input(z.object({
       task: z.string().min(1).max(2000),
@@ -205,8 +201,6 @@ export const valetRouter = router({
    * inference server to hot-reload, and optionally spawns valet_knowledge_refresh.py
    * to re-embed KB chunks into ChromaDB.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   refreshKnowledge: protectedProcedure.mutation(async ({ ctx }) => {
     // Signal inference server to hot-reload (fast path — always attempted)
     const valetUrl = process.env.VALET_ROUTER_URL ?? "http://127.0.0.1:8010";

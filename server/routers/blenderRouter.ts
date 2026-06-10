@@ -117,8 +117,6 @@ export const blenderRouter = router({
     }),
 
   /** Export a .blend file to another format (GLB, FBX, OBJ, STL) */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   export: protectedProcedure
     .input(blenderExportSchema)
     .mutation(async ({ ctx, input }) => {

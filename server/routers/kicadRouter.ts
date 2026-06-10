@@ -109,8 +109,6 @@ export const kicadRouter = router({
     }),
 
   /** Export PCB to Gerber files */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   exportGerbers: protectedProcedure
     .input(kicadGerberExportSchema)
     .mutation(async ({ ctx, input }) => {
@@ -139,8 +137,6 @@ export const kicadRouter = router({
     }),
 
   /** Run Electrical Rule Check on schematic */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   runERC: protectedProcedure
     .input(kicadERCSchema)
     .mutation(async ({ ctx, input }) => {
@@ -155,8 +151,6 @@ export const kicadRouter = router({
     }),
 
   /** Export PCB to 3D STEP file */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   exportSTEP: protectedProcedure
     .input(
       z.object({
@@ -205,8 +199,6 @@ export const kicadRouter = router({
     .mutation(async ({ ctx, input }) => {
       return PCBWayService.getInstance().getQuote(input.pcbPath);
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   exportForManufacturing: protectedProcedure
     .input(z.object({ pcbPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {

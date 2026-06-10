@@ -37,8 +37,6 @@ export const podcastRouter = router({
    * Stream dialogue turn-by-turn.
    * Emits audio chunks as they are synthesized locally.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   streamTurn: protectedProcedure
     .input(dialogueTurnSchema)
     .subscription(({ input }) => {

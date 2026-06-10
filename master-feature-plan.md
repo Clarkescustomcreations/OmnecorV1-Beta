@@ -4,7 +4,7 @@ This document serves as the authoritative record of all features, functional cap
 
 ## 1. Core AI & Chat Engine
 *   **Multi-Provider Hub:** Integration with Ollama, OpenAI, Anthropic, Google Gemini, Groq, Fal.ai, and Llama.cpp.
-*   **Valet Router (1.5B):** Fine-tuned Qwen-based router for intelligent task-to-model mapping.
+*   **Valet Router (1.5B → V2):** Fine-tuned Qwen-based router for intelligent task-to-model mapping. V1 training outputs committed; V2 dataset and pipeline scripts complete. V2 model artifact nearly ready — rule-based fallback active until loaded.
 *   **Hierarchical Context Management:** Rolling terminal buffers, permanent Goal & Plan buffers, and auto-summarization.
 *   **Action Hash Loop Detector:** HITL-gated protection against AI infinite loops.
 *   **Streamdown Rendering:** Real-time Markdown and interactive component rendering in chat.
@@ -93,9 +93,19 @@ This document serves as the authoritative record of all features, functional cap
 *   ✅ ~~**Rolling chat buffers**~~ — **FIXED 2026-06-08.** `Chat.tsx` auto-compresses after 50 messages (keeps last 6, inserts system summary entry, fires toast).
 *   ✅ ~~**Real-time preview sync (Blender/KiCad)**~~ — **FIXED 2026-06-08.** `ManufacturingPanel.tsx` wired with `useOmnecorSocket({ jobId })` + `jobLifecycle` events.
 *   ✅ ~~**Visual Controller non-functional**~~ — **FIXED 2026-06-08.** `visualControlStore.ts` (persist); 4 layout algorithms (Force, Hierarchical, Mind-Map, Circular); Node Size slider; Anim Speed slider; GPU Acceleration toggle; Auto-Clustering toggle. All settings saved to localStorage.
-*   ⚠️ **Missing backend services** — `ModelManagementService`, `ModelMarketplaceService`, `IntegrationManagementService`, crewAI/n8n connectors.
-*   ⚠️ **Valet Router advisory-only** — Decision is logged but does not override `providerId`; rule-based fallback active until model artifact is present.
+*   ⚠️ **Missing backend services** — `ModelManagementService`, `ModelMarketplaceService`, `IntegrationManagementService` deferred to v3.1.0.
+*   ⚠️ **Valet Router advisory-only** — Decision is logged but does not override `providerId`; rule-based fallback active until V2 artifact confirmed loaded.
+*   ⚠️ **Android APK** — Capacitor groundwork complete. Full APK build intentionally deferred as the final deliverable after Valet V2 sign-off.
+*   ⚠️ **9 DEAD inputs** — `PodcastStudio.tsx` Play/Download/Export buttons, `AgentNetworking.tsx` Calendar "Publish Now", and minor stubs confirmed unimplemented. See input-tracker.md Appendix for complete DEAD master list.
+*   ⚠️ **13 TSX files not yet audited** — `CriticalActionChecklist.tsx`, `ManusDialog.tsx`, `Map.tsx`, PCB schematic components (`CustomEdge.tsx`, `PCBNode.tsx`, `PCBSchematicEditor.tsx`, `SchematicNode.tsx`), and others. See input-tracker.md Appendix.
+
+## 9. Code Quality — Session 11 Audit Sweep (2026-06-10)
+
+*   **Stale comment removal** — 484 `UI-AUDIT-FINDING/SUGGESTION` lines removed from 6 client files; 140 `UI-LOGIC-AUDIT` lines removed from 24 server router files. No legitimate architecture notes removed.
+*   **Misleading placeholder comments** — Removed from `discoveryRouter.ts` (already queries DB), `agentSettingsRouter.ts` (stubs `updateBotTheme`/`updateDiscoveryKeywords`), and `brainmapRouter.ts` (header already explains stub intent).
+*   **TypeScript gate** — `pnpm check` passes with 0 errors post-sweep.
+*   **Input tracker verified** — 9-agent Haiku swarm cross-checked all 150+ TSX files against source. Net: ~820 elements, ~301 CONNECTED, ~485 LOCAL, ~9 DEAD, ~1 PARTIAL.
 
 ---
-**Last Updated:** Sunday, June 8, 2026 (3rd-Pass: Security + TSC + Chat Features + Visual Controller)
+**Last Updated:** Tuesday, June 10, 2026 (Session 11: 9-agent Haiku verification swarm + audit comment sweep)
 **Vision:** Omnecor v3.0.0 (The Autonomous AI Workstation)

@@ -29,8 +29,6 @@ export const discoveryRouter = router({
       const db = await getDb();
       if (!db) return { success: false, articlesAdded: 0, articles: [] };
 
-      // Placeholder: In a real implementation, this would fetch from RSS feeds, APIs, etc.
-      // For now, just return a count of newly created articles
       const articles = await db.select()
         .from(discoveredArticles)
         .where(eq(discoveredArticles.isProcessed, 0))
@@ -42,8 +40,6 @@ export const discoveryRouter = router({
         articles,
       };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getArticle: protectedProcedure
     .input(z.object({ articleId: z.number() }))
     .query(async ({ input }) => {
@@ -57,8 +53,6 @@ export const discoveryRouter = router({
 
       return result[0] || null;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   markAsProcessed: protectedProcedure
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ input }) => {

@@ -63,8 +63,6 @@ export const trainingRouter = router({
    * Validate a local JSONL dataset file for fine-tuning.
    * Ensures the file exists, is readable, and contains valid JSON lines.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   validateDataset: protectedProcedure
     .input(validateDatasetSchema)
     .mutation(async ({ input }) => {
@@ -261,8 +259,6 @@ export const trainingRouter = router({
    * Manually register an artifact path as the active Valet Router model.
    * Used after training completes or after fetching a pre-built release artifact.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   registerArtifact: protectedProcedure
     .input(
       z.object({

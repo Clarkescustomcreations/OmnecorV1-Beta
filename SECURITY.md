@@ -14,7 +14,11 @@ Omnecor incorporates several security features to protect your data and system:
 
 -   **Data Encryption**: Sensitive local project data is protected using AES-256-GCM encryption, ensuring confidentiality and integrity.
 
--   **Authentication and Authorization**: Omnecor includes mechanisms for user authentication (e.g., via OAuth routes) and authorization to control access to features and data. The `SecurityService` manages these aspects internally.
+-   **Authentication and Authorization**: Omnecor includes session-based authentication (JWT-signed cookies), OAuth2 login (GitHub, Google, Microsoft), and a full RBAC matrix with four roles: `viewer`, `user`, `admin`, and `owner`. tRPC procedure types enforce role requirements at the router layer (`publicProcedure`, `protectedProcedure`, `adminProcedure`, `ownerProcedure`).
+
+-   **Human-in-the-Loop (HITL) Gates**: Dangerous or irreversible operations (firmware flash, virtual card issuance, MCP tool calls marked `dangerous:true`, peer federation approval, multi-agent crew runs with >3 agents) require explicit human approval before execution. Loop detection (action hash tracking, 3-repetition threshold) triggers HITL alerts and logs violations to the audit trail.
+
+-   **Immutable Audit Log**: Every `protectedProcedure` call is automatically logged to the `audit_log` table via `auditMiddleware`. PII and secrets are redacted before insertion via `PromptSanitizer`. Logs are accessible via `auditRouter` and displayed in the Settings → Audit Log panel.
 
 -   **Secure Storage Proxy**: A secure storage proxy is implemented to handle interactions with external storage, ensuring that data transfers are managed safely.
 
@@ -46,10 +50,21 @@ To enhance the security of your Omnecor installation, we recommend the following
 
 -   **Monitor Logs**: Periodically review Omnecor logs (located in `server/_core/logs`) for any unusual activity or error messages that might indicate a security concern.
 
-## 3. Reporting Security Vulnerabilities
+## 3. Code Integrity & Audit Hygiene (2026-06-10)
+
+As part of the V1-Beta finalization sweep, all stale diagnostic comments were removed from the codebase:
+
+-   **484 `UI-AUDIT-FINDING/SUGGESTION` comment lines** removed from 6 client-side TSX files. These were injected by an automated scanner in earlier sessions and did not reflect actual code defects — their presence could mislead future auditors.
+-   **140 `UI-LOGIC-AUDIT` comment lines** removed from 24 server router files.
+-   **Misleading placeholder comments** removed from `discoveryRouter.ts` (which already queries the database), `agentSettingsRouter.ts` (`updateBotTheme`/`updateDiscoveryKeywords` are intentional stubs, not unimplemented), and `brainmapRouter.ts` (file-level JSDoc already explains the stub contract).
+-   **TypeScript gate**: `pnpm check` passes with 0 errors after all removals.
+
+These removals are purely cosmetic but security-relevant: misleading comments can cause reviewers to trust that a check is performed when it is not (or vice versa). The current comment state now reflects actual behavior.
+
+## 4. Reporting Security Vulnerabilities
 
 If you discover a security vulnerability in Omnecor, please report it responsibly by contacting the maintainers directly. Do not disclose the vulnerability publicly until it has been addressed.
 
-## 4. License
+## 5. License
 
 This security policy is part of the Omnecor project, which is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

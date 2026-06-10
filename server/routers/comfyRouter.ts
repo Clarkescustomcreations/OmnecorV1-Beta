@@ -29,8 +29,6 @@ export const comfyRouter = router({
   /**
    * Get the current ComfyUI queue
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getQueue: publicProcedure.query(async ({ ctx }) => {
     try {
       return await ctx.services.comfy.getQueue();
@@ -59,8 +57,6 @@ export const comfyRouter = router({
   /**
    * Interrupt current ComfyUI execution
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   interrupt: publicProcedure.mutation(async ({ ctx }) => {
     try {
       await ctx.services.comfy.interrupt();
@@ -76,8 +72,6 @@ export const comfyRouter = router({
   /**
    * Clear ComfyUI queue
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   clearQueue: publicProcedure.mutation(async ({ ctx }) => {
     try {
       await ctx.services.comfy.clearQueue();

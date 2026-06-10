@@ -187,8 +187,6 @@ export const projectRouter = router({
   /**
    * ORIGINAL — kept for backwards compatibility with any existing callers.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   registerWatcher: protectedProcedure
     .input(registerProjectSchema)
     .mutation(async ({ ctx, input }) => {
@@ -211,8 +209,6 @@ export const projectRouter = router({
         });
       }
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   unregisterWatcher: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
@@ -277,8 +273,6 @@ export const projectRouter = router({
   /**
    * PRESERVED — original flat string[] version for any existing internal callers.
    */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getFileTreeFlat: publicProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
@@ -296,8 +290,6 @@ export const projectRouter = router({
   // =========================================================================
   // Loop Detector (AI Agent Safety) — unchanged
   // =========================================================================
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   checkAgentLoop: publicProcedure
     .input(loopCheckSchema)
     .mutation(async ({ ctx, input }) => {
@@ -308,16 +300,12 @@ export const projectRouter = router({
       );
       return ctx.services.hashTracker.checkAndRecord(input.sessionId, hash);
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   resetLoopDetector: publicProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       ctx.services.hashTracker.resetSession(input.sessionId);
       return { success: true };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getLoopDetectorState: publicProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {

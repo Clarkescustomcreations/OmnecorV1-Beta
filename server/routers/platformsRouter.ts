@@ -38,8 +38,6 @@ export const platformsRouter = router({
 
       return accounts;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   getAccount: protectedProcedure
     .input(z.object({ accountId: z.number() }))
     .query(async ({ input, ctx }) => {
@@ -57,8 +55,6 @@ export const platformsRouter = router({
 
       return result[0] || null;
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   addAccount: protectedProcedure
     .input(z.object({
       platform: z.string(),
@@ -84,8 +80,6 @@ export const platformsRouter = router({
 
       return { success: true, accountId: input.platform };
     }),
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   updateAccount: protectedProcedure
     .input(z.object({
       accountId: z.number(),

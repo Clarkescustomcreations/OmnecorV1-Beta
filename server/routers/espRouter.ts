@@ -83,8 +83,6 @@ export const espRouter = router({
     }),
 
   /** Read ESP flash memory to a file */
-  // UI-LOGIC-AUDIT: This feature is not yet accessible from the GUI.
-  // SUGGESTION: Add a button or interaction box in the UI to trigger this logic.
   read: protectedProcedure
     .input(
       z.object({

@@ -6,31 +6,46 @@ This document outlines the future development plans and strategic direction for 
 
 Omnecor aims to be the definitive local-first AI workstation, empowering users with unparalleled control over their data, AI models, and creative workflows. We envision a future where complex multi-modal projects are seamlessly orchestrated, and human-machine collaboration reaches new heights.
 
-## Current Focus (V1-Beta)
+## Current Focus (V1-Beta — Final Finalization Phase, as of 2026-06-10)
 
-Our current efforts are concentrated on stabilizing the core platform, refining the user experience, and enhancing the foundational features:
+The core platform feature set is complete. Current efforts are on verification, integration, and the final remaining deliverables:
 
--   **Core Stability**: Ensuring robustness and reliability of the unified backend, tRPC API, and WebSocket server.
--   **Performance Optimization**: Continuous improvements in speed and efficiency for all AI-driven tasks and UI responsiveness.
--   **User Experience**: Iterative enhancements to the Neural Workspaces, chat interface, and overall usability.
--   **Documentation**: Comprehensive documentation to facilitate easier onboarding and development.
+-   **Valet Router V2** — Training complete; V2 model artifact nearly ready. Once loaded, the router moves from rule-based fallback to fully model-driven task-to-provider routing. This is the top active priority.
+-   **Android APK** — Capacitor project initialized; web assets synced. The APK build (`./gradlew assembleDebug`, keystore, sideload smoke test) is the intentionally last deliverable — will be completed after Valet V2 signs off.
+-   **UI Dead-End Cleanup** — 9 confirmed DEAD interactive elements remain (`PodcastStudio.tsx` output buttons, `AgentNetworking.tsx` Calendar "Publish Now", minor stubs). These will be wired or formally marked as v3.1.0 deferred.
+-   **Unaudited Components** — 13 TSX files not yet covered by the input-tracker swarm audit (`CriticalActionChecklist.tsx`, `ManusDialog.tsx`, PCB schematic components, etc.).
+-   **Code Quality Gate** — TypeScript check passes at 0 errors. All stale audit comments removed (624 lines across 30 files). Ongoing: no regressions allowed past `pnpm check`.
 
 ## Future Milestones
 
-### Phase 2: Advanced Orchestration & Integration
+### V1-Beta Remaining Checklist (before stable release)
 
--   **Enhanced Agent Capabilities**: Development of more sophisticated autonomous agents with improved decision-making and task execution.
--   **Deeper Hardware Integrations**: Expanding support for additional hardware tools and platforms (e.g., advanced robotics, IoT devices).
--   **Customizable Workflows**: Introduction of a visual workflow builder for users to design and deploy their own multi-step AI pipelines.
--   **OMMESH Expansion**: Further development of the distributed mesh intelligence layer for more robust multi-node collaboration and resource sharing.
--   **Advanced Security Features**: Implementation of granular access controls, audit logging, and enhanced data encryption options.
+| Item | Status |
+|---|---|
+| Valet V2 model artifact integrated + eval passed | 🟡 In progress (nearly done) |
+| Android APK smoke-tested (debug build sideloaded) | 🔴 Deferred — last item |
+| PodcastStudio output buttons wired | 🔴 DEAD — pending |
+| Calendar "Publish Now" wired | 🔴 DEAD — pending |
+| 13 unaudited TSX files covered by input-tracker | 🔴 Pending |
+| pnpm check — 0 errors | ✅ Passing |
+| All stale audit comments removed | ✅ Done (2026-06-10) |
 
-### Phase 3: Community & Ecosystem
+### Phase 2 (v2.x): Advanced Orchestration & Integration
 
--   **Plugin Marketplace**: Creation of a platform for community-contributed plugins and extensions to expand Omnecor's functionality.
--   **Open API & SDK**: Providing comprehensive tools for developers to build on top of Omnecor and integrate with external services.
--   **Educational Resources**: Development of tutorials, guides, and example projects to foster a vibrant user and developer community.
--   **Cross-Platform Support**: Investigating and implementing broader native support for Windows and macOS, beyond current experimental capabilities.
+Already implemented as part of V1-Beta build-out (Phases 2–35). Remaining v2.x deferred items:
+
+-   **Model Management Service**: Dedicated CRUD, versioning, and lifecycle manager for models (beyond current Ollama + provider coverage).
+-   **Model Marketplace Sync**: Curated model library with automated sync and ratings.
+-   **Integration Permission Management**: Per-integration OAuth scope control and granular revocation UI.
+-   **crewAI / n8n Full Connectors**: V1 bridges functional; deeper workflow orchestration planned.
+-   **OMMESH Topology UI**: Visual `react-force-graph` rendering of live mesh peer network.
+
+### Phase 3 (v3.x): Community & Ecosystem
+
+-   **Plugin Marketplace**: Platform for community-contributed plugins and extensions.
+-   **Open API & SDK**: Developer tools for building on top of Omnecor.
+-   **Educational Resources**: Tutorials, guides, and example projects.
+-   **macOS Native Support**: Current packaging covers Linux + Windows + Android. macOS Electron target planned for v3.x.
 
 ## Contributing to the Roadmap
 
