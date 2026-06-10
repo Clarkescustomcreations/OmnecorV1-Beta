@@ -146,3 +146,10 @@ packaging/appimage-build/
 # TypeScript build artifacts
 tsc_output.txt
 *.tsbuildinfo
+
+# Local working copy and zip extracts — machine-specific, never commit
+OmnecorV1-Beta-main/
+OmnecorV1-Beta-main.zip
+
+# Local Ollama Modelfile — references absolute machine path, not portable
+modelfile.txt
