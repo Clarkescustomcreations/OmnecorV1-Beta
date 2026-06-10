@@ -58,7 +58,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   }
 
   return (
-    <div className="w-72 border-l border-border bg-card flex flex-col shadow-sm">
+    <div className="w-72 border-l border-border bg-card flex flex-col min-h-0 shadow-sm">
       {/* Header */}
       <div className="p-3 border-b border-border">
         <h2 className="text-sm font-semibold text-foreground">Properties</h2>

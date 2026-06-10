@@ -21,7 +21,7 @@ export const ImageStudioPanel: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div className="p-6 border-b bg-muted/30">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="flex items-center gap-2">

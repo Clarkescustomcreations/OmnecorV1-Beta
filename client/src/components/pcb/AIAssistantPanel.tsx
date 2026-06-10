@@ -126,7 +126,7 @@ What would you like help with?`,
   };
 
   return (
-    <div className="w-96 border-l border-gray-200 bg-white flex flex-col shadow-sm">
+    <div className="w-96 border-l border-gray-200 bg-white flex flex-col min-h-0 shadow-sm">
       {/* Header */}
       <div className="p-3 border-b border-gray-200 flex items-center justify-between">
         <div>

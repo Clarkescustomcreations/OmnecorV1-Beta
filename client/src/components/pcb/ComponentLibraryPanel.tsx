@@ -57,7 +57,7 @@ export const ComponentLibraryPanel: React.FC<ComponentLibraryPanelProps> = ({
   };
 
   return (
-    <div className="w-64 border-r border-border bg-card flex flex-col shadow-sm">
+    <div className="w-64 border-r border-border bg-card flex flex-col min-h-0 shadow-sm">
       {/* Header */}
       <div className="p-3 border-b border-border">
         <h2 className="text-sm font-semibold text-foreground mb-3">Component Library</h2>

@@ -88,7 +88,7 @@ export const ChatPanel: React.FC = () => {
   }, [messages]);
 
   return (
-    <div className="flex flex-col h-full bg-background border-r">
+    <div className="flex flex-col h-full min-h-0 bg-background border-r">
       <div className="p-4 border-b bg-muted/20 flex justify-between items-center">
         <h2 className="font-bold tracking-tight">AI Orchestrator</h2>
         <span className="text-xs text-muted-foreground font-mono">

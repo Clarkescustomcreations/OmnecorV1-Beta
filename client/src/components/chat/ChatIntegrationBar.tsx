@@ -50,7 +50,7 @@ export default function ChatIntegrationBar({ onInjectContext }: ChatIntegrationB
                 onClick={() => handleUse(i.type, String(i.type).replace("-", " ").replace(/\b\w/g, c => c.toUpperCase()))}
               >
                 <span>{icon}</span>
-                <span className="truncate max-w-[80px]">{label}</span>
+                <span className="truncate min-w-0 max-w-[80px]">{label}</span>
               </Button>
             </TooltipTrigger>
             <TooltipContent side="bottom">

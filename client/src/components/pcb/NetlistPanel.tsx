@@ -95,7 +95,7 @@ export const NetlistPanel: React.FC<NetlistPanelProps> = ({
   );
 
   return (
-    <div className="w-80 border-l border-border bg-card flex flex-col shadow-sm">
+    <div className="w-80 border-l border-border bg-card flex flex-col min-h-0 shadow-sm">
       {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">Netlist</h2>

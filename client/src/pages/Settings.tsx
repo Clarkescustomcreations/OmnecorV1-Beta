@@ -214,7 +214,7 @@ export const Settings: React.FC = () => {
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar Tabs */}
-          <aside className="w-64 border-r bg-muted/10">
+          <aside className="min-h-0 w-64 border-r bg-muted/10">
             <ScrollArea className="h-full">
               <div className="p-4 space-y-1">
                 {noResults ? (

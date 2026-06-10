@@ -845,7 +845,7 @@ function BrainMapContent() {
                                 <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">
                                   AI context preview
                                 </summary>
-                                <pre className="text-[9px] mt-1 p-1.5 rounded bg-muted overflow-auto max-h-24 whitespace-pre-wrap">
+                                <pre className="text-[9px] mt-1 p-1.5 rounded bg-muted overflow-auto max-h-24 whitespace-pre-wrap break-words">
                                   {`You are assisting: ${userCard.displayName || "?"} (${userCard.role || "?"})${pc.description ? `\nProject: ${pc.description}` : ""}${(pc.techStack ?? []).length ? `\nStack: ${pc.techStack!.join(", ")}` : ""}`}
                                 </pre>
                               </details>

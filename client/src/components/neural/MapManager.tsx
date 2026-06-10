@@ -186,7 +186,7 @@ export default function MapManager() {
   const totalSources = localFolders.length + githubRepos.length + selectedCloud.size;
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full min-h-0 gap-4">
       {/* Header */}
       <div className="flex items-center justify-between px-2">
         <h2 className="text-lg font-semibold flex items-center gap-2">
