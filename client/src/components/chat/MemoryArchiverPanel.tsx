@@ -74,7 +74,7 @@ export default function MemoryArchiverPanel({ sessionId, projectId, selectedMode
         <Badge variant="outline" className="text-[10px] h-5 border-accent/20 text-accent">D2/D3</Badge>
       </div>
 
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-4 space-y-6">
           {/* Status Section */}
           <Card className="bg-slate-900/50 border-slate-800 border-none shadow-none">

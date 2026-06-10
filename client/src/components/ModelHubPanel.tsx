@@ -239,7 +239,7 @@ export default function ModelHubPanel({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {activeTab === "models" ? (
           <div role="list" className="space-y-3">
             {ollamaLoading ? (

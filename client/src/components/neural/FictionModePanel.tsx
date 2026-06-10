@@ -99,7 +99,7 @@ export default function FictionModePanel() {
                 <Plus className="w-4 h-4" /> Add Lore Entry
               </Button>
             </div>
-            <ScrollArea className="flex-1 pr-2">
+            <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="space-y-3">
                 {Object.entries(fictionState.lore).map(([key, value]) => (
                   <Card key={key}>
@@ -109,7 +109,7 @@ export default function FictionModePanel() {
                         {key}
                       </CardTitle>
                     </CardHeader>
-                    <CardContent className="p-4 pt-0 text-xs text-muted-foreground whitespace-pre-wrap">
+                    <CardContent className="p-4 pt-0 text-xs text-muted-foreground whitespace-pre-wrap break-words">
                       {value}
                     </CardContent>
                   </Card>
@@ -135,7 +135,7 @@ export default function FictionModePanel() {
                 <Plus className="w-4 h-4" /> Register Character
               </Button>
             </div>
-            <ScrollArea className="flex-1 pr-2">
+            <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="grid grid-cols-1 gap-3">
                 {fictionState.nodes
                   .filter(n => n.type === "character")
@@ -183,7 +183,7 @@ export default function FictionModePanel() {
                 <Plus className="w-4 h-4" /> Add Timeline Event
               </Button>
             </div>
-            <ScrollArea className="flex-1 pr-2">
+            <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="relative border-l-2 border-border ml-3 pl-4 space-y-4 py-2">
                 {fictionState.timeline.map(event => (
                   <div key={event.id} className="relative">

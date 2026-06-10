@@ -126,7 +126,7 @@ What would you like help with?`,
   };
 
   return (
-    <div className="w-96 border-l border-gray-200 bg-white flex flex-col shadow-sm">
+    <div className="w-96 border-l border-gray-200 bg-white flex flex-col min-h-0 shadow-sm">
       {/* Header */}
       <div className="p-3 border-b border-gray-200 flex items-center justify-between">
         <div>
@@ -151,7 +151,7 @@ What would you like help with?`,
       </div>
 
       {/* Messages */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-3 space-y-3">
           {messages.map((message) => (
             <div
@@ -168,7 +168,7 @@ What would you like help with?`,
                   }
                 `}
               >
-                <p className="whitespace-pre-wrap">{message.content}</p>
+                <p className="whitespace-pre-wrap break-words">{message.content}</p>
                 <p
                   className={`
                     text-xs mt-1

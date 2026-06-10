@@ -166,7 +166,7 @@ export default function ModelHub() {
                 <CardTitle>Active Models</CardTitle>
                 <CardDescription>Search, filter, and manage your models</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
+              <CardContent className="min-h-0 flex-1 overflow-hidden">
                 {ollamaLoading && (
                   <p className="text-sm text-muted-foreground">Discovering Ollama models…</p>
                 )}

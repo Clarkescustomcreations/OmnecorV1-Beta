@@ -690,7 +690,7 @@ export default function Designer3D() {
               </div>
 
               {/* Project File Tree List */}
-              <div className="flex-1 overflow-y-auto p-2 space-y-1 select-none font-sans">
+              <div className="min-h-0 flex-1 overflow-y-auto p-2 space-y-1 select-none font-sans">
                 {selectedProjectId ? (
                   fileTree && fileTree.length > 0 ? (
                     renderFileTreeItems(fileTree)
@@ -818,7 +818,7 @@ export default function Designer3D() {
                 </div>
 
                 {/* Content View */}
-                <div className="flex-1 overflow-auto bg-slate-950">
+                <div className="min-h-0 flex-1 overflow-auto bg-slate-950">
                   {previewTab === "preview" && files[activeFileIndex]?.name?.endsWith(".md") ? (
                     <div className="p-8 text-foreground prose dark:prose-invert max-w-none text-slate-200 selection:bg-accent/30 bg-slate-950 min-h-full">
                       <Streamdown>{files[activeFileIndex]?.content || ""}</Streamdown>
@@ -871,7 +871,7 @@ export default function Designer3D() {
             </button>
           </div>
 
-          <div className="bg-slate-950 p-2 rounded text-[10px] font-mono text-slate-300 mb-3 max-h-16 overflow-y-auto whitespace-pre-wrap border border-slate-800">
+          <div className="bg-slate-950 p-2 rounded text-[10px] font-mono text-slate-300 mb-3 max-h-16 overflow-y-auto whitespace-pre-wrap break-words border border-slate-800">
             {selectedText.length > 100 ? `${selectedText.substring(0, 100)}...` : selectedText}
           </div>
 
@@ -932,7 +932,7 @@ export default function Designer3D() {
             Re-dock to Workspace
           </Button>
         </div>
-        <div className="flex-1 overflow-hidden relative">
+        <div className="min-h-0 flex-1 overflow-hidden relative">
           {renderDesignerContent()}
         </div>
       </div>

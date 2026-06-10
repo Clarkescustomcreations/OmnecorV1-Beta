@@ -17,7 +17,6 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -256,7 +255,7 @@ export function RecursiveMASPanel() {
           </div>
 
           {/* Message feed */}
-          <ScrollArea className="flex-1 max-h-64 border rounded-md p-2 bg-background">
+          <div className="h-64 overflow-y-auto border rounded-md p-2 bg-background">
             {(status?.messages ?? []).length === 0 ? (
               <p className="text-sm text-muted-foreground text-center py-4">
                 {isRunning ? "Waiting for agent messages…" : "No messages yet."}
@@ -288,7 +287,7 @@ export function RecursiveMASPanel() {
                 ))}
               </div>
             )}
-          </ScrollArea>
+          </div>
 
           {/* Final result */}
           {isComplete && status?.result && (

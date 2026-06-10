@@ -637,7 +637,7 @@ function BrainMapContent() {
                             </div>
                             <details className="absolute bottom-2 left-2 z-10 text-xs bg-card/90 border border-border rounded p-1">
                               <summary className="cursor-pointer text-muted-foreground select-none">Text view</summary>
-                              <ul className="mt-1 max-h-40 overflow-y-auto space-y-0.5 pl-2">
+                              <ul className="mt-1 h-40 overflow-y-auto space-y-0.5 pl-2">
                                 {displayNetwork.nodes.map(n => (
                                   <li key={n.id} className="text-foreground font-mono text-[10px]">{n.label}</li>
                                 ))}
@@ -701,7 +701,7 @@ function BrainMapContent() {
               </div>
               
               {!rightSidebarCollapsed ? (
-                <div className="flex-1 overflow-auto">
+                <div className="min-h-0 flex-1 overflow-auto">
                   {isFictionMode ? (
                     <FictionModePanel />
                   ) : (
@@ -845,7 +845,7 @@ function BrainMapContent() {
                                 <summary className="text-[10px] text-muted-foreground cursor-pointer hover:text-foreground">
                                   AI context preview
                                 </summary>
-                                <pre className="text-[9px] mt-1 p-1.5 rounded bg-muted overflow-auto max-h-24 whitespace-pre-wrap">
+                                <pre className="text-[9px] mt-1 p-1.5 rounded bg-muted overflow-auto max-h-24 whitespace-pre-wrap break-words">
                                   {`You are assisting: ${userCard.displayName || "?"} (${userCard.role || "?"})${pc.description ? `\nProject: ${pc.description}` : ""}${(pc.techStack ?? []).length ? `\nStack: ${pc.techStack!.join(", ")}` : ""}`}
                                 </pre>
                               </details>
@@ -937,7 +937,7 @@ function BrainMapContent() {
                                     <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1">
                                       <FolderOpen className="w-3 h-3" /> Contents ({children.length})
                                     </span>
-                                    <div className="max-h-32 overflow-y-auto overflow-x-hidden rounded border border-border/50 bg-muted/20">
+                                    <div className="h-32 overflow-y-auto overflow-x-hidden rounded border border-border/50 bg-muted/20">
                                       <ul className="p-1 space-y-0.5">
                                         {children.map(child => (
                                           <li
@@ -1046,7 +1046,7 @@ function BrainMapContent() {
 
                           {/* Current context entries */}
                           {contextEntries.length > 0 && (
-                            <div className="max-h-52 overflow-y-auto overflow-x-hidden mt-1">
+                            <div className="h-52 overflow-y-auto overflow-x-hidden mt-1">
                               <ul className="space-y-1 pr-0.5">
                                 {contextEntries.map(entry => (
                                   <li

@@ -52,7 +52,7 @@ export default function Pipelines() {
             <Zap className="w-5 h-5 text-accent" />
             <span className="font-semibold">Pipeline Detail</span>
           </div>
-          <div className="flex-1 overflow-auto p-6">
+          <div className="min-h-0 flex-1 overflow-auto p-6">
             <PhaseOutputPanel pipelineId={selectedPipelineId} />
           </div>
         </div>
@@ -78,7 +78,7 @@ export default function Pipelines() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="min-h-0 flex-1 overflow-auto p-6 space-y-6">
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             <div className="lg:col-span-2 space-y-6">
               {showCreateForm && (

@@ -183,7 +183,7 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
       </div>
 
       {/* Source list */}
-      <ScrollArea className="flex-1 min-h-0">
+      <ScrollArea className="min-h-0 flex-1 min-h-0">
         <div className="p-2 space-y-1">
           {sources.length === 0 && (
             <p className="text-[10px] text-muted-foreground italic text-center py-6">No sources yet. Add some below.</p>

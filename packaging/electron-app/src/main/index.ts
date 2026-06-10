@@ -121,7 +121,7 @@ function createWindow(): void {
     height: 900,
     show: false,
     autoHideMenuBar: true,
-    title: 'Omnecor Setup Wizard',
+    title: 'Omnecor HMCI Workstation',
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
@@ -137,7 +137,6 @@ function createWindow(): void {
 
   mainWindow.on('ready-to-show', () => {
     mainWindow.show()
-    mainWindow.webContents.openDevTools()
   })
 
   // window.open / target=_blank: never open a sub-window; hand safe URLs to the
@@ -281,12 +280,16 @@ app.whenReady().then(async () => {
     return info
   })
 
-  // --- IPC: Setup Wizard finished — load the main app UI ---
-  ipcMain.on('setup-complete', () => {
+  // Backend ready — swap loading screen for the live web app
+  waitForBackend(`http://localhost:${BACKEND_PORT}/health`).then((ready) => {
     const windows = BrowserWindow.getAllWindows()
-    if (windows.length > 0) {
-      windows[0].setTitle('Omnecor HMCI Workstation')
+    if (ready && windows.length > 0) {
       windows[0].loadURL(`http://localhost:${BACKEND_PORT}`)
+    } else if (!ready) {
+      dialog.showErrorBox(
+        'Connection Timeout',
+        'Could not connect to the Omnecor backend. Please check the logs at:\n' + LOG_FILE
+      )
     }
   })
 
@@ -301,18 +304,6 @@ app.whenReady().then(async () => {
 
   startBackend()
   createWindow()
-
-  // Wait for backend after the window is visible so the user sees the app rather than a blank screen
-  if (!is.dev) {
-    waitForBackend(`http://localhost:${BACKEND_PORT}/health`).then((ready) => {
-      if (!ready) {
-        dialog.showErrorBox(
-          'Connection Timeout',
-          'Could not connect to the Omnecor backend. Please check the logs.'
-        )
-      }
-    })
-  }
 
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow()

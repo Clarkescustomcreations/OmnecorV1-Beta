@@ -102,7 +102,7 @@ export default function CliTerminalWindow({ isOpen, onClose, sessionId, selected
         initialSize={{ width: 640, height: 380 }}
       >
         <div className="flex flex-col h-full bg-slate-950">
-          <ScrollArea className="flex-1 p-3 font-mono text-xs">
+          <ScrollArea className="min-h-0 flex-1 p-3 font-mono text-xs">
             <div className="space-y-1">
               {logs.map((log, i) => (
                 <div
