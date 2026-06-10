@@ -925,6 +925,8 @@ const OMMESHPanel: React.FC = () => {
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                                       <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" disabled>
                         <CheckCircle2 className="w-4 h-4 mr-1.5" />
                         Active
