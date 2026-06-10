@@ -1184,9 +1184,11 @@ const WorkstationOptimizationPanel: React.FC = () => {
   const { data: settings, refetch } = trpc.system.getSettings.useQuery();
   const saveMutation = trpc.system.saveSettings.useMutation({
     onSuccess: () => { toast.success("Settings saved"); refetch(); },
+    onError: (err) => toast.error("Failed to save: " + err.message),
   });
   const applyMutation = trpc.system.applyOptimizations.useMutation({
     onSuccess: () => toast.success("Optimizations applied"),
+    onError: (err) => toast.error("Failed to apply: " + err.message),
   });
 
   const [local, setLocal] = useState({ gpuBypass: false, zramEnabled: false, zramSizeGB: 4 });
@@ -1478,7 +1480,7 @@ const ConnectedAccounts: React.FC<{ loginMethod: string | null }> = ({ loginMeth
   const { data: settings } = trpc.system.getSettings.useQuery();
   const [mode, setMode] = useState<"managed" | "custom">("managed");
   const [keys, setKeys] = useState({ googleClientId: "", googleClientSecret: "", microsoftClientId: "", microsoftClientSecret: "" });
-  const m = trpc.system.saveKeys.useMutation({ onSuccess: () => { toast.success("Saved"); refetch(); } });
+  const m = trpc.system.saveKeys.useMutation({ onSuccess: () => { toast.success("Saved"); refetch(); }, onError: (err) => toast.error(err.message) });
 
   useEffect(() => {
     if (settings) {
@@ -1551,7 +1553,7 @@ const AuditLogPanel: React.FC = () => {
 
 const UserManagementPanel: React.FC = () => {
   const { data, isLoading, refetch } = trpc.system.listUsers.useQuery();
-  const m = trpc.system.setUserRole.useMutation({ onSuccess: () => { toast.success("Updated"); refetch(); } });
+  const m = trpc.system.setUserRole.useMutation({ onSuccess: () => { toast.success("Updated"); refetch(); }, onError: (err) => toast.error("Role update failed: " + err.message) });
   return (
     <Card>
       <CardHeader><CardTitle>Users</CardTitle></CardHeader>

@@ -776,6 +776,7 @@ function MeshFederationPanel() {
       toast.success("Mesh connection established");
       utils.ommesh.discover.invalidate();
     },
+    onError: (error) => toast.error("Approval failed: " + error.message),
   });
 
   // Simple SVG Mesh Visualization

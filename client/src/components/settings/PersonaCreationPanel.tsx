@@ -1801,11 +1801,15 @@ const PersonaCreationPanel: React.FC = () => {
   const dbPersonasQuery = trpc.personas.list.useQuery(undefined, { retry: false });
   const upsertMutation = trpc.personas.upsert.useMutation({
     onSuccess: () => utils.personas.list.invalidate(),
+    onError: (err) => toast.error("Save failed: " + err.message),
   });
   const deleteMutation = trpc.personas.delete.useMutation({
     onSuccess: () => utils.personas.list.invalidate(),
+    onError: (err) => toast.error("Delete failed: " + err.message),
   });
-  const migrateMutation = trpc.personas.migrate.useMutation();
+  const migrateMutation = trpc.personas.migrate.useMutation({
+    onError: (err) => toast.error("Migration failed: " + err.message),
+  });
 
   // Prefer DB data when available; keep localStorage as offline cache
   useEffect(() => {

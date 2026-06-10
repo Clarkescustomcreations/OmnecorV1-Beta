@@ -169,8 +169,12 @@ export default function Chat() {
     { openId, limit: 15 },
     { enabled: !!me && !!openId, staleTime: 60_000 }
   );
-  const addHonchoFact = trpc.honcho.addFact.useMutation();
-  const addHonchoMessage = trpc.honcho.addMessage.useMutation();
+  const addHonchoFact = trpc.honcho.addFact.useMutation({
+    onError: (err) => console.error("[Honcho] addFact failed:", err.message),
+  });
+  const addHonchoMessage = trpc.honcho.addMessage.useMutation({
+    onError: (err) => console.error("[Honcho] addMessage failed:", err.message),
+  });
 
   // ── BTW notes ────────────────────────────────────────────────────────────
   const [btwNotes, setBtwNotes] = useState<string[]>(() => {

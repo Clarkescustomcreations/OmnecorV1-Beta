@@ -83,7 +83,9 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
 
 
   // tRPC mutations + queries
-  const saveDesignMutation = trpc.pcbEditor.saveDesign.useMutation();
+  const saveDesignMutation = trpc.pcbEditor.saveDesign.useMutation({
+    onError: (err) => toast.error("Failed to save design: " + err.message),
+  });
 
   // Auto-load latest design when projectId is known
   const latestDesignQuery = trpc.pcbEditor.getLatestDesign.useQuery(

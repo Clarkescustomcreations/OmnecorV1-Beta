@@ -97,7 +97,7 @@ export default function HITLAlertPanel({
       hash: loopAlert.actionHash,
       consecutiveCount: loopAlert.count,
       lastActions: [],
-    }).catch(() => {}); // fire-and-forget — never block the UI
+    }).catch((err) => console.error("[HITL]", err)); // fire-and-forget — never block the UI
   }, [loopAlert]);
 
   if (!activeAlert) {

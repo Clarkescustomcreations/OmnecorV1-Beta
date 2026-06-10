@@ -74,6 +74,7 @@ export default function ManufacturingPanel({ activeFile, mode }: ManufacturingPa
   // Mutations
   const renderMutation = trpc.blender.render.useMutation({
     onSuccess: (data) => { toast.success(`Render job started: ${data.jobId}`); setActiveJobId(data.jobId); },
+    onError: (err) => toast.error("Render failed: " + err.message),
   });
 
   const drcMutation = trpc.kicad.runDRC.useMutation({
@@ -83,14 +84,16 @@ export default function ManufacturingPanel({ activeFile, mode }: ManufacturingPa
       } else {
         toast.warning(`DRC Failed: ${data.violations} violations found.`);
       }
-    }
+    },
+    onError: (err) => toast.error("DRC failed: " + err.message),
   });
 
   const quoteMutation = trpc.kicad.getQuote.useMutation({
     onSuccess: (data) => {
       setQuote(data as unknown as PCBQuote);
       toast.success("Manufacturing quote received");
-    }
+    },
+    onError: (err) => toast.error("Quote request failed: " + err.message),
   });
 
   const orderMutation = trpc.kicad.placeOrder.useMutation({
