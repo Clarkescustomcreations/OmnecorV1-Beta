@@ -937,7 +937,7 @@ function BrainMapContent() {
                                     <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider flex items-center gap-1">
                                       <FolderOpen className="w-3 h-3" /> Contents ({children.length})
                                     </span>
-                                    <div className="max-h-40 overflow-y-auto overflow-x-hidden rounded border border-border/50">
+                                    <div className="max-h-32 overflow-y-auto overflow-x-hidden rounded border border-border/50 bg-muted/20">
                                       <ul className="p-1 space-y-0.5">
                                         {children.map(child => (
                                           <li
