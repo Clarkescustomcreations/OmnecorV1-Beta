@@ -1,0 +1,146 @@
+{
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "dataset_path": "data/valet/train.jsonl",
+  "dataset_hash": "f1422243a88141ca30c506bc486ba511615ec73335fa87498444269effe3ea3b",
+  "format": "lora",
+  "config": {
+    "r": 8,
+    "lora_alpha": 16,
+    "epochs": 3,
+    "max_seq_length": 512,
+    "save_method": "lora"
+  },
+  "eval_scores": {
+    "overall_accuracy": 0.1465,
+    "route_accuracy": 0.1179,
+    "per_bucket": {
+      "route:media_generation": 0.0667,
+      "route:code_generation": 0.2,
+      "route:local_task": 0.4,
+      "rules": 0.4,
+      "route:code_review": 0.0,
+      "qa": 0.6,
+      "route:context_management": 0.0333,
+      "route:synthesis": 0.1,
+      "plan": 0.0,
+      "route:memory_operations": 0.0,
+      "route:integration": 0.0,
+      "skill": 0.7,
+      "route:reporting": 0.0333,
+      "route:hardware": 0.2667,
+      "route:knowledge_retrieval": 0.0,
+      "route:research": 0.0,
+      "route:instruction_writing": 0.4333
+    },
+    "bucket_totals": {
+      "route:media_generation": 30,
+      "route:code_generation": 30,
+      "route:local_task": 30,
+      "rules": 10,
+      "route:code_review": 30,
+      "qa": 10,
+      "route:context_management": 30,
+      "route:synthesis": 30,
+      "plan": 10,
+      "route:memory_operations": 30,
+      "route:integration": 30,
+      "skill": 10,
+      "route:reporting": 30,
+      "route:hardware": 30,
+      "route:knowledge_retrieval": 30,
+      "route:research": 30,
+      "route:instruction_writing": 30
+    },
+    "confusion_matrix": {
+      "media_generation": {
+        "hardware": 12,
+        "unknown": 15,
+        "media_generation": 2,
+        "local_task": 1
+      },
+      "code_generation": {
+        "unknown": 24,
+        "code_generation": 6
+      },
+      "local_task": {
+        "unknown": 18,
+        "local_task": 12
+      },
+      "code_review": {
+        "unknown": 30
+      },
+      "context_management": {
+        "local_task": 22,
+        "unknown": 7,
+        "context_management": 1
+      },
+      "synthesis": {
+        "synthesis": 3,
+        "unknown": 21,
+        "knowledge_retrieval": 6
+      },
+      "memory_operations": {
+        "unknown": 25,
+        "context_management": 5
+      },
+      "integration": {
+        "unknown": 30
+      },
+      "reporting": {
+        "reporting": 1,
+        "unknown": 28,
+        "local_task": 1
+      },
+      "hardware": {
+        "local_task": 9,
+        "hardware": 8,
+        "unknown": 13
+      },
+      "knowledge_retrieval": {
+        "unknown": 23,
+        "local_task": 7
+      },
+      "research": {
+        "unknown": 29,
+        "knowledge_retrieval": 1
+      },
+      "instruction_writing": {
+        "unknown": 16,
+        "instruction_writing": 13,
+        "local_task": 1
+      }
+    },
+    "baseline_route_accuracy": 0.2744,
+    "model_beats_baseline": false,
+    "confidence_mean": 0.0,
+    "confidence_std": 0.0,
+    "total_examples": 430,
+    "eval_timestamp": "2026-06-08T16:09:17.378934Z",
+    "backend": "transformers",
+    "passed": false,
+    "threshold_failures": [
+      "Overall accuracy 14.65% < required 85.00%",
+      "Bucket 'route:media_generation' (30 examples): accuracy 6.67% < required 70.00%",
+      "Bucket 'route:code_generation' (30 examples): accuracy 20.00% < required 70.00%",
+      "Bucket 'route:local_task' (30 examples): accuracy 40.00% < required 70.00%",
+      "Bucket 'rules' (10 examples): accuracy 40.00% < required 70.00%",
+      "Bucket 'route:code_review' (30 examples): accuracy 0.00% < required 70.00%",
+      "Bucket 'qa' (10 examples): accuracy 60.00% < required 70.00%",
+      "Bucket 'route:context_management' (30 examples): accuracy 3.33% < required 70.00%",
+      "Bucket 'route:synthesis' (30 examples): accuracy 10.00% < required 70.00%",
+      "Bucket 'plan' (10 examples): accuracy 0.00% < required 70.00%",
+      "Bucket 'route:memory_operations' (30 examples): accuracy 0.00% < required 70.00%",
+      "Bucket 'route:integration' (30 examples): accuracy 0.00% < required 70.00%",
+      "Bucket 'route:reporting' (30 examples): accuracy 3.33% < required 70.00%",
+      "Bucket 'route:hardware' (30 examples): accuracy 26.67% < required 70.00%",
+      "Bucket 'route:knowledge_retrieval' (30 examples): accuracy 0.00% < required 70.00%",
+      "Bucket 'route:research' (30 examples): accuracy 0.00% < required 70.00%",
+      "Bucket 'route:instruction_writing' (30 examples): accuracy 43.33% < required 70.00%",
+      "Model route accuracy 11.79% does not exceed keyword baseline 27.44% \u2014 rule-based fallback is preferable"
+    ]
+  },
+  "git_sha": "103cebfa4adbf02d04dc5109cc0d5235a76c3772",
+  "created_at": "2026-06-08T08:55:25Z",
+  "source": "trained",
+  "eval_passed": false
+}

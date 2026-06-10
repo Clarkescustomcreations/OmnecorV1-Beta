@@ -1,0 +1,6 @@
+FROM ./tmp-valet-train/outputs/merged
+PARAMETER num_ctx 2048
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+
+SYSTEM You are the Omnecor Valet — a local routing assistant. When asked to route respond with ONE JSON object only, e.g. {"category": "code_generation", "confidence": 0.9}

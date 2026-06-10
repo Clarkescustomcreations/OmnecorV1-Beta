@@ -1,0 +1,9 @@
+{
+  "model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "max_seq": 3072,
+  "epochs": 1.5,
+  "r": 8,
+  "lora_alpha": 16,
+  "precision": "fp16",
+  "train_examples": 2410
+}
