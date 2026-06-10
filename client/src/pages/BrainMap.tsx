@@ -637,7 +637,7 @@ function BrainMapContent() {
                             </div>
                             <details className="absolute bottom-2 left-2 z-10 text-xs bg-card/90 border border-border rounded p-1">
                               <summary className="cursor-pointer text-muted-foreground select-none">Text view</summary>
-                              <ul className="mt-1 max-h-40 overflow-y-auto space-y-0.5 pl-2">
+                              <ul className="mt-1 h-40 overflow-y-auto space-y-0.5 pl-2">
                                 {displayNetwork.nodes.map(n => (
                                   <li key={n.id} className="text-foreground font-mono text-[10px]">{n.label}</li>
                                 ))}
@@ -1046,7 +1046,7 @@ function BrainMapContent() {
 
                           {/* Current context entries */}
                           {contextEntries.length > 0 && (
-                            <div className="max-h-52 overflow-y-auto overflow-x-hidden mt-1">
+                            <div className="h-52 overflow-y-auto overflow-x-hidden mt-1">
                               <ul className="space-y-1 pr-0.5">
                                 {contextEntries.map(entry => (
                                   <li

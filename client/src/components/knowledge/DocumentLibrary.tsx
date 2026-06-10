@@ -8,7 +8,6 @@ import { Search, FileText, UploadCloud, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
-import { ScrollArea } from "../ui/scroll-area";
 
 interface SearchResult {
   content: string;
@@ -127,11 +126,11 @@ export const DocumentLibrary: React.FC = () => {
               )}
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="max-h-[60vh]">
+          <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
             <pre className="whitespace-pre-wrap text-sm font-mono p-4 bg-muted/30 rounded-lg">
               {previewDoc?.content ?? ""}
             </pre>
-          </ScrollArea>
+          </div>
           {previewDoc?.metadata && Object.keys(previewDoc.metadata).length > 0 && (
             <div className="border-t pt-3">
               <p className="text-xs font-semibold text-muted-foreground mb-2">Metadata</p>
