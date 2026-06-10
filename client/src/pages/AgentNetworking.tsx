@@ -869,17 +869,17 @@ function MeshFederationPanel() {
               
               <div className="pt-4 border-t space-y-3">
                 <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Discovered Peers</p>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {(!peers || peers.length === 0) ? (
                     <p className="text-xs italic text-muted-foreground py-4">No peers detected on local network...</p>
                   ) : (
                     peers.map((peer) => (
                       <div key={peer.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                        <div className="flex items-center gap-3">
-                          <Server className="w-4 h-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">{peer.name}</p>
-                            <p className="text-[10px] font-mono opacity-50">{peer.address}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Server className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{peer.name}</p>
+                            <p className="text-[10px] font-mono opacity-50 truncate">{peer.address}</p>
                           </div>
                         </div>
                         {!peer.isApproved ? (
@@ -1306,7 +1306,7 @@ function CurationPanel() {
                         </Button>
                       </div>
                       <div className="p-4 rounded-xl bg-muted/50 border min-h-[100px] relative">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.

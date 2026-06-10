@@ -127,7 +127,7 @@ export const DocumentLibrary: React.FC = () => {
             </DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-y-auto overflow-x-auto">
-            <pre className="whitespace-pre-wrap text-sm font-mono p-4 bg-muted/30 rounded-lg">
+            <pre className="whitespace-pre-wrap break-words text-sm font-mono p-4 bg-muted/30 rounded-lg">
               {previewDoc?.content ?? ""}
             </pre>
           </div>

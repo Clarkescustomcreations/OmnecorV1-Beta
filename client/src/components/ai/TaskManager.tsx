@@ -34,16 +34,16 @@ export const TaskManager: React.FC = () => {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 overflow-y-auto pr-2">
+      <div className="grid grid-cols-1 gap-4 overflow-y-auto pr-2 flex-1 min-h-0 content-start">
         {(jobsQuery.data?.jobs as unknown as JobInfo[])?.map((job) => (
           <Card key={job.id} className="border-none bg-muted/30 shadow-sm group">
             <CardContent className="p-4 flex items-center gap-4">
               <div className="w-10 h-10 rounded-lg bg-background border flex items-center justify-center shadow-inner">
                  <Terminal className="w-5 h-5 text-muted-foreground" />
               </div>
-              <div className="flex-1">
+              <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="font-bold text-sm">{job.label || "Unnamed Process"}</span>
+                  <span className="font-bold text-sm truncate">{job.label || "Unnamed Process"}</span>
                   <Badge variant="outline" className="text-[10px] uppercase font-mono">{job.id.slice(0,8)}</Badge>
                 </div>
                 <div className="flex items-center gap-3 mt-1 text-[10px] text-muted-foreground font-medium uppercase tracking-wider">

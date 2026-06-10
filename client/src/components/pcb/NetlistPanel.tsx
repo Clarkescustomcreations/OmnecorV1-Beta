@@ -121,7 +121,7 @@ export const NetlistPanel: React.FC<NetlistPanelProps> = ({
       </div>
 
       {/* Netlist */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-3 space-y-3">
           {netlist.length === 0 ? (
             <p className="text-xs text-muted-foreground text-center py-8">

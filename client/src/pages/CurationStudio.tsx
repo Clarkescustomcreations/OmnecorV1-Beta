@@ -322,7 +322,7 @@ export default function CurationStudio() {
                           </div>
                         </div>
                         <div className="p-4 rounded-xl bg-muted/50 border min-h-[100px] relative">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
                                           <Button
                             variant="ghost"
                             size="icon"

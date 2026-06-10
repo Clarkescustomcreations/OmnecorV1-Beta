@@ -53,7 +53,7 @@ export default function HITLCommandApproval() {
         <div className="px-5 py-4 space-y-3">
           <div className="flex items-start gap-2 rounded-lg bg-slate-950 border border-border p-3">
             <Terminal className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-            <pre className="text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all leading-relaxed flex-1">
+            <pre className="text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all leading-relaxed flex-1 min-w-0 max-h-40 overflow-y-auto">
               {pending.fullCommand}
             </pre>
           </div>

@@ -257,7 +257,7 @@ export default function ConversationList({
       </div>
 
       {/* List Area */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="py-2 px-2 space-y-0.5">
           {mode === "chats" ? (
             filteredConversations.length === 0 ? (

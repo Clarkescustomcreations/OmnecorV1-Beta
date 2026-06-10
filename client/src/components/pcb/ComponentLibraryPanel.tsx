@@ -74,7 +74,7 @@ export const ComponentLibraryPanel: React.FC<ComponentLibraryPanelProps> = ({
       </div>
 
       {/* Components List */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <Tabs defaultValue={categories[0]} className="w-full">
           <TabsList className="w-full justify-start rounded-none border-b border-border bg-muted/50 p-0">
             {categories.map((category) => (

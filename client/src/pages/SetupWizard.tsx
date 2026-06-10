@@ -608,7 +608,7 @@ export default function SetupWizard() {
             <Progress value={progress} className="h-1 bg-muted" />
           </CardHeader>
 
-          <ScrollArea className="flex-1 px-8 py-10">
+          <ScrollArea className="min-h-0 flex-1 px-8 py-10">
             <div className="min-h-[450px]">
               <div className="mb-8">
                 <h1 className="text-3xl font-black tracking-tight">{STEPS[currentStep].title}</h1>

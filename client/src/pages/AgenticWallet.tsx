@@ -94,7 +94,7 @@ export default function AgenticWallet() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-6 space-y-6">
+        <div className="min-h-0 flex-1 overflow-auto p-6 space-y-6">
           <Tabs defaultValue="tracking" className="space-y-6">
             <TabsList className="bg-muted/50 p-1">
               <TabsTrigger value="tracking" className="gap-2">

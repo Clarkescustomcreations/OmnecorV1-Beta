@@ -66,7 +66,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
       </div>
 
       {/* Properties */}
-      <ScrollArea className="flex-1">
+      <ScrollArea className="min-h-0 flex-1">
         <div className="p-4 space-y-4">
           <div>
             <Label htmlFor="reference" className="text-xs font-semibold">

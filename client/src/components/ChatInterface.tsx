@@ -900,7 +900,7 @@ export default function ChatInterface({
       )}
 
       {/* ── Messages area ────────────────────────────────────────────── */}
-      <ScrollArea className="flex-1 px-4">
+      <ScrollArea className="min-h-0 flex-1 px-4">
         <div role="log" aria-live="polite" aria-label="Conversation messages" className="space-y-4 py-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3 text-center text-muted-foreground">

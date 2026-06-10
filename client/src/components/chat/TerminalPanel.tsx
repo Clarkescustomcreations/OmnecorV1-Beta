@@ -203,7 +203,7 @@ export default function TerminalPanel({ isOpen, onToggle, projectId }: TerminalP
           </div>
 
           {/* Log area */}
-          <ScrollArea className="flex-1 p-3 font-mono text-xs">
+          <ScrollArea className="min-h-0 flex-1 p-3 font-mono text-xs">
             <div className="space-y-0.5">
               {logs.map(log => (
                 <div

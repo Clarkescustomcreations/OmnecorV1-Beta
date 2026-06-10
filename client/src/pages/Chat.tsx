@@ -945,7 +945,7 @@ export default function Chat() {
                   </Button>
                 </div>
               </div>
-              <div className="flex-1 overflow-hidden relative bg-slate-950">
+              <div className="min-h-0 flex-1 overflow-hidden relative bg-slate-950">
                 {previewMode === "3d" && <ThreeViewer code={previewCode} />}
                 {previewMode === "pcb" && <EnhancedPCBEditor />}
                 {previewMode === "web" && <WebPreview code={previewCode} />}

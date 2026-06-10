@@ -49,7 +49,7 @@ export const ImageStudioPanel: React.FC = () => {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-6">
+      <ScrollArea className="min-h-0 flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Gallery</h3>

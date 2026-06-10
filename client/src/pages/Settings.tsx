@@ -248,7 +248,7 @@ export const Settings: React.FC = () => {
           </aside>
 
           {/* Content Area */}
-          <main className="flex-1 overflow-auto bg-muted/5 p-8">
+          <main className="min-h-0 flex-1 overflow-auto bg-muted/5 p-8">
             <div className="max-w-4xl mx-auto">
               <Tabs value={activeTab} className="w-full">
                 <TabsContent value="api">
@@ -877,7 +877,7 @@ const OMMESHPanel: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
             {(!peers || peers.length === 0) ? (
               <div className="p-8 text-center border-2 border-dashed rounded-xl bg-muted/20">
                 <Globe className="w-8 h-8 mx-auto mb-2 opacity-20" />
@@ -887,20 +887,20 @@ const OMMESHPanel: React.FC = () => {
             ) : (
               (peers as unknown as DisplayPeer[]).map((peer) => (
                 <div key={peer.id} className="flex items-center justify-between p-4 rounded-xl border bg-card/50 transition-all hover:border-accent/30">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-full bg-accent/10">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="p-2 rounded-full bg-accent/10 flex-shrink-0">
                       <Server className="w-5 h-5 text-accent" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-sm">{peer.name}</p>
+                        <p className="font-bold text-sm truncate">{peer.name}</p>
                         {peer.isApproved ? (
                           <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-[10px] h-4 px-1.5">Linked</Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] h-4 px-1.5">Pending</Badge>
                         )}
                       </div>
-                      <p className="text-[10px] font-mono text-muted-foreground">{peer.address}:{peer.port}</p>
+                      <p className="text-[10px] font-mono text-muted-foreground truncate">{peer.address}:{peer.port}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">

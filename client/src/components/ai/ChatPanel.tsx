@@ -96,7 +96,7 @@ export const ChatPanel: React.FC = () => {
         </span>
       </div>
 
-      <ScrollArea className="flex-1 p-4">
+      <ScrollArea className="min-h-0 flex-1 p-4">
         <div className="space-y-4 max-w-3xl mx-auto">
           {messages.map((m, i) => (
             <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
@@ -106,7 +106,7 @@ export const ChatPanel: React.FC = () => {
                 </div>
               )}
               <Card className={`max-w-[80%] border-none shadow-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-muted/50'}`}>
-                <CardContent className="p-3 text-sm leading-relaxed whitespace-pre-wrap">
+                <CardContent className="p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
                   {m.content}
                 </CardContent>
               </Card>
