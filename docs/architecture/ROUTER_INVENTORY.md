@@ -13,11 +13,13 @@ espRouter.ts
 falRouter.ts
 honchoRouter.ts
 imageGenRouter.ts
+integrationManagementRouter.ts
 integrationsRouter.ts
 jobRouter.ts
 kicadRouter.ts
 knowledgeBase.ts
 mcpRouter.ts
+modelManagementRouter.ts
 neuralMapsRouter.ts
 oauthRouter.ts
 ollamaRouter.ts

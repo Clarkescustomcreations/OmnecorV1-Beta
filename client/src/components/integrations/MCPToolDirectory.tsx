@@ -100,6 +100,8 @@ function ConnectServerForm() {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
                                         <Button variant="outline" size="sm" className="gap-2">
           <Plus className="w-4 h-4" />
           Connect Server

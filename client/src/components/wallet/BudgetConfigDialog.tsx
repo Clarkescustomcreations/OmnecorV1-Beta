@@ -64,6 +64,8 @@ export default function BudgetConfigDialog({ projectId }: BudgetConfigDialogProp
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
+    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
+    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
         <Button variant="ghost" size="icon" className="h-7 w-7">
           <Settings2 className="h-4 w-4" />
           <span className="sr-only">Configure budget</span>
