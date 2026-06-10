@@ -1415,6 +1415,8 @@ function CurationPanel() {
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                         <Button variant="ghost" size="icon" className="absolute top-2 right-2 h-6 w-6"><RefreshCw className="w-3 h-3" /></Button>
                       </div>
                       <div className="flex gap-3 pt-2">
