@@ -30,20 +30,21 @@ def audit_file(file_path):
     # Simple line-by-line check (can be improved with multi-line regex if needed)
     for i, line in enumerate(lines):
         # Skip if already audited to avoid duplicates
-        if "// UI-AUDIT-FINDING" in line:
+        if "UI-AUDIT-FINDING" in line:
             new_content.append(line)
             continue
             
         found_finding = False
         for pattern, message in PATTERNS:
             if re.search(pattern, line):
-                # Add finding and suggestion
+                # Add finding and suggestion as JSX-safe block comments.
+                # Do NOT use // here — in JSX element bodies // is a text node, not a comment.
                 suggestion = "SUGGESTION: Implement the intended logic or hide this element if it's not ready."
                 if "no onClick" in message:
                     suggestion = "SUGGESTION: Add an onClick handler or change type to 'submit' if in a form."
-                
-                new_content.append(f"    // UI-AUDIT-FINDING: {message}")
-                new_content.append(f"    // UI-AUDIT-SUGGESTION: {suggestion}")
+
+                new_content.append(f"    {{/* UI-AUDIT-FINDING: {message} */}}")
+                new_content.append(f"    {{/* UI-AUDIT-SUGGESTION: {suggestion} */}}")
                 new_content.append(line)
                 modified = True
                 found_finding = True
