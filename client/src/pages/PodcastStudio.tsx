@@ -735,14 +735,20 @@ export default function PodcastStudio() {
                             <User className="w-3 h-3 text-accent" />
                             <span className="font-bold">{seg.speaker}</span>
                           </div>
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                           <Button size="icon" variant="ghost" className="h-6 w-6"><Play className="w-3 h-3" /></Button>
                         </div>
                       ))}
                     </div>
                     <div className="grid grid-cols-2 gap-2 pt-2">
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                       <Button size="sm" variant="outline" className="text-[10px] h-8 gap-1.5">
                         <Download className="w-3 h-3" /> WAV
                       </Button>
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                       <Button size="sm" className="text-[10px] h-8 gap-1.5">
                         <Share2 className="w-3 h-3" /> Export
                       </Button>
