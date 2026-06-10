@@ -184,7 +184,7 @@ export default function OmnecorDashboardLayout({
           </div>
 
           {/* Navigation Items */}
-          <ScrollArea className="flex-1">
+          <ScrollArea className="min-h-0 flex-1">
             <nav className={cn("py-4 transition-all duration-300", sidebarOpen ? "px-3 space-y-2" : "px-0 space-y-4 flex flex-col items-center")}>
               {navItems.map(item => {
                 const Icon = item.icon;
@@ -366,7 +366,7 @@ export default function OmnecorDashboardLayout({
         {/* Removed Floating Sidebar Toggle Button */}
 
         {/* Content Area */}
-        <main className="flex-1 overflow-auto relative">
+        <main className="min-h-0 flex-1 overflow-auto relative">
           <div className="h-full">{children}</div>
 
           {/* Global Floating Alerts */}

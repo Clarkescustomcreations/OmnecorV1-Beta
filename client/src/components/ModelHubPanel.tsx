@@ -76,7 +76,7 @@ export default function ModelHubPanel({
 
   // Convert Ollama discovery results to AIModel format
   const fetchedModels = useMemo<AIModel[]>(() => {
-    const ollama: AIModel[] = ollamaRaw.map((m: any) => ({
+    const ollama: AIModel[] = ollamaRaw.map((m) => ({
       id: m.name ?? m.model,
       name: m.name ?? m.model,
       displayName: `${m.name ?? m.model} (Ollama)`,
@@ -93,14 +93,14 @@ export default function ModelHubPanel({
     }));
 
     const apiModels: AIModel[] = providerList
-      .filter((p: any) => p.id !== "ollama")
-      .map((p: any) => ({
+      .filter((p) => p.id !== "ollama")
+      .map((p) => ({
         id: p.id,
         name: p.name,
         displayName: p.name,
-        source: p.id as any,
+        source: p.id as AIModel["source"],
         type: "api" as const,
-        status: (p.status === "online" ? "available" : "offline") as any,
+        status: (p.status === "online" ? "available" : "offline") as AIModel["status"],
         capabilities: {
           chat: true,
           completion: true,
@@ -239,7 +239,7 @@ export default function ModelHubPanel({
       </div>
 
       {/* Content Area */}
-      <div className="flex-1 overflow-auto">
+      <div className="min-h-0 flex-1 overflow-auto">
         {activeTab === "models" ? (
           <div role="list" className="space-y-3">
             {ollamaLoading ? (

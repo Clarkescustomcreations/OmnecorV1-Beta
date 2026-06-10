@@ -36,9 +36,15 @@ interface ManufacturingPanelProps {
   mode: "3d" | "pcb";
 }
 
+interface PCBQuote {
+  totalPrice: number;
+  leadTimeDays: number;
+  id: string;
+}
+
 export default function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps) {
   const [activeTab, setActiveTab] = useState(mode);
-  const [quote, setQuote] = useState<any>(null);
+  const [quote, setQuote] = useState<PCBQuote | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   const { jobLifecycle } = useOmnecorSocket({ jobId: activeJobId ?? undefined });
@@ -82,7 +88,7 @@ export default function ManufacturingPanel({ activeFile, mode }: ManufacturingPa
 
   const quoteMutation = trpc.kicad.getQuote.useMutation({
     onSuccess: (data) => {
-      setQuote(data);
+      setQuote(data as unknown as PCBQuote);
       toast.success("Manufacturing quote received");
     }
   });
@@ -111,7 +117,7 @@ export default function ManufacturingPanel({ activeFile, mode }: ManufacturingPa
         <Badge variant="outline" className="text-[10px] h-5 border-accent/20 text-accent">Phase 3</Badge>
       </div>
 
-      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="flex-1 overflow-hidden flex flex-col">
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "3d" | "pcb")} className="min-h-0 flex-1 overflow-hidden flex flex-col">
         <div className="p-2 bg-slate-950/50">
           <TabsList className="grid w-full grid-cols-2 h-8 bg-slate-900">
             <TabsTrigger value="3d" className="text-[10px] gap-1.5"><Box className="w-3 h-3" /> 3D Render</TabsTrigger>
@@ -119,7 +125,7 @@ export default function ManufacturingPanel({ activeFile, mode }: ManufacturingPa
           </TabsList>
         </div>
 
-        <div className="flex-1 overflow-auto p-4 space-y-6 custom-scrollbar">
+        <div className="min-h-0 flex-1 overflow-auto p-4 space-y-6 custom-scrollbar">
           {/* 3D Tab */}
           <TabsContent value="3d" className="m-0 space-y-6">
             <Card className="bg-slate-950 border-slate-800 shadow-none">

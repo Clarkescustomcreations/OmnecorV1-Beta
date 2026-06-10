@@ -28,7 +28,7 @@ export default function Integrations() {
           </div>
         </div>
 
-        <div className="flex-1 overflow-auto p-6 space-y-8">
+        <div className="min-h-0 flex-1 overflow-auto p-6 space-y-8">
           <IntegrationsHub />
           <div>
             <h2 className="text-lg font-semibold mb-4">MCP Tool Directory</h2>

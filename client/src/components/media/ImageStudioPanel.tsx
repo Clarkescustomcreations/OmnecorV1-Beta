@@ -21,7 +21,7 @@ export const ImageStudioPanel: React.FC = () => {
   });
 
   return (
-    <div className="flex flex-col h-full overflow-hidden">
+    <div className="flex flex-col h-full min-h-0 overflow-hidden">
       <div className="p-6 border-b bg-muted/30">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="flex items-center gap-2">
@@ -49,7 +49,7 @@ export const ImageStudioPanel: React.FC = () => {
         </div>
       </div>
 
-      <ScrollArea className="flex-1 p-6">
+      <ScrollArea className="min-h-0 flex-1 p-6">
         <div className="max-w-7xl mx-auto">
           <div className="flex items-center justify-between mb-6">
             <h3 className="text-sm font-bold uppercase tracking-widest text-muted-foreground">Gallery</h3>

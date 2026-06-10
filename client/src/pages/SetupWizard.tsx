@@ -23,6 +23,11 @@ import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { useRef } from "react";
 
+interface WizardSettings {
+  vram?: number; ttsEngine?: string; mDnsEnabled?: boolean; discoveryPort?: string;
+  autoIndex?: boolean; maxFileSize?: number; language?: string; defaultModel?: string; kbPath?: string;
+}
+
 const STEPS = [
   { id: "welcome", title: "Welcome", description: "Let's configure your sovereign AI workstation." },
   { id: "mode", title: "Execution Mode", description: "Choose how you want Omnecor to handle AI requests." },
@@ -64,7 +69,7 @@ export default function SetupWizard() {
     if (files && files.length > 0) {
       // Extract the folder path from the first file's path
       const firstFile = files[0];
-      const fullPath = (firstFile as any).webkitRelativePath || firstFile.name;
+      const fullPath = (firstFile as File & { webkitRelativePath?: string }).webkitRelativePath || firstFile.name;
       const folderPath = fullPath.split("/")[0] || "/";
       setKbPath(folderPath);
       toast.success(`Folder selected: ${folderPath}`);
@@ -128,21 +133,22 @@ export default function SetupWizard() {
 
   useEffect(() => {
     if (aiProviders) {
-      setOllamaUrl((aiProviders as any).ollamaUrl || "http://localhost:11434");
+      setOllamaUrl(aiProviders?.ollamaUrl || "http://localhost:11434");
     }
   }, [aiProviders]);
 
   useEffect(() => {
     if (settings) {
-      setVram((settings as any).vram ?? 8);
-      setTtsEngine((settings as any).ttsEngine || "local");
-      setMDnsEnabled((settings as any).mDnsEnabled !== false);
-      setDiscoveryPort((settings as any).discoveryPort || "5353");
-      setKbAutoIndex((settings as any).autoIndex !== false);
-      setKbMaxFileSize((settings as any).maxFileSize ?? 50);
-      setLanguage((settings as any).language || "en");
-      setDefaultModel((settings as any).defaultModel || "auto");
-      setKbPath((settings as any).kbPath || "/home/linux/Documents/Omnecor");
+      const s = settings as WizardSettings;
+      setVram(s.vram ?? 8);
+      setTtsEngine(s.ttsEngine || "local");
+      setMDnsEnabled(s.mDnsEnabled !== false);
+      setDiscoveryPort(s.discoveryPort || "5353");
+      setKbAutoIndex(s.autoIndex !== false);
+      setKbMaxFileSize(s.maxFileSize ?? 50);
+      setLanguage(s.language || "en");
+      setDefaultModel(s.defaultModel || "auto");
+      setKbPath(s.kbPath || "/home/linux/Documents/Omnecor");
     }
   }, [settings]);
 
@@ -219,7 +225,7 @@ export default function SetupWizard() {
               ].map((mode) => (
                 <div 
                   key={mode.id}
-                  onClick={() => setSelectedMode(mode.id as any)}
+                  onClick={() => setSelectedMode(mode.id as "sovereign" | "scrapper" | "big_spender")}
                   className={cn(
                     "flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all hover:bg-muted/50",
                     selectedMode === mode.id ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border"
@@ -294,7 +300,7 @@ export default function SetupWizard() {
                       {p.label}
                       <span className="text-[10px] text-muted-foreground font-normal">{p.desc}</span>
                     </Label>
-                    {(aiProviders as any)?.[p.id] && (
+                    {!!(aiProviders as Record<string, unknown>)?.[p.id] && (
                       <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-none h-5 px-2 text-[10px] gap-1">
                         <CheckCircle className="w-3 h-3" /> Configured
                       </Badge>
@@ -302,7 +308,7 @@ export default function SetupWizard() {
                   </div>
                   <Input
                     type="password"
-                    placeholder={(aiProviders as any)?.[p.id] ? "••••••••••••••••" : p.placeholder}
+                    placeholder={(aiProviders as Record<string, unknown>)?.[p.id] ? "••••••••••••••••" : p.placeholder}
                     value={keys[p.id as keyof typeof keys]}
                     onChange={(e) => setKeys({ ...keys, [p.id]: e.target.value })}
                     onBlur={(e) => autoSaveKey(p.id, e.target.value)}
@@ -448,7 +454,7 @@ export default function SetupWizard() {
                 ].map((opt) => (
                   <div 
                     key={opt.id}
-                    onClick={() => setTheme(opt.id as any)}
+                    onClick={() => setTheme(opt.id as Parameters<typeof setTheme>[0])}
                     className={cn(
                       "flex flex-col items-center gap-3 p-6 rounded-2xl border-2 cursor-pointer transition-all",
                       theme === opt.id ? "border-accent bg-accent/5" : "border-border hover:border-accent/30"
@@ -534,7 +540,7 @@ export default function SetupWizard() {
         multiple
         className="sr-only"
         onChange={handleFolderSelect}
-        {...({ webkitdirectory: true } as any)}
+        {...({ webkitdirectory: "true" } as React.InputHTMLAttributes<HTMLInputElement>)}
       />
 
       {/* Background Ambience */}
@@ -602,7 +608,7 @@ export default function SetupWizard() {
             <Progress value={progress} className="h-1 bg-muted" />
           </CardHeader>
 
-          <ScrollArea className="flex-1 px-8 py-10">
+          <ScrollArea className="min-h-0 flex-1 px-8 py-10">
             <div className="min-h-[450px]">
               <div className="mb-8">
                 <h1 className="text-3xl font-black tracking-tight">{STEPS[currentStep].title}</h1>

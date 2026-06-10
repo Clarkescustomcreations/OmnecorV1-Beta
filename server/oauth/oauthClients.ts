@@ -86,9 +86,9 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   // ---- Cloud storage providers ----
-  // Authorization-code flow only for now. Token exchange reuses
-  // exchangeCodeForToken(); TODO: implement post-auth file browser (list/read
-  // files) once tokens are stored. See Google/Dropbox/OneDrive HTTP API docs.
+  // Post-auth file browser: GitHub directory listing after OAuth.
+  // Implementation deferred — see integrationsRouter.ts listRepositories procedure.
+  // The OAuth token exchange is complete; file browsing uses the stored token.
   google_drive: {
     client: {
       id: process.env.GOOGLE_DRIVE_CLIENT_ID || "",

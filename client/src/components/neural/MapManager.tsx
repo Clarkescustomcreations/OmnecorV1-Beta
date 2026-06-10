@@ -107,7 +107,8 @@ export default function MapManager() {
   const pickFolder = async () => {
     if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
       try {
-        const handle = await (window as any).showDirectoryPicker({ mode: "read" });
+        const handle = await (window as Window & { showDirectoryPicker?: (opts?: { mode?: string }) => Promise<{ name: string }> }).showDirectoryPicker?.({ mode: "read" });
+        if (!handle) return;
         addLocalFolder(handle.name); // name is the dir name; server needs full path
         toast.info(`Folder selected: ${handle.name}. If the full path differs, edit it below.`);
         setFolderInput(handle.name);
@@ -185,7 +186,7 @@ export default function MapManager() {
   const totalSources = localFolders.length + githubRepos.length + selectedCloud.size;
 
   return (
-    <div className="flex flex-col h-full gap-4">
+    <div className="flex flex-col h-full min-h-0 gap-4">
       {/* Header */}
       <div className="flex items-center justify-between px-2">
         <h2 className="text-lg font-semibold flex items-center gap-2">
@@ -198,7 +199,7 @@ export default function MapManager() {
       </div>
 
       {/* Map list */}
-      <ScrollArea className="flex-1 px-2">
+      <ScrollArea className="min-h-0 flex-1 px-2">
         <div className="space-y-3">
           {maps.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
@@ -280,7 +281,7 @@ export default function MapManager() {
             <DialogTitle>Create Neural Brain Map</DialogTitle>
           </DialogHeader>
 
-          <ScrollArea className="flex-1 -mx-1 px-1">
+          <ScrollArea className="min-h-0 flex-1 -mx-1 px-1">
             <div className="space-y-5 py-2 pr-2">
 
               {/* Map name + mode */}

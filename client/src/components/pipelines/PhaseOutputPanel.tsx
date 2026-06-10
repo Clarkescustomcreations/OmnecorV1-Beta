@@ -82,7 +82,7 @@ export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string })
                 )}
               </div>
               {phaseData?.outputText && (
-                <pre className="text-gray-300 text-xs whitespace-pre-wrap font-mono bg-black/30 rounded p-2 mt-2 max-h-48 overflow-y-auto">
+                <pre className="text-gray-300 text-xs whitespace-pre-wrap break-words font-mono bg-black/30 rounded p-2 mt-2 max-h-48 overflow-y-auto">
                   {phaseData.outputText}
                 </pre>
               )}

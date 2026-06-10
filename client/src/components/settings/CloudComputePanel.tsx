@@ -7,7 +7,6 @@ import { Label } from "../ui/label";
 import { Input } from "../ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "../ui/select";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
-import { ScrollArea } from "../ui/scroll-area";
 import { toast } from "sonner";
 import { Cloud, Cpu, CircleDot, Square, Plus, CreditCard, AlertCircle, CheckCircle2 } from "lucide-react";
 
@@ -227,7 +226,7 @@ function SessionHistoryPanel() {
   if (!history?.length) return <p className="text-sm text-muted-foreground py-4 text-center">No session history yet.</p>;
 
   return (
-    <ScrollArea className="h-80 rounded-md border">
+    <div className="h-80 rounded-md border overflow-auto">
       <table className="w-full text-xs" aria-label="Cloud compute session history">
         <thead className="sticky top-0 bg-muted">
           <tr>
@@ -260,7 +259,7 @@ function SessionHistoryPanel() {
           ))}
         </tbody>
       </table>
-    </ScrollArea>
+    </div>
   );
 }
 

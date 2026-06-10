@@ -50,7 +50,8 @@ export default function CurationStudio() {
     onSuccess: (data) => {
       toast.success(`Discovered ${data.articlesAdded} new insights`);
       utils.discovery.listUnprocessed.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Sync failed: " + err.message),
   });
 
   const curateMutation = trpc.curator.curateArticle.useMutation({
@@ -58,7 +59,8 @@ export default function CurationStudio() {
       toast.success("Article processed and queued for review");
       utils.discovery.listUnprocessed.invalidate();
       utils.curator.listByStatus.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Curation failed: " + err.message),
   });
 
   const approveMutation = trpc.curator.approvePosts.useMutation({
@@ -66,7 +68,8 @@ export default function CurationStudio() {
       toast.success("Post approved and scheduled");
       utils.curator.listByStatus.invalidate();
       utils.scheduling.listScheduledPosts.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Approval failed: " + err.message),
   });
 
   const rejectMutation = trpc.curator.rejectPosts.useMutation({
@@ -183,7 +186,7 @@ export default function CurationStudio() {
                             <div className="flex justify-between items-start mb-2">
                               <Badge variant="outline" className="text-[10px] h-5">{article.source}</Badge>
                               <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open((article as any).url || "#", "_blank")}><ExternalLink className="w-3 h-3" /></Button>
+                                <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => window.open((article as Record<string, unknown>).url as string || "#", "_blank")}><ExternalLink className="w-3 h-3" /></Button>
                                 <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive" onClick={() => toast.info(`Dismissed: "${article.title}"`, { description: "Article removed from queue" })}><XCircle className="w-3 h-3" /></Button>
                               </div>
                             </div>
@@ -319,7 +322,7 @@ export default function CurationStudio() {
                           </div>
                         </div>
                         <div className="p-4 rounded-xl bg-muted/50 border min-h-[100px] relative">
-                          <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                          <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
                                           <Button
                             variant="ghost"
                             size="icon"
@@ -358,7 +361,7 @@ export default function CurationStudio() {
                           <p className="text-xs text-muted-foreground">Tone: Authoritative, Technical</p>
                         </div>
                         <div className="pt-6">
-                                           <Button variant="link" className="text-accent p-0 h-auto text-xs gap-1" onClick={() => window.open((post as any).sourceUrl || "#", "_blank")}>
+                                           <Button variant="link" className="text-accent p-0 h-auto text-xs gap-1" onClick={() => window.open((post as Record<string, unknown>).sourceUrl as string || "#", "_blank")}>
                              <ExternalLink className="w-3 h-3" /> View Original Source
                            </Button>
                         </div>
@@ -398,7 +401,7 @@ export default function CurationStudio() {
                           <p className="text-xs font-bold">42</p>
                           <p className="text-[10px] text-muted-foreground">Interactions</p>
                         </div>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open((post as any).url || "#", "_blank")}><ExternalLink className="w-4 h-4" /></Button>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => window.open((post as Record<string, unknown>).url as string || "#", "_blank")}><ExternalLink className="w-4 h-4" /></Button>
                       </div>
                     </div>
                   ))}

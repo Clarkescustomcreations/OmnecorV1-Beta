@@ -88,7 +88,7 @@ export const BlenderPanel: React.FC = () => {
         </Card>
 
         <div className="flex flex-col gap-4 h-[500px]">
-          <Card className="flex-1 overflow-hidden flex flex-col">
+          <Card className="min-h-0 flex-1 overflow-hidden flex flex-col">
             <CardHeader className="py-3 border-b">
               <CardTitle className="text-sm font-medium">Render Preview</CardTitle>
             </CardHeader>

@@ -39,7 +39,7 @@ export default function ModelHub() {
   });
 
   useEffect(() => {
-    if (hubSettings) setPreferredQuantization((hubSettings as any).preferredQuantization || "q4_k_m");
+    if (hubSettings) setPreferredQuantization((hubSettings as { preferredQuantization?: string }).preferredQuantization || "q4_k_m");
   }, [hubSettings]);
 
   const {
@@ -119,10 +119,10 @@ export default function ModelHub() {
 
   // Build a readable list of configured API providers from Settings
   const configuredProviders: { id: string; label: string; configured: boolean }[] = [
-    { id: "openai",     label: "OpenAI",           configured: !!(aiProviders as any)?.openai },
-    { id: "anthropic",  label: "Anthropic (Claude)", configured: !!(aiProviders as any)?.anthropic },
-    { id: "gemini",     label: "Google Gemini",     configured: !!(aiProviders as any)?.gemini },
-    { id: "grok",       label: "Grok (xAI)",        configured: !!(aiProviders as any)?.grok },
+    { id: "openai",     label: "OpenAI",           configured: !!aiProviders?.openai },
+    { id: "anthropic",  label: "Anthropic (Claude)", configured: !!aiProviders?.anthropic },
+    { id: "gemini",     label: "Google Gemini",     configured: !!aiProviders?.gemini },
+    { id: "grok",       label: "Grok (xAI)",        configured: !!aiProviders?.grok },
     { id: "ollama",     label: "Ollama (Local)",    configured: true },
   ];
 
@@ -166,7 +166,7 @@ export default function ModelHub() {
                 <CardTitle>Active Models</CardTitle>
                 <CardDescription>Search, filter, and manage your models</CardDescription>
               </CardHeader>
-              <CardContent className="flex-1 overflow-hidden">
+              <CardContent className="min-h-0 flex-1 overflow-hidden">
                 {ollamaLoading && (
                   <p className="text-sm text-muted-foreground">Discovering Ollama models…</p>
                 )}

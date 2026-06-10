@@ -579,7 +579,14 @@ export default function ChatInterface({
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Chat-specific display settings
-  const [chatSettings, setChatSettings] = useState(() => {
+  interface ChatDisplaySettings {
+    showTimestamps: boolean;
+    showTokenCounts: boolean;
+    showModelName: boolean;
+    showLatency: boolean;
+    autoStoreMemory: boolean;
+  }
+  const [chatSettings, setChatSettings] = useState<ChatDisplaySettings>(() => {
     try {
       const saved = localStorage.getItem("omnecor:chat_display_settings");
       return saved ? JSON.parse(saved) : {
@@ -605,7 +612,7 @@ export default function ChatInterface({
   }, [chatSettings]);
 
   const toggleSetting = (key: keyof typeof chatSettings) => {
-    setChatSettings((prev: any) => ({ ...prev, [key]: !prev[key] }));
+    setChatSettings((prev) => ({ ...prev, [key]: !prev[key] }));
   };
 
   // Sync title draft when prop changes (switching conversations)
@@ -893,7 +900,7 @@ export default function ChatInterface({
       )}
 
       {/* ── Messages area ────────────────────────────────────────────── */}
-      <ScrollArea className="flex-1 px-4">
+      <ScrollArea className="min-h-0 flex-1 px-4">
         <div role="log" aria-live="polite" aria-label="Conversation messages" className="space-y-4 py-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3 text-center text-muted-foreground">

@@ -31,6 +31,28 @@ import OmnecorDashboardLayout from "../components/OmnecorDashboardLayout";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 
+interface DisplayPeer {
+  id?: string; name: string; address: string; port: number;
+  fingerprint: string; isApproved?: boolean; vramMb?: number;
+}
+
+interface SavedSettings {
+  localEncryption?: boolean; hitlCommandExecution?: boolean; hitlFileDeletion?: boolean;
+  hitlInternetAccess?: boolean; hitlFinancialTransactions?: boolean; maliciousFileScan?: boolean;
+  scanOnUpload?: boolean; encryptApiKeys?: boolean; sessionTimeout?: number;
+  vram?: number; cpuThreads?: number; inferenceTimeout?: number; autoRestart?: boolean;
+  offloadLatency?: number; poolVram?: boolean;
+  sttModel?: string; ttsEngine?: string; comfyUrl?: string;
+  fontSize?: number; language?: string;
+  autoSave?: boolean; notifications?: boolean; portableMode?: boolean;
+  startupBehavior?: string; autoBackup?: boolean; backupFrequency?: string;
+  googleClientId?: string; googleClientSecret?: string; microsoftClientId?: string; microsoftClientSecret?: string;
+  autoIndex?: boolean; indexInterval?: number; maxFileSize?: number;
+  zeroLoginMode?: boolean; telemetry?: boolean; crashReports?: boolean; analytics?: boolean; cloudSync?: boolean;
+  temperature?: number; topP?: number; apiServerEnabled?: boolean; apiPort?: number;
+  requireAuthToken?: boolean; debugMode?: boolean; devTools?: boolean; cacheEnabled?: boolean; logLevel?: string;
+}
+
 export const Settings: React.FC = () => {
   const [, setLocation] = useLocation();
   const { data: aiProviders, refetch: refetchAiProviders } = trpc.system.aiProviders.useQuery();
@@ -50,9 +72,9 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (aiProviders) {
-      setOllamaUrl((aiProviders as any).ollamaUrl || "http://localhost:11434");
-      setN8nUrl((aiProviders as any).n8nUrl || "http://localhost:5678");
-      setComfyUrl((aiProviders as any).comfyUrl || "");
+      setOllamaUrl(aiProviders.ollamaUrl || "http://localhost:11434");
+      setN8nUrl(aiProviders.n8nUrl || "http://localhost:5678");
+      setComfyUrl(aiProviders.comfyUrl || "");
     }
   }, [aiProviders]);
   const [searchQuery, setSearchQuery] = useState("");
@@ -104,15 +126,16 @@ export const Settings: React.FC = () => {
 
   useEffect(() => {
     if (settings) {
-      setLocalEncryption(!!(settings as any).localEncryption);
-      setHitlCommandExecution((settings as any).hitlCommandExecution !== false);
-      setHitlFileDeletion((settings as any).hitlFileDeletion !== false);
-      setHitlInternetAccess(!!(settings as any).hitlInternetAccess);
-      setHitlFinancialTransactions((settings as any).hitlFinancialTransactions !== false);
-      setMaliciousFileScan((settings as any).maliciousFileScan !== false);
-      setScanOnUpload((settings as any).scanOnUpload !== false);
-      setEncryptApiKeys((settings as any).encryptApiKeys !== false);
-      setSessionTimeout(typeof (settings as any).sessionTimeout === 'number' ? (settings as any).sessionTimeout : 30);
+      const s = settings as SavedSettings;
+      setLocalEncryption(!!s.localEncryption);
+      setHitlCommandExecution(s.hitlCommandExecution !== false);
+      setHitlFileDeletion(s.hitlFileDeletion !== false);
+      setHitlInternetAccess(!!s.hitlInternetAccess);
+      setHitlFinancialTransactions(s.hitlFinancialTransactions !== false);
+      setMaliciousFileScan(s.maliciousFileScan !== false);
+      setScanOnUpload(s.scanOnUpload !== false);
+      setEncryptApiKeys(s.encryptApiKeys !== false);
+      setSessionTimeout(typeof s.sessionTimeout === 'number' ? s.sessionTimeout : 30);
     }
   }, [settings]);
   const { data: me } = trpc.auth.me.useQuery();
@@ -191,7 +214,7 @@ export const Settings: React.FC = () => {
 
         <div className="flex flex-1 overflow-hidden">
           {/* Sidebar Tabs */}
-          <aside className="w-64 border-r bg-muted/10">
+          <aside className="min-h-0 w-64 border-r bg-muted/10">
             <ScrollArea className="h-full">
               <div className="p-4 space-y-1">
                 {noResults ? (
@@ -225,7 +248,7 @@ export const Settings: React.FC = () => {
           </aside>
 
           {/* Content Area */}
-          <main className="flex-1 overflow-auto bg-muted/5 p-8">
+          <main className="min-h-0 flex-1 overflow-auto bg-muted/5 p-8">
             <div className="max-w-4xl mx-auto">
               <Tabs value={activeTab} className="w-full">
                 <TabsContent value="api">
@@ -281,7 +304,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-openai" className="font-semibold">OpenAI</Label>
-                            {(aiProviders as any)?.openai ? (
+                            {aiProviders?.openai ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -293,7 +316,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-openai"
                             type="password"
-                            placeholder={(aiProviders as any)?.openai ? "••••••••••••••••" : "sk-..."}
+                            placeholder={aiProviders?.openai ? "••••••••••••••••" : "sk-..."}
                             value={keys.openai}
                             onChange={(e) => setKeys({ ...keys, openai: e.target.value })}
                           />
@@ -305,7 +328,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-anthropic" className="font-semibold">Anthropic (Claude)</Label>
-                            {(aiProviders as any)?.anthropic ? (
+                            {aiProviders?.anthropic ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -317,7 +340,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-anthropic"
                             type="password"
-                            placeholder={(aiProviders as any)?.anthropic ? "••••••••••••••••" : "sk-ant-..."}
+                            placeholder={aiProviders?.anthropic ? "••••••••••••••••" : "sk-ant-..."}
                             value={keys.anthropic}
                             onChange={(e) => setKeys({ ...keys, anthropic: e.target.value })}
                           />
@@ -329,7 +352,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-gemini" className="font-semibold">Google Gemini</Label>
-                            {(aiProviders as any)?.gemini ? (
+                            {aiProviders?.gemini ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -341,7 +364,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-gemini"
                             type="password"
-                            placeholder={(aiProviders as any)?.gemini ? "••••••••••••••••" : "AIza..."}
+                            placeholder={aiProviders?.gemini ? "••••••••••••••••" : "AIza..."}
                             value={keys.gemini}
                             onChange={(e) => setKeys({ ...keys, gemini: e.target.value })}
                           />
@@ -353,7 +376,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-grok" className="font-semibold">xAI Grok</Label>
-                            {(aiProviders as any)?.grok ? (
+                            {aiProviders?.grok ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -365,7 +388,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-grok"
                             type="password"
-                            placeholder={(aiProviders as any)?.grok ? "••••••••••••••••" : "xai-..."}
+                            placeholder={aiProviders?.grok ? "••••••••••••••••" : "xai-..."}
                             value={keys.grok}
                             onChange={(e) => setKeys({ ...keys, grok: e.target.value })}
                           />
@@ -377,7 +400,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-hf" className="font-semibold">Hugging Face</Label>
-                            {(aiProviders as any)?.huggingface ? (
+                            {aiProviders?.huggingface ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -391,7 +414,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-hf"
                             type="password"
-                            placeholder={(aiProviders as any)?.huggingface ? "••••••••••••••••" : "hf_..."}
+                            placeholder={aiProviders?.huggingface ? "••••••••••••••••" : "hf_..."}
                             value={keys.huggingface}
                             onChange={(e) => setKeys({ ...keys, huggingface: e.target.value })}
                           />
@@ -414,7 +437,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-elevenlabs" className="font-semibold">ElevenLabs (TTS)</Label>
-                            {(aiProviders as any)?.elevenlabs ? (
+                            {aiProviders?.elevenlabs ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -426,7 +449,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-elevenlabs"
                             type="password"
-                            placeholder={(aiProviders as any)?.elevenlabs ? "••••••••••••••••" : "sk_..."}
+                            placeholder={aiProviders?.elevenlabs ? "••••••••••••••••" : "sk_..."}
                             value={keys.elevenlabs}
                             onChange={(e) => setKeys({ ...keys, elevenlabs: e.target.value })}
                           />
@@ -438,7 +461,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-falai" className="font-semibold">fal.ai (Image Gen)</Label>
-                            {(aiProviders as any)?.falai ? (
+                            {aiProviders?.falai ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -450,7 +473,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-falai"
                             type="password"
-                            placeholder={(aiProviders as any)?.falai ? "••••••••••••••••" : "fal-..."}
+                            placeholder={aiProviders?.falai ? "••••••••••••••••" : "fal-..."}
                             value={keys.falai}
                             onChange={(e) => setKeys({ ...keys, falai: e.target.value })}
                           />
@@ -462,7 +485,7 @@ export const Settings: React.FC = () => {
                         <div className="space-y-1.5">
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-forge" className="font-semibold">Forge API</Label>
-                            {(aiProviders as any)?.forge ? (
+                            {aiProviders?.forge ? (
                               <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
@@ -474,7 +497,7 @@ export const Settings: React.FC = () => {
                           <Input
                             id="key-forge"
                             type="password"
-                            placeholder={(aiProviders as any)?.forge ? "••••••••••••••••" : "Bearer ..."}
+                            placeholder={aiProviders?.forge ? "••••••••••••••••" : "Bearer ..."}
                             value={keys.forge}
                             onChange={(e) => setKeys({ ...keys, forge: e.target.value })}
                           />
@@ -555,7 +578,7 @@ export const Settings: React.FC = () => {
                     <CardContent className="space-y-6">
                       <div className="space-y-3">
                         <Label>Execution Mode</Label>
-                        <RadioGroup value={selectedMode} onValueChange={(v) => setSelectedMode(v as any)}>
+                        <RadioGroup value={selectedMode} onValueChange={(v) => setSelectedMode(v as "sovereign" | "scrapper" | "big_spender")}>
                           <div className="flex items-start gap-3 rounded-md border p-3">
                             <RadioGroupItem value="sovereign" id="mode-sovereign" className="mt-0.5" />
                             <div>
@@ -780,8 +803,9 @@ const OMMESHPanel: React.FC = () => {
   const [poolVram, setPoolVram] = React.useState(false);
   React.useEffect(() => {
     if (ommeshSettings) {
-      setOffloadLatency((ommeshSettings as any).offloadLatency ?? 150);
-      setPoolVram(!!(ommeshSettings as any).poolVram);
+      const s = ommeshSettings as SavedSettings;
+      setOffloadLatency(s.offloadLatency ?? 150);
+      setPoolVram(!!s.poolVram);
     }
   }, [ommeshSettings]);
 
@@ -853,7 +877,7 @@ const OMMESHPanel: React.FC = () => {
           </div>
         </CardHeader>
         <CardContent>
-          <div className="space-y-3">
+          <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
             {(!peers || peers.length === 0) ? (
               <div className="p-8 text-center border-2 border-dashed rounded-xl bg-muted/20">
                 <Globe className="w-8 h-8 mx-auto mb-2 opacity-20" />
@@ -861,22 +885,22 @@ const OMMESHPanel: React.FC = () => {
                 <p className="text-xs text-muted-foreground">Make sure other Omnecor nodes are on the same WiFi/LAN.</p>
               </div>
             ) : (
-              peers.map((peer: any) => (
+              (peers as unknown as DisplayPeer[]).map((peer) => (
                 <div key={peer.id} className="flex items-center justify-between p-4 rounded-xl border bg-card/50 transition-all hover:border-accent/30">
-                  <div className="flex items-center gap-4">
-                    <div className="p-2 rounded-full bg-accent/10">
+                  <div className="flex items-center gap-4 min-w-0">
+                    <div className="p-2 rounded-full bg-accent/10 flex-shrink-0">
                       <Server className="w-5 h-5 text-accent" />
                     </div>
-                    <div>
+                    <div className="min-w-0">
                       <div className="flex items-center gap-2">
-                        <p className="font-bold text-sm">{peer.name}</p>
+                        <p className="font-bold text-sm truncate">{peer.name}</p>
                         {peer.isApproved ? (
                           <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-[10px] h-4 px-1.5">Linked</Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] h-4 px-1.5">Pending</Badge>
                         )}
                       </div>
-                      <p className="text-[10px] font-mono text-muted-foreground">{peer.address}:{peer.port}</p>
+                      <p className="text-[10px] font-mono text-muted-foreground truncate">{peer.address}:{peer.port}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-2">
@@ -891,6 +915,20 @@ const OMMESHPanel: React.FC = () => {
                         Authorize
                       </Button>
                     ) : (
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
@@ -965,9 +1003,10 @@ const VoiceMediaPanel: React.FC = () => {
 
   useEffect(() => {
     if (settings) {
-      setSttModel((settings as any).sttModel || "base");
-      setTtsEngine((settings as any).ttsEngine || "local");
-      setComfyUrl((settings as any).comfyUrl || "");
+      const s = settings as SavedSettings;
+      setSttModel(s.sttModel || "base");
+      setTtsEngine(s.ttsEngine || "local");
+      setComfyUrl(s.comfyUrl || "");
     }
   }, [settings]);
 
@@ -1057,8 +1096,9 @@ const AppearancePanel: React.FC = () => {
 
   useEffect(() => {
     if (settings) {
-      setFontSize((settings as any).fontSize || 14);
-      setLanguage((settings as any).language || "en");
+      const s = settings as SavedSettings;
+      setFontSize(s.fontSize || 14);
+      setLanguage(s.language || "en");
     }
   }, [settings]);
 
@@ -1144,7 +1184,7 @@ const WorkstationOptimizationPanel: React.FC = () => {
   });
 
   const [local, setLocal] = useState({ gpuBypass: false, zramEnabled: false, zramSizeGB: 4 });
-  useEffect(() => { if (settings) setLocal(prev => ({ ...prev, ...(settings as any) })); }, [settings]);
+  useEffect(() => { if (settings) setLocal(prev => ({ ...prev, ...settings })); }, [settings]);
 
   const toggle = (key: string, val: boolean) => {
     const next = { ...local, [key]: val };
@@ -1172,7 +1212,7 @@ const WorkstationOptimizationPanel: React.FC = () => {
 
 const ContextSettingsPanel: React.FC = () => {
   const [ctx, setCtx] = useState(() => advancedSettings.getSettings().contextLimit);
-  const apply = (p: any) => {
+  const apply = (p: Partial<typeof ctx>) => {
     const next = { ...ctx, ...p };
     setCtx(next);
     advancedSettings.updateSettings({ contextLimit: next });
@@ -1220,7 +1260,8 @@ const HardwarePanel: React.FC = () => {
       toast.success("Hardware profile updated");
       utils.system.getSettings.invalidate();
       gpuStatusQuery.refetch();
-    }
+    },
+    onError: (err) => toast.error("Hardware detection failed: " + err.message),
   });
 
   const { data: settings, refetch } = trpc.system.getSettings.useQuery();
@@ -1244,9 +1285,11 @@ const HardwarePanel: React.FC = () => {
   });
   const flashMutation = trpc.esp.flash.useMutation({
     onSuccess: () => toast.success("Flash job queued"),
+    onError: (err) => toast.error("Flash failed: " + err.message),
   });
   const eraseMutation = trpc.esp.erase.useMutation({
     onSuccess: () => toast.success("Erase job queued"),
+    onError: (err) => toast.error("Erase failed: " + err.message),
   });
 
   const [vram, setVram] = useState(8);
@@ -1256,10 +1299,11 @@ const HardwarePanel: React.FC = () => {
 
   useEffect(() => {
     if (settings) {
-      setVram((settings as any).vram || 8);
-      setCpuThreads((settings as any).cpuThreads || 4);
-      setInferenceTimeout((settings as any).inferenceTimeout || 300);
-      setAutoRestart((settings as any).autoRestart !== false);
+      const s = settings as SavedSettings;
+      setVram(s.vram || 8);
+      setCpuThreads(s.cpuThreads || 4);
+      setInferenceTimeout(s.inferenceTimeout || 300);
+      setAutoRestart(s.autoRestart !== false);
     }
   }, [settings]);
 
@@ -1432,13 +1476,14 @@ const ConnectedAccounts: React.FC<{ loginMethod: string | null }> = ({ loginMeth
 
   useEffect(() => {
     if (settings) {
+      const s = settings as SavedSettings;
       setKeys({
-        googleClientId: (settings as any).googleClientId || "",
-        googleClientSecret: (settings as any).googleClientSecret || "",
-        microsoftClientId: (settings as any).microsoftClientId || "",
-        microsoftClientSecret: (settings as any).microsoftClientSecret || "",
+        googleClientId: s.googleClientId || "",
+        googleClientSecret: s.googleClientSecret || "",
+        microsoftClientId: s.microsoftClientId || "",
+        microsoftClientSecret: s.microsoftClientSecret || "",
       });
-      if ((settings as any).googleClientId || (settings as any).microsoftClientId) {
+      if (s.googleClientId || s.microsoftClientId) {
         setMode("custom");
       }
     }
@@ -1448,7 +1493,7 @@ const ConnectedAccounts: React.FC<{ loginMethod: string | null }> = ({ loginMeth
     <Card>
       <CardHeader><CardTitle>OAuth</CardTitle></CardHeader>
       <CardContent className="space-y-6">
-        <RadioGroup value={mode} onValueChange={(v: any) => setMode(v)} className="grid grid-cols-2 gap-4">
+        <RadioGroup value={mode} onValueChange={(v) => setMode(v as "managed" | "custom")} className="grid grid-cols-2 gap-4">
           <div className={cn("p-3 border rounded-md cursor-pointer", mode === "managed" && "bg-primary/5")} onClick={() => setMode("managed")}>
             <RadioGroupItem value="managed" id="m-managed" />
             <Label htmlFor="m-managed" className="ml-2">Managed</Label>
@@ -1506,7 +1551,7 @@ const UserManagementPanel: React.FC = () => {
       <CardHeader><CardTitle>Users</CardTitle></CardHeader>
       <CardContent>
         {isLoading ? <p>Loading...</p> : <div className="space-y-2">
-          {(data?.users ?? []).map(u => (<div key={u.id} className="flex items-center justify-between border p-2 rounded-md"><span>{u.email || u.name}</span><select value={u.role} onChange={e => m.mutate({ userId: u.id, role: e.target.value as any })}><option value="viewer">Viewer</option><option value="user">User</option><option value="admin">Admin</option><option value="owner">Owner</option></select></div>))}
+          {(data?.users ?? []).map(u => (<div key={u.id} className="flex items-center justify-between border p-2 rounded-md"><span>{u.email || u.name}</span><select value={u.role} onChange={e => m.mutate({ userId: u.id, role: e.target.value as "viewer" | "user" | "admin" | "owner" })}><option value="viewer">Viewer</option><option value="user">User</option><option value="admin">Admin</option><option value="owner">Owner</option></select></div>))}
         </div>}
       </CardContent>
     </Card>
@@ -1530,12 +1575,13 @@ const GeneralPanel: React.FC = () => {
 
   React.useEffect(() => {
     if (settings) {
-      setAutoSave((settings as any).autoSave !== false);
-      setNotifications((settings as any).notifications !== false);
-      setPortableMode(!!(settings as any).portableMode);
-      setStartupBehavior((settings as any).startupBehavior || "dashboard");
-      setAutoBackup((settings as any).autoBackup !== false);
-      setBackupFrequency((settings as any).backupFrequency || "daily");
+      const s = settings as SavedSettings;
+      setAutoSave(s.autoSave !== false);
+      setNotifications(s.notifications !== false);
+      setPortableMode(!!s.portableMode);
+      setStartupBehavior(s.startupBehavior || "dashboard");
+      setAutoBackup(s.autoBackup !== false);
+      setBackupFrequency(s.backupFrequency || "daily");
     }
   }, [settings]);
 
@@ -1690,9 +1736,10 @@ const KnowledgePanel: React.FC = () => {
 
   React.useEffect(() => {
     if (kbSettings) {
-      setAutoIndex((kbSettings as any).autoIndex !== false);
-      setIndexInterval((kbSettings as any).indexInterval ?? 15);
-      setMaxFileSize((kbSettings as any).maxFileSize ?? 50);
+      const s = kbSettings as SavedSettings;
+      setAutoIndex(s.autoIndex !== false);
+      setIndexInterval(s.indexInterval ?? 15);
+      setMaxFileSize(s.maxFileSize ?? 50);
     }
   }, [kbSettings]);
 
@@ -1807,11 +1854,12 @@ const PrivacyPanel: React.FC = () => {
 
   React.useEffect(() => {
     if (settings) {
-      setZeroLoginMode(!!(settings as any).zeroLoginMode);
-      setTelemetry(!!(settings as any).telemetry);
-      setCrashReports(!!(settings as any).crashReports);
-      setAnalytics(!!(settings as any).analytics);
-      setCloudSync(!!(settings as any).cloudSync);
+      const s = settings as SavedSettings;
+      setZeroLoginMode(!!s.zeroLoginMode);
+      setTelemetry(!!s.telemetry);
+      setCrashReports(!!s.crashReports);
+      setAnalytics(!!s.analytics);
+      setCloudSync(!!s.cloudSync);
     }
   }, [settings]);
 
@@ -1888,15 +1936,16 @@ const AdvancedPanel: React.FC = () => {
 
   React.useEffect(() => {
     if (settings) {
-      setTemperature((settings as any).temperature ?? 0.7);
-      setTopP((settings as any).topP ?? 1);
-      setApiServerEnabled(!!(settings as any).apiServerEnabled);
-      setApiPort((settings as any).apiPort ?? 4444);
-      setRequireAuthToken((settings as any).requireAuthToken !== false);
-      setDebugMode(!!(settings as any).debugMode);
-      setDevTools(!!(settings as any).devTools);
-      setCacheEnabled((settings as any).cacheEnabled !== false);
-      setLogLevel((settings as any).logLevel || "info");
+      const s = settings as SavedSettings;
+      setTemperature(s.temperature ?? 0.7);
+      setTopP(s.topP ?? 1);
+      setApiServerEnabled(!!s.apiServerEnabled);
+      setApiPort(s.apiPort ?? 4444);
+      setRequireAuthToken(s.requireAuthToken !== false);
+      setDebugMode(!!s.debugMode);
+      setDevTools(!!s.devTools);
+      setCacheEnabled(s.cacheEnabled !== false);
+      setLogLevel(s.logLevel || "info");
     }
   }, [settings]);
 

@@ -104,4 +104,14 @@ export const agentRouter = router({
     .query(async ({ ctx, input }) => {
       return ctx.services.agent.getRecursiveMASStatus(input.jobId);
     }),
+
+  /**
+   * Stop a running RecursiveMAS crew job.
+   */
+  stopRecursiveMAS: protectedProcedure
+    .input(z.object({ jobId: z.string() }))
+    .mutation(async ({ input, ctx }) => {
+      await ctx.services.processManager.cancelJob(input.jobId);
+      return { stopped: true };
+    }),
 });

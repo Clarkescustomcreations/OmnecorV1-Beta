@@ -320,7 +320,7 @@ export default function AgentNetworking() {
               </Select>
             </div>
             <Button
-              onClick={() => fetchDiscoveryMutation.mutate(linkedToMap && activeMap ? { mapId: activeMap.id } as any : {})}
+              onClick={() => fetchDiscoveryMutation.mutate({})}
               disabled={fetchDiscoveryMutation.isPending}
               className="gap-2"
             >
@@ -434,8 +434,8 @@ export default function AgentNetworking() {
                       onChange={e => setNewPostForm(f => ({ ...f, platformAccountId: e.target.value }))}
                     >
                       <option value="">Select account…</option>
-                      {accountsData?.map((a: any) => (
-                        <option key={a.id} value={a.id}>{a.platform} — {a.username}</option>
+                      {accountsData?.map((a) => (
+                        <option key={a.id} value={a.id}>{a.platform} — {a.accountName}</option>
                       ))}
                     </select>
                   </div>
@@ -754,12 +754,22 @@ export default function AgentNetworking() {
   );
 }
 
+interface MeshPeer {
+  id: string;
+  name: string;
+  address: string;
+  port: number;
+  fingerprint: string;
+  isApproved?: boolean;
+}
+
 function MeshFederationPanel() {
   const utils = trpc.useUtils();
   const { data: identity } = trpc.ommesh.getIdentity.useQuery();
-  const { data: peers, isLoading: loadingPeers } = trpc.ommesh.discover.useQuery(undefined, {
+  const { data: peersRaw, isLoading: loadingPeers } = trpc.ommesh.discover.useQuery(undefined, {
     refetchInterval: 5000,
   });
+  const peers = peersRaw as unknown as MeshPeer[] | undefined;
 
   const approveMutation = trpc.ommesh.approvePeer.useMutation({
     onSuccess: () => {
@@ -772,7 +782,7 @@ function MeshFederationPanel() {
   const renderMeshGraph = () => {
     const nodes = [
       { id: "local", name: identity?.hostname || "Local Node", type: "local", isApproved: true as boolean, x: 150, y: 150 },
-      ...(peers?.map((p: any, i: number) => {
+      ...(peers?.map((p, i) => {
         const angle = (i / (peers.length || 1)) * Math.PI * 2;
         return {
           id: p.id,
@@ -859,17 +869,17 @@ function MeshFederationPanel() {
               
               <div className="pt-4 border-t space-y-3">
                 <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Discovered Peers</p>
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-1">
                   {(!peers || peers.length === 0) ? (
                     <p className="text-xs italic text-muted-foreground py-4">No peers detected on local network...</p>
                   ) : (
-                    peers.map((peer: any) => (
+                    peers.map((peer) => (
                       <div key={peer.id} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
-                        <div className="flex items-center gap-3">
-                          <Server className="w-4 h-4 text-muted-foreground" />
-                          <div>
-                            <p className="text-sm font-medium">{peer.name}</p>
-                            <p className="text-[10px] font-mono opacity-50">{peer.address}</p>
+                        <div className="flex items-center gap-3 min-w-0">
+                          <Server className="w-4 h-4 text-muted-foreground flex-shrink-0" />
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium truncate">{peer.name}</p>
+                            <p className="text-[10px] font-mono opacity-50 truncate">{peer.address}</p>
                           </div>
                         </div>
                         {!peer.isApproved ? (
@@ -925,6 +935,20 @@ function MeshFederationPanel() {
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                             <Button variant="outline" size="sm" className="w-full mt-2 text-[10px] h-8 gap-2">
               <Share2 className="w-3 h-3" /> Export Identity
             </Button>
@@ -938,7 +962,7 @@ function MeshFederationPanel() {
             </CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">{(peers?.filter((p: any) => p.isApproved).length || 0) + 1} Nodes</div>
+            <div className="text-2xl font-bold">{(peers?.filter((p) => p.isApproved).length || 0) + 1} Nodes</div>
             <p className="text-xs text-muted-foreground">Active in distributed cloud</p>
             <div className="mt-4 h-1.5 w-full bg-muted rounded-full overflow-hidden">
               <div className="h-full bg-accent" style={{ width: '45%' }} />
@@ -963,7 +987,7 @@ function PlatformOAuthButtons({
   accountsData,
   refetch,
 }: {
-  accountsData: unknown[] | undefined;
+  accountsData: { platform: string; [key: string]: unknown }[] | undefined;
   refetch: () => void;
 }) {
   const getAuthUrlMutation = trpc.oauth.getAuthorizationUrl.useMutation({
@@ -974,11 +998,11 @@ function PlatformOAuthButtons({
   });
 
   const connectedPlatforms = new Set(
-    accountsData?.map((a) => (a as any).platform?.toLowerCase() ?? "") || []
+    accountsData?.map((a) => a.platform?.toLowerCase() ?? "") || []
   );
 
   const handleConnect = (platform: string) => {
-    getAuthUrlMutation.mutate({ platform: platform as any });
+    getAuthUrlMutation.mutate({ platform: platform as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] });
   };
 
   return (
@@ -1022,7 +1046,8 @@ function CurationPanel() {
     onSuccess: (data) => {
       toast.success(`Discovered ${data.articlesAdded} new insights`);
       utils.discovery.listUnprocessed.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Sync failed: " + err.message),
   });
 
   const curateMutation = trpc.curator.curateArticle.useMutation({
@@ -1030,7 +1055,8 @@ function CurationPanel() {
       toast.success("Article processed and queued for review");
       utils.discovery.listUnprocessed.invalidate();
       utils.curator.listByStatus.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Curation failed: " + err.message),
   });
 
   const approveMutation = trpc.curator.approvePosts.useMutation({
@@ -1038,7 +1064,8 @@ function CurationPanel() {
       toast.success("Post approved and scheduled");
       utils.curator.listByStatus.invalidate();
       utils.scheduling.listScheduledPosts.invalidate();
-    }
+    },
+    onError: (err) => toast.error("Approval failed: " + err.message),
   });
 
   return (
@@ -1058,6 +1085,20 @@ function CurationPanel() {
             {syncMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
             Sync Feeds
           </Button>
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
@@ -1156,7 +1197,35 @@ function CurationPanel() {
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                               <Button size="icon" variant="ghost" className="h-7 w-7"><ExternalLink className="w-3 h-3" /></Button>
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
@@ -1204,6 +1273,20 @@ function CurationPanel() {
                           {tag} <XCircle className="w-3 h-3 ml-1.5" />
                         </Badge>
                       ))}
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
@@ -1288,12 +1371,42 @@ function CurationPanel() {
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                         <Button variant="ghost" size="sm" className="h-8 gap-2 text-xs">
                           <Clock className="w-3 h-3" /> Schedule
                         </Button>
                       </div>
                       <div className="p-4 rounded-xl bg-muted/50 border min-h-[100px] relative">
-                        <p className="text-sm leading-relaxed whitespace-pre-wrap">{post.content}</p>
+                        <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
@@ -1325,6 +1438,20 @@ function CurationPanel() {
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
                         <Button variant="outline" className="flex-1 h-10 gap-2 border-red-500/20 text-red-500 hover:bg-red-500/10">
                           <XCircle className="w-4 h-4" />
                           Reject
@@ -1339,6 +1466,20 @@ function CurationPanel() {
                         <p className="text-xs text-muted-foreground">Tone: Authoritative, Technical</p>
                       </div>
                       <div className="pt-6">
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
@@ -1388,6 +1529,20 @@ function CurationPanel() {
                         <p className="text-xs font-bold">42</p>
                         <p className="text-[10px] text-muted-foreground">Interactions</p>
                       </div>
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
+    // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
+    // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
     // UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form.
     // UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'.
