@@ -22,7 +22,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
-const jobTypeConfig: Record<string, { label: string; icon: any; color: string }> = {
+const jobTypeConfig: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   lora_training: { label: "LoRA Training", icon: Activity, color: "text-amber-500" },
   blender: { label: "3D Render", icon: Activity, color: "text-blue-500" },
   esp_flash: { label: "Hardware Flash", icon: Activity, color: "text-emerald-500" },
@@ -56,6 +56,7 @@ export default function JobsPanel() {
       toast.success("Job history pruned");
       utils.jobs.list.invalidate();
     },
+    onError: (err) => toast.error("Prune failed: " + err.message),
   });
 
   const jobs = jobData?.jobs || [];
@@ -83,11 +84,11 @@ export default function JobsPanel() {
               <p className="text-xs text-muted-foreground">No recent job activity.</p>
             </div>
           ) : (
-            jobs.map((job: any) => {
+            jobs.map((job) => {
               const config = jobTypeConfig[job.type] || jobTypeConfig.custom;
               const Icon = config.icon;
               return (
-                <div key={job.id} className="p-3 rounded-lg border bg-slate-900 border-slate-800 flex items-center justify-between group">
+                <div key={job.jobId} className="p-3 rounded-lg border bg-slate-900 border-slate-800 flex items-center justify-between group">
                   <div className="flex items-center gap-3">
                     <div className={cn("p-1.5 rounded-md bg-slate-950", config.color)}>
                       <Icon className="w-3.5 h-3.5" />
@@ -98,7 +99,7 @@ export default function JobsPanel() {
                         <Badge className={cn("text-[8px] h-4 uppercase tracking-tighter px-1.5", stateColors[job.state])}>
                           {job.state}
                         </Badge>
-                        <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]">{job.id.split('-')[0]}</span>
+                        <span className="text-[9px] text-muted-foreground font-mono truncate max-w-[120px]">{job.jobId.split('-')[0]}</span>
                       </div>
                     </div>
                   </div>
@@ -108,7 +109,7 @@ export default function JobsPanel() {
                         size="icon" 
                         variant="ghost" 
                         className="h-7 w-7 text-rose-500 hover:bg-rose-500/10"
-                        onClick={() => cancelMutation.mutate({ jobId: job.id })}
+                        onClick={() => cancelMutation.mutate({ jobId: job.jobId })}
                       >
                         <StopCircle className="w-4 h-4" />
                       </Button>

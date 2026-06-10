@@ -147,7 +147,7 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
     setAddMode(null);
   };
 
-  const handleAddDiscoveryArticle = (article: any) => {
+  const handleAddDiscoveryArticle = (article: { title?: string | null; summary?: string | null; content?: string | null }) => {
     onAdd({
       kind: "discovery",
       label: article.title || "Untitled article",
@@ -310,12 +310,8 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
               <button
                 key={p.label}
                 onClick={() => {
-                  // TODO: Once cloud OAuth is wired in the backend, uncomment and use:
-                  // getAuthUrlMutation.mutate({ provider: p.provider }, {
-                  //   onSuccess: (data) => {
-                  //     window.open(data.authUrl, "_blank");
-                  //   }
-                  // });
+                  // Cloud publishing (Spotify/Apple): requires OAuth integration — see Phase 35.
+                  // Planned for v3.1.0. Local export is fully functional.
                   toast.info(`${p.label}: Connect your account in Settings > Integrations`);
                 }}
                 className="w-full flex items-center gap-2 px-2 py-1.5 rounded border border-border text-[10px] hover:bg-muted/30 transition-colors"
@@ -351,7 +347,7 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
             {discoveryList.data && discoveryList.data.length > 0 && (
               <ScrollArea className="h-[140px]">
                 <div className="space-y-1">
-                  {discoveryList.data.map((article: any) => (
+                  {discoveryList.data.map((article) => (
                     <button
                       key={article.id}
                       onClick={() => handleAddDiscoveryArticle(article)}
@@ -387,7 +383,7 @@ export default function PodcastStudio() {
   const [turns, setTurns] = useState<DialogueTurn[]>(DEFAULT_TURNS);
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [isGenerating, setIsGenerating] = useState(false);
-  const [result, setResult] = useState<any>(null);
+  const [result, setResult] = useState<{ segments: { speaker: string; text?: string; content?: string }[] } | null>(null);
   const [podcastLength, setPodcastLength] = useState<PodcastLength>("medium");
 
   // Neural map link
@@ -441,16 +437,17 @@ export default function PodcastStudio() {
         const jsonMatch = data.content.match(/\[[\s\S]*\]/);
         if (jsonMatch) {
           const newTurns = JSON.parse(jsonMatch[0]);
-          setTurns(newTurns.map((t: any) => ({
+          setTurns((newTurns as DialogueTurn[]).map((t) => ({
+            ...t,
             id: Math.random().toString(36).substring(7),
-            ...t
           })));
           toast.success("AI Script generated!");
         }
       } catch {
         toast.error("Failed to parse AI script. Check logs.");
       }
-    }
+    },
+    onError: (err) => toast.error("Script generation failed: " + err.message),
   });
 
   const handleGenerateScript = () => {
@@ -732,7 +729,7 @@ export default function PodcastStudio() {
                     </div>
                     <div className="space-y-2">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Segment Breakdown</p>
-                      {result.segments.map((seg: any, i: number) => (
+                      {result.segments.map((seg, i) => (
                         <div key={i} className="flex items-center justify-between p-2 rounded bg-background border text-[10px]">
                           <div className="flex items-center gap-2">
                             <User className="w-3 h-3 text-accent" />

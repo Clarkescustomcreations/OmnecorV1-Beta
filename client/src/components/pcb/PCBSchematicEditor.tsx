@@ -36,7 +36,7 @@ import { NetlistPanel } from './NetlistPanel';
 
 export interface PCBSchematicEditorProps {
   projectId?: string;
-  onSave?: (data: any) => void;
+  onSave?: (data: Record<string, unknown>) => void;
 }
 
 export const PCBSchematicEditor: React.FC<PCBSchematicEditorProps> = ({

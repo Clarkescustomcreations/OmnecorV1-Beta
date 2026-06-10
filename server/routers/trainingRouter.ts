@@ -20,6 +20,7 @@ import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import fs from "fs/promises";
+import path from "path";
 import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
 
 // ---------------------------------------------------------------------------
@@ -224,6 +225,27 @@ export const trainingRouter = router({
           message: `Failed to start dataset builder: ${message}`,
         });
       }
+    }),
+
+  /**
+   * Persist LoRA configuration to valet.config.json.
+   */
+  saveLoraConfig: protectedProcedure
+    .input(z.object({
+      r: z.number().int().min(1).max(64),
+      alpha: z.number().int().min(1).max(128),
+      dropout: z.number().min(0).max(1),
+      targetModules: z.array(z.string()),
+    }))
+    .mutation(async ({ input }) => {
+      const configPath = path.join(process.cwd(), "valet.config.json");
+      let existing: Record<string, unknown> = {};
+      try {
+        const raw = await fs.readFile(configPath, "utf-8");
+        existing = JSON.parse(raw) as Record<string, unknown>;
+      } catch { /* file doesn't exist yet */ }
+      await fs.writeFile(configPath, JSON.stringify({ ...existing, lora: input }, null, 2));
+      return { saved: true };
     }),
 
   /** Return the current registered Valet Router artifact (reads current.json). */

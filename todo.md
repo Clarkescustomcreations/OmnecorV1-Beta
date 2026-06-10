@@ -328,13 +328,15 @@
 - [x] Create `server/phase2/services/ONNXEmbeddingService.ts` (`onnxruntime-node`; local embedding without Python)
 - [x] Modify `VectorDBService.ts` to accept pre-computed embeddings via `addWithEmbeddings()`
 
-## Phase 33 — SQLite Sovereign Mode Fallback 🟢 BACKLOG
-> **Depends on:** Phase 17 (Zero-Login Mode).(**NOTE this is an optional feature to the user should be toggled in settings**)
+## Phase 33 — SQLite Sovereign Mode Fallback ✅ COMPLETE
+> Completed 2026-06-01 as part of PKG-todo Phase 1.A.
+> `server/db.factory.ts` + `server/db.sqlite.ts` wired; `OMNECOR_DB=sqlite`
+> default for Electron; togglable in Settings under Execution Mode.
 
-- [ ] Add `better-sqlite3` dependency
-- [ ] Create `server/db.sqlite.ts` (Drizzle SQLite adapter with same schema subset)
-- [ ] Create `server/db.factory.ts` (auto-select MySQL vs SQLite based on `DATABASE_URL` or `ZERO_LOGIN_MODE`)
-- [ ] Update all `server/db.ts` imports to use `db.factory.ts`
+- [x] Add `better-sqlite3` dependency
+- [x] Create `server/db.sqlite.ts`
+- [x] Create `server/db.factory.ts`
+- [x] Update all `server/db.ts` imports to use `db.factory.ts`
 
 ## Phase 34 — GPU Detection + Auto-Update Mechanism ✅ COMPLETE
 > **Completed 2026-06-01.**

@@ -262,7 +262,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
         </div>
       </div>
 
-      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as any)}>
+      <Tabs value={activeTab} onValueChange={v => setActiveTab(v as "connected" | "available" | "social")}>
         <TabsList className="grid w-full grid-cols-3">
           <TabsTrigger value="connected">Integrations ({connected.length})</TabsTrigger>
           <TabsTrigger value="available">Available</TabsTrigger>
@@ -325,7 +325,7 @@ export default function IntegrationsHub({ className }: IntegrationsHubProps) {
                       size="sm"
                       variant="outline"
                       className="capitalize h-8 text-[10px] gap-2"
-                      onClick={() => getAuthUrlMutation.mutate({ platform: p as any })}
+                      onClick={() => getAuthUrlMutation.mutate({ platform: p as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] })}
                     >
                       {getAuthUrlMutation.isPending && getAuthUrlMutation.variables?.platform === p ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
                       Link {p}

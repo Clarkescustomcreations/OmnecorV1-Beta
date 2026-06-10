@@ -16,6 +16,8 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Send, Loader2 } from 'lucide-react';
+import { trpc } from '@/lib/trpc';
+import { toast } from 'sonner';
 
 export interface AIAssistantPanelProps {
   canvasState: {
@@ -56,6 +58,28 @@ What would you like help with?`,
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
 
+  const chatMutation = trpc.ai.chat.useMutation({
+    onSuccess: (data) => {
+      setMessages((prev) => [...prev, {
+        id: `msg-${Date.now()}-response`,
+        role: 'assistant',
+        content: data.content,
+        timestamp: new Date(),
+      }]);
+      setIsLoading(false);
+    },
+    onError: (err) => {
+      toast.error("AI error: " + err.message);
+      setMessages((prev) => [...prev, {
+        id: `msg-${Date.now()}-error`,
+        role: 'assistant',
+        content: 'Sorry, I encountered an error. Please try again.',
+        timestamp: new Date(),
+      }]);
+      setIsLoading(false);
+    },
+  });
+
   // Auto-scroll to bottom
   useEffect(() => {
     if (scrollRef.current) {
@@ -64,14 +88,14 @@ What would you like help with?`,
   }, [messages]);
 
   // Handle send message
-  const handleSendMessage = async () => {
+  const handleSendMessage = () => {
     if (!inputValue.trim()) return;
 
-    // Add user message
+    const prompt = inputValue.trim();
     const userMessage: Message = {
       id: `msg-${Date.now()}`,
       role: 'user',
-      content: inputValue,
+      content: prompt,
       timestamp: new Date(),
     };
 
@@ -79,42 +103,18 @@ What would you like help with?`,
     setInputValue('');
     setIsLoading(true);
 
-    try {
-      // TODO: Call AI API with context
-      // For now, show a placeholder response
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-
-      const assistantMessage: Message = {
-        id: `msg-${Date.now()}-response`,
-        role: 'assistant',
-        content: `I've analyzed your ${canvasState.mode} design with ${canvasState.nodes.length} components and ${canvasState.edges.length} connections.
-
-Based on your question: "${inputValue}"
-
-This is a placeholder response. In production, this would be powered by the LLM API with full context of your design.
-
-Key observations:
-• Total components: ${canvasState.nodes.length}
-• Total connections: ${canvasState.edges.length}
-• Mode: ${canvasState.mode}
-
-How can I help further?`,
-        timestamp: new Date(),
-      };
-
-      setMessages((prev) => [...prev, assistantMessage]);
-    } catch (error) {
-      console.error('Error sending message:', error);
-      const errorMessage: Message = {
-        id: `msg-${Date.now()}-error`,
-        role: 'assistant',
-        content: 'Sorry, I encountered an error. Please try again.',
-        timestamp: new Date(),
-      };
-      setMessages((prev) => [...prev, errorMessage]);
-    } finally {
-      setIsLoading(false);
-    }
+    chatMutation.mutate({
+      providerId: "ollama",
+      modelId: "llama3.2:latest",
+      messages: [
+        {
+          role: "system",
+          content: `PCB Design Context:\n${JSON.stringify({ nodes: canvasState.nodes.length, edges: canvasState.edges.length, mode: canvasState.mode }, null, 2)}`,
+        },
+        ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        { role: "user", content: prompt },
+      ],
+    });
   };
 
   // Handle keyboard enter

@@ -142,3 +142,7 @@ _refs/
 # AppImage build artifacts (large binaries — never commit)
 packaging/appimage-build/
 *.AppImage
+
+# TypeScript build artifacts
+tsc_output.txt
+*.tsbuildinfo

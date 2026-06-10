@@ -38,7 +38,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
     return componentLibrary.find((c) => c.id === selectedNode.data.component);
   }, [selectedNode]);
 
-  const handlePropertyChange = (key: string, value: any) => {
+  const handlePropertyChange = (key: string, value: string | number | boolean) => {
     if (!selectedNode) return;
     const updatedNode: Node = {
       ...selectedNode,
