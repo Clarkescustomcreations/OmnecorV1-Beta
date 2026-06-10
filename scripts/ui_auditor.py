@@ -29,11 +29,18 @@ def audit_file(file_path):
     
     # Simple line-by-line check (can be improved with multi-line regex if needed)
     for i, line in enumerate(lines):
-        # Skip if already audited to avoid duplicates
-        if "UI-AUDIT-FINDING" in line:
+        # Skip audit comment lines themselves (pass through unchanged)
+        if "UI-AUDIT-FINDING" in line or "UI-AUDIT-SUGGESTION" in line:
             new_content.append(line)
             continue
-            
+
+        # Skip if the preceding lines already have an audit annotation for this line.
+        # The injected comments land 1-2 lines above the triggering line, so check
+        # the last 3 items in new_content to avoid re-injecting on subsequent runs.
+        if any("UI-AUDIT-" in prev for prev in new_content[-3:]):
+            new_content.append(line)
+            continue
+
         found_finding = False
         for pattern, message in PATTERNS:
             if re.search(pattern, line):
