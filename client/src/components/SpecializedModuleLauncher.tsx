@@ -11,7 +11,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Brain, Box, Zap, Play, Settings, Plus, Trash2 } from "lucide-react";
+import { Brain, Box, Zap, Play, Settings, Plus, Trash2, Cloud, CheckCircle2, AlertCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import {
@@ -44,6 +44,12 @@ export default function SpecializedModuleLauncher({
   const [pcbProject, setPCBProject] = useState<PCBProject | null>(null);
   const [editingLoraConfig, setEditingLoraConfig] = useState<LoRAConfig | null>(null);
   const [selectedObject, setSelectedObject] = useState<BlenderProject["objects"][0] | null>(null);
+
+  const kaggleStatus = trpc.training.kaggleStatus.useQuery();
+  const startKaggle = trpc.training.startKaggleTraining.useMutation({
+    onSuccess: (d) => { toast.success(`Kaggle job queued: ${d.kernelSlug}`); },
+    onError: (e) => toast.error("Kaggle launch failed: " + e.message),
+  });
 
   const openInBlenderMutation = trpc.blender.openFile.useMutation({
     onSuccess: (d) => {
@@ -323,6 +329,56 @@ export default function SpecializedModuleLauncher({
           Configure
         </Button>
       </div>
+
+      {/* Kaggle GPU Training */}
+      <Card className="border-blue-500/20 bg-blue-500/5">
+        <CardHeader className="pb-3">
+          <div className="flex items-center justify-between">
+            <CardTitle className="text-sm flex items-center gap-2">
+              <Cloud className="w-4 h-4 text-blue-400" />
+              Kaggle GPU Training (Free)
+            </CardTitle>
+            {kaggleStatus.data?.connected
+              ? <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] gap-1"><CheckCircle2 className="w-3 h-3" /> {kaggleStatus.data.username}</Badge>
+              : <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1"><AlertCircle className="w-3 h-3" /> Not connected</Badge>
+            }
+          </div>
+          <CardDescription className="text-xs">
+            Train your custom model on free Kaggle T4 GPUs — no credit card needed.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {!kaggleStatus.data?.connected ? (
+            <div className="space-y-2 text-xs text-muted-foreground">
+              <p className="font-semibold text-foreground">Quick setup (5 minutes, completely free):</p>
+              <p>1. Create a free account at <strong>kaggle.com</strong></p>
+              <p>2. Verify your phone number in your Kaggle profile (required for GPU access)</p>
+              <p>3. Go to <strong>kaggle.com/settings</strong> → API section → click <strong>"Create New Token"</strong> — this downloads a file called <code className="font-mono bg-muted px-1 rounded">kaggle.json</code></p>
+              <p>4. Open that file — it looks like: <code className="font-mono bg-muted px-1 rounded">{`{"username":"you","key":"abc123..."}`}</code></p>
+              <p>5. Enter those values in <strong>Settings → AI Providers → Kaggle</strong> or in the <strong>Valet Router tab</strong> to connect.</p>
+              <p className="text-blue-400">Once connected, come back here to launch a training run with one click.</p>
+            </div>
+          ) : (
+            <Button
+              className="w-full"
+              size="sm"
+              onClick={() => startKaggle.mutate({
+                datasetPath: "data/valet",
+                modelName: llmSession?.name || undefined,
+                epochs: 1.5,
+                maxSeqLength: 3072,
+                r: 8,
+                loraAlpha: 16,
+              })}
+              disabled={startKaggle.isPending}
+            >
+              <Cloud className="w-4 h-4 mr-2" />
+              {startKaggle.isPending ? "Launching..." : "Train on Kaggle GPU"}
+            </Button>
+          )}
+          <p className="text-[10px] text-muted-foreground">Monitor training progress and import the finished model via <strong>Settings → Valet Router → Kaggle Training</strong>.</p>
+        </CardContent>
+      </Card>
     </div>
     );
   };

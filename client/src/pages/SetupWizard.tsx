@@ -100,6 +100,12 @@ export default function SetupWizard() {
     onError: (err) => toast.error("Failed to save keys: " + err.message),
   });
 
+  const kaggleStatusQuery = trpc.training.kaggleStatus.useQuery();
+  const saveKaggleMutation = trpc.training.saveKaggleKey.useMutation({
+    onSuccess: () => { toast.success("Kaggle credentials saved"); kaggleStatusQuery.refetch(); },
+    onError: (e) => toast.error("Kaggle save failed: " + e.message),
+  });
+
   const autoSaveKey = (field: string, value: string) => {
     if (!value) return;
     saveKeysMutation.mutate({ keys: { [field]: value } }, {
@@ -116,6 +122,8 @@ export default function SetupWizard() {
   // --- Step States ---
   const [selectedMode, setSelectedMode] = useState<"sovereign" | "scrapper" | "big_spender">("scrapper");
   const [keys, setKeys] = useState({ openai: "", anthropic: "", gemini: "", grok: "", huggingface: "", elevenlabs: "", falai: "", forge: "" });
+  const [kaggleUsername, setKaggleUsername] = useState("");
+  const [kaggleApiKey, setKaggleApiKey] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
   const [kbPath, setKbPath] = useState("/home/linux/Documents/Omnecor");
   const [vram, setVram] = useState(8);
@@ -316,6 +324,55 @@ export default function SetupWizard() {
                   />
                 </div>
               ))}
+            </div>
+
+            <div className="border-t" />
+
+            {/* ── Kaggle GPU Training ───────────────────────────────── */}
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Kaggle GPU Training (Free)</p>
+                {kaggleStatusQuery.data?.connected && (
+                  <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-none h-5 px-2 text-[10px] gap-1">
+                    <CheckCircle className="w-3 h-3" /> Connected as {kaggleStatusQuery.data.username}
+                  </Badge>
+                )}
+              </div>
+              <div className="p-3 rounded-lg bg-muted/20 border border-border/50 text-[11px] text-muted-foreground space-y-1">
+                <p>🎓 Train your Valet Router on free Kaggle T4 GPUs — no credit card needed.</p>
+                <p>1. Create a free account at <strong>kaggle.com</strong> and verify your phone number (required for GPU access).</p>
+                <p>2. Go to <strong>kaggle.com/settings</strong> → API → <strong>Create New Token</strong> → download <code className="font-mono">kaggle.json</code>.</p>
+                <p>3. Copy the <strong>username</strong> and <strong>key</strong> from that file into the fields below.</p>
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">🐎 Kaggle Username</Label>
+                <Input
+                  placeholder="your_kaggle_username"
+                  value={kaggleUsername}
+                  onChange={(e) => setKaggleUsername(e.target.value)}
+                  className="bg-background/50 focus-visible:ring-accent font-mono text-xs"
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-sm">🔑 Kaggle API Key</Label>
+                <div className="flex gap-2">
+                  <Input
+                    type="password"
+                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+                    value={kaggleApiKey}
+                    onChange={(e) => setKaggleApiKey(e.target.value)}
+                    className="bg-background/50 focus-visible:ring-accent font-mono text-xs"
+                  />
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    disabled={!kaggleUsername || !kaggleApiKey || saveKaggleMutation.isPending}
+                    onClick={() => saveKaggleMutation.mutate({ username: kaggleUsername, key: kaggleApiKey })}
+                  >
+                    {saveKaggleMutation.isPending ? "Saving..." : "Connect"}
+                  </Button>
+                </div>
+              </div>
             </div>
 
             <div className="p-3 rounded-lg bg-muted/30 border border-border/50 text-[11px] text-muted-foreground">

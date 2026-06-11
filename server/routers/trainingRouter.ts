@@ -20,8 +20,13 @@ import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import fs from "fs/promises";
+import os from "os";
 import path from "path";
+import { execFile } from "child_process";
+import { promisify } from "util";
 import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
+
+const execFileP = promisify(execFile);
 
 // ---------------------------------------------------------------------------
 // Input Schemas
@@ -254,6 +259,212 @@ export const trainingRouter = router({
       registryRoot: ValetArtifactRegistry.registryRoot,
     };
   }),
+
+  // -------------------------------------------------------------------------
+  // Kaggle free-GPU training (for weak/old PCs without sufficient VRAM)
+  // -------------------------------------------------------------------------
+
+  /** Save Kaggle API credentials to ~/.kaggle/kaggle.json */
+  saveKaggleKey: protectedProcedure
+    .input(z.object({ username: z.string().min(1), key: z.string().min(1) }))
+    .mutation(async ({ input }) => {
+      const kaggleDir = path.join(os.homedir(), ".kaggle");
+      await fs.mkdir(kaggleDir, { recursive: true });
+      await fs.mkdir(path.join(os.tmpdir(), ".kaggle", "uploads"), { recursive: true });
+      const content = JSON.stringify({ username: input.username, key: input.key }, null, 2);
+      const kaggleJsonPath = path.join(kaggleDir, "kaggle.json");
+      try {
+        await fs.writeFile(kaggleJsonPath, content, { mode: 0o600 });
+      } catch {
+        await fs.writeFile(kaggleJsonPath, content);
+      }
+      return { success: true };
+    }),
+
+  /** Return Kaggle connection status (username only, never the API key). */
+  kaggleStatus: protectedProcedure.query(async () => {
+    try {
+      const data = JSON.parse(
+        await fs.readFile(path.join(os.homedir(), ".kaggle", "kaggle.json"), "utf-8")
+      );
+      const connected = Boolean(data.username && data.key);
+      return { connected, username: connected ? (data.username as string) : undefined };
+    } catch {
+      return { connected: false, username: undefined as string | undefined };
+    }
+  }),
+
+  /**
+   * Upload dataset to Kaggle and push the training kernel.
+   * Returns immediately — training runs in the cloud (~30–120 min).
+   */
+  startKaggleTraining: protectedProcedure
+    .input(z.object({
+      datasetPath: z.string().min(1).default("data/valet"),
+      modelName: z.string().optional(),
+      epochs: z.number().default(1.5),
+      maxSeqLength: z.number().int().default(3072),
+      r: z.number().int().default(8),
+      loraAlpha: z.number().int().default(16),
+    }))
+    .mutation(async ({ input }) => {
+      const kaggleJsonPath = path.join(os.homedir(), ".kaggle", "kaggle.json");
+      let username: string;
+      try {
+        const kj = JSON.parse(await fs.readFile(kaggleJsonPath, "utf-8"));
+        if (!kj.username) throw new Error("missing username");
+        username = kj.username as string;
+      } catch {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Kaggle API key not configured. Go to Settings → API Providers → Kaggle first.",
+        });
+      }
+
+      const validatedDatasetPath = await validatePath(input.datasetPath);
+      await fs.mkdir(path.join(os.tmpdir(), ".kaggle", "uploads"), { recursive: true });
+
+      const bundleBase = path.join(os.tmpdir(), "omnecor-kaggle-bundle");
+      const dataDir = path.join(bundleBase, "data");
+      const kernelDir = path.join(bundleBase, "kernel");
+      await fs.rm(bundleBase, { recursive: true, force: true });
+      await fs.mkdir(dataDir, { recursive: true });
+      await fs.mkdir(kernelDir, { recursive: true });
+
+      for (const fname of ["train.jsonl", "val.jsonl", "eval.jsonl"]) {
+        try {
+          await fs.copyFile(path.join(validatedDatasetPath, fname), path.join(dataDir, fname));
+        } catch { /* val/eval optional */ }
+      }
+      try {
+        await fs.access(path.join(dataDir, "train.jsonl"));
+      } catch {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: `No train.jsonl found in ${validatedDatasetPath}. Dataset folder must contain at least train.jsonl.`,
+        });
+      }
+
+      const datasetSlug = `${username}/omnecor-valet-data`;
+      const kernelSlug = `${username}/omnecor-valet-train`;
+
+      await fs.writeFile(path.join(dataDir, "dataset-metadata.json"), JSON.stringify({
+        title: "omnecor-valet-data", id: datasetSlug, licenses: [{ name: "CC0-1.0" }],
+      }, null, 2));
+
+      try {
+        await execFileP("kaggle", ["datasets", "version", "-p", dataDir, "-m",
+          `Omnecor upload ${new Date().toISOString()}`]);
+      } catch {
+        await execFileP("kaggle", ["datasets", "create", "-p", dataDir]);
+      }
+
+      const refScript = path.join(process.cwd(), "tmp-valet-train", "kaggle-bundle", "valet_train_kaggle.py");
+      let script = await fs.readFile(refScript, "utf-8");
+      const modelName = input.modelName ?? "Qwen/Qwen2.5-1.5B-Instruct";
+      script = script
+        .replace(/^MODEL_ID\s*=\s*.+$/m, `MODEL_ID = "${modelName}"`)
+        .replace(/^EPOCHS\s*=\s*.+$/m, `EPOCHS = ${input.epochs}`)
+        .replace(/^MAX_SEQ_LENGTH\s*=\s*.+$/m, `MAX_SEQ_LENGTH = ${input.maxSeqLength}`)
+        .replace(/^LORA_R\s*=\s*.+$/m, `LORA_R = ${input.r}`)
+        .replace(/^LORA_ALPHA\s*=\s*.+$/m, `LORA_ALPHA = ${input.loraAlpha}`);
+      await fs.writeFile(path.join(kernelDir, "valet_train_kaggle.py"), script);
+
+      await fs.writeFile(path.join(kernelDir, "kernel-metadata.json"), JSON.stringify({
+        id: kernelSlug, title: "omnecor-valet-train",
+        code_file: "valet_train_kaggle.py", language: "python", kernel_type: "script",
+        is_private: true, enable_gpu: true, enable_internet: true,
+        dataset_sources: [datasetSlug],
+      }, null, 2));
+
+      await execFileP("kaggle", ["kernels", "push", "-p", kernelDir]);
+
+      return {
+        success: true, kernelSlug, datasetSlug,
+        message: "Kaggle training job submitted. Poll with kaggleJobStatus. Runs take 30–120 min.",
+      };
+    }),
+
+  /** Poll a Kaggle kernel status. Safe to call every 60 s. */
+  kaggleJobStatus: protectedProcedure
+    .input(z.object({ kernelSlug: z.string().min(1) }))
+    .query(async ({ input }) => {
+      try {
+        const { stdout } = await execFileP("kaggle", ["kernels", "status", input.kernelSlug]);
+        const lower = stdout.toLowerCase();
+        const status: "running" | "complete" | "error" | "queued" | "unknown" =
+          lower.includes("complete") ? "complete" :
+          lower.includes("error") || lower.includes("failed") ? "error" :
+          lower.includes("running") ? "running" :
+          lower.includes("queued") || lower.includes("pending") ? "queued" : "unknown";
+        const runtimeMatch = stdout.match(/(\d{2}:\d{2}:\d{2})/);
+        return { status, rawOutput: stdout.trim(), runtime: runtimeMatch?.[1] };
+      } catch (e) {
+        return { status: "error" as const, rawOutput: String(e), runtime: undefined };
+      }
+    }),
+
+  /**
+   * Download a completed Kaggle adapter, merge into the base model (CPU job),
+   * and queue registration. Returns mergeJobId to monitor in Jobs panel.
+   */
+  pullKaggleArtifact: protectedProcedure
+    .input(z.object({ kernelSlug: z.string().min(1), baseModel: z.string().optional() }))
+    .mutation(async ({ ctx, input }) => {
+      const outDir = path.join(os.tmpdir(), "omnecor-kaggle-output");
+      await fs.rm(outDir, { recursive: true, force: true });
+      await fs.mkdir(outDir, { recursive: true });
+
+      await execFileP("kaggle", ["kernels", "output", input.kernelSlug, "-p", outDir]);
+
+      let adapterDir: string | undefined;
+      for (const e of await fs.readdir(outDir, { withFileTypes: true })) {
+        if (e.isDirectory()) {
+          try {
+            await fs.access(path.join(outDir, e.name, "adapter_config.json"));
+            adapterDir = path.join(outDir, e.name);
+            break;
+          } catch { /* keep looking */ }
+        }
+      }
+      if (!adapterDir) {
+        try {
+          await fs.access(path.join(outDir, "adapter_config.json"));
+          adapterDir = outDir;
+        } catch {
+          throw new TRPCError({
+            code: "NOT_FOUND",
+            message: "Could not find adapter_config.json in Kaggle output. The kernel may still be running or errored.",
+          });
+        }
+      }
+
+      const slug = `kaggle-${new Date().toISOString().slice(0, 10)}`;
+      const stagedAdapterPath = path.join(ValetArtifactRegistry.registryRoot, `${slug}-adapter`);
+      await fs.mkdir(stagedAdapterPath, { recursive: true });
+      for (const f of await fs.readdir(adapterDir)) {
+        await fs.copyFile(path.join(adapterDir, f), path.join(stagedAdapterPath, f));
+      }
+
+      const mergedModelPath = path.join(ValetArtifactRegistry.registryRoot, slug);
+      const baseModel = input.baseModel ?? "Qwen/Qwen2.5-1.5B-Instruct";
+      const mergeJobId = await ctx.services.processManager.spawn({
+        type: "custom",
+        command: "python3",
+        args: ["server/python_bridges/valet_merge.py"],
+        env: {
+          VALET_MERGE_ADAPTER: stagedAdapterPath,
+          VALET_MERGE_BASE: baseModel,
+          VALET_MERGE_OUT: mergedModelPath,
+        },
+        label: "Valet Kaggle Adapter Merge",
+      });
+
+      return {
+        success: true, mergeJobId, adapterPath: stagedAdapterPath, mergedModelPath,
+        message: `Adapter staged. Merge job ${mergeJobId} started — monitor in Jobs panel. When done, click Activate.`,
+      };
+    }),
 
   /**
    * Manually register an artifact path as the active Valet Router model.

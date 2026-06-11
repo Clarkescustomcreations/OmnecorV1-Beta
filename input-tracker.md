@@ -14,15 +14,15 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 
 ---
 
-## Global Summary (Updated 2026-06-10 Session 11 - Verification Swarm)
+## Global Summary (Updated 2026-06-11 Session 12 - Kaggle Integration)
 
-| Category | Before | After (S4) | After (Sessions 5-9) | After (Session 10) | After (Session 11 - NOW) |
-|---|---|---|---|---|---|
-| Total interactive elements audited | ~700+ | ~220-290 | ~795+ | **~795+** | **~820+** (+25 newly documented) |
-| CONNECTED (real API calls) | ~220 | ~280-290 | **~292** | **~297** | **~301** (corrected + new) |
-| LOCAL (state/Zustand only) | ~420 | ~380-400 | **~480** | **~480** | **~485** |
-| DEAD (empty / toast-only) | ~50 | **~0-15** | **~0** | **~0** | **~9** (newly discovered + mis-classified) |
-| PARTIAL (incomplete wiring) | ~3 | **~5** | **~3** | **~0** | **~1** (AgentNetworking Publish Now) |
+| Category | Before | After (S4) | After (Sessions 5-9) | After (Session 10) | After (Session 11) | After (Session 12 - NOW) |
+|---|---|---|---|---|---|---|
+| Total interactive elements audited | ~700+ | ~220-290 | ~795+ | **~795+** | **~820+** | **~850+** (+30 new Kaggle UI elements) |
+| CONNECTED (real API calls) | ~220 | ~280-290 | **~292** | **~297** | **~301** | **~325** (+24 new tRPC calls) |
+| LOCAL (state/Zustand only) | ~420 | ~380-400 | **~480** | **~480** | **~485** | **~491** (+6 local state controls) |
+| DEAD (empty / toast-only) | ~50 | **~0-15** | **~0** | **~0** | **~9** | **~9** (unchanged) |
+| PARTIAL (incomplete wiring) | ~3 | **~5** | **~3** | **~0** | **~1** | **~1** (AgentNetworking Publish Now) |
 
 ### What was corrected in Session 11 — 9-Agent Haiku Verification Swarm
 
@@ -56,6 +56,46 @@ Each agent read source files directly and diffed against the tracker. Correction
 - `CriticalActionChecklist.tsx`, `ManusDialog.tsx`, `Map.tsx` — not yet audited
 - PCB infrastructure: `CustomEdge.tsx`, `PCBNode.tsx`, `PCBSchematicEditor.tsx`, `SchematicNode.tsx`
 - `FictionModeContext.tsx`, `NeuralMapContext.tsx` — context providers (may have no direct UI)
+
+---
+
+### Session 12 (2026-06-11) — Kaggle GPU Training Integration
+
+**New components and elements added:**
+
+#### `client/src/pages/Settings.tsx` — Kaggle API section (API tab)
+| Element | Type | Status | Notes |
+|---|---|---|---|
+| KaggleKeyCard — kaggleStatus badge | Display | **CONNECTED** | `trpc.training.kaggleStatus.useQuery()` |
+| KaggleKeyCard — Username input | Input | **LOCAL** | Controls `username` state |
+| KaggleKeyCard — API Key input (password) | Input | **LOCAL** | Controls `apiKey` state |
+| KaggleKeyCard — Connect/Update button | Button | **CONNECTED** | `trpc.training.saveKaggleKey.useMutation()` |
+
+#### `client/src/components/settings/ValetRouterPanel.tsx` — Kaggle Training Card
+| Element | Type | Status | Notes |
+|---|---|---|---|
+| KaggleTrainingCard — connection badge | Display | **CONNECTED** | `trpc.training.kaggleStatus.useQuery()` |
+| KaggleTrainingCard — Dataset Path input | Input | **LOCAL** | Controls `datasetPath` state |
+| KaggleTrainingCard — Epochs input | Input | **LOCAL** | Controls `epochs` state |
+| KaggleTrainingCard — Max Seq Length input | Input | **LOCAL** | Controls `maxSeqLength` state |
+| KaggleTrainingCard — Launch Training button | Button | **CONNECTED** | `trpc.training.startKaggleTraining.useMutation()` |
+| KaggleTrainingCard — Job status badge | Display | **CONNECTED** | `trpc.training.kaggleJobStatus.useQuery()` (60s poll) |
+| KaggleTrainingCard — Import Adapter button | Button | **CONNECTED** | `trpc.training.pullKaggleArtifact.useMutation()` (shows on complete) |
+| KaggleTrainingCard — Activate Model button | Button | **CONNECTED** | `trpc.training.registerArtifact.useMutation()` (shows after merge) |
+
+#### `client/src/pages/SetupWizard.tsx` — Providers step: Kaggle section
+| Element | Type | Status | Notes |
+|---|---|---|---|
+| Kaggle — connection badge | Display | **CONNECTED** | `trpc.training.kaggleStatus.useQuery()` |
+| Kaggle — Username input | Input | **LOCAL** | Controls `kaggleUsername` state |
+| Kaggle — API Key input (password) | Input | **LOCAL** | Controls `kaggleApiKey` state |
+| Kaggle — Connect button | Button | **CONNECTED** | `trpc.training.saveKaggleKey.useMutation()` |
+
+#### `client/src/components/SpecializedModuleLauncher.tsx` — LLM Builder tab: Kaggle card
+| Element | Type | Status | Notes |
+|---|---|---|---|
+| Kaggle card — connection badge | Display | **CONNECTED** | `trpc.training.kaggleStatus.useQuery()` |
+| Kaggle card — Train on Kaggle GPU button | Button | **CONNECTED** | `trpc.training.startKaggleTraining.useMutation()` (only shown when connected) |
 
 ---
 

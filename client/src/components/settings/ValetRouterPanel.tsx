@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -6,8 +6,200 @@ import { Badge } from "@/components/ui/badge";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { Cpu, Database, GitBranch, Loader2, PackageCheck, Server, Zap } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Cpu, Database, GitBranch, Loader2, PackageCheck, Server, Zap, Cloud, CheckCircle2, AlertCircle, Download, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+
+// ---------------------------------------------------------------------------
+// Kaggle Cloud Training Card
+// ---------------------------------------------------------------------------
+
+function KaggleTrainingCard() {
+  const [datasetPath, setDatasetPath] = useState("data/valet");
+  const [epochs, setEpochs] = useState("1.5");
+  const [maxSeqLength, setMaxSeqLength] = useState("3072");
+  const [kernelSlug, setKernelSlug] = useState<string | undefined>();
+  const [mergeJobId, setMergeJobId] = useState<string | undefined>();
+  const [mergedPath, setMergedPath] = useState<string | undefined>();
+  const [pollEnabled, setPollEnabled] = useState(false);
+
+  const kaggleStatus = trpc.training.kaggleStatus.useQuery(undefined, { refetchOnWindowFocus: false });
+  const artifactQuery = trpc.training.getArtifact.useQuery();
+
+  const jobStatus = trpc.training.kaggleJobStatus.useQuery(
+    { kernelSlug: kernelSlug ?? "" },
+    { enabled: Boolean(kernelSlug) && pollEnabled, refetchInterval: 60_000 }
+  );
+
+  useEffect(() => {
+    if (jobStatus.data?.status === "complete" || jobStatus.data?.status === "error") {
+      setPollEnabled(false);
+    }
+  }, [jobStatus.data?.status]);
+
+  const startTraining = trpc.training.startKaggleTraining.useMutation({
+    onSuccess: (data) => {
+      setKernelSlug(data.kernelSlug);
+      setPollEnabled(true);
+      toast.success("Training job submitted to Kaggle! Checking status every 60 s…");
+    },
+    onError: (e) => toast.error("Kaggle training failed: " + e.message),
+  });
+
+  const pullArtifact = trpc.training.pullKaggleArtifact.useMutation({
+    onSuccess: (data) => {
+      setMergeJobId(data.mergeJobId);
+      setMergedPath(data.mergedModelPath);
+      toast.success(`Adapter downloaded. Merging (job: ${data.mergeJobId.slice(0, 8)}) — monitor in Jobs panel.`);
+    },
+    onError: (e) => toast.error("Failed to pull adapter: " + e.message),
+  });
+
+  const registerArtifact = trpc.training.registerArtifact.useMutation({
+    onSuccess: () => {
+      toast.success("Valet model activated! Restart inference server to serve it.");
+      artifactQuery.refetch();
+      setKernelSlug(undefined); setMergeJobId(undefined); setMergedPath(undefined);
+    },
+    onError: (e) => toast.error("Failed to register model: " + e.message),
+  });
+
+  const isConnected = kaggleStatus.data?.connected;
+  const connectedAs = kaggleStatus.data?.username;
+  const statusColor: Record<string, string> = {
+    running: "text-blue-500", queued: "text-amber-500",
+    complete: "text-green-500", error: "text-destructive", unknown: "text-muted-foreground",
+  };
+
+  return (
+    <Card>
+      <CardHeader className="pb-3">
+        <CardTitle className="text-base flex items-center gap-2">
+          <Cloud className="h-4 w-4" />
+          Kaggle Cloud Training
+          <Badge variant="outline" className="ml-auto text-xs">Free GPU · No credit card</Badge>
+        </CardTitle>
+        <CardDescription>
+          Train the Valet Router on a free Kaggle T4/P100 GPU (16 GB VRAM). Ideal for machines
+          with weak or no GPU. Jobs run in the cloud; you import the finished model.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-5">
+        <div className="flex items-center gap-2">
+          {isConnected
+            ? <Badge className="bg-green-600 text-white border-transparent text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Connected as {connectedAs}</Badge>
+            : <Badge variant="secondary" className="text-xs"><AlertCircle className="w-3 h-3 mr-1" />Not connected</Badge>
+          }
+          {!isConnected && (
+            <p className="text-xs text-muted-foreground">
+              Add your key in <strong>Settings → API Providers → Kaggle</strong> first.
+            </p>
+          )}
+        </div>
+
+        {isConnected && (
+          <>
+            <Separator />
+            <div className="space-y-2">
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Training Configuration</p>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label htmlFor="kg-dataset" className="text-xs">Dataset Folder</Label>
+                  <Input id="kg-dataset" value={datasetPath} onChange={e => setDatasetPath(e.target.value)}
+                    placeholder="data/valet" className="h-8 text-xs font-mono" />
+                  <p className="text-[10px] text-muted-foreground">Must contain train.jsonl</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="kg-epochs" className="text-xs">Epochs</Label>
+                  <Input id="kg-epochs" value={epochs} onChange={e => setEpochs(e.target.value)}
+                    placeholder="1.5" className="h-8 text-xs" />
+                  <p className="text-[10px] text-muted-foreground">1.5 recommended</p>
+                </div>
+                <div className="space-y-1">
+                  <Label htmlFor="kg-seq" className="text-xs">Max Sequence Length</Label>
+                  <Input id="kg-seq" value={maxSeqLength} onChange={e => setMaxSeqLength(e.target.value)}
+                    placeholder="3072" className="h-8 text-xs" />
+                  <p className="text-[10px] text-muted-foreground">3072 = Valet default</p>
+                </div>
+              </div>
+              <div className="rounded-md bg-muted/40 border px-3 py-2 text-xs text-muted-foreground">
+                Cloud GPU: Kaggle T4 or P100 (16 GB) · Base: Qwen2.5-1.5B-Instruct · LoRA r=8 · fp16
+              </div>
+            </div>
+
+            {!kernelSlug && (
+              <Button size="sm" disabled={startTraining.isPending || !datasetPath}
+                onClick={() => startTraining.mutate({
+                  datasetPath, epochs: parseFloat(epochs) || 1.5,
+                  maxSeqLength: parseInt(maxSeqLength, 10) || 3072,
+                })}
+                className="flex items-center gap-2">
+                {startTraining.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Cloud className="h-4 w-4" />}
+                {startTraining.isPending ? "Submitting to Kaggle…" : "Train on Kaggle"}
+              </Button>
+            )}
+
+            {kernelSlug && (
+              <>
+                <Separator />
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Cloud Job Status</p>
+                    <Button size="sm" variant="ghost" className="h-6 px-2 text-xs"
+                      onClick={() => { setPollEnabled(true); jobStatus.refetch(); }}>
+                      <RefreshCw className="h-3 w-3 mr-1" />Refresh
+                    </Button>
+                  </div>
+                  <div className="rounded-md bg-muted p-3 text-xs font-mono space-y-1">
+                    <div>Kernel: {kernelSlug}</div>
+                    {jobStatus.data && (
+                      <div className={statusColor[jobStatus.data.status] ?? "text-muted-foreground"}>
+                        Status: {jobStatus.data.status}{jobStatus.data.runtime && ` · ${jobStatus.data.runtime}`}
+                      </div>
+                    )}
+                    {jobStatus.data?.status === "running" && (
+                      <div className="text-muted-foreground">Kaggle runs take 30–120 min. Checking every 60 s.</div>
+                    )}
+                  </div>
+
+                  {jobStatus.data?.status === "complete" && !mergeJobId && (
+                    <Button size="sm" disabled={pullArtifact.isPending}
+                      onClick={() => pullArtifact.mutate({ kernelSlug })}
+                      className="flex items-center gap-2">
+                      {pullArtifact.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Download className="h-4 w-4" />}
+                      {pullArtifact.isPending ? "Downloading adapter…" : "Import Adapter"}
+                    </Button>
+                  )}
+
+                  {mergeJobId && !mergedPath && (
+                    <div className="text-xs text-muted-foreground flex items-center gap-2">
+                      <Loader2 className="h-3 w-3 animate-spin" />
+                      Merging LoRA into base model (CPU, ~5–15 min) · Job {mergeJobId.slice(0, 8)} — see Jobs panel
+                    </div>
+                  )}
+
+                  {mergedPath && (
+                    <Button size="sm" disabled={registerArtifact.isPending}
+                      onClick={() => registerArtifact.mutate({
+                        artifactPath: mergedPath, format: "merged_16bit",
+                        baseModel: "Qwen/Qwen2.5-1.5B-Instruct", source: "trained",
+                      })}
+                      className="flex items-center gap-2">
+                      {registerArtifact.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CheckCircle2 className="h-4 w-4" />}
+                      {registerArtifact.isPending ? "Activating…" : "Activate Model"}
+                    </Button>
+                  )}
+                </div>
+              </>
+            )}
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ---------------------------------------------------------------------------
 
 export default function ValetRouterPanel() {
   const [localTrainingEnabled, setLocalTrainingEnabled] = useState(false);
@@ -257,6 +449,8 @@ export default function ValetRouterPanel() {
           )}
         </CardContent>
       </Card>
+
+      <KaggleTrainingCard />
     </div>
   );
 }

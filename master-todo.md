@@ -651,3 +651,46 @@ batch responses.
 - [x] `client/src/components/media/ImageStudioPanel.tsx`
 - [x] `client/src/components/hardware/UnslothPanel.tsx`
 - [x] Verified zero remaining `// UI-AUDIT-FINDING` / `// UI-AUDIT-SUGGESTION` lines in `client/src`
+
+## Kaggle GPU Training Integration — 2026-06-11
+
+Free-tier Kaggle T4 GPU training pipeline wired end-to-end. No credit card required. Setup takes ~5 minutes.
+
+### Backend — `server/routers/trainingRouter.ts`
+- [x] Add `saveKaggleKey` mutation — writes `~/.kaggle/kaggle.json` with 0o600 permissions
+- [x] Add `kaggleStatus` query — reads `kaggle.json` and returns `{ connected, username }`
+- [x] Add `startKaggleTraining` mutation — validates creds, bundles dataset, uploads to Kaggle, pushes kernel notebook
+- [x] Add `kaggleJobStatus` query — polls `kaggle kernels status <slug>` and parses running/complete/error states
+- [x] Add `pullKaggleArtifact` mutation — downloads kernel output, locates adapter, spawns `valet_merge.py` background job via ProcessManager
+
+### Backend — `server/python_bridges/valet_merge.py`
+- [x] Create CPU-only LoRA → merged fp16 script driven by `VALET_MERGE_ADAPTER`, `VALET_MERGE_BASE`, `VALET_MERGE_OUT` env vars
+- [x] Streams JSON progress events (`load_base`, `merge`, `save`, `done`) for ProcessManager integration
+
+### Frontend — Settings page
+- [x] Add `KaggleKeyCard` component to `client/src/pages/Settings.tsx` (API tab)
+- [x] Shows connection status badge, 4-step numbered instructions including phone verification note
+- [x] Username + API key inputs with Connect/Update button → `trpc.training.saveKaggleKey`
+
+### Frontend — Valet Router panel
+- [x] Add `KaggleTrainingCard` component to `client/src/components/settings/ValetRouterPanel.tsx`
+- [x] Shows connection status, dataset path + epochs + seq length inputs, Launch Training button → `trpc.training.startKaggleTraining`
+- [x] 60-second polling of `trpc.training.kaggleJobStatus` when a kernel slug is active
+- [x] "Import Adapter" button (shows on complete) → `trpc.training.pullKaggleArtifact`
+- [x] "Activate Model" button (shows when merge job completes) → `trpc.training.registerArtifact`
+
+### Frontend — Setup Wizard
+- [x] Add Kaggle GPU Training section to `client/src/pages/SetupWizard.tsx` providers step
+- [x] 3-step beginner walkthrough (create account → phone verify → download token → connect)
+- [x] Username + API key inputs with Connect button → `trpc.training.saveKaggleKey`
+- [x] Shows "Connected as {username}" badge when already configured
+
+### Frontend — LLM Builder (Project Pipelines page)
+- [x] Add Kaggle GPU Training card to `client/src/components/SpecializedModuleLauncher.tsx` LLM tab
+- [x] When not connected: shows 5-step beginner guide with exact kaggle.json format example
+- [x] When connected: shows "Train on Kaggle GPU" button → `trpc.training.startKaggleTraining`
+- [x] Links user to Settings → Valet Router panel for monitoring progress
+
+### VALET-todo 6.4 — Status update
+- [x] Kaggle training pipeline integrated and wired to all entry points (Settings, Setup Wizard, LLM Builder, Valet Router tab)
+- [ ] 6.4 full sign-off pending: `pnpm valet:build` clean run + eval thresholds confirmed on GPU artifact

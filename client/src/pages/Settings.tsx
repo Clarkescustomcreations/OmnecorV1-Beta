@@ -559,6 +559,8 @@ export const Settings: React.FC = () => {
                         }
                       </Button>
                     </div>
+
+                    <KaggleKeyCard />
                   </div>
                 </TabsContent>
 
@@ -915,11 +917,7 @@ const OMMESHPanel: React.FC = () => {
                         Authorize
                       </Button>
                     ) : (
-    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
-    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
-    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
-    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
-                                      <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" disabled>
+                      <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" disabled>
                         <CheckCircle2 className="w-4 h-4 mr-1.5" />
                         Active
                       </Button>
@@ -1054,6 +1052,81 @@ const VoiceMediaPanel: React.FC = () => {
     </div>
   );
 };
+
+// ---------------------------------------------------------------------------
+// Kaggle API key card
+// ---------------------------------------------------------------------------
+
+function KaggleKeyCard() {
+  const [username, setUsername] = useState("");
+  const [apiKey, setApiKey] = useState("");
+  const statusQuery = trpc.training.kaggleStatus.useQuery(undefined, { refetchOnWindowFocus: false });
+
+  const saveMutation = trpc.training.saveKaggleKey.useMutation({
+    onSuccess: () => {
+      toast.success("Kaggle API key saved");
+      setApiKey("");
+      statusQuery.refetch();
+    },
+    onError: (e) => toast.error("Failed to save Kaggle key: " + e.message),
+  });
+
+  const isConnected = statusQuery.data?.connected;
+  const connectedAs = statusQuery.data?.username;
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Download className="w-4 h-4 text-primary" />
+          Kaggle — Free GPU Training
+          {isConnected
+            ? <Badge className="ml-auto bg-green-600 text-white border-transparent text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Connected as {connectedAs}</Badge>
+            : <Badge variant="secondary" className="ml-auto text-xs"><AlertCircle className="w-3 h-3 mr-1" />Not connected</Badge>
+          }
+        </CardTitle>
+        <CardDescription>
+          Train custom AI models on a free Kaggle GPU (T4/P100, 16 GB VRAM) — no credit card.
+          Used by the Valet Router trainer for machines with weak or no GPU.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="rounded-md bg-blue-500/5 border border-blue-500/20 px-4 py-3 text-xs text-blue-700 dark:text-blue-400 space-y-1">
+          <p className="font-medium">How to get your Kaggle API key (2 min):</p>
+          <ol className="list-decimal list-inside space-y-0.5 text-blue-600 dark:text-blue-400/80">
+            <li>Create a free account at <span className="font-mono">kaggle.com</span></li>
+            <li>Go to <span className="font-mono">kaggle.com/settings</span> → Phone Verification → verify your phone (required for GPU)</li>
+            <li>Still in Settings → API section → click <strong>Create New Token</strong> → <span className="font-mono">kaggle.json</span> downloads</li>
+            <li>Open that file and paste the <span className="font-mono">username</span> and <span className="font-mono">key</span> below</li>
+          </ol>
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="space-y-1">
+            <Label htmlFor="kaggle-username">Kaggle Username</Label>
+            <Input id="kaggle-username" placeholder="your-kaggle-username" value={username}
+              onChange={e => setUsername(e.target.value)} autoComplete="off" />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="kaggle-key">Kaggle API Key</Label>
+            <Input id="kaggle-key" type="password" placeholder="Paste key from kaggle.json"
+              value={apiKey} onChange={e => setApiKey(e.target.value)} autoComplete="off" />
+          </div>
+        </div>
+        <div className="flex items-center gap-3">
+          <Button size="sm" disabled={!username || !apiKey || saveMutation.isPending}
+            onClick={() => saveMutation.mutate({ username, key: apiKey })}>
+            {saveMutation.isPending ? "Saving…" : isConnected ? "Update Key" : "Connect Kaggle"}
+          </Button>
+          {isConnected && (
+            <p className="text-xs text-muted-foreground">
+              Connected. Go to <strong>Settings → Valet Router</strong> to train on Kaggle GPU.
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 
 const THEME_OPTIONS: { value: Theme; label: string; icon: React.ReactNode }[] = [
   { value: "dark", label: "Dark", icon: <Moon className="h-5 w-5" /> },
