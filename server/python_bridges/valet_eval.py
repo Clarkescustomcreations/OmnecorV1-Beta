@@ -49,7 +49,7 @@ def _emit(obj: dict) -> None:
 # ─── Prompt construction ──────────────────────────────────────────────────────
 def _load_system_prompt() -> str:
     try:
-        text = _SYSTEM_PROMPT_PATH.read_text()
+        text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
         match = re.search(r"```\n(.*?)```", text, re.DOTALL)
         if match:
             return match.group(1).strip()
@@ -60,7 +60,7 @@ def _load_system_prompt() -> str:
 
 def _load_manifest() -> str:
     try:
-        data = json.loads(_MANIFEST_PATH.read_text())
+        data = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
         return json.dumps(data, separators=(",", ":"))
     except Exception:
         return "{}"
@@ -208,12 +208,17 @@ def _infer(user_input: str, rag_context: str = "") -> str | None:
             prompt = _hf_tokenizer.apply_chat_template(  # type: ignore[union-attr]
                 messages, tokenize=False, add_generation_prompt=True
             )
+            # max_length must match the training MAX_SEQ (3072) — the system prompt +
+            # manifest alone is ~2.8k tokens. Left-truncate so the user turn and
+            # generation marker survive. Must mirror valet_router_inference._route_via_transformers.
             inputs = _hf_tokenizer(  # type: ignore[union-attr]
-                prompt, return_tensors="pt", max_length=1024, truncation=True
+                prompt, return_tensors="pt", max_length=3072,
+                truncation=True, truncation_side="left",
             )
+            inputs = {k: v.to(_hf_model.device) for k, v in inputs.items()}  # type: ignore[union-attr]
             with torch.no_grad():
                 outputs = _hf_model.generate(  # type: ignore[union-attr]
-                    **inputs, max_new_tokens=220, temperature=0, do_sample=False
+                    **inputs, max_new_tokens=220, do_sample=False
                 )
             return _hf_tokenizer.decode(  # type: ignore[union-attr]
                 outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
@@ -344,7 +349,7 @@ _SCORERS = {
 # ─── Eval loop ────────────────────────────────────────────────────────────────
 def run_eval(eval_path: Path, max_examples: int = 0) -> dict:
     rows: list[dict] = []
-    for line in eval_path.read_text().splitlines():
+    for line in eval_path.read_text(encoding="utf-8").splitlines():
         line = line.strip()
         if not line:
             continue
@@ -497,10 +502,10 @@ def check_thresholds(scores: dict, thresholds: dict) -> tuple[bool, list[str]]:
 # ─── Registry / metadata updates (4.4) ────────────────────────────────────────
 def _update_registry(scores: dict, passed: bool) -> None:
     try:
-        cur = json.loads(_CURRENT_JSON.read_text())
+        cur = json.loads(_CURRENT_JSON.read_text(encoding="utf-8"))
         cur["eval_scores"] = scores
         cur["status"] = "ready" if passed else "eval_failed"
-        _CURRENT_JSON.write_text(json.dumps(cur, indent=2) + "\n")
+        _CURRENT_JSON.write_text(json.dumps(cur, indent=2) + "\n", encoding="utf-8")
     except Exception as e:
         _emit({"type": "warning", "warning": f"Could not update current.json: {e}"})
 
@@ -512,10 +517,10 @@ def _update_artifact_metadata(artifact_path: str | None, scores: dict, passed: b
     if not meta_path.exists():
         return
     try:
-        meta = json.loads(meta_path.read_text())
+        meta = json.loads(meta_path.read_text(encoding="utf-8"))
         meta["eval_scores"] = scores
         meta["eval_passed"] = passed
-        meta_path.write_text(json.dumps(meta, indent=2) + "\n")
+        meta_path.write_text(json.dumps(meta, indent=2) + "\n", encoding="utf-8")
     except Exception as e:
         _emit({"type": "warning", "warning": f"Could not update artifact metadata.json: {e}"})
 
@@ -558,7 +563,7 @@ def main() -> None:
 
     # Read registry
     try:
-        registry = json.loads(_CURRENT_JSON.read_text())
+        registry = json.loads(_CURRENT_JSON.read_text(encoding="utf-8"))
     except Exception:
         registry = {}
 

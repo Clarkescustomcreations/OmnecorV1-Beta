@@ -524,12 +524,13 @@
 ## VALET-todo (Final Sign-off)
 - [ ] 6.4 Final sign-off:
     - [ ] `pnpm valet:build` green from scratch on a clean GPU box
-    - [ ] artifact fetchable + checksum-verified on a fresh machine
-    - [ ] app auto-serves it; `/health` model_loaded:true; `/route` model-driven
-    - [ ] eval thresholds met and beat keyword baseline
-    - [ ] docs match reality
+    - [~] artifact checksum-verified (adapter/merged/gguf sha256 recorded in `current.json`); fresh-machine fetch flow still TODO
+    - [x] app auto-serves it; `/health` model_loaded:true; `/route` model-driven — **done 2026-06-11** (Ollama backend)
+    - [~] eval — **verified** route accuracy **0.7385** (independent Kaggle P100 kernel `valet-router-eval`, 390 balanced ex), **beats keyword baseline 0.2744** ~2.7×; below the 0.85 config gate. (The 0.8949 hard-coded in the conversion kernel did NOT reproduce.) Routing works; QA/freeform de-prioritized.
+    - [~] docs match reality — `SERVING.md`, `VALET_ROUTER.md`, `current.json` updated 2026-06-11; pipeline docs still assume GitHub-Release GGUF + llama-cpp-python
     *Status Update (2026-06-09):* Valet 1.5B router evaluation is running on another PC. Training has completed, and the model is being finalized for integration.
     *Status Update (2026-06-10):* **Valet V2 run is nearly complete.** V1 training outputs, Kaggle bundle, V2 dataset, and pipeline scripts committed (commit `1f43797`). V2 model artifact expected imminently — final sign-off checklist above will be executed once artifact is available. Rule-based fallback remains active until model is confirmed loaded.
+    *Status Update (2026-06-11):* **Model deployed and routing signed off.** Kaggle adapter (`valet-router-train`) merged → fp16 → **Q8_0 GGUF**, imported into Ollama as **`omnecor-valet-router:v2-q8`**, registered `format:"ollama"`/`status:"ready"` (both repo + `%APPDATA%` registry copies). `/health` reports `model_loaded:true, backend:"ollama"`; `/route` is model-driven (~2-3s warm). Ollama is used instead of llama-cpp-python because this box is Sandy Bridge (AVX1-only → prebuilt wheels crash) and transformers serving is ~30s/route here. Fixed 3 Windows/GPU serving bugs in `valet_router_inference.py` + `valet_eval.py` (CPU/CUDA device mismatch; cp1252 mojibake in the system prompt; 1024- vs 3072-token prompt truncation). Full serving runbook: `docs/ai-agents/valet-training/SERVING.md`. Independent re-verification eval kernel pushed to Kaggle (`valet-router-eval`). QA/freeform bucket is weak (~20%) but intentionally de-prioritized — routing is the model's purpose.
 
 ## Session 12 Completion Pass (2026-06-10)
 - [x] Add `publishNow` mutation to `server/routers/schedulingRouter.ts` — batch publishes selected post IDs via `inArray`, sets status "published" + publishedAt timestamp

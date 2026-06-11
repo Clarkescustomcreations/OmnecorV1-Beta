@@ -50,7 +50,7 @@ _STOPWORDS = frozenset({
 
 def _load_system_prompt() -> str:
     try:
-        text = _SYSTEM_PROMPT_PATH.read_text()
+        text = _SYSTEM_PROMPT_PATH.read_text(encoding="utf-8")
         match = re.search(r"```\n(.*?)```", text, re.DOTALL)
         if match:
             return match.group(1).strip()
@@ -60,7 +60,7 @@ def _load_system_prompt() -> str:
 
 def _load_manifest() -> str:
     try:
-        data = json.loads(_MANIFEST_PATH.read_text())
+        data = json.loads(_MANIFEST_PATH.read_text(encoding="utf-8"))
         return json.dumps(data, separators=(",", ":"))
     except Exception as e:
         print(f"[ValetRouter] Could not load routing manifest: {e}")
@@ -115,7 +115,7 @@ def _get_kb_text() -> str:
     try:
         mtime = kb_path.stat().st_mtime
         if mtime != _kb_cache["mtime"]:
-            _kb_cache["text"] = kb_path.read_text()
+            _kb_cache["text"] = kb_path.read_text(encoding="utf-8")
             _kb_cache["mtime"] = mtime
     except Exception:
         pass
@@ -124,7 +124,7 @@ def _get_kb_text() -> str:
 # ─── Registry reader ──────────────────────────────────────────────────────────
 def _read_registry() -> dict:
     try:
-        return json.loads(_CURRENT_JSON.read_text())
+        return json.loads(_CURRENT_JSON.read_text(encoding="utf-8"))
     except Exception:
         return {"artifact_path": None, "status": "pending"}
 
@@ -387,10 +387,20 @@ async def _route_via_transformers(task: str, rag_context: str) -> Optional[dict]
         prompt = _tokenizer.apply_chat_template(  # type: ignore[union-attr]
             messages, tokenize=False, add_generation_prompt=True
         )
-        inputs = _tokenizer(prompt, return_tensors="pt", max_length=1024, truncation=True)
+        # The system prompt + routing manifest alone is ~2.8k tokens, so the cap must
+        # match the training MAX_SEQ (3072). Left-truncate so that if a very long task
+        # overflows, we drop the oldest system text — never the user turn or the
+        # generation marker the model needs to start its JSON answer.
+        inputs = _tokenizer(
+            prompt, return_tensors="pt", max_length=3072,
+            truncation=True, truncation_side="left",
+        )
+        # Move inputs onto the model's device (cuda when device_map="auto" placed
+        # the weights on GPU) — otherwise generate() raises a CPU/CUDA mismatch.
+        inputs = {k: v.to(_model.device) for k, v in inputs.items()}  # type: ignore[union-attr]
         with torch.no_grad():
             outputs = _model.generate(  # type: ignore[union-attr]
-                **inputs, max_new_tokens=220, temperature=0, do_sample=False
+                **inputs, max_new_tokens=220, do_sample=False
             )
         return _tokenizer.decode(
             outputs[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True

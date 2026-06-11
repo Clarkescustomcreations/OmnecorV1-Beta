@@ -1,0 +1,97 @@
+{
+  "route_accuracy": 0.7385,
+  "baseline_route_accuracy": 0.2744,
+  "model_beats_baseline": true,
+  "confidence_mean": 0.9018,
+  "route_examples": 390,
+  "per_bucket": {
+    "route:code_generation": 0.9667,
+    "route:code_review": 0.9667,
+    "route:context_management": 0.7333,
+    "route:hardware": 1.0,
+    "route:instruction_writing": 0.8,
+    "route:integration": 0.7333,
+    "route:knowledge_retrieval": 0.5333,
+    "route:local_task": 0.5667,
+    "route:media_generation": 0.7667,
+    "route:memory_operations": 0.6667,
+    "route:reporting": 0.2667,
+    "route:research": 0.8,
+    "route:synthesis": 0.8
+  },
+  "bucket_totals": {
+    "route:media_generation": 30,
+    "route:code_generation": 30,
+    "route:local_task": 30,
+    "route:code_review": 30,
+    "route:context_management": 30,
+    "route:synthesis": 30,
+    "route:memory_operations": 30,
+    "route:integration": 30,
+    "route:reporting": 30,
+    "route:hardware": 30,
+    "route:knowledge_retrieval": 30,
+    "route:research": 30,
+    "route:instruction_writing": 30
+  },
+  "confusion_matrix": {
+    "media_generation": {
+      "media_generation": 23,
+      "parse_error": 7
+    },
+    "code_generation": {
+      "code_generation": 29,
+      "code_review": 1
+    },
+    "local_task": {
+      "code_review": 7,
+      "local_task": 17,
+      "context_management": 6
+    },
+    "code_review": {
+      "code_review": 29,
+      "parse_error": 1
+    },
+    "context_management": {
+      "context_management": 22,
+      "parse_error": 8
+    },
+    "synthesis": {
+      "synthesis": 24,
+      "code_review": 6
+    },
+    "memory_operations": {
+      "memory_operations": 20,
+      "knowledge_retrieval": 8,
+      "parse_error": 2
+    },
+    "integration": {
+      "integration": 22,
+      "code_review": 7,
+      "code_generation": 1
+    },
+    "reporting": {
+      "reporting": 8,
+      "context_management": 9,
+      "code_review": 5,
+      "synthesis": 8
+    },
+    "hardware": {
+      "hardware": 30
+    },
+    "knowledge_retrieval": {
+      "knowledge_retrieval": 16,
+      "research": 14
+    },
+    "research": {
+      "research": 24,
+      "synthesis": 5,
+      "parse_error": 1
+    },
+    "instruction_writing": {
+      "instruction_writing": 24,
+      "parse_error": 6
+    }
+  },
+  "gpu": "Tesla P100-PCIE-16GB"
+}
