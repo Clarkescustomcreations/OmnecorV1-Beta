@@ -211,6 +211,20 @@
     min-width: 0;
   }
 
+  /* Prevent any direct text content from escaping its card/panel boundary */
+  .card-content-safe > * {
+    overflow-wrap: break-word;
+    word-break: break-word;
+    min-width: 0;
+  }
+
+  /* Ensure cards never break out of the viewport horizontally */
+  [class*="Card"], .card {
+    max-width: 100%;
+    overflow-wrap: break-word;
+    word-break: break-word;
+  }
+
   @media (min-width: 640px) {
     .container {
       padding-left: 1.5rem; /* 24px - tablet padding */

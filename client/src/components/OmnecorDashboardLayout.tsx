@@ -361,16 +361,17 @@ export default function OmnecorDashboardLayout({
         </div>
       </aside>
 
-      {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden transition-all duration-300">
-        {/* Removed Floating Sidebar Toggle Button */}
-
+      {/* Main Content — offset left on mobile to clear the fixed sidebar */}
+      <div className={cn(
+        "flex-1 flex flex-col overflow-hidden transition-all duration-300 min-w-0",
+        sidebarOpen ? "ml-64 lg:ml-0" : "ml-16 lg:ml-0"
+      )}>
         {/* Content Area */}
         <main className="min-h-0 flex-1 overflow-auto relative">
-          <div className="h-full">{children}</div>
+          <div className="h-full min-w-0">{children}</div>
 
-          {/* Global Floating Alerts */}
-          <div className="fixed bottom-6 right-6 z-[100] w-full max-w-md pointer-events-none">
+          {/* Global Floating Alerts — pinned inside viewport on all screen sizes */}
+          <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-full sm:max-w-md z-[100] pointer-events-none">
             <div className="pointer-events-auto">
               <HITLAlertPanel className="shadow-2xl border-accent/20" />
             </div>

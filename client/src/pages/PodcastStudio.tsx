@@ -519,7 +519,7 @@ export default function PodcastStudio() {
     <OmnecorDashboardLayout>
       <div className="h-full flex flex-col">
         {/* Header */}
-        <div className="border-b border-border bg-card px-6 py-4 flex items-center justify-between shrink-0 flex-wrap gap-3">
+        <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0 flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
               <Mic2 className="w-5 h-5 text-accent" /> Podcast Studio
@@ -574,8 +574,8 @@ export default function PodcastStudio() {
           </div>
         </div>
 
-        {/* Body: 3-panel layout */}
-        <div className="flex-1 min-h-0 grid grid-cols-[280px_1fr_280px]">
+        {/* Body: 3-panel layout — stacks on mobile, 2-col on tablet, 3-col on desktop */}
+        <div className="flex-1 min-h-0 grid grid-cols-1 md:grid-cols-[240px_1fr] lg:grid-cols-[280px_1fr_280px] overflow-auto md:overflow-hidden">
 
           {/* Left: Sources */}
           <SourcesSidebar

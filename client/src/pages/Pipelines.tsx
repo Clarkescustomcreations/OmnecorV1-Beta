@@ -45,12 +45,12 @@ export default function Pipelines() {
     return (
       <OmnecorDashboardLayout>
         <div className="h-full flex flex-col bg-background">
-          <div className="border-b border-border bg-card px-6 py-4 flex items-center gap-3">
-            <Button variant="ghost" size="sm" onClick={() => setSelectedPipelineId(null)}>
+          <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 min-w-0">
+            <Button variant="ghost" size="sm" onClick={() => setSelectedPipelineId(null)} className="flex-shrink-0">
               <ArrowLeft className="w-4 h-4 mr-1" /> Back
             </Button>
-            <Zap className="w-5 h-5 text-accent" />
-            <span className="font-semibold">Pipeline Detail</span>
+            <Zap className="w-5 h-5 text-accent flex-shrink-0" />
+            <span className="font-semibold truncate">Pipeline Detail</span>
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-6">
             <PhaseOutputPanel pipelineId={selectedPipelineId} />
@@ -63,23 +63,23 @@ export default function Pipelines() {
   return (
     <OmnecorDashboardLayout>
       <div className="h-full flex flex-col bg-background">
-        <div className="border-b border-border bg-card px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Zap className="w-6 h-6 text-accent" />
-              <div>
-                <h1 className="text-xl font-bold">GodMode Pipelines</h1>
-                <p className="text-sm text-muted-foreground">5-phase gated execution framework</p>
+        <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Zap className="w-6 h-6 text-accent flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold truncate">GodMode Pipelines</h1>
+                <p className="text-sm text-muted-foreground truncate">5-phase gated execution framework</p>
               </div>
             </div>
-            <Button size="sm" onClick={() => setShowCreateForm(v => !v)}>
+            <Button size="sm" onClick={() => setShowCreateForm(v => !v)} className="flex-shrink-0">
               <Plus className="w-4 h-4 mr-1" /> New Pipeline
             </Button>
           </div>
         </div>
 
-        <div className="min-h-0 flex-1 overflow-auto p-6 space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="min-h-0 flex-1 overflow-auto p-4 sm:p-6 space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
             <div className="lg:col-span-2 space-y-6">
               {showCreateForm && (
                 <div className="rounded-lg border border-border bg-card p-4 space-y-3">

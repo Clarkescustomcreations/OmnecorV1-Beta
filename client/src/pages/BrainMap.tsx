@@ -503,11 +503,11 @@ function BrainMapContent() {
           <ResizablePanel defaultSize={55} className="flex flex-col">
             <div className="flex-1 flex flex-col overflow-hidden">
               {/* Header */}
-              <div className="border-b border-border bg-card px-6 py-4 flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <Brain className="w-6 h-6 text-accent" />
-                  <div>
-                    <h1 className="text-xl font-bold flex items-center gap-2">
+              <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3 min-w-0">
+                  <Brain className="w-6 h-6 text-accent flex-shrink-0" />
+                  <div className="min-w-0">
+                    <h1 className="text-xl font-bold flex flex-wrap items-center gap-2">
                       {activeMap?.name ?? "Omnecor Workspace"}
                       {isFictionMode && (
                         <Badge variant="outline" className="text-accent border-accent text-[10px] py-0">
@@ -528,7 +528,7 @@ function BrainMapContent() {
 
                 <div className="flex items-center gap-2">
                   {/* View Switchers */}
-                  <div className="flex bg-muted rounded-md p-1 mr-4">
+                  <div className="flex flex-wrap bg-muted rounded-md p-1 mr-1 sm:mr-4">
                     <HowToTooltip title="Graph View" description="A spatial, node-based visualization of your files and their relationships.">
                       <Button
                         size="sm"

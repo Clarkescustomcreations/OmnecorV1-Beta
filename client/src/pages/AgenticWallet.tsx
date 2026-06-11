@@ -52,18 +52,18 @@ export default function AgenticWallet() {
   return (
     <OmnecorDashboardLayout>
       <div className="flex flex-col h-full bg-background overflow-hidden">
-        <div className="border-b border-border bg-card px-6 py-4 flex-shrink-0 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <Wallet className="w-6 h-6 text-accent" />
-            <div>
-              <h1 className="text-xl font-bold">Agentic Wallet Dashboard</h1>
-              <p className="text-sm text-muted-foreground">
+        <div className="border-b border-border bg-card px-4 sm:px-6 py-4 flex-shrink-0 flex flex-wrap items-center gap-3 justify-between">
+          <div className="flex items-center gap-3 min-w-0">
+            <Wallet className="w-6 h-6 text-accent flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-lg sm:text-xl font-bold truncate">Agentic Wallet Dashboard</h1>
+              <p className="text-xs sm:text-sm text-muted-foreground truncate">
                 Live financial monitoring and spend tracking for AI agents
               </p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-3">
+
+          <div className="flex items-center gap-2 flex-wrap">
             {/* Global / Per-Project toggle */}
             <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg border border-border bg-muted/30">
               <Label htmlFor="wallet-global-toggle" className="text-xs cursor-pointer whitespace-nowrap">
@@ -78,7 +78,7 @@ export default function AgenticWallet() {
             </div>
             {/* Project selector — only when not in global mode */}
             {!globalMode && (
-              <div className="w-56">
+              <div className="w-full sm:w-48">
                 <select
                   className="w-full bg-background border rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-primary/20 outline-none transition-all"
                   value={selectedProjectId}

@@ -665,8 +665,8 @@ export default function Designer3D() {
           {/* Main workspace (Editor & Preview split) */}
           <div className="flex-1 flex overflow-hidden relative">
             
-            {/* Left Workspace Panel: Local Project Files Explorer */}
-            <div className="w-56 h-full bg-slate-900 border-r border-slate-800 flex flex-col flex-shrink-0">
+            {/* Left Workspace Panel: Local Project Files Explorer — hidden on mobile */}
+            <div className="hidden md:flex w-44 lg:w-56 h-full bg-slate-900 border-r border-slate-800 flex-col flex-shrink-0">
               <div className="p-3 border-b border-slate-800 flex-shrink-0 flex items-center justify-between">
                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Local Workspace</span>
                 <span className="text-[9px] text-accent font-semibold bg-accent/10 px-1 rounded">Beta</span>
@@ -957,22 +957,22 @@ export default function Designer3D() {
           </div>
         </FloatingWindow>
 
-        <div className="border-b border-border bg-card px-6 py-4 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center">
+        <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
               <Box className="w-5 h-5 text-accent" />
             </div>
-            <div>
-              <h1 className="text-xl font-bold flex items-center gap-2">
+            <div className="min-w-0">
+              <h1 className="text-xl font-bold flex flex-wrap items-center gap-2">
                 Multi-Modal Designer
                 <Badge variant="outline" className="text-[10px] py-0 text-accent border-accent">Beta</Badge>
               </h1>
-              <p className="text-sm text-muted-foreground">View and interact with generated models, circuits, and UI.</p>
+              <p className="text-sm text-muted-foreground truncate">View and interact with generated models, circuits, and UI.</p>
             </div>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <div className="flex bg-muted rounded-md p-1 mr-4">
+
+          <div className="flex flex-wrap items-center gap-2 flex-shrink-0">
+            <div className="flex flex-wrap bg-muted rounded-md p-1 mr-1 sm:mr-4">
               <Button size="sm" variant={mode === "3d" ? "default" : "ghost"} className="h-7 px-3 text-xs" onClick={() => setMode("3d")}>
                 <Box className="w-3.5 h-3.5 mr-1.5" /> 3D View
               </Button>
@@ -1086,7 +1086,7 @@ export default function Designer3D() {
           </div>
         </div>
 
-        <div className="flex-1 p-6 overflow-hidden flex gap-6">
+        <div className="flex-1 p-3 sm:p-6 overflow-hidden flex gap-3 sm:gap-6">
           <Card className="flex-1 h-full p-0 overflow-hidden border-2 border-border/50 shadow-2xl relative">
             {windowMode === "embedded" ? (
                renderDesignerContent()
