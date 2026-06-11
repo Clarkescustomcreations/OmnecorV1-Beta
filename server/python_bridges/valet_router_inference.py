@@ -32,7 +32,13 @@ _PROJECT_ROOT = _BRIDGES_DIR.parent.parent
 _TRAINING_DIR = _PROJECT_ROOT / "docs" / "ai-agents" / "valet-training"
 _SYSTEM_PROMPT_PATH = _TRAINING_DIR / "VALET_SYSTEM_PROMPT.md"
 _MANIFEST_PATH = _TRAINING_DIR / "routing_manifest.json"
-_CURRENT_JSON = _PROJECT_ROOT / "models" / "valet-router" / "current.json"
+# Registry root is overridable so the TS ValetServerService can pin both sides to
+# the same directory regardless of platform (it resolves to %APPDATA% on Windows).
+# Falls back to the repo-root models dir for standalone/CLI use.
+_REGISTRY_ROOT = Path(
+    os.environ.get("VALET_REGISTRY_ROOT", str(_PROJECT_ROOT / "models" / "valet-router"))
+)
+_CURRENT_JSON = _REGISTRY_ROOT / "current.json"
 
 # ─── Prompts & manifest (loaded once at module import) ────────────────────────
 _FALLBACK_PROMPT = "You are the Omnecor Valet — a local routing assistant."

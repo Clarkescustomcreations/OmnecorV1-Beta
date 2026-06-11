@@ -1,5 +1,19 @@
 {
-  "artifact_path": null,
-  "status": "pending",
-  "note": "No trained artifact registered. Run 'pnpm valet:fetch' to download a pre-built model, or 'pnpm valet:build' to train one locally."
+  "artifact_path": "c:/OmnecorV1-Beta/models/valet-router/kaggle-2026-06-11",
+  "status": "ready",
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "format": "merged_16bit",
+  "source": "trained",
+  "config": {
+    "r": 8,
+    "lora_alpha": 16,
+    "epochs": 1.5,
+    "max_seq_length": 3072,
+    "save_method": "merged_16bit"
+  },
+  "sha256": "f8f196d519991d49368dbdad26a6f9c39c87f21bbfb94932d635718dc6fd561a",
+  "train_examples": 2995,
+  "eval_scores": {},
+  "kaggle_kernel": "th3artistunknown/valet-router-train",
+  "created_at": "2026-06-11T05:35:00Z"
 }

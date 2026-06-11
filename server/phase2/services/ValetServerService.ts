@@ -124,6 +124,9 @@ export class ValetServerService {
         PYTHONUNBUFFERED: "1",
         VALET_ROUTER_PORT: port,
         OLLAMA_URL: ENV.ollamaUrl,
+        // Pin the Python bridge to the same registry dir the TS side reads/writes
+        // (PATHS.valetRouter → %APPDATA% on Windows), so both always agree.
+        VALET_REGISTRY_ROOT: ValetArtifactRegistry.registryRoot,
       },
       stdio: ["ignore", "pipe", "pipe"],
     });
