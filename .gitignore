@@ -153,3 +153,4 @@ OmnecorV1-Beta-main.zip
 
 # Local Ollama Modelfile — references absolute machine path, not portable
 modelfile.txt
+ui_audit_report.md

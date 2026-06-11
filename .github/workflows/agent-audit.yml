@@ -1,10 +1,13 @@
 name: Agentic — Oversight & Audit
 
-# This workflow combines:
-# 1. Automated Code Review (Self-Correction)
-# 2. "Living" Documentation Sync
-# 3. Background Security Auditing
-# 4. UI Interaction Auditor (Custom)
+# This workflow is REPORT-ONLY. It analyses the code and surfaces findings as
+# build logs / artifacts. It never modifies source files and never pushes back
+# to the repository. (A previous version injected JSX comments into source and
+# committed them to main, which repeatedly broke compilation.)
+#
+# It covers:
+# 1. UI Interaction Auditor (dead/suspicious buttons)
+# 2. Background Security Auditing (pattern scan)
 
 on:
   push:
@@ -13,8 +16,7 @@ on:
     branches: [ "main" ]
 
 permissions:
-  contents: write   # Required to commit audit findings back to code
-  pull-requests: write
+  contents: read
 
 jobs:
   agentic-audit:
@@ -23,47 +25,27 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Set up Python 3.11
         uses: actions/setup-python@v5
         with:
           python-version: '3.11'
 
-      # --- 1. UI Interaction Audit ---
+      # --- 1. UI Interaction Audit (report-only) ---
       - name: Run UI Interaction Auditor
         run: python3 scripts/ui_auditor.py
 
-      # --- 2. Security Audit (YARA + Pattern Scan) ---
-      # Runs the existing security scans in headless mode
+      - name: Upload UI audit report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ui-audit-report
+          path: ui_audit_report.md
+          if-no-files-found: ignore
+
+      # --- 2. Security Audit (pattern scan, advisory only) ---
       - name: Run Background Security Audit
         run: |
-          # Placeholder for headless security script
           echo "Running security pattern scan..."
           grep -rn "eval(" . || true
           grep -rn "dangerouslySetInnerHTML" . || true
-
-      # --- 3. Living Documentation Sync ---
-      # Auto-updates architecture docs if routes have changed
-      - name: Sync Architecture Documentation
-        run: |
-          echo "Checking for router changes..."
-          if git diff --name-only HEAD~1 | grep "server/routers/"; then
-            echo "Router changes detected. Updating DATA_FLOW.md..."
-            # Simple script to append new routers to docs
-            ls server/routers/ > docs/architecture/ROUTER_INVENTORY.md
-          fi
-
-      # --- 4. Commit Findings Back to Repository ---
-      - name: Commit Audit Findings
-        run: |
-          git config --global user.name "Omnecor-Agent-Bot"
-          git config --global user.email "agent-bot@omnecor.local"
-          git add .
-          if ! git diff --cached --quiet; then
-            git commit -m "chore: agentic audit findings and UX suggestions"
-            git push
-          else
-            echo "No findings to commit."
-          fi
