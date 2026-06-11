@@ -191,16 +191,16 @@ export const Settings: React.FC = () => {
     <OmnecorDashboardLayout>
       <div className="flex flex-col h-full bg-background">
         {/* Header */}
-        <div className="flex items-center justify-between p-6 border-b bg-muted/30">
-          <div className="flex items-center gap-4">
-            <SettingsIcon className="w-6 h-6 text-accent" />
-            <div>
-              <h1 className="text-2xl font-bold tracking-tight">Settings</h1>
-              <p className="text-sm text-muted-foreground">Manage your workstation and AI behavior.</p>
+        <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-6 border-b bg-muted/30">
+          <div className="flex items-center gap-4 min-w-0">
+            <SettingsIcon className="w-6 h-6 text-accent flex-shrink-0" />
+            <div className="min-w-0">
+              <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">Settings</h1>
+              <p className="text-sm text-muted-foreground truncate">Manage your workstation and AI behavior.</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="relative w-64">
+          <div className="flex items-center gap-3 w-full sm:w-auto">
+            <div className="relative w-full sm:w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
               <Input
                 placeholder="Search settings..."
@@ -212,13 +212,13 @@ export const Settings: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex flex-1 overflow-hidden">
-          {/* Sidebar Tabs */}
-          <aside className="min-h-0 w-64 border-r bg-muted/10">
-            <ScrollArea className="h-full">
-              <div className="p-4 space-y-1">
+        <div className="flex flex-col md:flex-row flex-1 overflow-hidden">
+          {/* Sidebar Tabs — horizontal scroll on mobile, vertical list on desktop */}
+          <aside className="min-h-0 md:w-56 border-b md:border-b-0 md:border-r bg-muted/10 flex-shrink-0">
+            <ScrollArea className="h-auto md:h-full">
+              <div className="flex md:flex-col flex-row p-2 md:p-4 gap-1 overflow-x-auto md:overflow-x-visible">
                 {noResults ? (
-                  <div className="px-3 py-6 text-center">
+                  <div className="px-3 py-4 text-center whitespace-nowrap">
                     <Search className="w-5 h-5 text-muted-foreground/40 mx-auto mb-2" />
                     <p className="text-xs text-muted-foreground">No settings match</p>
                     <p className="text-[10px] text-muted-foreground/60 mt-0.5">"{searchQuery}"</p>
@@ -231,13 +231,13 @@ export const Settings: React.FC = () => {
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
                         className={cn(
-                          "w-full flex items-center gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors",
+                          "flex items-center gap-2 md:gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap md:whitespace-normal md:w-full",
                           activeTab === tab.id
                             ? "bg-accent text-accent-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         )}
                       >
-                        <Icon className="w-4 h-4" />
+                        <Icon className="w-4 h-4 flex-shrink-0" />
                         {tab.label}
                       </button>
                     );
@@ -248,8 +248,8 @@ export const Settings: React.FC = () => {
           </aside>
 
           {/* Content Area */}
-          <main className="min-h-0 flex-1 overflow-auto bg-muted/5 p-8">
-            <div className="max-w-4xl mx-auto">
+          <main className="min-h-0 flex-1 overflow-auto bg-muted/5 p-4 sm:p-6 md:p-8">
+            <div className="max-w-4xl mx-auto w-full">
               <Tabs value={activeTab} className="w-full">
                 <TabsContent value="api">
                   <div className="space-y-6">
@@ -915,11 +915,7 @@ const OMMESHPanel: React.FC = () => {
                         Authorize
                       </Button>
                     ) : (
-    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
-    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
-    {/* UI-AUDIT-FINDING: SUSPICIOUS-BUTTON: Button has no onClick and is not type='submit'. */}
-    {/* UI-AUDIT-SUGGESTION: SUGGESTION: Add an onClick handler or change type to 'submit' if in a form. */}
-                                      <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" disabled>
+                      <Button variant="ghost" size="sm" className="h-8 text-muted-foreground" disabled>
                         <CheckCircle2 className="w-4 h-4 mr-1.5" />
                         Active
                       </Button>

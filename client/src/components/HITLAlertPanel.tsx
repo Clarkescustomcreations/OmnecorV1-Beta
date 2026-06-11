@@ -104,13 +104,13 @@ export default function HITLAlertPanel({
     return (
       <>
         {walletSpend && (
-          <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+          <div className="rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
             <div className="flex items-center gap-2 text-amber-400 text-sm font-medium mb-1">
-              <AlertTriangle className="h-4 w-4" />
-              Budget Spend Event
+              <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+              <span className="truncate">Budget Spend Event</span>
             </div>
             <div className="text-xs text-amber-200/80 space-y-0.5">
-              <div>Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
+              <div className="truncate">Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
               <div>Cost: <span className="font-mono">${(walletSpend.costMicrocents / 100_000_000).toFixed(6)}</span></div>
             </div>
           </div>
@@ -168,13 +168,13 @@ export default function HITLAlertPanel({
   return (
     <>
       {walletSpend && (
-        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+        <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
           <div className="flex items-center gap-2 text-amber-400 text-sm font-medium mb-1">
-            <AlertTriangle className="h-4 w-4" />
-            Budget Spend Event
+            <AlertTriangle className="h-4 w-4 flex-shrink-0" />
+            <span className="truncate">Budget Spend Event</span>
           </div>
           <div className="text-xs text-amber-200/80 space-y-0.5">
-            <div>Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
+            <div className="truncate">Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
             <div>Cost: <span className="font-mono">${(walletSpend.costMicrocents / 100_000_000).toFixed(6)}</span></div>
           </div>
         </div>

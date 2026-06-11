@@ -210,49 +210,53 @@ export default function AgenticWalletPanel() {
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="flex items-center justify-between p-5 rounded-2xl border bg-card mb-6 shadow-sm">
-            <div className="flex items-center gap-5">
-              <div className="w-14 h-9 rounded-lg bg-gradient-to-br from-gray-800 to-black border-gray-700 border flex items-center justify-center shadow-lg relative overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl border bg-card mb-6 shadow-sm">
+            <div className="flex items-center gap-4 min-w-0">
+              <div className="w-14 h-9 rounded-lg bg-gradient-to-br from-gray-800 to-black border-gray-700 border flex items-center justify-center shadow-lg relative overflow-hidden flex-shrink-0">
                 <div className="absolute top-0 left-0 w-full h-full bg-white/5 opacity-20 pointer-events-none" />
                 <span className="text-[10px] text-white/40 font-mono tracking-widest z-10">VISA</span>
               </div>
-              <div>
-                <p className="text-sm font-bold tracking-tight">Lithic Integration Status</p>
-                <p className="text-xs text-muted-foreground">System authenticated and ready to issue</p>
+              <div className="min-w-0">
+                <p className="text-sm font-bold tracking-tight truncate">Lithic Integration Status</p>
+                <p className="text-xs text-muted-foreground truncate">System authenticated and ready to issue</p>
               </div>
             </div>
-            <Badge className="bg-green-500/20 text-green-500 border-green-500/30 font-bold px-4 py-1">CONNECTED</Badge>
+            <Badge className="bg-green-500/20 text-green-500 border-green-500/30 font-bold px-4 py-1 flex-shrink-0">CONNECTED</Badge>
           </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                                    <Button
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Button
               variant="outline"
-              className="h-auto py-5 px-6 flex-col items-start gap-2 hover:bg-background hover:border-primary/50 transition-all border-muted-foreground/20"
+              className="h-auto py-5 px-4 sm:px-6 flex-col items-start gap-2 hover:bg-background hover:border-primary/50 transition-all border-muted-foreground/20 w-full"
               disabled={issueCardMutation.isPending}
               onClick={handleIssueProjectCard}
             >
               {issueCardMutation.isPending ? (
                 <span className="flex items-center gap-2 text-sm font-bold">
-                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
                   Awaiting HITL Approval…
                 </span>
               ) : (
                 <span className="text-sm font-bold">Issue Project Card</span>
               )}
-              <span className="text-[10px] text-muted-foreground font-normal leading-relaxed text-left">Create a dedicated virtual card with automatic spending limits tied to {projects?.find(p => p.id === selectedProjectId)?.name || "a project"}.</span>
+              <span className="text-[10px] text-muted-foreground font-normal leading-relaxed text-left break-words w-full">
+                Create a dedicated virtual card with automatic spending limits tied to {projects?.find(p => p.id === selectedProjectId)?.name || "a project"}.
+              </span>
             </Button>
-                                                    <Button
+            <Button
               variant="outline"
-              className="h-auto py-5 px-6 flex-col items-start gap-2 hover:bg-background hover:border-primary/50 transition-all border-muted-foreground/20"
+              className="h-auto py-5 px-4 sm:px-6 flex-col items-start gap-2 hover:bg-background hover:border-primary/50 transition-all border-muted-foreground/20 w-full"
               disabled={executionMode === "sovereign"}
               onClick={handleOpenHitlQueue}
-              aria-label="Open human-in-the-loop authorization review queue"
+              aria-label="Open HITL-review queue for pending card issuance and high-value transaction requests"
             >
               <span className="flex items-center gap-2 text-sm font-bold">
-                <ShieldCheck className="w-4 h-4 text-accent" />
+                <ShieldCheck className="w-4 h-4 text-accent flex-shrink-0" />
                 HITL Authorization
               </span>
-              <span className="text-[10px] text-muted-foreground font-normal leading-relaxed text-left">Human-in-the-loop review queue for pending card issuance and high-value transaction requests.</span>
+              <span className="text-[10px] text-muted-foreground font-normal leading-relaxed text-left break-words w-full">
+                HITL-review queue for pending card issuance and high-value transaction requests.
+              </span>
             </Button>
           </div>
         </CardContent>
