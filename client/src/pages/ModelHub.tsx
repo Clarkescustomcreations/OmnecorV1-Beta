@@ -130,16 +130,16 @@ export default function ModelHub() {
     <OmnecorDashboardLayout>
       <div className="h-full flex flex-col bg-background">
         {/* Header */}
-        <div className="border-b border-border bg-card px-6 py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <Zap className="w-6 h-6 text-accent" />
-              <div>
-                <h1 className="text-xl font-bold">Model Hub</h1>
-                <p className="text-sm text-muted-foreground">Manage local and API-based AI models</p>
+        <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3 min-w-0">
+              <Zap className="w-6 h-6 text-accent flex-shrink-0" />
+              <div className="min-w-0">
+                <h1 className="text-xl font-bold truncate">Model Hub</h1>
+                <p className="text-sm text-muted-foreground truncate">Manage local and API-based AI models</p>
               </div>
             </div>
-            <div className="flex gap-2">
+            <div className="flex flex-wrap gap-2 flex-shrink-0">
               <Button size="sm" variant="outline" onClick={handleRefresh} disabled={isRefreshing || ollamaLoading}>
                 <RefreshCw className={`w-4 h-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
                 {isRefreshing ? "Refreshing..." : "Refresh"}
@@ -151,7 +151,8 @@ export default function ModelHub() {
                 className="gap-1.5"
               >
                 <Settings className="w-4 h-4" />
-                Configure Providers
+                <span className="hidden sm:inline">Configure Providers</span>
+                <span className="sm:hidden">Configure</span>
                 <ExternalLink className="w-3 h-3 opacity-60" />
               </Button>
             </div>
@@ -159,8 +160,8 @@ export default function ModelHub() {
         </div>
 
         {/* Main Content */}
-        <div className="flex-1 flex gap-6 p-6 overflow-hidden">
-          <div className="flex-1 flex flex-col">
+        <div className="flex-1 flex flex-col md:flex-row gap-4 sm:gap-6 p-4 sm:p-6 overflow-auto md:overflow-hidden">
+          <div className="flex-1 flex flex-col min-w-0 min-h-0">
             <Card className="flex-1 flex flex-col">
               <CardHeader>
                 <CardTitle>Active Models</CardTitle>
@@ -179,7 +180,7 @@ export default function ModelHub() {
           </div>
 
           {/* Right Sidebar */}
-          <div className="w-80 flex flex-col gap-4">
+          <div className="w-full md:w-72 flex flex-col gap-4 md:overflow-y-auto md:flex-shrink-0">
             {/* Selected Model */}
             <Card>
               <CardHeader>

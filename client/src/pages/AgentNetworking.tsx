@@ -275,7 +275,7 @@ export default function AgentNetworking() {
 
   return (
     <OmnecorDashboardLayout>
-      <div className="p-8 max-w-7xl mx-auto space-y-8">
+      <div className="p-4 sm:p-6 md:p-8 max-w-7xl mx-auto space-y-6 md:space-y-8">
         {/* Header */}
         <div className="flex justify-between items-start flex-wrap gap-4">
           <div>
@@ -339,7 +339,7 @@ export default function AgentNetworking() {
         </div>
 
         {/* Stats Grid */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card>
             <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
               <CardTitle className="text-sm font-medium">Scheduled</CardTitle>
@@ -649,7 +649,7 @@ export default function AgentNetworking() {
                 {/* Connected Accounts */}
                 <div className="space-y-3">
                   <p className="text-sm font-medium">Connected Accounts</p>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {isLoadingAccounts ? (
                       <div className="col-span-2 flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
                     ) : accountsData?.length === 0 ? (
@@ -848,7 +848,7 @@ function MeshFederationPanel() {
   };
 
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
       <Card className="lg:col-span-2">
         <CardHeader>
           <div className="flex items-center justify-between">
@@ -860,7 +860,7 @@ function MeshFederationPanel() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-6">
             <div className="space-y-4">
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
@@ -996,7 +996,7 @@ function PlatformOAuthButtons({
   };
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
       {OAUTH_PLATFORMS.map((platform) => (
         <button
           key={platform.id}
@@ -1125,7 +1125,7 @@ function CurationPanel() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6">
         <Card className="bg-muted/30 border-none">
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
@@ -1177,7 +1177,7 @@ function CurationPanel() {
         </TabsList>
 
         <TabsContent value="discovery" className="space-y-4">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
             <Card className="border-accent/10">
               <CardHeader>
                 <CardTitle className="text-base">Incoming Stream</CardTitle>

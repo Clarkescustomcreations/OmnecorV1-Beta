@@ -138,7 +138,7 @@ export default function Dashboard() {
       <div className="min-h-screen bg-background">
         {/* Hero Section */}
         <div className="border-b border-border bg-gradient-to-br from-card to-background">
-          <div className="max-w-7xl mx-auto px-6 py-12 md:py-20">
+          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 md:py-20">
             <div className="flex items-center gap-2 mb-4">
               <Sparkles className="w-5 h-5 text-accent" />
               <span className="text-sm font-medium text-accent">
@@ -159,7 +159,7 @@ export default function Dashboard() {
         </div>
 
         {/* Features Grid */}
-        <div className="max-w-7xl mx-auto px-6 py-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 md:py-12">
           <div className="mb-8">
             <h2 className="text-2xl font-bold mb-2">Core Features</h2>
             <p className="text-muted-foreground">
@@ -199,7 +199,7 @@ export default function Dashboard() {
                       </Button>
                     </CardContent>
                   </div>
-                  <div className="p-6 bg-muted/20 md:border-l border-border min-w-[300px]">
+                  <div className="p-4 sm:p-6 bg-muted/20 md:border-l border-border w-full md:min-w-[280px] md:max-w-[320px]">
                     <BudgetPanel projectId="default" className="border-none bg-transparent shadow-none p-0" />
                   </div>
                 </div>

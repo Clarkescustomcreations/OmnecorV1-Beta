@@ -902,7 +902,7 @@ export default function Chat() {
 
           {/* Live Preview Panel */}
           {previewMode !== "none" && (
-            <div className="w-96 lg:w-[400px] xl:w-[500px] flex flex-col gap-2 overflow-hidden flex-shrink-0 border border-border rounded-xl bg-card shadow-xl animate-in slide-in-from-right-4 duration-300 relative z-10">
+            <div className="w-72 sm:w-96 lg:w-[400px] xl:w-[500px] flex flex-col gap-2 overflow-hidden flex-shrink-0 border border-border rounded-xl bg-card shadow-xl animate-in slide-in-from-right-4 duration-300 relative z-10">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center gap-2">
                   {previewMode === "3d" && <Box className="w-4 h-4 text-accent" />}
@@ -959,8 +959,8 @@ export default function Chat() {
 
           {/* Context panel (Collapsible) */}
           <div className={cn(
-            "flex flex-col gap-3 transition-all duration-300 overflow-hidden flex-shrink-0 hidden xl:flex",
-            contextCollapsed ? "w-10 items-center" : "w-72"
+            "flex flex-col gap-3 transition-all duration-300 overflow-hidden flex-shrink-0 hidden lg:flex",
+            contextCollapsed ? "w-10 items-center" : "w-60 xl:w-72"
           )}>
             <HowToTooltip 
               title={contextCollapsed ? "Expand Context" : "Collapse Context"} 
