@@ -8,16 +8,20 @@
  * configurable from Settings → Security (14 days / 28 days / 0 = permanent).
  * Errors are swallowed so audit logging never crashes the main application flow.
  *
- * Note: the audit log persists only in MySQL mode — in SQLite (Sovereign) mode
- * getDb() returns null and logging/purging are no-ops.
+ * Persistence and the retention/purge schedule are identical in MySQL and
+ * SQLite (Sovereign) mode — both backends implement the audit* functions
+ * routed through db.factory.ts.
  */
 
 import { v4 as uuidv4 } from "uuid";
 import { readFileSync, writeFileSync, existsSync } from "fs";
 import { join } from "path";
-import { lt, sql } from "drizzle-orm";
-import { getDb } from "../../db.factory.js";
-import { auditLog, type InsertAuditLog } from "../../../drizzle/schema.js";
+import {
+  auditInsert,
+  auditPurgeBefore,
+  auditStats,
+} from "../../db.factory.js";
+import { type InsertAuditLog } from "../../../drizzle/schema.js";
 import { PATHS } from "../../_core/paths.js";
 
 type LogInput = Omit<InsertAuditLog, "id" | "createdAt">;
@@ -47,10 +51,8 @@ export class AuditLogService {
   }
 
   async log(input: LogInput): Promise<void> {
-    const db = await getDb();
-    if (!db) return;
     try {
-      await db.insert(auditLog).values({ id: uuidv4(), ...input });
+      await auditInsert({ id: uuidv4(), ...input });
     } catch {
       // Audit log must never crash the main flow
     }
@@ -94,18 +96,15 @@ export class AuditLogService {
 
   /**
    * Delete entries older than the retention window. No-op when retention is
-   * permanent (0) or the database is unavailable (SQLite mode).
+   * permanent (0). Works identically against MySQL and SQLite.
    * Returns the number of rows removed.
    */
   async purgeExpired(): Promise<number> {
     const days = this.getRetentionDays();
     if (days === 0) return 0;
-    const db = await getDb();
-    if (!db) return 0;
     try {
       const cutoff = new Date(Date.now() - days * 24 * 60 * 60 * 1000);
-      const result = await db.delete(auditLog).where(lt(auditLog.createdAt, cutoff));
-      const affected = Number((result as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0);
+      const affected = await auditPurgeBefore(cutoff);
       if (affected > 0) {
         console.log(`[AuditLog] Retention purge removed ${affected} entries older than ${days} days`);
       }
@@ -123,32 +122,10 @@ export class AuditLogService {
     oldestEntryAt: string | null;
     approxBytes: number;
   }> {
-    const db = await getDb();
-    if (!db) return { dbActive: false, entries: 0, oldestEntryAt: null, approxBytes: 0 };
     try {
-      const [countRows, oldestRows, sizeRows] = await Promise.all([
-        db.select({ count: sql<number>`count(*)` }).from(auditLog),
-        db.select({ oldest: sql<Date | null>`min(${auditLog.createdAt})` }).from(auditLog),
-        // information_schema gives real table+index size on MySQL; if the
-        // query fails we fall back to a conservative per-row estimate.
-        db
-          .execute(
-            sql`SELECT (data_length + index_length) AS bytes FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'audit_log'`
-          )
-          .catch(() => null),
-      ]);
-      const entries = Number(countRows[0]?.count ?? 0);
-      const oldestRaw = oldestRows[0]?.oldest ?? null;
-      const oldestEntryAt = oldestRaw ? new Date(oldestRaw).toISOString() : null;
-      let approxBytes = entries * 768; // fallback: ~0.75 KB per row incl. JSON args
-      if (sizeRows) {
-        const rows = (sizeRows as unknown as [Array<{ bytes?: number | string }>])[0];
-        const bytes = Number(rows?.[0]?.bytes ?? 0);
-        if (bytes > 0) approxBytes = bytes;
-      }
-      return { dbActive: true, entries, oldestEntryAt, approxBytes };
+      return await auditStats();
     } catch {
-      return { dbActive: true, entries: 0, oldestEntryAt: null, approxBytes: 0 };
+      return { dbActive: false, entries: 0, oldestEntryAt: null, approxBytes: 0 };
     }
   }
 

@@ -102,7 +102,7 @@ Defines per-project spending limits and alerting behaviour. The `mode` column co
 
 ### 2.7. `audit_log` Table
 
-> **APPEND-ONLY.** No `UPDATE` is ever performed and application code cannot delete entries. The only deletion path is the time-based retention purge in `AuditLogService` (default 14 days; configurable to 28 days or permanent in Settings → Security). Sensitive data is redacted before insertion via `redactSensitiveData()`.
+> **APPEND-ONLY.** No `UPDATE` is ever performed and application code cannot delete entries. The only deletion path is the time-based retention purge in `AuditLogService` (default 14 days; configurable to 28 days or permanent in Settings → Security). Sensitive data is redacted before insertion via `redactSensitiveData()`. The table exists in BOTH backends — MySQL (`drizzle/schema.ts`) and SQLite (`server/db.sqlite.ts`) — with the identical retention schedule, routed through the `audit*` functions in `db.factory.ts`.
 
 | Column Name | Type | Description | Constraints |
 |---|---|---|---|

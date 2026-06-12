@@ -232,9 +232,10 @@ export class IntegrationManagementService {
   }
 
   /**
-   * Attempt to refresh an OAuth token.
-   * Requires refresh_token to be stored and provider-specific refresh logic.
-   * For now, returns success/error without actual refresh (assumes manual reconnect).
+   * Refresh an OAuth token using the stored refresh_token (standard OAuth2
+   * refresh_token grant against the platform's token endpoint, via
+   * `refreshOAuthToken` in server/oauth/oauthClients.ts). The new access
+   * token, rotated refresh token (when issued), and expiry are persisted.
    */
   async refreshToken(
     integrationId: string,
@@ -270,9 +271,35 @@ export class IntegrationManagementService {
         };
       }
 
-      // TODO: Implement provider-specific refresh logic here
-      // For now, just log and return success with existing expiry
-      log.info(`Token refresh requested for ${integrationId} (user ${userId})`);
+      // Perform the OAuth2 refresh_token grant against the provider's token
+      // endpoint and persist the rotated credentials.
+      const { refreshOAuthToken } = await import("../../oauth/oauthClients.js");
+      const refreshed = await refreshOAuthToken(integrationId, acc.oauthRefreshToken);
+      if (!refreshed.access_token) {
+        return {
+          success: false,
+          message: `${integrationId} returned no access token on refresh. Please reconnect.`,
+        };
+      }
+
+      const tokenExpiresAt = refreshed.expires_in
+        ? new Date(Date.now() + refreshed.expires_in * 1000)
+        : (acc.tokenExpiresAt ?? null);
+
+      await db
+        .update(platformAccounts)
+        .set({
+          oauthToken: refreshed.access_token,
+          // Providers may rotate the refresh token; keep the old one otherwise.
+          oauthRefreshToken: refreshed.refresh_token || acc.oauthRefreshToken,
+          tokenExpiresAt,
+        })
+        .where(and(
+          eq(platformAccounts.userId, Number(userId)),
+          eq(platformAccounts.platform, integrationId),
+        ));
+
+      log.info(`Token refreshed for ${integrationId} (user ${userId})`);
 
       // Clear cache to force re-check on next health check
       const key = getCacheKey(userId, integrationId);
@@ -281,7 +308,7 @@ export class IntegrationManagementService {
       return {
         success: true,
         message: `${integrationId} token refreshed`,
-        tokenExpiresAt: acc.tokenExpiresAt?.toISOString(),
+        tokenExpiresAt: tokenExpiresAt ? new Date(tokenExpiresAt).toISOString() : undefined,
       };
     } catch (err) {
       log.error(

@@ -231,7 +231,7 @@ export const kicadRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
       return PCBWayService.getInstance().placeOrder(input.quoteId, input.shippingAddress);
     }),
 });

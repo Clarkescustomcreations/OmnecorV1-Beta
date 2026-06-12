@@ -101,6 +101,29 @@ The append-only audit log had no pruning — every tRPC call is logged, so it wo
 - `docs/backend/DATABASE_SCHEMA.md` + `docs/backend/SERVICES_OVERVIEW.md`: audit_log/AuditLogService descriptions updated for retention semantics.
 - `master-feature-plan.md`: pullOllama removal noted.
 
+## v1.0-Tag Blockers Round (2026-06-12, third pass)
+
+### Silent mutations — eliminated by construction
+- **Desktop** (`client/src/main.tsx`): QueryClient now uses a global `MutationCache.onError` — any of the 159 `useMutation` calls that lacks a local `onError` (13 did) surfaces its failure as a toast; mutations with their own `onError` keep full control (no double-toasting). Unauthorized redirects preserved.
+- **APK** (`app/_layout.tsx`): same global `MutationCache.onError` pattern using `Alert.alert`.
+- **Server**: the last 8 silent audit-log `.catch(() => {})` (AgentService ×5, mcpRouter ×2, kicadRouter ×1) now log warnings; projectRouter folder-open failures (×3) now warn. Remaining empty catches are verified best-effort cleanup only (temp-file unlink, PTY kill, client close, settings-fallback write, audio preview autoplay).
+- `onError: () => {}` count: **0**. `catch(() => {})` on anything non-cleanup: **0**.
+
+### `err: any` — eliminated
+- `CurationStudio.tsx:96` → inferred tRPC error type. Also found and fixed the only other one in the repo: APK `podcast.tsx:68` (`catch (err: any)` → `err instanceof Error`). Client + APK now have **zero** `err:/error:/e: any`.
+
+### OAuth refresh TODO — implemented
+- `IntegrationManagementService.refreshToken` now performs the real OAuth2 `refresh_token` grant via the existing `refreshOAuthToken()` in `server/oauth/oauthClients.ts`, persists the new access token, rotated refresh token, and expiry to `platformAccounts`, and clears the health cache. Failure paths return `success: false` with a reconnect message instead of fake success. Zero TODO/FIXME comments remain in server/, client/src/, shared/.
+
+### Audit log parity in SQLite / Sovereign mode
+- `audit_log` table added to the SQLite schema (`server/db.sqlite.ts`) with a `createdAt` index, mirroring MySQL.
+- New backend-routed functions in `db.factory.ts`: `auditInsert`, `auditPurgeBefore`, `auditList`, `auditListByActor`, `auditStats` — MySQL impl in `db.ts`, SQLite impl in `db.sqlite.ts`.
+- `AuditLogService` and `auditRouter` now use the factory exclusively → identical persistence, retention windows, and 6-hour purge schedule in both modes. **Live-verified in SQLite mode**: insert → stats → backdated entry purged by the 14-day window (PASS).
+- Settings panel + docs updated (MySQL-only caveat removed).
+
+### Bonus finds in the same pass
+- `command: "python3"` hardcoded in AgentService (×2) and trainingRouter (×2) spawns — now `PYTHON_SCRIPTS.pythonBin` (Windows-safe).
+
 ## Accepted / Deferred (documented, not blockers)
 
 - **`as any` debt (~38 server instances)** — concentrated in sdk.ts OAuth response shaping and settings-file reads; all behind validated boundaries. Typed-schema refactor deferred post-beta (no behavior risk found).

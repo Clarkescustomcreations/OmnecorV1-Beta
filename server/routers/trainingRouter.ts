@@ -23,6 +23,7 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { execFile } from "child_process";
+import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
 import { promisify } from "util";
 import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
 
@@ -212,7 +213,7 @@ export const trainingRouter = router({
       try {
         const jobId = await ctx.services.processManager.spawn({
           type: "custom",
-          command: "python3",
+          command: PYTHON_SCRIPTS.pythonBin,
           args,
           env,
           label: "Valet Router Dataset Builder",
@@ -450,7 +451,7 @@ export const trainingRouter = router({
       const baseModel = input.baseModel ?? "Qwen/Qwen2.5-1.5B-Instruct";
       const mergeJobId = await ctx.services.processManager.spawn({
         type: "custom",
-        command: "python3",
+        command: PYTHON_SCRIPTS.pythonBin,
         args: ["server/python_bridges/valet_merge.py"],
         env: {
           VALET_MERGE_ADAPTER: stagedAdapterPath,

@@ -159,7 +159,7 @@ Without a retention window an append-only log grows without bound (every tRPC ca
 
 Change it under **Settings → Security → Audit Log Retention** (Admin/Owner role required). Shrinking the window applies immediately, and the retention change itself is recorded in the audit log (`audit_retention_changed`).
 
-> Note: the audit log persists only in MySQL mode. In SQLite (Sovereign) mode entries are not stored, so retention has no effect.
+> The audit log persists in both MySQL and SQLite (Sovereign) mode with the identical retention/purge schedule — the `audit_log` table exists in both backends and the 6-hour sweep runs regardless of mode.
 
 ### What Gets Logged
 
