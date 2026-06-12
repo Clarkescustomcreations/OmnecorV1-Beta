@@ -25,6 +25,7 @@ import CloudComputePanel from "../components/settings/CloudComputePanel";
 import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
 import ValetRouterPanel from "../components/settings/ValetRouterPanel";
+import { AuditRetentionPanel } from "../components/settings/AuditRetentionPanel";
 import AgenticWalletPanel from "../components/settings/AgenticWalletPanel";
 import { advancedSettings } from "../lib/advancedSettings";
 import OmnecorDashboardLayout from "../components/OmnecorDashboardLayout";
@@ -78,7 +79,12 @@ export const Settings: React.FC = () => {
     }
   }, [aiProviders]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("api");
+  // Deep-linkable: /settings?tab=hardware opens the Hardware tab directly.
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    const known = ["api", "wallet", "ommesh", "security", "hardware", "voice", "system", "accounts", "valet", "appearance", "cloud", "general", "knowledge", "privacy", "advanced", "admin"];
+    return requested && known.includes(requested) ? requested : "api";
+  });
 
   const saveKeysMutation = trpc.system.saveKeys.useMutation({
     onSuccess: () => {
@@ -667,6 +673,8 @@ export const Settings: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                      <AuditRetentionPanel />
+
                       <div className="pt-6 border-t space-y-6">
                         <h3 className="text-lg font-semibold">Encryption Settings</h3>
                         <div className="flex items-center justify-between">

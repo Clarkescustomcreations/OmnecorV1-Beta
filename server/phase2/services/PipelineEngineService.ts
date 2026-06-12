@@ -98,7 +98,7 @@ export class PipelineEngineService {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch(() => {});
+    }).catch((err) => console.warn("[AuditLog] write failed:", err));
 
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, id));
     return pipeline;
@@ -159,7 +159,7 @@ export class PipelineEngineService {
 
     if (!nextPhase) {
       await db.update(pipelines).set({ status: "complete", currentPhase: "DONE" }).where(eq(pipelines.id, pipelineId));
-      AuditLogService.getInstance().log({ eventType: "pipeline_complete", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase }, result: null, ipAddress: null, sessionId: null }).catch(() => {});
+      AuditLogService.getInstance().log({ eventType: "pipeline_complete", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
     } else {
       await db.update(pipelines).set({ currentPhase: nextPhase }).where(eq(pipelines.id, pipelineId));
       const output = PromptSanitizer.getInstance().sanitize(phaseOutput(nextPhase, pipeline.goal)).clean;
@@ -170,7 +170,7 @@ export class PipelineEngineService {
         status: "awaiting_approval",
         outputText: output,
       });
-      AuditLogService.getInstance().log({ eventType: "pipeline_phase_approved", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase, nextPhase }, result: null, ipAddress: null, sessionId: null }).catch(() => {});
+      AuditLogService.getInstance().log({ eventType: "pipeline_phase_approved", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase, nextPhase }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
     }
 
     const [updated] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
@@ -188,7 +188,7 @@ export class PipelineEngineService {
     }
 
     await db.update(pipelines).set({ status: "aborted" }).where(eq(pipelines.id, pipelineId));
-    AuditLogService.getInstance().log({ eventType: "pipeline_aborted", actorId: null, actorType: "user", procedure: "pipeline.abort", args: { pipelineId }, result: null, ipAddress: null, sessionId: null }).catch(() => {});
+    AuditLogService.getInstance().log({ eventType: "pipeline_aborted", actorId: null, actorType: "user", procedure: "pipeline.abort", args: { pipelineId }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
     return pipeline;
   }

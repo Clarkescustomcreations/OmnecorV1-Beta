@@ -185,7 +185,8 @@ class SDKServer {
     options: { expiresInMs?: number } = {}
   ): Promise<string> {
     const issuedAt = Date.now();
-    const expiresInMs = options.expiresInMs ?? ONE_YEAR_MS;
+    // Precedence: explicit per-call value → SESSION_TTL_MS env → one-year default.
+    const expiresInMs = options.expiresInMs ?? ENV.sessionTtlMs ?? ONE_YEAR_MS;
     const expirationSeconds = Math.floor((issuedAt + expiresInMs) / 1000);
     const secretKey = this.getSessionSecret();
 

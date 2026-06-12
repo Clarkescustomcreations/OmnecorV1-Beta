@@ -127,11 +127,12 @@ graph TD
 
 ### 2.13. `AuditLogService` (`server/phase2/services/AuditLogService.ts`)
 
--   **Purpose**: Maintains an immutable, append-only audit trail of all privileged system actions for compliance and security monitoring.
+-   **Purpose**: Maintains an append-only audit trail of all privileged system actions for compliance and security monitoring, with automatic time-based retention so the log never grows without bound.
 -   **Key Responsibilities**:
     -   Recording login/logout events, HITL approvals, agent spawns, budget changes, and security events.
     -   Automatically scrubbing sensitive data (API keys, tokens, PII) via `redactSensitiveData()` before writing.
-    -   Enforcing append-only semantics — no update or delete procedures exist for the `audit_log` table.
+    -   Enforcing append-only semantics — entries are never updated; the only deletion path is the retention purge.
+    -   Time-based retention: a background sweep (every 6 hours, started at server boot) deletes entries older than the configured window — 14 days by default, 28 days or permanent (0) selectable in Settings → Security. Permanent mode shows a storage-size warning in the UI.
     -   Providing filtered log viewing and CSV export capabilities for audit and compliance purposes.
 
 ### 2.14. `WebSocketServer` (`server/_core/websocket.ts`)

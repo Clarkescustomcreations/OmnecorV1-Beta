@@ -13,6 +13,11 @@ import { SettingsService } from "../phase2/services/SettingsService.js";
 
 export const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
 
+// Resolved session lifetime: SESSION_TTL_MS env when set, else one year
+// (local-first default). Used for both the JWT expiry and the cookie maxAge so
+// network deployments can shorten sessions via a single env var.
+const SESSION_TTL_MS = ENV.sessionTtlMs ?? ONE_YEAR_MS;
+
 // Treat a token as expired this many ms before its real expiry so an in-flight
 // request never races the expiry boundary.
 const TOKEN_EXPIRY_SKEW_MS = 60 * 1000;
@@ -254,13 +259,13 @@ export function registerOAuthRoutes(app: Express) {
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
-        expiresInMs: ONE_YEAR_MS,
+        expiresInMs: SESSION_TTL_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, {
         ...cookieOptions,
-        maxAge: ONE_YEAR_MS,
+        maxAge: SESSION_TTL_MS,
       });
 
       // Clear state cookie
@@ -353,11 +358,11 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
       const sessionToken = await sdk.createSessionToken(openId, {
         name: userInfo.name ?? "",
-        expiresInMs: ONE_YEAR_MS,
+        expiresInMs: SESSION_TTL_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_TTL_MS });
       res.clearCookie("google_oauth_state", cookieOptions);
       res.redirect(302, "/");
     } catch (error) {
@@ -446,11 +451,11 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
 
       const sessionToken = await sdk.createSessionToken(openId, {
         name: userInfo.displayName ?? "",
-        expiresInMs: ONE_YEAR_MS,
+        expiresInMs: SESSION_TTL_MS,
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: ONE_YEAR_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_TTL_MS });
       res.clearCookie("ms_oauth_state", cookieOptions);
       res.redirect(302, "/");
     } catch (error) {

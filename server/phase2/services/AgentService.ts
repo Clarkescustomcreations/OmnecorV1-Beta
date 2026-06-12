@@ -316,8 +316,10 @@ export class AgentService extends EventEmitter {
 
   // ── MCP tool methods ──────────────────────────────────────────────────────────
 
-  getAvailableMCPTools() {
-    const { MCPClientService } = require("./MCPClientService.js") as typeof import("./MCPClientService.js");
+  async getAvailableMCPTools() {
+    // Dynamic import (not a static top-level import) to break the
+    // AgentService <-> MCPClientService circular dependency.
+    const { MCPClientService } = await import("./MCPClientService.js");
     return MCPClientService.getInstance().listTools();
   }
 
@@ -334,9 +336,11 @@ export class AgentService extends EventEmitter {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch(() => {});
+    }).catch((err) => {
+      console.warn("[AgentService] Failed to write mcp_tool_call audit log:", err);
+    });
 
-    const { MCPClientService } = require("./MCPClientService.js") as typeof import("./MCPClientService.js");
+    const { MCPClientService } = await import("./MCPClientService.js");
     return MCPClientService.getInstance().callTool(serverId, toolName, safeArgs);
   }
 

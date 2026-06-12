@@ -62,7 +62,9 @@ export default function AiNodeScreen() {
       setModelLoaded(isModelLoaded());
       setModelPath(getLoadedModelPath());
     });
-    return unsub;
+    return () => {
+      unsub();
+    };
   }, []);
 
   const handleTestInference = useCallback(async () => {

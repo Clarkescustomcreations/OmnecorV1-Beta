@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { useLocation } from "wouter";
 import { toast } from "sonner";
 import {
   Card,
@@ -38,6 +39,7 @@ interface SpecializedModuleLauncherProps {
 export default function SpecializedModuleLauncher({
   className,
 }: SpecializedModuleLauncherProps) {
+  const [, setLocation] = useLocation();
   const [activeTab, setActiveTab] = useState<"llm" | "3d" | "pcb">("llm");
   const [llmSession, setLLMSession] = useState<LLMBuilderSession | null>(null);
   const [blenderProject, setBlenderProject] = useState<BlenderProject | null>(null);
@@ -324,7 +326,7 @@ export default function SpecializedModuleLauncher({
           <Play className="w-4 h-4 mr-2" aria-hidden="true" />
           Start Training
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure LLM training" onClick={() => toast.info("Configure fine-tuning via Unsloth panel — navigate to 3D Designer > LLM tab")}>
+        <Button variant="outline" className="flex-1" aria-label="Configure LLM training" onClick={() => setLocation("/settings?tab=valet")}>
           <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Configure
         </Button>
@@ -571,7 +573,7 @@ export default function SpecializedModuleLauncher({
           <Box className="w-4 h-4 mr-2" aria-hidden="true" />
           {openInBlenderMutation.isPending ? "Opening…" : "Open in Blender"}
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure 3D Modeler settings" onClick={() => toast.info("Blender settings — configure in Settings > Hardware")}>
+        <Button variant="outline" className="flex-1" aria-label="Configure 3D Modeler settings" onClick={() => setLocation("/settings?tab=hardware")}>
           <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Settings
         </Button>
@@ -711,7 +713,7 @@ export default function SpecializedModuleLauncher({
           <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
           {openInKicadMutation.isPending ? "Opening…" : "Open in KiCad"}
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure PCB Designer settings" onClick={() => toast.info("KiCad settings — configure in Settings > Hardware")}>
+        <Button variant="outline" className="flex-1" aria-label="Configure PCB Designer settings" onClick={() => setLocation("/settings?tab=hardware")}>
           <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
           Settings
         </Button>

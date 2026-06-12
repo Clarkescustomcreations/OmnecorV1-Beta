@@ -7,6 +7,30 @@ import { TRPCError } from "@trpc/server";
 
 const UPLOAD_DIR = join(process.cwd(), "uploads", "attachments");
 
+/**
+ * Allowlist of file extensions that may be stored with their original
+ * extension. Anything not in this set (including executable, script, and
+ * active-content types such as exe/dll/bat/cmd/ps1/sh/msi/scr/com/jar/apk/
+ * svg/html/htm/xhtml/mht) is stored as ".bin" so it can never be served or
+ * executed with a dangerous content type from the /uploads route.
+ */
+const ALLOWED_EXTENSIONS = new Set<string>([
+  // documents
+  "pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "odt", "ods", "odp", "rtf", "csv",
+  // images (note: svg deliberately excluded — it can carry scripts)
+  "png", "jpg", "jpeg", "gif", "webp", "bmp", "tiff", "tif", "ico", "heic", "heif", "avif",
+  // audio
+  "mp3", "wav", "ogg", "flac", "aac", "m4a", "opus", "wma",
+  // video
+  "mp4", "webm", "mov", "avi", "mkv", "m4v", "wmv", "flv",
+  // archives
+  "zip", "tar", "gz", "tgz", "bz2", "xz", "7z", "rar",
+  // text / data / code (served as text, never executed)
+  "txt", "md", "markdown", "log", "json", "yaml", "yml", "toml", "ini", "xml",
+  "js", "ts", "jsx", "tsx", "py", "go", "rs", "java", "c", "cpp", "h", "hpp",
+  "cs", "rb", "php", "swift", "kt", "sql", "css", "scss",
+]);
+
 export const attachmentsRouter = router({
   uploadFile: protectedProcedure
     .input(
@@ -26,9 +50,11 @@ export const attachmentsRouter = router({
         });
       }
 
-      // Sanitise the extension — allow only simple alphanumeric extensions
-      const rawExt = input.name.split(".").pop() ?? "bin";
-      const ext = /^[a-zA-Z0-9]{1,10}$/.test(rawExt) ? rawExt : "bin";
+      // Sanitise the extension — allow only known-safe extensions; map anything
+      // else (executables, scripts, active content) to ".bin" so it can't be
+      // served or executed with a dangerous content type.
+      const rawExt = (input.name.split(".").pop() ?? "").toLowerCase();
+      const ext = ALLOWED_EXTENSIONS.has(rawExt) ? rawExt : "bin";
 
       const fileId = randomUUID();
       const filename = `${fileId}.${ext}`;

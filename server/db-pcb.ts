@@ -9,7 +9,7 @@
  * - Exports
  */
 
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, inArray } from "drizzle-orm";
 import { getDb } from "./db.factory.js";
 import {
   designProjects,
@@ -103,13 +103,14 @@ export async function deleteProject(projectId: number): Promise<boolean> {
     .from(designSaves)
     .where(eq(designSaves.projectId, projectId));
 
-  for (const save of saves) {
+  const saveIds = saves.map((save) => save.id);
+  if (saveIds.length > 0) {
     await db
       .delete(designExports)
-      .where(eq(designExports.designSaveId, save.id));
+      .where(inArray(designExports.designSaveId, saveIds));
     await db
       .delete(aiDesignReviews)
-      .where(eq(aiDesignReviews.designSaveId, save.id));
+      .where(inArray(aiDesignReviews.designSaveId, saveIds));
   }
 
   await db

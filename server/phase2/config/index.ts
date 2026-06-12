@@ -111,8 +111,11 @@ export const PYTHON_SCRIPTS = {
     __dirname,
     "../../python_bridges/valet_dataset_builder.py"
   ),
-  /** Python executable (can be overridden for venvs) */
-  pythonBin: process.env.PYTHON_BIN || "python3",
+  /** Python executable (can be overridden for venvs). Windows installs expose
+   *  `python`, not `python3`. */
+  pythonBin:
+    process.env.PYTHON_BIN ||
+    (process.platform === "win32" ? "python" : "python3"),
   /** Blender executable path */
   blenderBin: process.env.BLENDER_BIN || "blender",
 } as const;

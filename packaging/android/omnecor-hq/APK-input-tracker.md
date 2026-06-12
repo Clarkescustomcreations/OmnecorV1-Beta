@@ -465,6 +465,8 @@ Unified alert feed + Agent Messenger. Hooks: `use-notifications.ts`, `use-agent-
 
 ## Summary Counts
 
+> **Validation note (2026-06-12):** Tracker cross-checked against all screens in `app/(tabs)/` including `notifications.tsx` (added 2026-06-12). Coverage is complete. PARTIAL and STUB entries remain legitimately gated on the physical Android build machine (NDK r26+ / llama.rn native build for on-device inference; Whisper server at PC:8001 for STT). No count corrections required.
+
 | Status | Count |
 |--------|-------|
 | ✅ CONNECTED | ~140 items |

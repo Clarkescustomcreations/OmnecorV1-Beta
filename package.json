@@ -4,9 +4,9 @@
   "type": "module",
   "license": "MIT",
   "scripts": {
-    "dev": "NODE_ENV=development tsx watch server/_core/index.ts",
+    "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
     "build": "vite build && esbuild server/_core/index.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);\" --define:process.env.NODE_ENV=\"\\\"production\\\"\" --external:better-sqlite3 --external:onnxruntime-node --external:fsevents --external:vite --external:cohere-ai --external:ollama --external:lightningcss --external:@babel/core --external:@tailwindcss/oxide && node --input-type=commonjs -e \"require('fs').writeFileSync('dist/package.json',JSON.stringify({type:'module'}))\"",
-    "start": "NODE_ENV=production node dist/index.js",
+    "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
     "test": "vitest run",
@@ -15,9 +15,9 @@
     "build:web": "cd packaging/electron-app && pnpm build",
     "build:android": "pnpm build:web && cd packaging/electron-app && pnpm exec cap sync android",
     "valet:fetch": "bash scripts/fetch-valet-model.sh",
-    "valet:build": "python3 server/python_bridges/valet_pipeline.py",
+    "valet:build": "node scripts/run-python.mjs server/python_bridges/valet_pipeline.py",
     "valet:setup-ml": "bash scripts/setup-valet-ml.sh",
-    "valet:repro": "python3 scripts/check_valet_reproducibility.py"
+    "valet:repro": "node scripts/run-python.mjs scripts/check_valet_reproducibility.py"
   },
   "dependencies": {
     "@anthropic-ai/tokenizer": "^0.0.4",
@@ -131,6 +131,7 @@
     "add": "^2.0.6",
     "autoprefixer": "^10.4.20",
     "axe-core": "^4.10.3",
+    "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.25.0",
     "pnpm": "^10.15.1",
@@ -146,5 +147,9 @@
     "vitest": "^4.1.7"
   },
   "packageManager": "pnpm@10.34.1",
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.0.0"
+  },
   "//pnpm": "pnpm settings (overrides, onlyBuiltDependencies, etc.) live in pnpm-workspace.yaml — in a workspace pnpm ignores the 'pnpm' field here. legacy-peer-deps is in .npmrc."
 }

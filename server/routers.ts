@@ -79,7 +79,6 @@ import { oauthRouter } from "./routers/oauthRouter.js";
 import { attachmentsRouter } from "./routers/attachmentsRouter.js";
 import { neuralMapsRouter } from "./routers/neuralMapsRouter.js";
 import { personaRouter } from "./routers/personaRouter.js";
-import { brainmapRouter } from "./routers/brainmapRouter.js";
 import { integrationManagementRouter } from "./routers/integrationManagementRouter.js";
 import { hitlRouter } from "./routers/hitlRouter.js";
 import { notificationRouter } from "./routers/notificationRouter.js";
@@ -209,9 +208,6 @@ export const appRouter = router({
 
   // ─── Personas (DB persistence) ───────────────────────────────────────────
   personas: personaRouter,
-
-  // ─── Brain Map (Layout preference persistence) ────────────────────────────
-  brainmap: brainmapRouter,
 
   // ─── Human-in-the-Loop (HITL) Approval ───────────────────────────────────
   hitl: hitlRouter,

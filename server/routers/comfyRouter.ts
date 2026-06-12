@@ -13,7 +13,7 @@ export const comfyRouter = router({
    */
   queuePrompt: publicProcedure
     .input(z.object({
-      prompt: z.any(),
+      prompt: z.record(z.string(), z.unknown()),
     }))
     .mutation(async ({ ctx, input }) => {
       try {

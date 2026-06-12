@@ -1,6 +1,14 @@
 export const ENV = {
   appId: process.env.VITE_APP_ID ?? "",
   cookieSecret: process.env.JWT_SECRET ?? "",
+  // Session lifetime in milliseconds. Defaults to one year for local-first /
+  // sovereign desktop installs (long-lived convenience). Network deployments
+  // should set a short value (e.g. 604800000 = 7 days). Invalid/non-positive
+  // values fall back to the default (resolved in sdk.ts against ONE_YEAR_MS).
+  sessionTtlMs: (() => {
+    const raw = Number(process.env.SESSION_TTL_MS);
+    return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+  })(),
   databaseUrl: process.env.DATABASE_URL ?? "",
   // Database backend selection. "auto" (default) uses MySQL when DATABASE_URL is
   // set, otherwise falls back to the local SQLite store (Sovereign / offline

@@ -44,6 +44,24 @@ export function getWsUrl(): string {
   return `ws://${_ip}:${_port}/ws`;
 }
 
+/**
+ * WS URL with the stored session token appended as `?token=`. The PC verifies
+ * it at upgrade time (React Native WebSockets don't reliably attach cookies on
+ * every platform). Falls back to the bare URL when no session token is stored.
+ */
+export async function getAuthedWsUrl(): Promise<string> {
+  const base = getWsUrl();
+  if (!base) return "";
+  try {
+    const { getSessionToken } = await import("./auth");
+    const token = await getSessionToken();
+    if (token) return `${base}?token=${encodeURIComponent(token)}`;
+  } catch {
+    /* fall back to bare URL */
+  }
+  return base;
+}
+
 export function getOmmeshSecret(): string  { return _secret; }
 export function getNodeName(): string       { return _name; }
 export function getServerIp(): string       { return _ip; }

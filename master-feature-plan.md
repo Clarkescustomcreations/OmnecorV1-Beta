@@ -112,7 +112,7 @@ This document serves as the authoritative record of all features, functional cap
 
 ### Backend services delivered:
 *   **ModelManagementService** (`server/phase2/services/ModelManagementService.ts`) — JSON-based model registry at `data/model-registry.json`; 9 tRPC procedures via `modelManagementRouter`; ModelHub enhanced with set-active/sync UI.
-*   **ModelMarketplaceService** (`server/phase2/services/ModelMarketplaceService.ts`) — Dual-source model discovery (Ollama library + HuggingFace API); 8 curated featured models; `modelMarketplaceRouter` with search/featured/pullOllama; ModelHub marketplace tab enhanced.
+*   **ModelMarketplaceService** (`server/phase2/services/ModelMarketplaceService.ts`) — Dual-source model discovery (Ollama library + HuggingFace API); 8 curated featured models; `modelMarketplaceRouter` with search/featured (the no-op `pullOllama` was removed 2026-06-12 — clients call `trpc.ollama.pullModel` directly); ModelHub marketplace tab enhanced.
 *   **IntegrationManagementService** (`server/phase2/services/IntegrationManagementService.ts`) — Unified health monitoring for all 15+ integrations; 60s in-memory cache; OAuth token refresh + disconnect; `integrationManagementRouter`; IntegrationsHub shows live health dots.
 *   **schedulingRouter.publishNow** — Batch publish scheduled posts immediately via `inArray` update.
 *   **curatorRouter.regenerateDraft** — AI-assisted draft regeneration with Anthropic fallback to template.

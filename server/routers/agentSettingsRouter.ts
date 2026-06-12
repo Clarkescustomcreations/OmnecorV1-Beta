@@ -28,7 +28,7 @@ export const agentSettingsRouter = router({
       platform: z.string(),
       postsPerDay: z.number().optional(),
       autoApprove: z.number().optional(),
-      optimalPostingTimes: z.any().optional(),
+      optimalPostingTimes: z.array(z.string()).optional(),
       timezone: z.string().optional(),
     }))
     .mutation(async ({ input, ctx }) => {
@@ -67,16 +67,6 @@ export const agentSettingsRouter = router({
         });
       }
 
-      return { success: true };
-    }),
-  updateBotTheme: protectedProcedure
-    .input(z.object({ theme: z.string() }))
-    .mutation(async () => {
-      return { success: true };
-    }),
-  updateDiscoveryKeywords: protectedProcedure
-    .input(z.object({ keywords: z.array(z.string()) }))
-    .mutation(async () => {
       return { success: true };
     }),
 });

@@ -43,10 +43,10 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 | pcbEditor | pcbEditorRouter.ts | PCB design persistence, versioning, AI review | 8+ | protected |
 | esp | espRouter.ts | ESP microcontroller flashing, detection, erasing | 5+ | public/protected |
 | security | securityRouter.ts | File scanning (YARA), encryption, backup/restore | 4+ | protected |
-| audit | auditRouter.ts | Immutable event log retrieval (admin-only, read-only) | 1 | admin |
+| audit | auditRouter.ts | Append-only event log retrieval + retention window control (admin-only) | 5 | admin |
 | valet | valetRouter.ts | Intelligent multi-API routing, GPU detection, training setup | 4+ | protected |
 | ollama | ollamaRouter.ts | Ollama model lifecycle (list, info, pull, delete) | 5+ | protected/admin |
-| modelMarketplace | phase2/routers/modelMarketplaceRouter.ts | Model search across Ollama + HuggingFace | 1+ | protected |
+| modelMarketplace | phase2/routers/modelMarketplaceRouter.ts | Model search across Ollama + HuggingFace (search, featured) | 2 | protected |
 | modelManagement | modelManagementRouter.ts | Model registry CRUD, versioning, lifecycle | 5+ | protected |
 | mcp | mcpRouter.ts | Model Context Protocol client (connect, disconnect, list) | 4+ | protected |
 | pipeline | pipelineRouter.ts | GodMode pipeline framework (CRUD, phase approval) | 5+ | protected |
@@ -60,12 +60,11 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 | discovery | discoveryRouter.ts | Article discovery, processing pipeline | 3+ | protected |
 | platforms | platformsRouter.ts | Social platform account management (safe columns only) | 3+ | protected |
 | analytics | analyticsRouter.ts | Platform analytics summaries (impressions, engagement) | 2+ | protected |
-| settings | agentSettingsRouter.ts | Agent posting schedule configuration | 3+ | protected |
+| settings | agentSettingsRouter.ts | Agent posting schedule configuration (getScheduleConfig, updateScheduleConfig) | 2 | protected |
 | oauth | oauthRouter.ts | OAuth flow (authorization, callback, token exchange) | 3+ | protected |
 | attachments | attachmentsRouter.ts | File upload with sanitization (max 10 MB base64) | 1+ | protected |
 | neuralMaps | neuralMapsRouter.ts | Neural brain map persistence (settings, metadata) | 4+ | protected |
 | personas | personaRouter.ts | Persona CRUD and data persistence | 3+ | protected |
-| brainmap | brainmapRouter.ts | Brain map layout preference persistence | 1 | protected |
 | hitl | hitlRouter.ts | Human-in-the-Loop approval queue (pending, approve, reject) | 3+ | protected |
 | notifications | notificationRouter.ts | Unified alert feed (list, unreadCount, markRead, markAllRead, clear, create) | 6 | protected |
 | agentMessenger | agentMessengerRouter.ts | Agent/persona messenger threads (listConversations, getMessages, markRead, send) | 4 | protected |
@@ -210,8 +209,8 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 ### Audit Router
 - **Namespace**: `audit`
 - **File**: `server/routers/auditRouter.ts`
-- **Description**: Immutable, insert-only audit log. All procedures are admin-only. No mutations are exposed.
-- **Key Procedures**: `getAuditLog`
+- **Description**: Append-only audit log. Application code can never update or rewrite entries; the only deletion path is the time-based retention purge (default **14 days**, configurable to 28 days or permanent in Settings → Security; permanent shows a storage warning). All procedures are admin-only.
+- **Key Procedures**: `getAuditLog`, `getAuditLogByActor`, `exportAuditLog`, `getRetention`, `setRetention`
 - **Procedure Types**: `adminProcedure`
 
 ### Valet Router
@@ -354,13 +353,6 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 - **Key Procedures**: `list`, `upsert`, `delete`
 - **Procedure Types**: `protectedProcedure`
 
-### Brain Map Router
-- **Namespace**: `brainmap`
-- **File**: `server/routers/brainmapRouter.ts`
-- **Description**: Brain Map layout preference persistence (Zustand store roundtrip). Actual DB persistence can be wired in later.
-- **Key Procedures**: `saveLayoutPreferences`
-- **Procedure Types**: `protectedProcedure`
-
 ### HITL Router (Human-in-the-Loop)
 - **Namespace**: `hitl`
 - **File**: `server/routers/hitlRouter.ts`
@@ -404,7 +396,7 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 - **Namespace**: `modelMarketplace`
 - **File**: `server/phase2/routers/modelMarketplaceRouter.ts`
 - **Description**: Curated model library with automated sync across Ollama and HuggingFace repositories.
-- **Key Procedures**: `search`
+- **Key Procedures**: `search`, `featured`
 - **Procedure Types**: `protectedProcedure`
 
 ---
