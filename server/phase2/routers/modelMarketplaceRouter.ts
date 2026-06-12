@@ -39,25 +39,4 @@ export const modelMarketplaceRouter = router({
       const models = service.getHotModels();
       return { models, total: models.length };
     }),
-
-  /**
-   * Pull a model from Ollama registry
-   * Delegates to ollamaRouter.pullModel — we reuse that mutation.
-   * The client should handle the actual mutation call.
-   */
-  pullOllama: protectedProcedure
-    .input(z.object({
-      modelName: z.string().min(1).max(256),
-    }))
-    .mutation(async ({ ctx }) => {
-      // This procedure accepts the model name but doesn't directly call Ollama.
-      // The client is responsible for calling trpc.ollama.pullModel after this.
-      // Alternatively, we could proxy to ollamaFetch here, but the pattern
-      // in ollamaRouter is to use fire-and-forget fetch. For consistency,
-      // we delegate back to the client.
-      return {
-        success: true,
-        message: "Call trpc.ollama.pullModel to initiate the pull.",
-      };
-    }),
 });

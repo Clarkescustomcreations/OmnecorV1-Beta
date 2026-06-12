@@ -78,7 +78,12 @@ export const Settings: React.FC = () => {
     }
   }, [aiProviders]);
   const [searchQuery, setSearchQuery] = useState("");
-  const [activeTab, setActiveTab] = useState("api");
+  // Deep-linkable: /settings?tab=hardware opens the Hardware tab directly.
+  const [activeTab, setActiveTab] = useState(() => {
+    const requested = new URLSearchParams(window.location.search).get("tab");
+    const known = ["api", "wallet", "ommesh", "security", "hardware", "voice", "system", "accounts", "valet", "appearance", "cloud", "general", "knowledge", "privacy", "advanced", "admin"];
+    return requested && known.includes(requested) ? requested : "api";
+  });
 
   const saveKeysMutation = trpc.system.saveKeys.useMutation({
     onSuccess: () => {

@@ -19,7 +19,7 @@
  *     { type: "error",      data: { message } }
  */
 import { useState, useEffect, useRef, useCallback } from "react";
-import { getWsUrl, isServerConfigured } from "@/lib/_core/server-config";
+import { getAuthedWsUrl, isServerConfigured } from "@/lib/_core/server-config";
 
 export type TerminalStatus = "disconnected" | "connecting" | "ready" | "error";
 
@@ -57,48 +57,62 @@ export function useTerminal() {
     }
 
     setStatus("connecting");
-    let ws: WebSocket;
-    try {
-      ws = new WebSocket(getWsUrl());
-    } catch {
-      setStatus("error");
-      return;
-    }
-    wsRef.current = ws;
-
-    ws.onopen = () => {
-      ws.send(JSON.stringify({ type: "pty:spawn", data: { cols: 80, rows: 24 } }));
-    };
-
-    ws.onmessage = (event) => {
-      try {
-        const msg = JSON.parse(event.data as string);
-        switch (msg.type) {
-          case "pty:ready":
-            setSessionId(msg.data?.sessionId ?? null);
-            setStatus("ready");
-            break;
-          case "pty:output":
-            setOutput((prev) => clip(prev + clean(msg.data?.output ?? "")));
-            break;
-          case "pty:exit":
-            setOutput((prev) => prev + `\n[process exited — code ${msg.data?.exitCode ?? "?"}]\n`);
-            setStatus("disconnected");
-            break;
-          case "error":
-            setOutput((prev) => prev + `\n[error] ${msg.data?.message ?? "unknown"}\n`);
-            break;
+    // Resolve the session-token-authenticated URL first — the PC verifies it
+    // at upgrade time and unauthenticated sockets cannot drive a PTY.
+    getAuthedWsUrl()
+      .then((url) => {
+        if (!url) {
+          setStatus("error");
+          return;
         }
-      } catch {
-        /* ignore malformed frames */
-      }
-    };
+        const current = wsRef.current;
+        if (current && (current.readyState === WebSocket.OPEN || current.readyState === WebSocket.CONNECTING)) {
+          return;
+        }
+        let ws: WebSocket;
+        try {
+          ws = new WebSocket(url);
+        } catch {
+          setStatus("error");
+          return;
+        }
+        wsRef.current = ws;
 
-    ws.onerror = () => setStatus("error");
-    ws.onclose = () => {
-      setStatus("disconnected");
-      setSessionId(null);
-    };
+        ws.onopen = () => {
+          ws.send(JSON.stringify({ type: "pty:spawn", data: { cols: 80, rows: 24 } }));
+        };
+
+        ws.onmessage = (event) => {
+          try {
+            const msg = JSON.parse(event.data as string);
+            switch (msg.type) {
+              case "pty:ready":
+                setSessionId(msg.data?.sessionId ?? null);
+                setStatus("ready");
+                break;
+              case "pty:output":
+                setOutput((prev) => clip(prev + clean(msg.data?.output ?? "")));
+                break;
+              case "pty:exit":
+                setOutput((prev) => prev + `\n[process exited — code ${msg.data?.exitCode ?? "?"}]\n`);
+                setStatus("disconnected");
+                break;
+              case "error":
+                setOutput((prev) => prev + `\n[error] ${msg.data?.message ?? "unknown"}\n`);
+                break;
+            }
+          } catch {
+            /* ignore malformed frames */
+          }
+        };
+
+        ws.onerror = () => setStatus("error");
+        ws.onclose = () => {
+          setStatus("disconnected");
+          setSessionId(null);
+        };
+      })
+      .catch(() => setStatus("error"));
   }, []);
 
   const sendInput = useCallback((text: string) => {

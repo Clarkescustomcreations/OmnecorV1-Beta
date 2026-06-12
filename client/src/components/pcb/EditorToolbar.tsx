@@ -61,7 +61,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   onShowNetlist,
 }) => {
   return (
-    <div className="flex items-center gap-2 p-3 bg-card border-b border-border shadow-sm">
+    <div className="flex flex-wrap items-center gap-2 p-3 bg-card border-b border-border shadow-sm">
       {/* Mode Selector */}
       <ToggleGroup
         type="single"

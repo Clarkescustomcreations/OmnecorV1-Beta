@@ -110,7 +110,7 @@ export default function SetupWizard() {
     if (!value) return;
     saveKeysMutation.mutate({ keys: { [field]: value } }, {
       onSuccess: () => refetchAiProviders(),
-      onError: () => {},
+      onError: (e) => toast.error(`Failed to save ${field} key: ${e.message}`),
     });
   };
 
@@ -125,7 +125,7 @@ export default function SetupWizard() {
   const [kaggleUsername, setKaggleUsername] = useState("");
   const [kaggleApiKey, setKaggleApiKey] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
-  const [kbPath, setKbPath] = useState("/home/linux/Documents/Omnecor");
+  const [kbPath, setKbPath] = useState("");
   const [vram, setVram] = useState(8);
   const [ttsEngine, setTtsEngine] = useState("local");
   const [mDnsEnabled, setMDnsEnabled] = useState(true);
@@ -156,7 +156,7 @@ export default function SetupWizard() {
       setKbMaxFileSize(s.maxFileSize ?? 50);
       setLanguage(s.language || "en");
       setDefaultModel(s.defaultModel || "auto");
-      setKbPath(s.kbPath || "/home/linux/Documents/Omnecor");
+      setKbPath(s.kbPath || "");
     }
   }, [settings]);
 
@@ -430,7 +430,7 @@ export default function SetupWizard() {
                <div className="space-y-2">
                  <Label>Primary Folder Path</Label>
                  <div className="flex gap-2">
-                   <Input value={kbPath} onChange={(e) => setKbPath(e.target.value)} className="font-mono text-xs" />
+                   <Input value={kbPath} onChange={(e) => setKbPath(e.target.value)} placeholder={navigator.userAgent.includes("Windows") ? "C:\\Users\\you\\Documents\\Omnecor" : "/home/you/Documents/Omnecor"} className="font-mono text-xs" />
                    <Button variant="outline" onClick={handleBrowse}>Browse</Button>
                  </div>
                </div>

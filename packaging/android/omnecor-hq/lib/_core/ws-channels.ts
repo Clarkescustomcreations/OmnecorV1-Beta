@@ -15,7 +15,7 @@
  * This is separate from the OMMESH node socket (mobile-mesh-node.ts) and the
  * terminal socket (use-terminal.ts) on purpose — each has a distinct lifecycle.
  */
-import { getWsUrl, isServerConfigured } from "./server-config";
+import { getAuthedWsUrl, isServerConfigured } from "./server-config";
 
 type ChannelListener = (data: any, type: string) => void;
 
@@ -34,9 +34,21 @@ function ensureSocket() {
   if (!isServerConfigured()) return;
   if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
 
+  // Resolve the session-token-authenticated URL first — the PC verifies it at
+  // upgrade time and unauthenticated sockets cannot subscribe to channels.
+  getAuthedWsUrl()
+    .then((url) => {
+      if (!url) return scheduleReconnect();
+      if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
+      openSocket(url);
+    })
+    .catch(() => scheduleReconnect());
+}
+
+function openSocket(url: string) {
   let ws: WebSocket;
   try {
-    ws = new WebSocket(getWsUrl());
+    ws = new WebSocket(url);
   } catch {
     scheduleReconnect();
     return;

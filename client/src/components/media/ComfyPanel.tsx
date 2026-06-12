@@ -22,6 +22,22 @@ export const ComfyPanel: React.FC = () => {
     onError: (err) => toast.error("ComfyUI error: " + err.message)
   });
 
+  const handleQueue = () => {
+    // The ComfyUI /prompt API requires a workflow graph object, not free text.
+    let workflow: Record<string, unknown>;
+    try {
+      const parsed: unknown = JSON.parse(prompt);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("not an object");
+      }
+      workflow = parsed as Record<string, unknown>;
+    } catch {
+      toast.error("Enter a valid ComfyUI workflow JSON object (export it from ComfyUI via Save (API Format)).");
+      return;
+    }
+    queueMutation.mutate({ prompt: workflow });
+  };
+
   return (
     <div className="p-6 space-y-6">
       <div className="flex justify-between items-center">
@@ -51,7 +67,7 @@ export const ComfyPanel: React.FC = () => {
             />
             <Button 
               className="w-full" 
-              onClick={() => queueMutation.mutate({ prompt })}
+              onClick={handleQueue}
               disabled={!prompt || queueMutation.isPending || !statusQuery.data?.online}
             >
               {queueMutation.isPending ? "Queuing..." : <><Play className="w-4 h-4 mr-2" /> Execute Workflow</>}

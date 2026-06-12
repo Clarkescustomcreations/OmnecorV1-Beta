@@ -36,6 +36,11 @@ import { WebSocketServer as WSServer, WebSocket } from "ws";
 import { IncomingMessage, Server as HttpServer } from "http";
 import { v4 as uuidv4 } from "uuid";
 import { homedir } from "os";
+import { createHash, timingSafeEqual } from "crypto";
+import { parse as parseCookieHeader } from "cookie";
+import { ENV } from "../../_core/env.js";
+import { sdk } from "../../_core/sdk.js";
+import { COOKIE_NAME } from "../../../shared/const.js";
 import {
   FileSystemWatcherService,
   FileEvent,
@@ -63,6 +68,25 @@ async function getPty() {
 import { SERVER_CONFIG } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("WebSocket");
+
+/** True when a remote address is a loopback (localhost) peer. */
+function isLoopbackAddress(addr: string | undefined): boolean {
+  if (!addr) return false;
+  // Normalise IPv4-mapped IPv6 (e.g. "::ffff:127.0.0.1") and bare forms.
+  const a = addr.replace(/^::ffff:/, "");
+  return a === "127.0.0.1" || a === "::1" || a === "localhost" || a.startsWith("127.");
+}
+
+/**
+ * Constant-time comparison of two secrets. Both sides are SHA-256 hashed first
+ * so the buffers are always equal length (timingSafeEqual throws on length
+ * mismatch) and the comparison never leaks the secret's length.
+ */
+function secretsMatch(a: string, b: string): boolean {
+  const ha = createHash("sha256").update(a).digest();
+  const hb = createHash("sha256").update(b).digest();
+  return timingSafeEqual(ha, hb);
+}
 
 // ---------------------------------------------------------------------------
 // Types
@@ -123,6 +147,15 @@ interface OmnecorSocket extends WebSocket {
   connectedAt: string;
   ptySession?: PtySession;
   mobileNodeId?: string;
+  /**
+   * Whether the connection is authenticated. Set at upgrade time from the
+   * session cookie (or loopback/zero-login). Unauthenticated connections may
+   * ONLY send `mobile_node_register` and must complete it successfully before
+   * any other message type or channel subscription is processed.
+   */
+  authenticated: boolean;
+  /** Remote address captured at connection time (for loopback checks). */
+  remoteAddress?: string;
 }
 
 /** Registered mobile OMMESH node info */
@@ -197,9 +230,12 @@ export class OmnecorWebSocketServer {
     this.notificationService = NotificationService.getInstance();
 
     // Wire up connection handling
-    this.wss.on("connection", (ws, req) =>
-      this.handleConnection(ws as OmnecorSocket, req)
-    );
+    this.wss.on("connection", (ws, req) => {
+      this.handleConnection(ws as OmnecorSocket, req).catch(err => {
+        log.error("Error handling WebSocket connection", err);
+        try { (ws as OmnecorSocket).close(1011, "Internal error"); } catch { /* ignore */ }
+      });
+    });
 
     // Wire up service event listeners
     this.wireServiceEvents();
@@ -215,16 +251,37 @@ export class OmnecorWebSocketServer {
   // -------------------------------------------------------------------------
 
   /** Handle a new WebSocket connection */
-  private handleConnection(ws: OmnecorSocket, req: IncomingMessage): void {
+  private async handleConnection(ws: OmnecorSocket, req: IncomingMessage): Promise<void> {
     // Assign metadata to the socket
     ws.id = uuidv4();
     ws.subscriptions = new Set();
     ws.isAlive = true;
     ws.connectedAt = new Date().toISOString();
+    ws.remoteAddress = req.socket.remoteAddress ?? undefined;
+
+    // ── Connection authentication ────────────────────────────────────────────
+    // Verify the session cookie (browser SPA) at upgrade time. Connections are
+    // marked authenticated when: ZERO_LOGIN_MODE is on, the peer is loopback, or
+    // a valid session cookie is present. Otherwise the connection is allowed
+    // ONLY so the mobile APK can authenticate via mobile_node_register — but
+    // only when OMMESH_SECRET is configured; such connections are marked
+    // unauthenticated and may send nothing but mobile_node_register until it
+    // succeeds.
+    ws.authenticated = await this.resolveAuth(req);
+    if (!ws.authenticated && !process.env.OMMESH_SECRET) {
+      // No session, not loopback/zero-login, and no mesh secret to authenticate
+      // a mobile node against — reject (fail-closed).
+      try {
+        ws.send(JSON.stringify({ type: "error", data: { message: "Unauthorized: no valid session and OMMESH_SECRET not configured" } }));
+      } catch { /* ignore */ }
+      ws.close(4401, "Unauthorized");
+      log.warn("WebSocket connection rejected — unauthenticated and no OMMESH_SECRET", { id: ws.id, ip: ws.remoteAddress });
+      return;
+    }
 
     this.clients.set(ws.id, ws);
 
-    log.info("Client connected", { id: ws.id, ip: req.socket.remoteAddress, total: this.clients.size });
+    log.info("Client connected", { id: ws.id, ip: req.socket.remoteAddress, authenticated: ws.authenticated, total: this.clients.size });
 
     // Handle incoming messages
     ws.on("message", raw => {
@@ -261,8 +318,61 @@ export class OmnecorWebSocketServer {
     });
   }
 
+  /**
+   * Resolve whether an upgrade request is authenticated. True when zero-login
+   * mode is enabled, the peer is loopback, or a valid session token is
+   * presented via the session cookie (browser SPA), an
+   * `Authorization: Bearer` header, or a `?token=` query parameter (the mobile
+   * APK uses the latter two — React Native WebSockets don't reliably attach
+   * cookies on every platform). Mirrors the session verification used by the
+   * tRPC context.
+   */
+  private async resolveAuth(req: IncomingMessage): Promise<boolean> {
+    if (ENV.zeroLoginMode) return true;
+    if (isLoopbackAddress(req.socket.remoteAddress ?? undefined)) return true;
+
+    const candidates: string[] = [];
+
+    try {
+      const cookieHeader = req.headers.cookie;
+      if (cookieHeader) {
+        const sessionCookie = parseCookieHeader(cookieHeader)[COOKIE_NAME];
+        if (sessionCookie) candidates.push(sessionCookie);
+      }
+
+      const authHeader = req.headers.authorization;
+      if (authHeader?.startsWith("Bearer ")) {
+        candidates.push(authHeader.slice("Bearer ".length));
+      }
+
+      const url = new URL(req.url ?? "/", "http://localhost");
+      const queryToken = url.searchParams.get("token");
+      if (queryToken) candidates.push(queryToken);
+
+      for (const token of candidates) {
+        const session = await sdk.verifySession(token);
+        if (session != null) return true;
+      }
+    } catch {
+      /* fall through to unauthenticated */
+    }
+    return false;
+  }
+
   /** Process a message from a client */
   private handleClientMessage(ws: OmnecorSocket, message: ClientMessage): void {
+    // Unauthenticated connections (LAN mobile nodes that have not yet completed
+    // registration) may ONLY send mobile_node_register. Everything else —
+    // subscriptions, PTY, getState, etc. — is refused until the connection is
+    // authenticated by a successful registration.
+    if (!ws.authenticated && message.type !== "mobile_node_register") {
+      this.sendToClient(ws, {
+        type: "error",
+        data: { message: "Unauthorized: complete mobile_node_register before sending other messages" },
+      });
+      return;
+    }
+
     switch (message.type) {
       case "subscribe":
         if (message.channel) {
@@ -329,14 +439,22 @@ export class OmnecorWebSocketServer {
       // ── Mobile OMMESH Node Registration ──────────────────────────────────
       case "mobile_node_register": {
         const secret = process.env.OMMESH_SECRET;
+        // Loopback and zero-login connections are already trusted (set at
+        // upgrade); everything else MUST present a matching OMMESH_SECRET.
+        const preTrusted = isLoopbackAddress(ws.remoteAddress) || ENV.zeroLoginMode;
         if (secret) {
-          if (message.ommeshSecret !== secret) {
+          // Constant-time comparison; rejects when the secret is missing too.
+          if (!message.ommeshSecret || !secretsMatch(message.ommeshSecret, secret)) {
             ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: false, reason: "Invalid OMMESH_SECRET" }));
             log.warn("Mobile node rejected — bad secret", { id: ws.id });
             break;
           }
-        } else {
-          log.warn("OMMESH_SECRET not set — accepting mobile node without authentication", { id: ws.id });
+        } else if (!preTrusted) {
+          // Fail-closed: no secret configured and the node is not loopback /
+          // zero-login → reject rather than accept open registration.
+          ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: false, reason: "OMMESH_SECRET is not configured on the server — remote node registration is disabled" }));
+          log.warn("Mobile node rejected — OMMESH_SECRET not set and node is not loopback/zero-login", { id: ws.id, ip: ws.remoteAddress });
+          break;
         }
 
         const nodeId = message.nodeId;
@@ -345,6 +463,9 @@ export class OmnecorWebSocketServer {
           break;
         }
 
+        // Registration succeeded — the connection is now authenticated and may
+        // send other message types.
+        ws.authenticated = true;
         ws.mobileNodeId = nodeId;
         this.mobileNodes.set(nodeId, {
           ws,

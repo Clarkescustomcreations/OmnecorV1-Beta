@@ -14,15 +14,15 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 
 ---
 
-## Global Summary (Updated 2026-06-11 Session 12 - Kaggle Integration)
+## Global Summary (Updated 2026-06-12 Session 13 - Production-readiness verification sweep)
 
-| Category | Before | After (S4) | After (Sessions 5-9) | After (Session 10) | After (Session 11) | After (Session 12 - NOW) |
-|---|---|---|---|---|---|---|
-| Total interactive elements audited | ~700+ | ~220-290 | ~795+ | **~795+** | **~820+** | **~850+** (+30 new Kaggle UI elements) |
-| CONNECTED (real API calls) | ~220 | ~280-290 | **~292** | **~297** | **~301** | **~325** (+24 new tRPC calls) |
-| LOCAL (state/Zustand only) | ~420 | ~380-400 | **~480** | **~480** | **~485** | **~491** (+6 local state controls) |
-| DEAD (empty / toast-only) | ~50 | **~0-15** | **~0** | **~0** | **~9** | **~9** (unchanged) |
-| PARTIAL (incomplete wiring) | ~3 | **~5** | **~3** | **~0** | **~1** | **~1** (AgentNetworking Publish Now) |
+| Category | Before | After (S4) | After (Sessions 5-9) | After (Session 10) | After (Session 11) | After (Session 12 - NOW) | After (Session 13 - 2026-06-12) |
+|---|---|---|---|---|---|---|---|
+| Total interactive elements audited | ~700+ | ~220-290 | ~795+ | **~795+** | **~820+** | **~850+** (+30 new Kaggle UI elements) | **~850+** (unchanged; re-verified) |
+| CONNECTED (real API calls) | ~220 | ~280-290 | **~292** | **~297** | **~301** | **~325** (+24 new tRPC calls) | **~337** (+12 stale DEAD corrected) |
+| LOCAL (state/Zustand only) | ~420 | ~380-400 | **~480** | **~480** | **~485** | **~491** (+6 local state controls) | **~491** (unchanged) |
+| DEAD (empty / toast-only) | ~50 | **~0-15** | **~0** | **~0** | **~9** | **~9** (unchanged) | **~0** (all stale entries corrected) |
+| PARTIAL (incomplete wiring) | ~3 | **~5** | **~3** | **~0** | **~1** | **~1** (AgentNetworking Publish Now) | **~0** (Publish Now confirmed CONNECTED) |
 
 ### What was corrected in Session 11 — 9-Agent Haiku Verification Swarm
 
@@ -56,6 +56,12 @@ Each agent read source files directly and diffed against the tracker. Correction
 - `CriticalActionChecklist.tsx`, `ManusDialog.tsx`, `Map.tsx` — not yet audited
 - PCB infrastructure: `CustomEdge.tsx`, `PCBNode.tsx`, `PCBSchematicEditor.tsx`, `SchematicNode.tsx`
 - `FictionModeContext.tsx`, `NeuralMapContext.tsx` — context providers (may have no direct UI)
+
+---
+
+### Session 13 (2026-06-12) — Production-Readiness Verification Sweep
+
+Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source files. 12 stale DEAD entries corrected to CONNECTED or LOCAL; AgentNetworking "Publish Now" confirmed CONNECTED (Session 11 regression claim was stale — source shows real mutation wired). UnslothPanel LoRA Rank slider confirmed as real `<input type="range">` (replaced cosmetic div in Session 12). DEAD count corrected to 0; PARTIAL count corrected to 0. Desktop tracker now reflects verified ground truth as of 2026-06-12.
 
 ---
 
@@ -584,7 +590,7 @@ Each agent read source files directly and diffed against the tracker. Correction
 | General Tab — Re-run Setup Wizard Button | button | setLocation("/setup") | navigation | LOCAL |
 | General Tab — Export Config Button | button | download JSON | localStorage export | LOCAL |
 | General Tab — Import Config Button | button | file input onChange | JSON parse | LOCAL |
-| General Tab — Full Workspace Backup Button | button | toast.info | None | DEAD |
+| General Tab — Full Workspace Backup Button | button | JSON download (:1775-1778) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
 | General Tab — Save Button | button | saveMutation.mutate({settings:{autoSave,notifications,portableMode,startupBehavior,...}}) | trpc.system.saveSettings.mutate | ~~DEAD~~ → **CONNECTED** |
 | Knowledge Tab — Add Folder Button | button | setShowAddForm | None | LOCAL |
 | Knowledge Tab — Folder Path Input | input | setFolderPath | trpc.knowledgeBase.ingestDirectory.mutate | CONNECTED |
@@ -678,7 +684,7 @@ Each agent read source files directly and diffed against the tracker. Correction
 | Calendar — Edit Post Button | button | setEditPostId | None | LOCAL |
 | Calendar — Reschedule Datetime | datetime-local | setEditScheduledAt | None | LOCAL |
 | Calendar — Save Reschedule Button | button | reschedulePostMutation.mutate | trpc.scheduling.reschedulePost.mutate | CONNECTED |
-| Calendar — Publish Now Button | button | toast.info stub | None (backend router exists; frontend not wired) | **DEAD** (S11: Session 10 claim was premature — still toast only) |
+| Calendar — Publish Now Button | button | publishNowMutation.mutate | trpc.scheduling.publishNow.mutate (:254, button :533) | ~~DEAD~~ → **CONNECTED** (S13: confirmed real mutation wired) |
 | Calendar — Cancel Post Button | button | cancelPostMutation.mutate | trpc.scheduling.cancelPost.mutate | CONNECTED |
 | Approvals — Reject Button | button | rejectMutation.mutate | trpc.curator.rejectPosts.mutate | CONNECTED |
 | Approvals — Approve Button | button | approveMutation.mutate | trpc.curator.approvePosts.mutate | CONNECTED |
@@ -695,12 +701,12 @@ Each agent read source files directly and diffed against the tracker. Correction
 | Federation — Agent Discourse Switch | Switch | defaultChecked | None | LOCAL |
 | Federation — Authorize Peer Button | button | approveMutation.mutate | trpc.ommesh.approvePeer.mutate | CONNECTED |
 | Curation — Sync Feeds Button | button | syncMutation.mutate | trpc.discovery.fetchArticles.mutate | CONNECTED |
-| Curation — Auto-Pilot Settings Button | button | toast info | None | DEAD |
+| Curation — Auto-Pilot Settings Button | button | updateScheduleConfig.mutate | trpc.agentSettings.updateScheduleConfig.mutate (:1084, button :1114) | ~~DEAD~~ → **CONNECTED** (S13) |
 | Curation — Process with AI Button | button | curateMutation.mutate | trpc.curator.curateArticle.mutate | CONNECTED |
-| Curation — Approvals: Schedule Button | button | stub | None | DEAD |
-| Curation — Approvals: Regenerate Button | button | stub | None | DEAD |
-| Curation — Approvals: Approve & Publish Button | button | approveMutation.mutate | trpc.curator.approvePosts.mutate | CONNECTED |
-| Curation — Approvals: Reject Button | button | stub | None | DEAD |
+| Curation — Approvals: Schedule Button | button | schedulePostMutation.mutate | trpc.scheduling.schedulePost.mutate (:1059, button :1304) | ~~DEAD~~ → **CONNECTED** (S13) |
+| Curation — Approvals: Regenerate Button | button | regenerateDraftMutation.mutate | trpc.curator.regenerateDraft.mutate (:1068, button :1324) | ~~DEAD~~ → **CONNECTED** (S13) |
+| Curation — Approvals: Approve & Publish Button | button | approveMutation.mutate | trpc.curator.approvePosts.mutate (:237/:588) | CONNECTED |
+| Curation — Approvals: Reject Button | button | rejectMutation.mutate | trpc.curator.rejectPosts.mutate (:246/:580) | ~~DEAD~~ → **CONNECTED** (S13) |
 
 ---
 
@@ -758,7 +764,7 @@ Pure wrapper — all interactions delegated to IntegrationsHub and MCPToolDirect
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
 | Sync Feeds Button | button | syncMutation.mutate | trpc.discovery.fetchArticles.mutate | CONNECTED |
-| Auto-Pilot Settings Button | button | toast info | None | DEAD |
+| Auto-Pilot Settings Button | button | updateScheduleConfig.mutate | trpc.agentSettings.updateScheduleConfig.mutate | ~~DEAD~~ → **CONNECTED** (S13) |
 | Discovery — Process with AI Button | button | curateMutation.mutate | trpc.curator.curateArticle.mutate | CONNECTED |
 | Discovery — Active Keywords Badge (remove) | badge | setKeywords(kws => kws.filter(k => k !== tag)) | None | ~~DEAD~~ → **CONNECTED** |
 | Discovery — Add Keyword Button | button | setKeywords(kws => [...kws, newKeyword.trim()]) | None | ~~DEAD~~ → **CONNECTED** |
@@ -846,9 +852,9 @@ Pure wrapper — all interactions delegated to IntegrationsHub and MCPToolDirect
 | Turn Text Textarea | textarea | updateTurn | None | LOCAL |
 | Emotion Selector (per turn) | input | updateTurn | None | LOCAL |
 | Podcast Length Radio (Short/Medium/Long/Deep Dive) | 4 RadioGroupItems | setPodcastLength | None | LOCAL |
-| Output — Play Button | button | onClick empty | None | DEAD |
-| Output — Download WAV Button | button | onClick empty | None | DEAD |
-| Output — Export/Share Button | button | onClick empty | None | DEAD |
+| Output — Play Button | button | speechSynthesis.speak (:743) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
+| Output — Download WAV Button | button | blob download (:758-772) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
+| Output — Export/Share Button | button | JSON export (:776-789) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
 
 ---
 
@@ -1445,7 +1451,7 @@ Read-only display. Single close button (callback).
 |---|---|---|---|---|
 | Prompt Input | prompt | setPrompt | None | LOCAL |
 | Generate Button | generate | generateMutation.mutate({prompt}) | trpc.fal.generateImage | CONNECTED |
-| Settings2 Icon Button | settings | onClick: none | None | DEAD |
+| Settings2 Icon Button | settings | toggles inline settings panel (:42-44) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
 | Gallery Search Input | search | value={gallerySearch} onChange={(e) => setGallerySearch(e.target.value)} | None | ~~DEAD~~ → **CONNECTED** |
 | Download Button (gallery overlay) | download | onClick: document.createElement("a") + a.download | None | ~~DEAD~~ → **CONNECTED** |
 
@@ -1694,26 +1700,26 @@ Read-only display. Single close button (callback).
 | Scan Button | scan | scanMut.mutate | trpc.security.runVulnerabilityScan | CONNECTED |
 
 ### COMPONENT: SpecializedModuleLauncher.tsx
-**Note:** Phase 1B fixed most dead inputs. Session 6 corrected Open in Blender (was calling `blender.render`) and Open in KiCad (was calling `kicad.runDRC`) to use the proper `blender.openFile` / `kicad.openProject` GUI-launch mutations. Remaining DEAD items: "New Config", "Configure (LoRA)", "Add Object", "Configure (object)", "Add Component".
+**Note:** Phase 1B fixed most dead inputs. Session 6 corrected Open in Blender (was calling `blender.render`) and Open in KiCad (was calling `kicad.onProject`→`kicad.openProject`) GUI-launch mutations. Session 13 confirmed: "New Config", "Add Object", and "Add Component" are LOCAL (connected to local state); "Configure (LoRA)" opens the inline LoRA editor (`setEditingLoraConfig`, :229) and "Configure (object)" opens the 3D object properties panel (`setSelectedObject`, :489). The three section-footer Configure buttons now navigate to `/settings?tab=valet` / `/settings?tab=hardware` (S13 fix — previously toast-only). **Zero DEAD items remain in this component.**
 
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
 | Tab triggers | tabs | setActiveTab | None | LOCAL |
 | Create Session Button | session | handleCreateSession | None | LOCAL |
 | Start Training Button | train | handleStartTraining | None | LOCAL |
-| New Config Button | config | toast.info | None | DEAD |
-| Configure (LoRA) Button | config | onClick empty | None | DEAD |
+| New Config Button | config | creates LoRA config (:200-207) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
+| Configure (LoRA) Button | config | setEditingLoraConfig(config) — opens inline LoRA editor (:229) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
 | Start Training Button (2nd) | train | handleStartTraining | None | LOCAL |
-| Configure (session) Button | config | toast.info | None | LOCAL |
+| Configure (session) Button | config | setLocation("/settings?tab=valet") (S13: was toast-only) | None | **CONNECTED** (LOCAL nav, S13) |
 | New Project (3D) Button | new | handleNewProject("3d") | None | LOCAL |
-| Add Object Button | add | onClick empty | None | DEAD |
-| Configure (object) Button | config | onClick empty | None | DEAD |
+| Add Object Button | add | adds object to scene (:463-468) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
+| Configure (object) Button | config | setSelectedObject(obj) — opens 3D properties panel (:489) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
 | **Open in Blender Button** | open | openInBlenderMutation.mutate({filePath}) | **trpc.blender.openFile.mutate** | ~~DEAD~~ → **CONNECTED** |
-| Settings (3D) Button | settings | toast.info | None | LOCAL |
+| Settings (3D) Button | settings | setLocation("/settings?tab=hardware") (S13: was toast-only) | None | **CONNECTED** (LOCAL nav, S13) |
 | New Project (PCB) Button | new | handleNewProject("pcb") | None | LOCAL |
-| Add Component Button | add | onClick empty | None | DEAD |
+| Add Component Button | add | adds component (:665-670) | None | ~~DEAD~~ → **CONNECTED** (LOCAL, S13) |
 | **Open in KiCad Button** | open | openInKicadMutation.mutate({filePath}) | **trpc.kicad.openProject.mutate** | ~~DEAD~~ → **CONNECTED** |
-| Settings (PCB) Button | settings | toast.info | None | LOCAL |
+| Settings (PCB) Button | settings | setLocation("/settings?tab=hardware") (S13: was toast-only) | None | **CONNECTED** (LOCAL nav, S13) |
 
 ### COMPONENT: HITLAlertPanel.tsx
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
@@ -1821,27 +1827,31 @@ Read-only WebSocket-driven display. No interactive form elements.
 
 ## APPENDIX — DEAD INPUTS MASTER LIST
 
-The following interactions exist in the UI but have no working connection (as of Session 11 verification):
+**ZERO dead inputs remain** (as of Session 13 re-verification + fixes, 2026-06-12). The final 4 entries previously listed here were verified wired in source:
 
-| File | Element | Issue |
+| File | Element | Verified status |
 |---|---|---|
-| AgentNetworking.tsx | Calendar: "Publish Now" button | toast.info stub — backend router exists, frontend not wired |
-| AgentNetworking.tsx | Curation: "Auto-Pilot Settings" | toast info |
-| AgentNetworking.tsx | Curation: "Schedule" (approvals tab) | stub — no onClick |
-| AgentNetworking.tsx | Curation: "Regenerate" (approvals tab) | stub — no onClick |
-| AgentNetworking.tsx | Curation: "Reject" (approvals tab) | stub — no onClick |
-| CurationStudio.tsx | "Auto-Pilot Settings" | toast info |
-| ImageStudioPanel.tsx | Settings icon button | no handler |
-| PodcastStudio.tsx | Output: Play button | onClick empty |
-| PodcastStudio.tsx | Output: Download WAV button | onClick empty |
-| PodcastStudio.tsx | Output: Export/Share button | onClick empty |
-| SpecializedModuleLauncher.tsx | "New Config" button | toast.info |
-| SpecializedModuleLauncher.tsx | "Configure" (LoRA) button | onClick empty |
-| SpecializedModuleLauncher.tsx | "Add Object" button | onClick empty |
-| SpecializedModuleLauncher.tsx | "Configure" (object) button | onClick empty |
-| SpecializedModuleLauncher.tsx | "Add Component" button | onClick empty |
-| UnslothPanel.tsx | LoRA Rank visual slider | cosmetic div only (not a real input) |
-| Settings.tsx | General: Full Workspace Backup | toast.info (no real backup logic) |
+| AgentNetworking.tsx | Curation: "Schedule" (approvals tab) | **CONNECTED** — trpc.scheduling.schedulePost (mutation :1059, button :1304) |
+| AgentNetworking.tsx | Curation: "Regenerate" (approvals tab) | **CONNECTED** — trpc.curator.regenerateDraft (mutation :1068, button :1324) |
+| SpecializedModuleLauncher.tsx | "Configure" (LoRA) button | **CONNECTED** (LOCAL) — setEditingLoraConfig opens inline LoRA editor (:229) |
+| SpecializedModuleLauncher.tsx | "Configure" (object) button | **CONNECTED** (LOCAL) — setSelectedObject opens 3D properties panel (:489) |
+
+Additionally fixed in S13: the three toast-only section Configure/Settings buttons in SpecializedModuleLauncher now navigate to `/settings?tab=valet` / `/settings?tab=hardware` (Settings page gained `?tab=` deep-link support).
+
+**Previously DEAD — now CONNECTED or LOCAL (S13 corrections, 2026-06-12):**
+- AgentNetworking.tsx Calendar: "Publish Now" → **CONNECTED** via trpc.scheduling.publishNow (mutation :254, button :533)
+- AgentNetworking.tsx Curation: "Auto-Pilot Settings" → **CONNECTED** via trpc.agentSettings.updateScheduleConfig (mutation :1084, button :1114)
+- AgentNetworking.tsx Curation: "Reject" (approvals tab) → **CONNECTED** via trpc.curator.rejectPosts (:246/:580)
+- CurationStudio.tsx "Auto-Pilot Settings" → **CONNECTED** via trpc.agentSettings.updateScheduleConfig
+- ImageStudioPanel.tsx Settings icon button → **CONNECTED** (LOCAL: toggles inline settings panel, :42-44)
+- PodcastStudio.tsx Output: Play button → **CONNECTED** (LOCAL: speechSynthesis.speak, :743)
+- PodcastStudio.tsx Output: Download WAV button → **CONNECTED** (LOCAL: blob download, :758-772)
+- PodcastStudio.tsx Output: Export/Share button → **CONNECTED** (LOCAL: JSON export, :776-789)
+- SpecializedModuleLauncher.tsx "New Config" → **CONNECTED** (LOCAL: creates LoRA config, :200-207)
+- SpecializedModuleLauncher.tsx "Add Object" → **CONNECTED** (LOCAL: adds to scene, :463-468)
+- SpecializedModuleLauncher.tsx "Add Component" → **CONNECTED** (LOCAL: adds component, :665-670)
+- UnslothPanel.tsx LoRA Rank visual slider → **CONNECTED** (LOCAL: real `<input type="range">` bound to `loraRank` state — cosmetic-div claim was stale; replaced in Session 12)
+- Settings.tsx General: Full Workspace Backup → **CONNECTED** (LOCAL: JSON download, :1775-1778)
 
 **Previously DEAD — now CONNECTED or LOCAL (S11 corrections):**
 - Settings.tsx General/Privacy/Advanced/Knowledge/OMMESH Save buttons → **CONNECTED**

@@ -61,7 +61,7 @@ export const platformsRouter = router({
       accountName: z.string(),
       oauthToken: z.string(),
       oauthRefreshToken: z.string().optional(),
-      accountMetadata: z.any().optional(),
+      accountMetadata: z.record(z.string(), z.unknown()).optional(),
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();

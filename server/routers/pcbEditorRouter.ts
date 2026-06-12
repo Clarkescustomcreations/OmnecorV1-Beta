@@ -29,9 +29,9 @@ import {
 } from "../db-pcb.js";
 
 const CanvasDataSchema = z.object({
-  nodes: z.array(z.any()),
-  edges: z.array(z.any()),
-  metadata: z.any().optional(),
+  nodes: z.array(z.record(z.string(), z.unknown())),
+  edges: z.array(z.record(z.string(), z.unknown())),
+  metadata: z.record(z.string(), z.unknown()).optional(),
 });
 
 export const pcbEditorRouter = router({

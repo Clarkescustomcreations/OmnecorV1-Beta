@@ -902,7 +902,7 @@ export default function Chat() {
 
           {/* Live Preview Panel */}
           {previewMode !== "none" && (
-            <div className="w-72 sm:w-96 lg:w-[400px] xl:w-[500px] flex flex-col gap-2 overflow-hidden flex-shrink-0 border border-border rounded-xl bg-card shadow-xl animate-in slide-in-from-right-4 duration-300 relative z-10">
+            <div className="fixed inset-y-0 right-0 w-[85vw] max-w-sm sm:static sm:w-96 sm:max-w-none lg:w-[400px] xl:w-[500px] flex flex-col gap-2 overflow-hidden flex-shrink-0 border border-border rounded-xl bg-card shadow-xl animate-in slide-in-from-right-4 duration-300 z-30 sm:z-10">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center gap-2">
                   {previewMode === "3d" && <Box className="w-4 h-4 text-accent" />}

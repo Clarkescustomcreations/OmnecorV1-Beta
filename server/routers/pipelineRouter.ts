@@ -41,7 +41,7 @@ export const pipelineRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
       return PipelineEngineService.getInstance().approvePhase(input.pipelineId, input.phase, ctx.user!.id);
     }),
   abortPipeline: protectedProcedure
@@ -56,7 +56,7 @@ export const pipelineRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
       return PipelineEngineService.getInstance().abortPipeline(input.pipelineId);
     }),
 });

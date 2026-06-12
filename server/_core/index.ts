@@ -155,6 +155,20 @@ async function startServer() {
 
   app.use(limiter);
 
+  // Stricter limiter for authentication endpoints (OAuth login + callbacks).
+  // Brute-forcing/abuse of the login flow should be throttled far harder than
+  // general traffic. Successful requests are not counted so a legitimate user
+  // completing login is never penalised.
+  const authLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes
+    max: 10,
+    standardHeaders: true,
+    legacyHeaders: false,
+    skipSuccessfulRequests: true,
+    message: "Too many authentication attempts, please try again later.",
+  });
+  app.use("/api/oauth", authLimiter);
+
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
   app.use(express.urlencoded({ limit: "50mb", extended: true }));

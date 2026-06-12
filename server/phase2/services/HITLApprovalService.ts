@@ -52,7 +52,7 @@ export class HITLApprovalService extends EventEmitter {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch(() => {});
+    }).catch((err) => console.warn("[AuditLog] write failed:", err));
 
     // Wait for manual approval/rejection
     return new Promise(resolve => {
@@ -81,7 +81,7 @@ export class HITLApprovalService extends EventEmitter {
         result: { approved },
         ipAddress: null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
     }
   }
 

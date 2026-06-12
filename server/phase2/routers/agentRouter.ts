@@ -90,7 +90,7 @@ export const agentRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
 
       const jobId = await ctx.services.agent.runRecursiveMAS(input);
       return { jobId };
