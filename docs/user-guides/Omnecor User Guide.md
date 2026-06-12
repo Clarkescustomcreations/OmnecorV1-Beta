@@ -21,7 +21,10 @@ Operational Memory Never Escapes. Context Overview Remains.
 8.  [Configuration Guide](#8-configuration-guide)
 9.  [AI Systems Documentation](#9-ai-systems-documentation)
 10. [Agentic Wallet & Budgeting](#10-agentic-wallet--budgeting)
+10b. [Notifications & Agent Messenger](#10b-notifications--agent-messenger)
 11. [Cloud Compute Rental](#11-cloud-compute-rental)
+    -   11b. [Kaggle GPU Training](#11b-kaggle-gpu-training)
+    -   11a. [Agent Networking & Social Media Automation](#11a-agent-networking--social-media-automation)
 12. [Persona & Agent Creation](#12-persona--agent-creation)
 13. [Networking & Multi-System Operation](#13-networking--multi-system-operation)
 14. [Security & Permissions](#14-security--permissions)
@@ -265,16 +268,18 @@ The Omnecor Android app is a **thin client** that connects to a running desktop 
 adb install app-debug.apk
 ```
 
-**Build yourself:**
+**Build yourself (requires Android NDK r26+ and CMake 3.22+):**
 
 ```bash
-pnpm build:android
-cd packaging/electron-app/android && ./gradlew assembleDebug
+cd packaging/android/omnecor-hq
+pnpm install
+pnpm prebuild:android   # generates the Gradle/native project
+pnpm apk:debug          # produces app-debug.apk
 ```
 
-**Connect to the desktop:** Launch the app → Setup Wizard → Local Network → enter your desktop's LAN IP.
+**Connect to the desktop:** Launch the app → Settings → Omnecor Server → enter your desktop's LAN IP or Tailscale IP. Tap **Test** to verify, then **Save**.
 
-Full reference: [INSTALL.md — Android APK](../INSTALL.md#46-android--thin-client-apk) · [packaging/android/BUILD-ANDROID.md](../packaging/android/BUILD-ANDROID.md)
+Full reference: [INSTALL.md — Android APK](../INSTALL.md#46-android--thin-client-apk) · [packaging/android/BUILD-ANDROID.md](../packaging/android/BUILD-ANDROID.md) · [BUILD.md (detailed)](../packaging/android/omnecor-hq/BUILD.md)
 
 ### 4.4. Beginner Installation Path
 
@@ -294,7 +299,7 @@ For enterprise or high-security environments that prohibit external network call
 
 1.  **Enable**: Set `ZERO_LOGIN_MODE=true` in your `.env` file.
 2.  **Behavior**:
-    -   Skips all OAuth provider checks (Manus, Google, Microsoft).
+    -   Skips all OAuth provider checks (Google, Microsoft).
     -   Generates a synthetic "Local Admin" session on startup with `role = 'owner'`.
     -   Automatically enforces **Sovereign Mode** (`executionMode = 'sovereign'`) — no cloud procedures can execute.
     -   No external SDK calls are made during the boot sequence.
@@ -355,7 +360,7 @@ Omnecor's UI is designed for intuitive navigation and efficient workflow managem
 
 ### 6.1. Navigation Layout
 
--   **Navigation Sidebar (Left)**: Provides global access to core modules like Dashboard, Chat, Model Hub, Neural Brain Map, Pipelines, Integrations, and Settings. Click icons to switch views.
+-   **Navigation Sidebar (Left)**: Provides global access to core modules like Dashboard, Chat, Model Hub, Neural Brain Map, Pipelines, Integrations, Agentic Wallet, **Notifications**, and Settings. Click icons to switch views. The Notifications item (between Agentic Wallet and Settings) shows a live unread badge.
 -   **Header (Top)**: Contains the application logo, search (Command Palette), notifications, and user profile access.
 -   **Main Content Area**: The central dynamic area that displays the content of the currently selected module.
 
@@ -372,6 +377,9 @@ Omnecor's UI is designed for intuitive navigation and efficient workflow managem
 ### 6.4. Notifications
 
 -   **Sonner Notifications**: Non-intrusive pop-up notifications provide feedback on background processes, task completions, and alerts.
+-   **Notifications Hub (`/notifications`)**: A dedicated page (sidebar item between Agentic Wallet and Settings) with two views:
+    -   **Alerts** — a persistent, live feed of everything you'd wait on: new chat replies, task/job completion, Human-in-the-Loop (HITL) approvals, and agentic-wallet budget alerts. Each item is colour-coded by kind; tap to mark read and jump to the source. Use **Mark all read** / **Clear** to manage the feed. The sidebar badge tracks unread count in real time.
+    -   **Agent Messenger** — see §10b. The same hub is available on the Android companion app as the **Alerts** tab.
 
 ### 6.5. Terminal Interfaces
 
@@ -573,6 +581,37 @@ See [Section 2.10](#210-agentic-wallet) for a full feature overview. This sectio
 
 ---
 
+## 10b. Notifications & Agent Messenger
+
+The **Notifications** hub (`/notifications`, sidebar item between Agentic Wallet and Settings) unifies every alert Omnecor raises and adds a direct messenger for your agents. It is available identically in the desktop GUI and as the **Alerts** tab on the Android companion app.
+
+### Alerts feed
+
+A live, persistent feed of everything you'd wait on. Alert kinds:
+
+| Kind | Raised when |
+|---|---|
+| 💬 Chat | A blocking `ai.chat` completion returns (background/agent replies; the live chat UI streams separately). |
+| ✅ Task | A background job/process finishes or fails. |
+| ⚠️ HITL | An agent action is paused awaiting your approval. |
+| 💳 Wallet | A project crosses its budget **alert threshold** or **limit** (deduped per project). |
+| 🤖 Agent | An agent/persona replies to you in the Agent Messenger. |
+| 🔔 System | Generic system events. |
+
+Alerts arrive in real time over the `notifications` WebSocket channel, and the sidebar/tab badge shows the unread count. Tap an alert to mark it read and jump to its source; use **Mark all read** or **Clear** to manage the list. Alerts are in-memory (they reset when the server restarts), so this is a "what needs my attention now" feed rather than a permanent audit log — for the immutable log see **Settings → Audit**.
+
+### Agent Messenger
+
+A WhatsApp/Discord-style messenger for your agents/personas, **separate from regular project chats**. Each persona you create (see §12) becomes a thread. Use it to talk to always-on agents — ask a **planner** to outline work, an **assistant** to start or check on Omnecor tasks, or a self-clone to retrieve neural-map data — back and forth, conversationally.
+
+-   Replies are generated through each persona's configured model backend (`Settings → Personas → Model`). If that backend is offline, your message is saved and the agent replies with a graceful "offline" notice.
+-   Every agent reply also raises a 🤖 **Agent** notification, so you're alerted even when you're not on the thread.
+-   Threads are in-memory for now (history resets on server restart).
+
+> Tip: deep-link straight to a thread with `/notifications?persona=<personaId>`.
+
+---
+
 ## 11. Cloud Compute Rental
 
 Omnecor integrates with GPU cloud rental providers so you can run heavy inference workloads remotely without leaving the application.
@@ -597,6 +636,31 @@ Omnecor integrates with GPU cloud rental providers so you can run heavy inferenc
 Sessions can be assigned as the model backend for always-on Persona agents (see section 12).
 
 Full reference: [docs/user-guides/CLOUD_COMPUTE.md](CLOUD_COMPUTE.md)
+
+---
+
+## 11b. Kaggle GPU Training
+
+Omnecor integrates Kaggle's free T4 GPU tier for Valet Router LoRA training and custom model fine-tuning — no credit card required.
+
+**Access:** Settings → Valet Router → Train on Kaggle  
+Also available in: Setup Wizard, LLM Builder, and the Valet Router panel.
+
+### Quick Start
+
+1. Create a free account at [kaggle.com](https://kaggle.com) and enable phone verification.
+2. Go to **Settings → Account → API** → click **Create New Token** → download `kaggle.json`.
+3. In Omnecor: **Settings → Valet Router → Kaggle** → paste your username and API token.
+4. Click **Launch Training Job** — Omnecor creates and starts a Kaggle kernel with your dataset and LoRA config.
+5. Monitor kernel status in the Kaggle panel (60-second polling).
+6. When training completes, click **Import Adapter** — the LoRA weights are downloaded automatically.
+7. Click **Activate** to load the new adapter into your Valet Router.
+
+### Notes
+
+- Kaggle free tier provides ~30 GPU hours/week on NVIDIA T4.
+- Training datasets are generated from your local audit log and spend log via the Valet Dataset Builder.
+- The adapter import overwrites the previous Valet Router adapter; the old weights are archived locally.
 
 ---
 
@@ -663,11 +727,11 @@ Omnecor supports multi-system operation through its OMMESH distributed intellige
 
 ---
 
-## 12. Security & Permissions
+## 14. Security & Permissions
 
 Security is a paramount concern in Omnecor. For a comprehensive reference, see [SECURITY.md](../SECURITY.md) and the `SecurityService` documentation.
 
-### 12.1. Execution Modes
+### 14.1. Execution Modes
 
 Omnecor operates in three distinct **Execution Modes** that balance power with privacy. Toggle from the header badge or via Settings → Execution Mode.
 
@@ -679,7 +743,7 @@ Omnecor operates in three distinct **Execution Modes** that balance power with p
 
 Your selected mode is persisted to `users.executionMode` in the database and survives session restarts. The `sovereignCheck` middleware enforces Sovereign Mode at the tRPC layer — it cannot be bypassed by the frontend.
 
-### 12.2. Immutable Audit Log
+### 14.2. Immutable Audit Log
 
 Omnecor maintains an append-only audit log of all privileged system events.
 
@@ -689,13 +753,12 @@ Omnecor maintains an append-only audit log of all privileged system events.
 -   **Export**: Use `audit.exportAuditLog` (Admin only) to download a CSV of the full log for compliance reporting.
 -   **Captured Events**: User logins/logouts, HITL approvals/rejections, agent spawns/terminations, critical tool calls (Blender, KiCad, ESPTool), budget changes, virtual card issuance.
 
-### 12.3. Extended OAuth Providers (Phase 23)
+### 14.3. Extended OAuth Providers
 
-Omnecor supports three OAuth identity providers. Configure the required environment variables to enable each:
+Omnecor supports two OAuth identity providers for user authentication. Configure the required environment variables to enable each:
 
 | Provider | Required Variables |
 |---|---|
-| **Manus** (default) | `MANUS_CLIENT_ID`, `MANUS_CLIENT_SECRET` |
 | **Google** | `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET` |
 | **Microsoft** | `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET` |
 
@@ -703,33 +766,33 @@ Use `ZERO_LOGIN_MODE=true` to skip all OAuth providers for air-gapped deployment
 
 ---
 
-## 13. Backup, Recovery, and Migration
+## 15. Backup, Recovery, and Migration
 
 Regular backups are crucial for protecting your data. Omnecor stores critical data in its database and local file system.
 
-### 13.1. Backup Procedures
+### 15.1. Backup Procedures
 
 -   **Database Backup**: Regularly export your MySQL/TiDB database using standard database tools (e.g., `mysqldump`).
 -   **File System Backup**: Back up your project folders, the `.omnecor` configuration directory, and any custom AI models.
 
-### 13.2. Recovery Procedures
+### 15.2. Recovery Procedures
 
 -   In case of data loss, restore your database from the latest backup and replace affected files from your file system backup.
 
-### 13.3. Migration
+### 15.3. Migration
 
 -   **Database Migrations**: Use Drizzle Kit for schema migrations (`pnpm drizzle-kit generate`, `pnpm run db:push`).
 -   **System Migration**: To move your Omnecor installation to a new machine, copy the entire installation directory, including the `.env` file, and restore your database.
 
 ---
 
-## 14. Troubleshooting Guide
+## 16. Troubleshooting Guide
 
 For common issues and their solutions, please refer to the dedicated [TROUBLESHOOTING.md](../TROUBLESHOOTING.md) document.
 
 ---
 
-## 15. Logs & Diagnostics
+## 17. Logs & Diagnostics
 
 Omnecor generates detailed logs to assist with debugging and monitoring.
 
@@ -739,26 +802,26 @@ Omnecor generates detailed logs to assist with debugging and monitoring.
 
 ---
 
-## 16. Advanced Usage
+## 18. Advanced Usage
 
-### 16.1. Custom AI Model Integration
+### 18.1. Custom AI Model Integration
 
 -   **Local Models**: Integrate new local AI models by configuring their API endpoints in the `.env` file or through the Model Hub settings.
 -   **Custom Providers**: For advanced users, it is possible to extend the `AiProviderService` to support new AI service providers.
 
-### 16.2. Extending Python Bridges
+### 18.2. Extending Python Bridges
 
 -   **New Bridges**: Create new Python scripts in `server/python_bridges/` to integrate with additional external tools or hardware.
 -   **Custom Commands**: Extend existing bridges with new commands or functionalities.
 
-### 16.3. Developing Custom Agents
+### 18.3. Developing Custom Agents
 
 -   **Agent API**: Utilize the `AgentService` to define and register new autonomous AI agents with specific responsibilities and capabilities.
 -   **Workflow Integration**: Integrate custom agents into existing or new workflows using the `WorkflowSequencing` mechanisms.
 
 ---
 
-## 17. Performance Optimization
+## 19. Performance Optimization
 
 To ensure Omnecor runs optimally, consider the following:
 
@@ -770,13 +833,13 @@ To ensure Omnecor runs optimally, consider the following:
 
 ---
 
-## 18. FAQ
+## 20. FAQ
 
 For answers to frequently asked questions, please refer to the dedicated [FAQ.md](../FAQ.md) document.
 
 ---
 
-## 19. Glossary
+## 21. Glossary
 
 -   **`/plan` Mode**: A Valet Router guided session that creates and maintains the project documentation suite (`todo.md`, `status.md`, `project-docs/`).
 -   **Agentic Wallet**: Omnecor's built-in cost management system for cloud AI providers, featuring project budgets, spend logging, and optional Lithic virtual card integration.
@@ -817,17 +880,17 @@ For answers to frequently asked questions, please refer to the dedicated [FAQ.md
 
 ---
 
-## 20. Appendix
+## 22. Appendix
 
-### 20.1. Third-Party Libraries and Licenses
+### 22.1. Third-Party Libraries and Licenses
 
 Refer to the `package.json` file for a comprehensive list of third-party libraries and their respective licenses.
 
-### 20.2. Contributing
+### 22.2. Contributing
 
 For information on how to contribute to the Omnecor project, please see the [CONTRIBUTING.md](../CONTRIBUTING.md) file.
 
-### 20.3. Contact and Support
+### 22.3. Contact and Support
 
 For support, bug reports, or feature requests, please visit the [GitHub repository](https://github.com/Clarkescustomcreations/OmnecorV1-Beta) or contact the development team.
 

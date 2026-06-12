@@ -443,7 +443,7 @@ Sovereign mode is a deliberate, user-activated restriction for specific use case
 
 ### Phase 23 — Google + Microsoft OAuth Extensions
 
-**Goal:** Add Google and Microsoft OAuth as optional login providers alongside the existing SDK/Manus OAuth.
+**Goal:** Add Google and Microsoft OAuth as optional login providers alongside local authentication.
 
 **Tasks:**
 1. Extend `server/_core/oauth.ts`: add `registerGoogleOAuthRoutes(app)` and `registerMicrosoftOAuthRoutes(app)` functions following the exact same CSRF state pattern as the existing `registerOAuthRoutes`.

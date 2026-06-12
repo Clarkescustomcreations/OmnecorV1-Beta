@@ -1,54 +1,38 @@
 # Omnecor — Android Build Guide
 
-This guide explains how to build the Omnecor Android thin client. The Android app acts as a remote interface to a running Omnecor desktop brain on the same local network.
+The Omnecor Android app is **Omnecor HQ** — a React Native (Expo) companion app for the desktop workstation. It connects over Tailscale or LAN Wi-Fi and runs on-device GGUF inference via llama.rn.
 
-## Prerequisites
+For complete build instructions, see the dedicated guide:
 
-1.  **JDK 17**: Required for Gradle.
-2.  **Android SDK**: Download via [Android Studio](https://developer.android.com/studio) or command-line tools.
-    *   Target SDK: 34
-    *   Build Tools: 34.0.0+
-3.  **Node.js & pnpm**: See the root `INSTALL.md` for pinned versions.
+**[packaging/android/omnecor-hq/BUILD.md](omnecor-hq/BUILD.md)**
 
-## Building the APK (Debug)
+## Quick Reference
 
-The following commands build the web assets and synchronize them with the native Android project:
+| Step | Command | Location |
+|------|---------|---------|
+| Install deps | `pnpm install` | `packaging/android/omnecor-hq/` |
+| Generate Gradle project | `pnpm prebuild:android` | `packaging/android/omnecor-hq/` |
+| Build debug APK | `pnpm apk:debug` | `packaging/android/omnecor-hq/` |
+| Install to device | `pnpm apk:install` | `packaging/android/omnecor-hq/` |
 
-```bash
-# From the project root
-pnpm install
-pnpm build:android
-```
+## Requirements
 
-Then, compile the APK using Gradle:
+- Android NDK r26+ (required for llama.rn C++ compilation)
+- CMake 3.22+
+- JDK 17
+- Android SDK 34
 
-```bash
-cd packaging/electron-app/android
-./gradlew assembleDebug
-```
+Both NDK and CMake can be installed via Android Studio → SDK Manager → SDK Tools.
 
-Output: `packaging/electron-app/android/app/build/outputs/apk/debug/app-debug.apk`
+## Package Details
 
-## Sideloading for Beta Testing
+| Field | Value |
+|-------|-------|
+| App name | Omnecor HQ |
+| Package | `com.omnecor.mobilehq` |
+| Framework | React Native 0.81 + Expo SDK 54 |
+| Min Android | 7.0 (API 24) |
+| Target SDK | 34 |
+| Tabs | Chat, HITL, **Alerts** (Notifications + Agent Messenger), AI Node, Status, Terminal, Podcast, 3D View, Settings |
 
-1.  Enable **Developer Options** on your Android device.
-2.  Enable **USB Debugging** and **Install via USB**.
-3.  Connect your device and run:
-    ```bash
-    ./gradlew installDebug
-    ```
-    Alternatively, copy the `app-debug.apk` to your device and open it via a file manager.
-
-## Connecting to the Desktop Brain
-
-1.  Ensure your Android device and Desktop are on the **same Wi-Fi/LAN**.
-2.  Launch the Omnecor app on Android.
-3.  In the **Local Network** step of the Setup Wizard, enter the **IP address** of your desktop workstation.
-4.  The app will navigate to the desktop backend and provide the full workstation experience.
-
-## Build from Android Studio
-
-1.  Open Android Studio.
-2.  Select **Open** and choose the directory: `packaging/electron-app/android`.
-3.  Wait for Gradle to sync.
-4.  Click **Run > Run 'app'** to deploy to a connected device or emulator.
+> The **Alerts** tab (`app/(tabs)/notifications.tsx`, added 2026-06-12) mirrors the desktop Notifications hub: a unified alert feed (`notifications.*`) plus the Agent Messenger (`agentMessenger.*`), both served by the PC over tRPC + the `notifications` WebSocket channel.

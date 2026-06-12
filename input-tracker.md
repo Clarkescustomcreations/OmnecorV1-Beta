@@ -1794,6 +1794,31 @@ Read-only WebSocket-driven display. No interactive form elements.
 
 ---
 
+## SECTION 9 — NOTIFICATIONS & AGENT MESSENGER (added 2026-06-12)
+
+### PAGE: Notifications.tsx (`/notifications`)
+**Notes:** Unified alert feed + Agent Messenger. Live via the `notifications` WebSocket channel (`useNotifications` → `useOmnecorSocket`). Nav item lives between Agentic Wallet and Settings in `OmnecorDashboardLayout.tsx` with a live unread badge (`trpc.notifications.unreadCount`).
+
+| Element | Label/ID | Handler Function | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Tab: Alerts | alerts | setTab | None | LOCAL |
+| Tab: Agent Messenger | messenger | setTab | None | LOCAL |
+| Notification card (click) | open | markRead + navigate to href | trpc.notifications.markRead | CONNECTED |
+| Mark all read | markAll | markAllRead | trpc.notifications.markAllRead | CONNECTED |
+| Clear | clear | clear | trpc.notifications.clear | CONNECTED |
+| Feed hydration | list | useNotifications | trpc.notifications.list | CONNECTED |
+| Live push | ws | useOmnecorSocket onEvent("notification") | WS channel `notifications` | CONNECTED |
+| Conversation list | convos | listConversations | trpc.agentMessenger.listConversations | CONNECTED |
+| Thread load | thread | getMessages | trpc.agentMessenger.getMessages | CONNECTED |
+| Message input + Send | send | handleSend | trpc.agentMessenger.send | CONNECTED |
+
+### NAV: OmnecorDashboardLayout.tsx (Notifications item)
+| Element | Label/ID | Handler Function | API/tRPC Call | Status |
+|---|---|---|---|---|
+| Notifications nav link | /notifications | wouter Link | trpc.notifications.unreadCount (badge) | CONNECTED |
+
+---
+
 ## APPENDIX — DEAD INPUTS MASTER LIST
 
 The following interactions exist in the UI but have no working connection (as of Session 11 verification):

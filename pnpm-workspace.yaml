@@ -1,6 +1,7 @@
 packages:
   - "."
   - "packaging/electron-app"
+  - "packaging/android/omnecor-hq"
 
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"

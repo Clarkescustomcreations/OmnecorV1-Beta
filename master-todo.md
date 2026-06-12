@@ -464,12 +464,24 @@
 > **2nd-Pass Audit — 2026-06-07.** Items confirmed DONE are promoted to the Done section above. Items below are verified incomplete or newly discovered. Bugs found by swarm audit are marked 🐛.
 
 ## PKG-todo (Android & Final Verification)
-> **Intentionally deferred — APK build is being saved for last.** All other platform targets (Linux, Windows) complete. Android will be the final deliverable after Valet V2 integration is confirmed.
-- [ ] 4.3.1 `pnpm build:android` + `./gradlew assembleDebug`.
-- [ ] 4.3.2 Configure keystore and `assembleRelease`.
-- [ ] 4.4.1 Sideload the APK on a device/emulator.
-- [ ] 4.4.2 App launches, network step accepts desktop IP, connects to backend.
-- 🔴 `packaging/android/` groundwork present but no smoke-tested native APK build. **Will be addressed after Valet V2 sign-off.**
+> **Software integration complete (2026-06-11).** All PC-side handlers and mobile app screens are fully wired. Remaining items require a physical Android SDK/NDK build machine.
+- [x] 4.1 React Native (Expo) app scaffolded as `packaging/android/omnecor-hq/` pnpm workspace — registered in `pnpm-workspace.yaml`.
+- [x] 4.2 All 8 tab screens wired to real PC tRPC endpoints — Chat, HITL, AI Node, Status, Terminal, Podcast, Settings; no stubs remaining in critical paths.
+- [x] 4.3 PC-side WebSocket mobile node handlers added to `WebSocketServer.ts`: `mobile_node_register`, `mobile_node_heartbeat`, `mobile_inference_response`, `mobile_node_ack` send, `removeMobileNode` cleanup; public `getMobileNodes()`, `hasMobileWorker()`, `routeInferenceToMobile()` API.
+- [x] 4.4 `server/routers/hitlRouter.ts` created (`hitl.getPending` + `hitl.resolve`) and registered; HITL events broadcast to `hitl:pending` WS channel.
+- [x] 4.5 `auth.setExecutionMode` mutation added to `server/routers.ts`; mobile Settings screen reads mode from `auth.me` on load and syncs on change.
+- [x] 4.6 `aiRouter.ts` wired to `"ommesh"` provider: `getProviders` surfaces phone when worker registered + model loaded; `chat` + `chatStream` route to phone via `routeInferenceToMobile()`.
+- [x] 4.7 Chat screen neural map / agent selectors load from `neuralMaps.list` + `personas.list`; `ai.chat` call fixed to send required `providerId`/`modelId` with `systemPrompt` context.
+- [x] 4.8 Podcast screen `handleGenerate` wired to `podcast.generate` tRPC; script split into host/guest dialogue turns; `audioPath` shown on completion.
+- [x] 4.9 `expo-file-system ~18.0.12` dependency added to `omnecor-hq/package.json`.
+- [x] 4.10 `pnpm check` — 0 TypeScript errors after all changes.
+- [ ] 4.11 `pnpm install` in `packaging/android/omnecor-hq/` (requires Node/pnpm on build machine).
+- [ ] 4.12 `pnpm prebuild:android` — generates `android/` Gradle project; requires Android SDK + NDK r26+ + CMake 3.22+.
+- [ ] 4.13 `pnpm apk:debug` → `android/app/build/outputs/apk/debug/app-debug.apk`.
+- [ ] 4.14 Configure release signing keystore → `pnpm apk:release`.
+- [ ] 4.15 Sideload APK; verify Chat + HITL + Terminal + OMMESH Node screens connect to PC.
+- [ ] 4.16 Download GGUF model to phone (`Documents/models/`); test on-device inference via AI Node screen.
+- ⚠️ `OMMESH_SECRET` not yet set in `.env` — mobile nodes accepted with warning. Set `OMMESH_SECRET=<secret>` to enforce auth.
 
 ## OMMESH / Agent Networking — Critical Bugs 🐛
 - [x] ~~🐛 **`DiscoveryService.getPeers()` returns `[]`**~~ — **FIXED 2026-06-07.** Added `Map<string, PeerInfo>` with bonjour `'up'`/`'down'` browser events. Peers now tracked and returned by `getPeers()`.
@@ -695,3 +707,32 @@ Free-tier Kaggle T4 GPU training pipeline wired end-to-end. No credit card requi
 ### VALET-todo 6.4 — Status update
 - [x] Kaggle training pipeline integrated and wired to all entry points (Settings, Setup Wizard, LLM Builder, Valet Router tab)
 - [ ] 6.4 full sign-off pending: `pnpm valet:build` clean run + eval thresholds confirmed on GPU artifact
+
+## Android APK — Session 2026-06-11
+> Full PC-side integration + mobile app wiring completed. Only build-machine steps remain.
+- [x] Renamed `apk-staging/` → `packaging/android/omnecor-hq/`; registered as pnpm workspace; backward-compat symlink created.
+- [x] `server/routers/hitlRouter.ts` — `hitl.getPending` + `hitl.resolve` wired to `HITLApprovalService`; registered in `server/routers.ts`; HITL WS broadcast already present in `WebSocketServer.ts`.
+- [x] `server/phase2/websocket/WebSocketServer.ts` — mobile OMMESH node support: register/heartbeat/inference handlers, `MobileNodeInfo` map, `pendingInferences` map, `routeInferenceToMobile()` public API, timeout + cleanup on disconnect.
+- [x] `server/routers/aiRouter.ts` — `"ommesh"` provider: surfaces in `getProviders` when phone worker live; `chat` + `chatStream` route to phone; `PRECONDITION_FAILED` if no worker.
+- [x] `server/routers.ts` — `auth.setExecutionMode` mutation added (uses `updateUserExecutionMode` from `db.factory.ts`).
+- [x] `omnecor-hq/app/(tabs)/index.tsx` — Neural Map + Agent selectors load from `neuralMaps.list` / `personas.list`; `ai.chat` fixed (`providerId`/`modelId` required fields sent); `systemPrompt` built from selected map + persona.
+- [x] `omnecor-hq/app/(tabs)/podcast.tsx` — `handleGenerate` wired to `podcast.generate`; script → dialogue turns transform; `audioPath` state.
+- [x] `omnecor-hq/app/(tabs)/settings.tsx` — execution mode reads `auth.me` on mount; syncs to `auth.setExecutionMode` on change.
+- [x] `omnecor-hq/package.json` — `expo-file-system ~18.0.12` added.
+- [x] `pnpm check` — 0 TypeScript errors project-wide.
+
+## Unified Notifications & Agent Messenger — Session 2026-06-12
+> New Notifications hub (alerts + Agent Messenger) on both the desktop GUI and the Android APK. In-memory + WS, no schema migration.
+- [x] `shared/notifications.ts` — `OmnecorNotification` / `AgentMessage` / `AgentConversation` types + `NotificationKind` (chat/task/hitl/wallet/agent/system).
+- [x] `server/_core/NotificationService.ts` — singleton in-memory ring buffer + EventEmitter (`notify` / `list` / `unreadCount` / `markRead` / `markAllRead` / `clear`).
+- [x] `server/_core/AgentMessengerStore.ts` — in-memory per-persona threads + unread tracking.
+- [x] `server/routers/notificationRouter.ts` — `list` / `unreadCount` / `markRead` / `markAllRead` / `clear` / `create`; registered in `server/routers.ts` under `notifications`.
+- [x] `server/routers/agentMessengerRouter.ts` — `listConversations` / `getMessages` / `markRead` / `send` (reply via persona `modelConfig` backend, graceful offline fallback); registered under `agentMessenger`.
+- [x] `server/phase2/websocket/WebSocketServer.ts` — relays `NotificationService` events to the `notifications` channel; HITL `actionPending` + job `lifecycle` (completed/failed) now raise notifications; added `"notification"` to `ServerMessage` union.
+- [x] `server/phase2/services/AiProviderService.ts` — agentic-wallet budget threshold/limit alerts (deduped per project via `raiseWalletAlert`).
+- [x] `server/routers/aiRouter.ts` — blocking `ai.chat` completions raise a `chat` notification.
+- [x] `client/src/pages/Notifications.tsx` — Alerts feed + Agent Messenger (master-detail), deep-link `?persona=<id>`.
+- [x] `client/src/hooks/useNotifications.ts` — hydrate + live WS via shared socket; `client/src/hooks/useOmnecorSocket.ts` adds `"notification"` event type.
+- [x] `client/src/App.tsx` — `/notifications` route; `client/src/components/OmnecorDashboardLayout.tsx` — nav item between Agentic Wallet and Settings with live unread badge.
+- [x] APK: `hooks/use-notifications.ts` + `hooks/use-agent-messenger.ts`; `app/(tabs)/notifications.tsx` (Alerts + Messenger); `_layout.tsx` tab + `bell.fill` icon mapping.
+- [x] `pnpm check` — 0 TypeScript errors; `pnpm build` — clean production build.

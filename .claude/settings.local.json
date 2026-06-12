@@ -39,7 +39,10 @@
       "Bash(sudo systemctl restart ollama)",
       "Bash(systemctl is-active *)",
       "Bash(OLLAMA_NUM_GPU=0 OLLAMA_HOST=127.0.0.1:11435 OLLAMA_MODELS=/usr/share/ollama/.ollama/models ollama serve)",
-      "Bash(echo \"CPU Ollama PID: $!\")"
+      "Bash(echo \"CPU Ollama PID: $!\")",
+      "Bash(timeout 300 pnpm check)",
+      "Bash(timeout 360 pnpm check)",
+      "Bash(echo \"TOTAL ERRORS: $\\(timeout 360 pnpm check 2>&1)"
     ]
   }
 }

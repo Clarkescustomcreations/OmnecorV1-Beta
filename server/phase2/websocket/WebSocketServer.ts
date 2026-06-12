@@ -49,6 +49,8 @@ import { HashTrackerService } from "../services/HashTrackerService.js";
 import { VoiceService, VoiceEventData } from "../services/VoiceService.js";
 import { HITLApprovalService } from "../services/HITLApprovalService.js";
 import { AgentService } from "../services/AgentService.js";
+import { NotificationService } from "../../_core/NotificationService.js";
+import type { OmnecorNotification } from "../../../shared/notifications.js";
 
 // Lazy-load node-pty so the server starts even if the native binding isn't built
 let ptyModule: typeof import("node-pty") | null = null;
@@ -68,9 +70,20 @@ const log = createLogger("WebSocket");
 
 /** WebSocket message from client to server */
 interface ClientMessage {
-  type: "subscribe" | "unsubscribe" | "ping" | "getState" | "pty:spawn" | "pty:input" | "pty:resize" | "pty:kill" | "chat:toTerminal";
+  type: "subscribe" | "unsubscribe" | "ping" | "getState" | "pty:spawn" | "pty:input" | "pty:resize" | "pty:kill" | "chat:toTerminal" | "mobile_node_register" | "mobile_node_heartbeat" | "mobile_inference_response";
   channel?: string;
   data?: any;
+  // mobile node registration fields (sent at top level, not nested in data)
+  nodeId?: string;
+  nodeName?: string;
+  capabilities?: { modelLoaded: boolean; modelPath?: string; contextLength?: number };
+  ommeshSecret?: string;
+  stats?: { totalRequests: number; totalTokens: number; tokensPerSecond: number };
+  modelLoaded?: boolean;
+  requestId?: string;
+  token?: string;
+  done?: boolean;
+  error?: string;
 }
 
 /** WebSocket message from server to client */
@@ -86,6 +99,7 @@ interface ServerMessage {
     | "unsubscribed"
     | "state"
     | "actionPending"
+    | "notification"
     | "pty:output"
     | "pty:ready"
     | "pty:exit"
@@ -108,6 +122,24 @@ interface OmnecorSocket extends WebSocket {
   isAlive: boolean;
   connectedAt: string;
   ptySession?: PtySession;
+  mobileNodeId?: string;
+}
+
+/** Registered mobile OMMESH node info */
+interface MobileNodeInfo {
+  ws: OmnecorSocket;
+  nodeId: string;
+  nodeName: string;
+  capabilities: { modelLoaded: boolean; modelPath?: string; contextLength?: number };
+  lastSeen: number;
+  stats: { totalRequests: number; totalTokens: number; tokensPerSecond: number };
+}
+
+/** Pending inference keyed by requestId */
+interface PendingInference {
+  nodeId: string;
+  onToken: (token: string, done: boolean) => void;
+  reject: (err: Error) => void;
 }
 
 // ---------------------------------------------------------------------------
@@ -135,6 +167,8 @@ interface OmnecorSocket extends WebSocket {
 export class OmnecorWebSocketServer {
   private wss: WSServer;
   private clients: Map<string, OmnecorSocket> = new Map();
+  private mobileNodes: Map<string, MobileNodeInfo> = new Map();
+  private pendingInferences: Map<string, PendingInference> = new Map();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private fileWatcher: FileSystemWatcherService;
   private processManager: ProcessManagerService;
@@ -142,6 +176,7 @@ export class OmnecorWebSocketServer {
   private voiceService: VoiceService;
   private hitlService: HITLApprovalService;
   private agentService: AgentService;
+  private notificationService: NotificationService;
 
   constructor(httpServer: HttpServer) {
     // Create WebSocket server attached to the HTTP server (upgrade path)
@@ -159,6 +194,7 @@ export class OmnecorWebSocketServer {
     this.voiceService = VoiceService.getInstance();
     this.hitlService = HITLApprovalService.getInstance();
     this.agentService = AgentService.getInstance();
+    this.notificationService = NotificationService.getInstance();
 
     // Wire up connection handling
     this.wss.on("connection", (ws, req) =>
@@ -211,6 +247,9 @@ export class OmnecorWebSocketServer {
     // Handle disconnection
     ws.on("close", () => {
       this.killPtySession(ws);
+      if (ws.mobileNodeId) {
+        this.removeMobileNode(ws.mobileNodeId);
+      }
       this.clients.delete(ws.id);
       log.info("Client disconnected", { id: ws.id, total: this.clients.size });
     });
@@ -287,6 +326,70 @@ export class OmnecorWebSocketServer {
         }
         break;
 
+      // ── Mobile OMMESH Node Registration ──────────────────────────────────
+      case "mobile_node_register": {
+        const secret = process.env.OMMESH_SECRET;
+        if (secret) {
+          if (message.ommeshSecret !== secret) {
+            ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: false, reason: "Invalid OMMESH_SECRET" }));
+            log.warn("Mobile node rejected — bad secret", { id: ws.id });
+            break;
+          }
+        } else {
+          log.warn("OMMESH_SECRET not set — accepting mobile node without authentication", { id: ws.id });
+        }
+
+        const nodeId = message.nodeId;
+        if (!nodeId) {
+          ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: false, reason: "Missing nodeId" }));
+          break;
+        }
+
+        ws.mobileNodeId = nodeId;
+        this.mobileNodes.set(nodeId, {
+          ws,
+          nodeId,
+          nodeName: message.nodeName ?? nodeId,
+          capabilities: message.capabilities ?? { modelLoaded: false },
+          lastSeen: Date.now(),
+          stats: { totalRequests: 0, totalTokens: 0, tokensPerSecond: 0 },
+        });
+
+        ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: true }));
+        log.info("Mobile OMMESH node registered", { nodeId, nodeName: message.nodeName, capabilities: message.capabilities });
+        break;
+      }
+
+      // ── Mobile Node Heartbeat ─────────────────────────────────────────────
+      case "mobile_node_heartbeat": {
+        const nodeId = message.nodeId;
+        if (!nodeId) break;
+        const node = this.mobileNodes.get(nodeId);
+        if (!node) break;
+        node.lastSeen = Date.now();
+        if (message.stats) node.stats = message.stats;
+        if (typeof message.modelLoaded === "boolean") node.capabilities.modelLoaded = message.modelLoaded;
+        break;
+      }
+
+      // ── Mobile Inference Response (streaming token) ───────────────────────
+      case "mobile_inference_response": {
+        const { requestId, token, done, error } = message;
+        if (!requestId) break;
+        const pending = this.pendingInferences.get(requestId);
+        if (!pending) break;
+        if (error) {
+          this.pendingInferences.delete(requestId);
+          pending.reject(new Error(error));
+          break;
+        }
+        pending.onToken(token ?? "", done ?? false);
+        if (done) {
+          this.pendingInferences.delete(requestId);
+        }
+        break;
+      }
+
       default:
         this.sendToClient(ws, {
           type: "error",
@@ -344,12 +447,38 @@ export class OmnecorWebSocketServer {
     }
   }
 
+  /** Remove a mobile node and fail all its pending inferences */
+  private removeMobileNode(nodeId: string): void {
+    this.mobileNodes.delete(nodeId);
+    log.info("Mobile OMMESH node removed", { nodeId });
+
+    // Reject all pending inferences that were routed to the disconnecting node
+    for (const [requestId, pending] of this.pendingInferences) {
+      if (pending.nodeId === nodeId) {
+        pending.reject(new Error("Mobile node disconnected"));
+        this.pendingInferences.delete(requestId);
+      }
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Service Event Wiring
   // -------------------------------------------------------------------------
 
   /** Wire up all backend service events to WebSocket broadcasts */
   private wireServiceEvents(): void {
+    // --- Unified Notifications → "notifications" channel ---
+    // Any notification raised anywhere in the process is pushed to every client
+    // subscribed to the Notifications feed (main GUI + Android APK).
+    this.notificationService.on("notification", (notification: OmnecorNotification) => {
+      this.broadcastToChannel("notifications", {
+        type: "notification",
+        channel: "notifications",
+        data: notification,
+        timestamp: notification.createdAt,
+      });
+    });
+
     // --- File System Events → Neural Node-Tree UI ---
     this.fileWatcher.on("fileEvent", (event: FileEvent) => {
       const channel = `files:${event.projectId}`;
@@ -403,6 +532,21 @@ export class OmnecorWebSocketServer {
 
     // --- Process Lifecycle Events ---
     this.processManager.on("lifecycle", (event: ProcessLifecycleEvent) => {
+      // Task completion / failure → notification feed.
+      const state = (event as any).state as string | undefined;
+      if (state === "completed" || state === "failed") {
+        const label = (event as any).label ?? (event as any).type ?? "Background task";
+        this.notificationService.notify({
+          kind: "task",
+          title: state === "completed" ? "Task completed" : "Task failed",
+          body:
+            state === "completed"
+              ? `${label} finished successfully.`
+              : `${label} failed${(event as any).error ? `: ${(event as any).error}` : "."}`,
+          data: { jobId: (event as any).jobId, type: (event as any).type, state },
+        });
+      }
+
       if (event.type === "blender" || event.type === "esp_flash") {
         // Hardware lifecycle → hardware:{jobId} + hardware:all
         const hwChannel = `hardware:${event.jobId}`;
@@ -499,6 +643,15 @@ export class OmnecorWebSocketServer {
         channel: "hitl:pending",
         data: event,
         timestamp: event.timestamp,
+      });
+
+      // Surface as a notification so the user is alerted even when off the HITL view.
+      this.notificationService.notify({
+        kind: "hitl",
+        title: "Approval needed",
+        body: `${event?.toolName ?? "An agent action"} is waiting for your approval.`,
+        href: "/notifications",
+        data: { actionId: event?.id },
       });
     });
 
@@ -659,6 +812,95 @@ export class OmnecorWebSocketServer {
   // -------------------------------------------------------------------------
   // Public API
   // -------------------------------------------------------------------------
+
+  // -------------------------------------------------------------------------
+  // Mobile OMMESH Node Public API
+  // -------------------------------------------------------------------------
+
+  /** Returns all currently registered mobile OMMESH nodes */
+  getMobileNodes(): MobileNodeInfo[] {
+    return Array.from(this.mobileNodes.values());
+  }
+
+  /** Returns true if at least one mobile node has a model loaded */
+  hasMobileWorker(): boolean {
+    for (const node of this.mobileNodes.values()) {
+      if (node.capabilities.modelLoaded) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Route an inference request to the first available mobile worker.
+   * Resolves with the full response string when the mobile node finishes.
+   * Optional `onToken` receives streaming tokens as they arrive.
+   */
+  routeInferenceToMobile(
+    prompt: string,
+    opts?: { maxTokens?: number; onToken?: (t: string, done: boolean) => void },
+  ): Promise<string> {
+    // Find first node with a model loaded
+    let target: MobileNodeInfo | undefined;
+    for (const node of this.mobileNodes.values()) {
+      if (node.capabilities.modelLoaded) {
+        target = node;
+        break;
+      }
+    }
+
+    if (!target) {
+      return Promise.reject(new Error("No mobile worker available"));
+    }
+
+    const requestId = crypto.randomUUID();
+    const node = target;
+
+    return new Promise<string>((resolve, reject) => {
+      let accumulated = "";
+
+      const onToken = (token: string, done: boolean): void => {
+        accumulated += token;
+        opts?.onToken?.(token, done);
+        if (done) {
+          resolve(accumulated);
+        }
+      };
+
+      this.pendingInferences.set(requestId, { nodeId: node.nodeId, onToken, reject });
+
+      // Send inference request to the mobile node
+      const msg = JSON.stringify({
+        type: "mobile_inference_request",
+        requestId,
+        prompt,
+        ...(opts?.maxTokens !== undefined ? { maxTokens: opts.maxTokens } : {}),
+      });
+      node.ws.send(msg);
+
+      // 120-second timeout
+      const timer = setTimeout(() => {
+        if (this.pendingInferences.has(requestId)) {
+          this.pendingInferences.delete(requestId);
+          reject(new Error("Mobile inference timed out after 120 seconds"));
+        }
+      }, 120_000);
+
+      // Clear timeout if promise settles
+      const originalResolve = resolve;
+      const originalReject = reject;
+      void originalResolve; void originalReject; // already captured via closure above
+      // Attach cleanup to the promise chain externally is tricky; instead we
+      // clear inside onToken (done path) and the reject path above by deleting
+      // from pendingInferences. Clear the timer when the entry is gone.
+      const clearTimer = (): void => clearTimeout(timer);
+      // Wrap to ensure timer cleanup regardless of resolution path
+      const entry = this.pendingInferences.get(requestId)!;
+      const originalOnToken = entry.onToken;
+      const originalEntryReject = entry.reject;
+      entry.onToken = (t: string, d: boolean): void => { originalOnToken(t, d); if (d) clearTimer(); };
+      entry.reject = (err: Error): void => { clearTimer(); originalEntryReject(err); };
+    });
+  }
 
   /** Get the number of connected clients */
   get clientCount(): number {

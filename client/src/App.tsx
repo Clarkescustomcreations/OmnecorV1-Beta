@@ -24,6 +24,7 @@ const AgentNetworking = lazy(() => import("@/pages/AgentNetworking"));
 const PodcastStudio = lazy(() => import("@/pages/PodcastStudio"));
 const NotFound = lazy(() => import("@/pages/NotFound"));
 const AgenticWallet = lazy(() => import("@/pages/AgenticWallet"));
+const Notifications = lazy(() => import("@/pages/Notifications"));
 const SetupWizard = lazy(() => import("@/pages/SetupWizard"));
 const ExternalBrainMapWindow = lazy(() => import("./components/window-system/ExternalBrainMapWindow"));
 
@@ -87,6 +88,7 @@ function RouterRoutes() {
         <Route path="/agent-networking" component={withBoundary(AgentNetworking)} />
         <Route path="/podcast-studio" component={withBoundary(PodcastStudio)} />
         <Route path="/wallet" component={withBoundary(AgenticWallet)} />
+        <Route path="/notifications" component={withBoundary(Notifications)} />
         <Route path="/settings" component={withBoundary(SettingsPage)} />
         <Route path="/404" component={withBoundary(NotFound)} />
         {/* Final fallback route */}
