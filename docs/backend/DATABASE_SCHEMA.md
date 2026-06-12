@@ -15,10 +15,10 @@ This table stores core user information, backing the authentication flow. It is 
 | Column Name | Type | Description | Constraints |
 |---|---|---|---|
 | `id` | `int` | Surrogate primary key. Auto-incremented numeric value. | `PRIMARY KEY`, `AUTO_INCREMENT` |
-| `openId` | `varchar(64)` | Manus OAuth identifier (openId) from OAuth callback. | `NOT NULL`, `UNIQUE` |
+| `openId` | `varchar(64)` | OAuth provider subject identifier returned from the OAuth callback. | `NOT NULL`, `UNIQUE` |
 | `name` | `text` | User's display name. | |
 | `email` | `varchar(320)` | User's email address. | |
-| `loginMethod` | `varchar(64)` | Method used for user login. Supports `'manus'`, `'google'`, `'microsoft'`, `'local'`. | |
+| `loginMethod` | `varchar(64)` | Method used for user login. Supports `'google'`, `'microsoft'`, `'local'`. | |
 | `role` | `enum('viewer', 'user', 'admin', 'owner')` | User's role within the system. | `NOT NULL`, `DEFAULT 'user'` |
 | `executionMode` | `mysqlEnum('executionMode', ['sovereign', 'scrapper', 'big_spender'])` | Controls which execution mode this user prefers. | `NOT NULL`, `DEFAULT 'scrapper'` |
 | `createdAt` | `timestamp` | Timestamp of user creation. | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
@@ -307,6 +307,124 @@ Configuration for automated posting schedules. Defines how often posts are publi
 | `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
 | `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
 
+### 2.19. `design_projects` Table
+
+Represents top-level PCB design projects. Users can organize multiple design files (saves) within each project.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `userId` | `int` | FK to `users.id`. User who owns this design project. | `NOT NULL` |
+| `name` | `varchar(255)` | Project name | `NOT NULL` |
+| `description` | `text` | Project description | |
+| `mode` | `varchar(20)` | Design mode (schematic or PCB layout). Supports `'schematic'`, `'pcb'`. | `NOT NULL`, `DEFAULT 'schematic'` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL` |
+
+### 2.20. `design_saves` Table
+
+Stores versioned snapshots of PCB design projects. Each save represents a state of the canvas at a point in time.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `projectId` | `int` | FK to `design_projects.id`. Project this save belongs to. | `NOT NULL` |
+| `userId` | `int` | FK to `users.id`. User who owns this save. | `NOT NULL` |
+| `name` | `varchar(255)` | Save name or version label | `NOT NULL` |
+| `description` | `text` | Save description or notes | |
+| `canvasData` | `json` | Complete canvas state (components, connections, layout) | `NOT NULL` |
+| `componentCount` | `int` | Number of components in this design | `DEFAULT 0` |
+| `connectionCount` | `int` | Number of electrical connections in this design | `DEFAULT 0` |
+| `version` | `int` | Version number within the project | `DEFAULT 1` |
+| `isLatest` | `int` | Boolean flag (0 = archived, 1 = latest version) | `DEFAULT 1` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL` |
+
+### 2.21. `component_library_items` Table
+
+Reusable PCB components stored in a user's custom library. Components include schematic symbols, footprints, and electrical properties.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `userId` | `int` | FK to `users.id`. User who owns this component. | `NOT NULL` |
+| `componentId` | `varchar(255)` | Unique identifier for the component (unique per user) | `NOT NULL`, `UNIQUE` |
+| `name` | `varchar(255)` | Human-readable component name | `NOT NULL` |
+| `category` | `varchar(100)` | Component category (e.g. `'resistor'`, `'capacitor'`, `'ic'`) | `NOT NULL` |
+| `description` | `text` | Component description and notes | |
+| `symbolSvg` | `text` | SVG representation of the schematic symbol | |
+| `footprintSvg` | `text` | SVG representation of the PCB footprint | |
+| `properties` | `json` | Electrical properties (resistance, capacitance, ratings, etc.) | `NOT NULL` |
+| `handles` | `json` | Connection points/pads for the component | `NOT NULL` |
+| `manufacturer` | `varchar(255)` | Component manufacturer name | |
+| `partNumber` | `varchar(255)` | Manufacturer part number | |
+| `datasheet` | `varchar(512)` | URL to the component datasheet | |
+| `tags` | `json` | JSON array of searchable tags | `NOT NULL` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL` |
+
+### 2.22. `design_exports` Table
+
+Tracks exported design files in various formats (Gerber, DXF, SVG, PDF). Enables users to download their designs for manufacturing or analysis.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `designSaveId` | `int` | FK to `design_saves.id`. Design being exported. | `NOT NULL` |
+| `userId` | `int` | FK to `users.id`. User who requested the export. | `NOT NULL` |
+| `format` | `varchar(20)` | Export format (e.g. `'gerber'`, `'dxf'`, `'svg'`, `'pdf'`) | `NOT NULL` |
+| `fileUrl` | `varchar(512)` | URL to the exported file | `NOT NULL` |
+| `fileSize` | `int` | Size of the exported file in bytes | |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
+
+### 2.23. `ai_design_reviews` Table
+
+Records of AI-assisted design reviews and critiques. Captures user questions and AI analysis for a given design state.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `int` | Auto-incremented primary key | `PRIMARY KEY`, `AUTO_INCREMENT` |
+| `designSaveId` | `int` | FK to `design_saves.id`. Design being reviewed. | `NOT NULL` |
+| `userId` | `int` | FK to `users.id`. User requesting the review. | `NOT NULL` |
+| `prompt` | `text` | User's question or request for the AI review | `NOT NULL` |
+| `response` | `text` | AI's analysis and recommendations | `NOT NULL` |
+| `componentCount` | `int` | Component count at review time (context snapshot) | |
+| `connectionCount` | `int` | Connection count at review time (context snapshot) | |
+| `mode` | `varchar(20)` | Design mode at review time (schematic or PCB) | |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
+
+### 2.24. `neural_maps` Table
+
+Knowledge maps representing hierarchical directory structures and code relationships. Users create neural maps to visualize project organization and navigate complex codebases.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `varchar(36)` | Unique identifier (UUID from client) | `PRIMARY KEY` |
+| `userId` | `int` | FK to `users.id`. User who owns this neural map. | `NOT NULL` |
+| `name` | `varchar(255)` | Human-readable neural map name | `NOT NULL` |
+| `mode` | `varchar(50)` | Map visualization mode (e.g. `'standard'`, `'compact'`) | `NOT NULL`, `DEFAULT 'standard'` |
+| `rootDirectories` | `json` | JSON array of root directory paths to index | `NOT NULL` |
+| `projectContext` | `json` | Arbitrary metadata about the project or codebase | |
+| `labelOverrides` | `json` | JSON object mapping nodeId to custom display labels | |
+| `settings` | `json` | Display and behaviour preferences (zoom, layout, colors, etc.) | `NOT NULL` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL` |
+
+### 2.25. `personas` Table
+
+AI personas created by users for multi-agent systems and social media integration. Personas define agent identities, behavioural traits, voice characteristics, and tool permissions.
+
+| Column Name | Type | Description | Constraints |
+|---|---|---|---|
+| `id` | `varchar(36)` | Unique identifier (UUID from client) | `PRIMARY KEY` |
+| `userId` | `int` | FK to `users.id`. User who owns this persona. | `NOT NULL` |
+| `name` | `varchar(255)` | Persona display name | `NOT NULL` |
+| `type` | `varchar(50)` | Persona type. Supports `'self_clone'`, `'social_media'`, `'agent'`. | `NOT NULL`, `DEFAULT 'self_clone'` |
+| `alwaysOn` | `int` | Boolean flag (0 = on-demand, 1 = always-on agent) | `NOT NULL`, `DEFAULT 0` |
+| `data` | `json` | Complete persona definition: bio, traits, voice config, model config, tool permissions, etc. | `NOT NULL` |
+| `createdAt` | `timestamp` | Timestamp of record creation | `NOT NULL` |
+| `updatedAt` | `timestamp` | Timestamp of last update | `NOT NULL` |
+
 ## 3. Relationships
 
 ### Core Chat & Audit
@@ -343,6 +461,33 @@ Configuration for automated posting schedules. Defines how often posts are publi
 ### Posting Schedule Configuration
 
 -   **`postingScheduleConfig` to `users`**: Many-to-one via `userId`. A posting schedule belongs to one user.
+
+### PCB Designer & 3D Workspace
+
+-   **`design_projects` to `users`**: Many-to-one via `userId`. A design project belongs to one user.
+-   **`design_saves` to `design_projects`**: Many-to-one via `projectId`. Multiple design saves can exist for a single project.
+-   **`design_saves` to `users`**: Many-to-one via `userId` (denormalized). User who created/owns the save.
+-   **`component_library_items` to `users`**: Many-to-one via `userId`. Components are stored in a user's library.
+-   **`design_exports` to `design_saves`**: Many-to-one via `designSaveId`. An export is derived from a specific design save.
+-   **`design_exports` to `users`**: Many-to-one via `userId` (denormalized). User who requested the export.
+-   **`ai_design_reviews` to `design_saves`**: Many-to-one via `designSaveId`. A review is associated with a specific design state.
+-   **`ai_design_reviews` to `users`**: Many-to-one via `userId`. User who requested the review.
+
+### Neural Brain Map
+
+-   **`neural_maps` to `users`**: Many-to-one via `userId`. A neural map belongs to one user.
+
+### Personas
+
+-   **`personas` to `users`**: Many-to-one via `userId`. A persona belongs to one user.
+
+### Intentionally Non-Persisted State (in-memory)
+
+Some features are deliberately **not** backed by a table — they are ephemeral, process-local state that resets on server restart. This keeps them migration-free and identical across the MySQL and SQLite backends:
+
+-   **Unified Notifications** — held in `NotificationService` (`server/_core/NotificationService.ts`), a capped in-memory ring buffer; the immutable history lives in the `auditLog` table instead.
+-   **Agent Messenger threads** — held in `AgentMessengerStore` (`server/_core/AgentMessengerStore.ts`), keyed by `personas.id`. The conversation participants are persisted (the `personas` table); the message history is not.
+-   **HITL pending queue** — held in `HITLApprovalService`.
 
 ## 4. Migrations
 
@@ -489,6 +634,58 @@ erDiagram
         int postsPerDay
         varchar timezone
     }
+    DESIGN_PROJECTS {
+        int id PK
+        int userId FK
+        varchar name
+        varchar mode
+    }
+    DESIGN_SAVES {
+        int id PK
+        int projectId FK
+        int userId FK
+        varchar name
+        json canvasData
+        int componentCount
+        int connectionCount
+    }
+    COMPONENT_LIBRARY_ITEMS {
+        int id PK
+        int userId FK
+        varchar componentId
+        varchar name
+        varchar category
+        json properties
+        json handles
+    }
+    DESIGN_EXPORTS {
+        int id PK
+        int designSaveId FK
+        int userId FK
+        varchar format
+        varchar fileUrl
+    }
+    AI_DESIGN_REVIEWS {
+        int id PK
+        int designSaveId FK
+        int userId FK
+        text prompt
+        text response
+    }
+    NEURAL_MAPS {
+        varchar id PK
+        int userId FK
+        varchar name
+        varchar mode
+        json rootDirectories
+    }
+    PERSONAS {
+        varchar id PK
+        int userId FK
+        varchar name
+        varchar type
+        json data
+    }
 
     USERS ||--o{ CHAT_SESSIONS : owns
     USERS ||--o{ INTEGRATIONS : configures
@@ -505,4 +702,11 @@ erDiagram
     CURATED_POSTS ||--o{ SCHEDULED_POSTS : schedules
     PLATFORM_ACCOUNTS ||--o{ SCHEDULED_POSTS : publishes_via
     SCHEDULED_POSTS ||--o{ POST_ANALYTICS : tracks
+    USERS ||--o{ DESIGN_PROJECTS : creates
+    DESIGN_PROJECTS ||--o{ DESIGN_SAVES : contains
+    USERS ||--o{ COMPONENT_LIBRARY_ITEMS : owns
+    DESIGN_SAVES ||--o{ DESIGN_EXPORTS : exports
+    DESIGN_SAVES ||--o{ AI_DESIGN_REVIEWS : reviewed_by
+    USERS ||--o{ NEURAL_MAPS : creates
+    USERS ||--o{ PERSONAS : defines
 ```

@@ -21,6 +21,7 @@ import { getDb } from "../../db.factory.js";
 import { spendLog, projectBudgets } from "../../../drizzle/schema.js";
 import { calculateCostMicrocents } from "../config/providerPricing.js";
 import { SettingsService } from "./SettingsService.js";
+import { NotificationService } from "../../_core/NotificationService.js";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -88,11 +89,31 @@ export class AiProviderService {
 
   private constructor() {}
 
+  /** Per-project wallet-alert levels already raised, to avoid repeat spam. */
+  private walletAlertsSent = new Map<string, "threshold" | "over">();
+
   public static getInstance(): AiProviderService {
     if (!AiProviderService.instance) {
       AiProviderService.instance = new AiProviderService();
     }
     return AiProviderService.instance;
+  }
+
+  /**
+   * Raise an agentic-wallet notification once per (project, level). "over"
+   * supersedes "threshold" so the user gets at most two alerts per budget run.
+   */
+  private raiseWalletAlert(projectId: string, level: "threshold" | "over", body: string): void {
+    if (this.walletAlertsSent.get(projectId) === level) return;
+    if (level === "threshold" && this.walletAlertsSent.get(projectId) === "over") return;
+    this.walletAlertsSent.set(projectId, level);
+    NotificationService.getInstance().notify({
+      kind: "wallet",
+      title: level === "over" ? "Budget limit reached" : "Budget warning",
+      body,
+      href: "/wallet",
+      data: { projectId, level },
+    });
   }
 
   /**
@@ -190,6 +211,16 @@ export class AiProviderService {
 
             const spentMicrocents = Number(spentRows[0]?.total ?? 0);
             const spentCents = spentMicrocents / 1_000_000;
+            const pct = (spentCents / budget.limitCents) * 100;
+
+            // Agentic Wallet alerts → Notifications feed (deduped per level).
+            if (pct >= 100) {
+              this.raiseWalletAlert(chatInput.projectId, "over",
+                `Budget reached: $${spentCents.toFixed(2)} of $${budget.limitCents} on this project.`);
+            } else if (pct >= (budget.alertThreshold ?? 80)) {
+              this.raiseWalletAlert(chatInput.projectId, "threshold",
+                `Budget ${Math.round(pct)}% used: $${spentCents.toFixed(2)} of $${budget.limitCents}.`);
+            }
 
             if (spentCents >= budget.limitCents && budget.mode === "hard") {
               // Auto-downgrade to Ollama — never silently drop the request

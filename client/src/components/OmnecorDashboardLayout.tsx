@@ -21,6 +21,7 @@ import {
   Network,
   Mic2,
   Lock,
+  Bell,
 } from "lucide-react";
 import { Wallet } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -66,6 +67,14 @@ export default function OmnecorDashboardLayout({
   const { isFictionMode, toggleFictionMode } = useFictionMode();
   const { data: me } = trpc.auth.me.useQuery();
   const setExecutionMode = useAppStore((s) => s.setExecutionMode);
+
+  // Unread notification count → nav badge. Polled as a fallback; the
+  // Notifications page itself receives live WebSocket pushes.
+  const { data: unreadData } = trpc.notifications.unreadCount.useQuery(undefined, {
+    refetchInterval: 20_000,
+    refetchOnWindowFocus: true,
+  });
+  const unreadCount = unreadData?.unread ?? 0;
 
   useEffect(() => {
     if (me?.executionMode) setExecutionMode(me.executionMode);
@@ -127,6 +136,13 @@ export default function OmnecorDashboardLayout({
       href: "/wallet",
       icon: Wallet,
       description: "Manage autonomous agent budgets",
+    },
+    {
+      label: "Notifications",
+      href: "/notifications",
+      icon: Bell,
+      description: "Alerts & Agent Messenger",
+      badge: unreadCount,
     },
     {
       label: "Settings",
@@ -240,7 +256,21 @@ export default function OmnecorDashboardLayout({
                         {sidebarOpen && (
                           <span className="font-medium text-sm whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-300">{item.label}</span>
                         )}
-                        {sidebarOpen && active && (
+                        {(() => {
+                          const badge = (item as { badge?: number }).badge ?? 0;
+                          if (badge <= 0) return null;
+                          const label = badge > 99 ? "99+" : String(badge);
+                          return sidebarOpen ? (
+                            <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                              {label}
+                            </span>
+                          ) : (
+                            <span className="absolute -right-0.5 -top-0.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border border-sidebar">
+                              {label}
+                            </span>
+                          );
+                        })()}
+                        {sidebarOpen && active && (item as { badge?: number }).badge ? null : sidebarOpen && active && (
                           <ChevronRight className="w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                         )}
                         {!sidebarOpen && active && (

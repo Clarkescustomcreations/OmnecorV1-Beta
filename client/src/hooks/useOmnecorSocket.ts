@@ -28,7 +28,8 @@ export type OmnecorEventType =
   | "MAP_SWITCHED"
   | "MAP_REINDEXED"
   | "FICTION_EVENT"
-  | "budget:spend";
+  | "budget:spend"
+  | "notification";
 
 export function useOmnecorSocket(
   options: {

@@ -11,6 +11,7 @@
 
 import { z } from "zod";
 import { publicProcedure, router, protectedProcedure } from "../_core/trpc.js";
+import { TRPCError } from "@trpc/server";
 import { observable } from "@trpc/server/observable";
 import { v4 as uuidv4 } from "uuid";
 import {
@@ -23,6 +24,8 @@ import {
 } from "../db.factory.js";
 import { validatePath } from "../_core/security.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { getWsInstance } from "../phase2/websocket/WebSocketServer.js";
+import { NotificationService } from "../_core/NotificationService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -112,7 +115,7 @@ export const aiRouter = router({
    * Get a list of supported AI providers and their health status.
    */
   getProviders: publicProcedure.query(async ({ ctx }) => {
-    const providers = [
+    const providers: { id: string; name: string }[] = [
       { id: "ollama", name: "Ollama" },
       { id: "openai", name: "OpenAI" },
       { id: "anthropic", name: "Anthropic" },
@@ -120,6 +123,13 @@ export const aiRouter = router({
       { id: "grok", name: "Grok" },
       { id: "forge", name: "Forge" },
     ];
+
+    const ws = getWsInstance();
+    if (ws?.hasMobileWorker()) {
+      const nodeName =
+        ws.getMobileNodes().find(n => n.capabilities.modelLoaded)?.nodeName ?? "Phone";
+      providers.push({ id: "ommesh", name: `Phone — ${nodeName}` });
+    }
 
     return providers;
   }),
@@ -254,7 +264,26 @@ ${transcript}
   chat: protectedProcedure
     .input(chatInputSchema)
     .mutation(async ({ ctx, input }) => {
+      if (input.providerId === "ommesh") {
+        const ws = getWsInstance();
+        if (!ws || !ws.hasMobileWorker()) {
+          throw new TRPCError({ code: "PRECONDITION_FAILED", message: "No phone worker available" });
+        }
+        const prompt = input.messages.map(m => `${m.role}: ${m.content}`).join("\n");
+        const content = await ws.routeInferenceToMobile(prompt, { maxTokens: input.maxTokens });
+        return { content };
+      }
       const content = await ctx.services.aiProvider.chat(input);
+      // New-chat alert → Notifications feed. Blocking chat() calls are typically
+      // background/agent completions the user is waiting on (the live UI streams),
+      // so surfacing them here keeps the user informed without flooding.
+      NotificationService.getInstance().notify({
+        kind: "chat",
+        title: "New chat reply",
+        body: content.slice(0, 200),
+        href: "/chat",
+        data: { providerId: input.providerId, modelId: input.modelId },
+      });
       return { content };
     }),
 
@@ -265,6 +294,27 @@ ${transcript}
   chatStream: protectedProcedure
     .input(chatInputSchema)
     .subscription(({ ctx, input }) => {
+      if (input.providerId === "ommesh") {
+        return observable<{ content: string; delta: string; done: boolean }>(emit => {
+          const ws = getWsInstance();
+          if (!ws || !ws.hasMobileWorker()) {
+            emit.error(new TRPCError({ code: "PRECONDITION_FAILED", message: "No phone worker available" }));
+            return () => {};
+          }
+          const prompt = input.messages.map(m => `${m.role}: ${m.content}`).join("\n");
+          ws.routeInferenceToMobile(prompt, {
+            maxTokens: input.maxTokens,
+            onToken: (token, done) => {
+              emit.next({ content: token, delta: token, done });
+              if (done) emit.complete();
+            },
+          }).catch(err => {
+            emit.error(err);
+          });
+          return () => {};
+        });
+      }
+
       return observable(emit => {
         const stream = ctx.services.aiProvider.streamChat(input);
         (async () => {

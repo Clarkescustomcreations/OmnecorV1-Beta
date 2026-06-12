@@ -31,10 +31,12 @@
  *   audit       — Immutable audit log (admin-only)
  */
 
+import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
-import { publicProcedure, router } from "./_core/trpc.js";
+import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
+import { updateUserExecutionMode } from "./db.factory.js";
 
 // ─── Unified Feature Routers ────────────────────────────────────────────────
 import { knowledgeBaseRouter } from "./routers/knowledgeBase.js";
@@ -79,6 +81,9 @@ import { neuralMapsRouter } from "./routers/neuralMapsRouter.js";
 import { personaRouter } from "./routers/personaRouter.js";
 import { brainmapRouter } from "./routers/brainmapRouter.js";
 import { integrationManagementRouter } from "./routers/integrationManagementRouter.js";
+import { hitlRouter } from "./routers/hitlRouter.js";
+import { notificationRouter } from "./routers/notificationRouter.js";
+import { agentMessengerRouter } from "./routers/agentMessengerRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -96,6 +101,12 @@ export const appRouter = router({
         success: true,
       } as const;
     }),
+    setExecutionMode: protectedProcedure
+      .input(z.object({ mode: z.enum(["sovereign", "scrapper", "big_spender"]) }))
+      .mutation(async ({ ctx, input }) => {
+        await updateUserExecutionMode(ctx.user.id, input.mode);
+        return { success: true } as const;
+      }),
   }),
 
   // ─── Jobs (Unified Background Process Management) ─────────────────────────
@@ -201,6 +212,15 @@ export const appRouter = router({
 
   // ─── Brain Map (Layout preference persistence) ────────────────────────────
   brainmap: brainmapRouter,
+
+  // ─── Human-in-the-Loop (HITL) Approval ───────────────────────────────────
+  hitl: hitlRouter,
+
+  // ─── Unified Notifications (chat / task / HITL / wallet / agent alerts) ───
+  notifications: notificationRouter,
+
+  // ─── Agent Messenger (per-persona WhatsApp/Discord-style threads) ─────────
+  agentMessenger: agentMessengerRouter,
 });
 
 export type AppRouter = typeof appRouter;

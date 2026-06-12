@@ -189,7 +189,7 @@ System-wide configuration procedures.
 | Procedure | Type | Description |
 |---|---|---|
 | `system.setExecutionMode` | Mutation | Updates the authenticated user's `executionMode` to `sovereign`, `scrapper`, or `big_spender`. Immediately enforced by subsequent `sovereignCheck` calls. |
-| `system.loginProviders` | Query | Returns the list of enabled OAuth providers (manus, google, microsoft) based on which client IDs are configured in `.env`. |
+| `system.loginProviders` | Query | Returns the list of enabled OAuth providers (google, microsoft) based on which client IDs are configured in `.env`. |
 
 ### 7.5. `training` Router (Valet Dataset)
 
@@ -213,3 +213,29 @@ The `valet` router includes the following additional procedure not previously do
 | Procedure | Type | Input | Output | Description |
 |---|---|---|---|---|
 | `valet.refreshKnowledge` | Mutation | (none) | `{ reloaded: boolean, embeddingJobId?: string }` | Triggers a hot-reload of the Valet knowledge base. Calls `/admin/reload` on the inference server and spawns `valet_knowledge_refresh.py` to bump `knowledge_base_version`, re-embed KB chunks into ChromaDB, and perform a second reload. |
+
+### 7.8. `notifications` Router (Unified Alerts)
+
+Backs the Notifications tab in the main GUI and the Android APK. State lives in the in-memory `NotificationService`; live pushes arrive on the `notifications` WebSocket channel. All procedures are `protectedProcedure`.
+
+| Procedure | Type | Input | Output | Description |
+|---|---|---|---|---|
+| `notifications.list` | Query | (none) | `{ notifications: OmnecorNotification[]; unread: number }` | Full feed (newest-first) plus the unread count. |
+| `notifications.unreadCount` | Query | (none) | `{ unread: number }` | Cheap polling fallback for the nav badge. |
+| `notifications.markRead` | Mutation | `{ id }` | `{ success }` | Marks one notification read. |
+| `notifications.markAllRead` | Mutation | (none) | `{ success, flipped }` | Marks every notification read. |
+| `notifications.clear` | Mutation | (none) | `{ success }` | Removes all notifications. |
+| `notifications.create` | Mutation | `{ kind, title, body, href?, data? }` | `{ notification }` | Push an alert. `kind ∈ chat \| task \| hitl \| wallet \| agent \| system`. |
+
+Notifications are raised automatically by: blocking `ai.chat` completions (`chat`), `processManager` lifecycle completed/failed (`task`), HITL `actionPending` (`hitl`), and agentic-wallet budget threshold/limit crossings (`wallet`). See `shared/notifications.ts` for the `OmnecorNotification` shape.
+
+### 7.9. `agentMessenger` Router (Agent Messenger)
+
+WhatsApp/Discord-style threads with agents/personas, separate from project chats. One thread per persona; replies are generated through the persona's `modelConfig` backend and raise an `agent` notification. Threads live in the in-memory `AgentMessengerStore`. All procedures are `protectedProcedure`.
+
+| Procedure | Type | Input | Output | Description |
+|---|---|---|---|---|
+| `agentMessenger.listConversations` | Query | (none) | `{ conversations: AgentConversation[] }` | One entry per persona with last message + unread count. |
+| `agentMessenger.getMessages` | Query | `{ personaId }` | `{ messages: AgentMessage[] }` | Ordered thread (oldest-first); marks the thread read. |
+| `agentMessenger.markRead` | Mutation | `{ personaId }` | `{ success }` | Marks a thread read without fetching. |
+| `agentMessenger.send` | Mutation | `{ personaId, content }` | `{ reply: AgentMessage }` | Stores the user turn, generates + stores the agent reply, raises an `agent` notification. |
