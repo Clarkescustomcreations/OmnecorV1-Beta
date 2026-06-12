@@ -6,7 +6,7 @@ import { sdk } from "./sdk";
 import { ENV } from "./env.js";
 import crypto from "crypto";
 import { exchangeCodeForToken, fetchUserProfile } from "../oauth/oauthClients.js";
-import { getDb } from "../db.js";
+import { getDb } from "../db.factory.js";
 import { platformAccounts, oauthStates } from "../../drizzle/schema.js";
 import { eq, lt } from "drizzle-orm";
 import { SettingsService } from "../phase2/services/SettingsService.js";

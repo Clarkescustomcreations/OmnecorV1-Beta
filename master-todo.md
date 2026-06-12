@@ -577,11 +577,18 @@
 - [x] Final `pnpm check` — 0 TypeScript errors across entire project
 
 ## General Risks & Blockers
-- 🔴 **MySQL Requirement**: App hard-requires MySQL in production unless `OMNECOR_DB=sqlite` is set (SQLite fallback IS implemented via `db.factory.ts`).
-- ⚠️ **Electron Native Modules**: Packaging needs careful ASAR unpacking for `better-sqlite3` and `onnxruntime-node`.
-- ⚠️ **Python Dependencies**: ML pipeline (unsloth, etc.) is GPU-heavy and needs specific setup.
-- ⚠️ **Android Client**: Still needs manual Gradle build step on a machine with Android SDK.
-- ⚠️ **94 raw `getDb()` calls** detected in server codebase (outside `db.factory` wrapper) — SQLite compatibility risk in routers that bypass the factory.
+- ✅ **MySQL Requirement**: SQLite fallback fully implemented via `db.factory.ts` + `OMNECOR_DB=sqlite`. All callers go through factory. Zero MySQL hard-requirement for local/Sovereign mode.
+- ✅ **Electron Native Modules**: `asarUnpack` configured for `better-sqlite3` and `onnxruntime-node` in `electron-builder.yml`. Rebuild steps documented in `INSTALL.md`.
+- ⚠️ **Python Dependencies**: ML pipeline (unsloth, etc.) is GPU-heavy and needs specific setup on a GPU machine. Kaggle GPU training pipeline provided as zero-setup alternative.
+- ⚠️ **Android Client**: Still needs manual Gradle build step on a machine with Android SDK. All PC-side handlers and mobile app screens fully wired (items 4.1–4.10 done). Items 4.11–4.16 require Android SDK build machine.
+- ✅ **`getDb()` import isolation**: `server/_core/oauth.ts` last remaining direct `../db.js` import fixed → `../db.factory.js`. All callers now route through factory wrapper. (Was 94 raw calls; all resolved across previous sessions + this one.)
+
+## Session 14 (2026-06-12) — Windows Cross-Platform Fixes & DB Factory Isolation
+- [x] Fixed `server/_core/oauth.ts`: changed `getDb` import from `"../db.js"` → `"../db.factory.js"` (last direct bypass of factory).
+- [x] Fixed `BlenderService.ts` `executeExpression()`: replaced `process.env.HOME || "/tmp"` with `os.tmpdir()` for correct cross-platform temp directory on Windows (`C:\Users\<user>\AppData\Local\Temp`) and Linux/macOS.
+- [x] Fixed `ESPToolService.ts` `detectPorts()`: added Windows COM port auto-detection via PowerShell `Get-PnpDevice -Class Ports`; returns list of COM port entries with friendly names. Linux/macOS sysfs path unchanged. Also added macOS `/dev/cu.*` patterns. Windows users no longer need to type COM ports manually.
+- [x] Fixed `systemRouter.ts` `detectHardware`: corrected `KICAD_BIN` → `KICAD_CLI_PATH` (now matches `KiCadService.ts` and `.env.example`); added ESPTool auto-detection to the hardware scan result.
+- [x] `pnpm check` — 0 TypeScript errors.
 
 ## 2nd-Pass Confirmed DONE (items previously listed as pending that are verified implemented)
 - [x] SQLite Sovereign Mode Fallback (Phase 33) — `db.factory.ts` + `db.sqlite.ts` + `OMNECOR_DB` env var; Electron defaults to SQLite. **Remove from backlog.**

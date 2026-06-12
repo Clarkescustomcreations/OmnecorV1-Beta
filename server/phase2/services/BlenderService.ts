@@ -27,6 +27,7 @@
  */
 
 import { EventEmitter } from "events";
+import os from "os";
 import path from "path";
 import fs from "fs/promises";
 import { ProcessManagerService } from "./ProcessManagerService.js";
@@ -285,11 +286,7 @@ export class BlenderBridge extends EventEmitter {
    */
   async executeExpression(expression: string, label?: string): Promise<string> {
     // Write expression to a temporary file
-    const tmpDir = path.join(
-      process.env.HOME || "/tmp",
-      ".omnecor",
-      "blender_tmp"
-    );
+    const tmpDir = path.join(os.tmpdir(), ".omnecor", "blender_tmp");
     await fs.mkdir(tmpDir, { recursive: true });
 
     const tmpScript = path.join(tmpDir, `expr_${Date.now()}.py`);

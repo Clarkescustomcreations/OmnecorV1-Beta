@@ -300,8 +300,9 @@ export const systemRouter = router({
       "C:\\Program Files\\Blender Foundation\\Blender 4.0\\blender.exe",
       "C:\\Program Files\\Blender Foundation\\Blender 3.6\\blender.exe",
     ];
+    // KICAD_CLI_PATH is the canonical env var (also used by KiCadService.ts)
     const kicadCandidates = [
-      ...(process.env.KICAD_BIN ? [process.env.KICAD_BIN] : []),
+      ...(process.env.KICAD_CLI_PATH ? [process.env.KICAD_CLI_PATH] : []),
       "/usr/bin/kicad-cli",
       "/usr/local/bin/kicad-cli",
       "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
@@ -309,10 +310,20 @@ export const systemRouter = router({
       "C:\\Program Files\\KiCad\\8.0\\bin\\kicad-cli.exe",
       "C:\\Program Files\\KiCad\\7.0\\bin\\kicad-cli.exe",
     ];
+    const esptoolCandidates = [
+      "esptool",
+      "esptool.py",
+      "/usr/local/bin/esptool",
+      "/usr/local/bin/esptool.py",
+      "C:\\Python312\\Scripts\\esptool.exe",
+      "C:\\Python311\\Scripts\\esptool.exe",
+      "C:\\Python310\\Scripts\\esptool.exe",
+    ];
 
-    const [blenderPath, kicadPath] = await Promise.all([
+    const [blenderPath, kicadPath, esptoolPath] = await Promise.all([
       findExecutable(blenderCandidates),
       findExecutable(kicadCandidates),
+      findExecutable(esptoolCandidates),
     ]);
 
     // GPU detection — each platform branch is in its own try/catch so a failure
@@ -355,6 +366,7 @@ export const systemRouter = router({
     return {
       blenderPath,
       kicadPath,
+      esptoolPath,
       gpuInfo,
       ollamaVersion,
       platform: platform(),

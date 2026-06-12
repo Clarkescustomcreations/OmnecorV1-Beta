@@ -25,7 +25,7 @@
  */
 
 import { EventEmitter } from "events";
-import { spawn } from "child_process";
+import { spawn, execSync } from "child_process";
 import path from "path";
 import fs from "fs/promises";
 import { ProcessManagerService } from "./ProcessManagerService.js";
@@ -173,21 +173,47 @@ export class ESPToolBridge extends EventEmitter {
 
   /**
    * Detect connected serial ports that may be ESP devices.
-   * Scans /dev/ttyUSB* and /dev/ttyACM* on Linux.
+   * On Linux/macOS: scans /dev/ttyUSB*, /dev/ttyACM*, /dev/cu.* via sysfs.
+   * On Windows: queries COM ports via PowerShell Get-PnpDevice.
    */
   async detectPorts(): Promise<SerialPort[]> {
     const ports: SerialPort[] = [];
 
+    if (process.platform === "win32") {
+      try {
+        // Use PowerShell to list COM ports with friendly names
+        const raw = execSync(
+          "powershell -NoProfile -Command \"Get-PnpDevice -Class Ports -Status OK | Select-Object FriendlyName,InstanceId | ConvertTo-Json -Compress\"",
+          { timeout: 5000, encoding: "utf-8" }
+        );
+        const items: Array<{ FriendlyName?: string; InstanceId?: string }> =
+          JSON.parse(raw.trim().startsWith("[") ? raw.trim() : `[${raw.trim()}]`);
+        for (const item of items) {
+          const match = item.FriendlyName?.match(/\((COM\d+)\)/);
+          if (match) {
+            ports.push({
+              path: match[1],
+              description: item.FriendlyName ?? match[1],
+            });
+          }
+        }
+      } catch {
+        // PowerShell unavailable or no COM ports found — return empty list
+        console.warn("[Omnecor ESP] Windows COM port enumeration failed; enter port manually.");
+      }
+      return ports;
+    }
+
     try {
-      // Read /dev/ for serial devices
+      // Read /dev/ for serial devices (Linux / macOS)
       const devEntries = await fs.readdir("/dev");
-      const serialPatterns = ["ttyUSB", "ttyACM", "ttyS"];
+      const serialPatterns = ["ttyUSB", "ttyACM", "ttyS", "cu.usbserial", "cu.usbmodem", "tty.usbserial", "tty.usbmodem"];
 
       for (const entry of devEntries) {
         if (serialPatterns.some(p => entry.startsWith(p))) {
           const devicePath = `/dev/${entry}`;
 
-          // Try to get USB device info from sysfs
+          // Try to get USB device info from sysfs (Linux only)
           let description = `Serial port: ${entry}`;
           try {
             const sysPath = `/sys/class/tty/${entry}/device/../../`;

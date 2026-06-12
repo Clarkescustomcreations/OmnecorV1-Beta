@@ -14,6 +14,16 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 
 ---
 
+## Global Summary (Updated 2026-06-12 Session 14 - Windows cross-platform fixes)
+
+### Session 14 (2026-06-12) — Windows Cross-Platform & DB Factory Isolation
+No new UI elements added. Backend service fixes only:
+- **ESPToolService.ts `detectPorts()`**: Now auto-detects COM ports on Windows via PowerShell `Get-PnpDevice -Class Ports -Status OK`. Returns COM port entries with friendly names (e.g. "USB-SERIAL CH340 (COM3)"). Linux/macOS unchanged. Windows users no longer need to type COM ports manually.
+- **BlenderService.ts `executeExpression()`**: Replaced `process.env.HOME || "/tmp"` with `os.tmpdir()`. Correctly resolves to `%TEMP%` on Windows instead of attempting to create `C:\tmp`.
+- **`server/_core/oauth.ts`**: Fixed last remaining direct `../db.js` import → `../db.factory.js`. DB factory isolation now complete across entire server codebase.
+
+---
+
 ## Global Summary (Updated 2026-06-12 Session 13 - Production-readiness verification sweep)
 
 | Category | Before | After (S4) | After (Sessions 5-9) | After (Session 10) | After (Session 11) | After (Session 12 - NOW) | After (Session 13 - 2026-06-12) |
