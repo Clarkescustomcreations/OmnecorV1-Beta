@@ -5,15 +5,18 @@
  * high-level function exports as db.ts so callers are unaffected.
  *
  * Limitations vs MySQL mode:
- *  - Pipelines, audit log, spend tracking, virtual cards, and integrations
- *    are not persisted in SQLite — callers that use getDb() directly will
- *    receive null and should already handle that gracefully.
+ *  - Pipelines, spend tracking, virtual cards, and integrations are not
+ *    persisted in SQLite — callers that use getDb() directly will receive
+ *    null and should already handle that gracefully.
+ *  - The audit log IS persisted (audit_log table below) with the same
+ *    retention/purge schedule as MySQL mode, via the audit* functions
+ *    routed through db.factory.ts.
  *  - No onDuplicateKeyUpdate support — upserts use insert-or-replace.
  */
 
 import Database from "better-sqlite3";
 import { drizzle } from "drizzle-orm/better-sqlite3";
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, asc, desc, lt, sql } from "drizzle-orm";
 import {
   sqliteTable,
   integer,
@@ -69,6 +72,23 @@ const chatMessages = sqliteTable("chat_messages", {
 });
 
 type SqliteInsertChatMessage = typeof chatMessages.$inferInsert;
+
+// Mirrors drizzle/schema.ts `audit_log` so the append-only audit trail (and
+// its retention purge) behaves identically in Sovereign/SQLite mode.
+const auditLogSqlite = sqliteTable("audit_log", {
+  id: text("id").primaryKey(),
+  eventType: text("eventType").notNull(),
+  actorId: integer("actorId"),
+  actorType: text("actorType").notNull().default("user"),
+  procedure: text("procedure"),
+  args: text("args", { mode: "json" }),
+  result: text("result", { mode: "json" }),
+  ipAddress: text("ipAddress"),
+  sessionId: text("sessionId"),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(() => new Date()),
+});
+
+type SqliteInsertAuditLog = typeof auditLogSqlite.$inferInsert;
 
 // ---------------------------------------------------------------------------
 // Connection — lazy singleton
@@ -129,6 +149,20 @@ export function getSqliteDb(): ReturnType<typeof drizzle> {
       tokenCount INTEGER,
       createdAt INTEGER NOT NULL
     );
+
+    CREATE TABLE IF NOT EXISTS audit_log (
+      id TEXT PRIMARY KEY,
+      eventType TEXT NOT NULL,
+      actorId INTEGER,
+      actorType TEXT NOT NULL DEFAULT 'user',
+      procedure TEXT,
+      args TEXT,
+      result TEXT,
+      ipAddress TEXT,
+      sessionId TEXT,
+      createdAt INTEGER NOT NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_audit_log_createdAt ON audit_log (createdAt);
   `);
 
   log.info("SQLite database opened", { path: SQLITE_PATH });
@@ -201,4 +235,57 @@ export async function addChatMessage(message: SqliteInsertChatMessage) {
 export async function getChatMessages(sessionId: string) {
   const db = getSqliteDb();
   return db.select().from(chatMessages).where(eq(chatMessages.sessionId, sessionId)).orderBy(asc(chatMessages.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Audit log — same append-only contract and retention purge as MySQL mode
+// ---------------------------------------------------------------------------
+
+export async function auditInsert(entry: SqliteInsertAuditLog): Promise<void> {
+  const db = getSqliteDb();
+  await db.insert(auditLogSqlite).values(entry);
+}
+
+/** Delete entries older than `cutoff`; returns the number of rows removed. */
+export async function auditPurgeBefore(cutoff: Date): Promise<number> {
+  const db = getSqliteDb();
+  const result = await db.delete(auditLogSqlite).where(lt(auditLogSqlite.createdAt, cutoff));
+  return Number((result as unknown as { changes?: number }).changes ?? 0);
+}
+
+export async function auditList(limit: number, offset: number) {
+  const db = getSqliteDb();
+  const [entries, countRows] = await Promise.all([
+    db.select().from(auditLogSqlite).orderBy(desc(auditLogSqlite.createdAt)).limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)` }).from(auditLogSqlite),
+  ]);
+  return { entries, total: Number(countRows[0]?.count ?? 0) };
+}
+
+export async function auditListByActor(actorId: number, limit: number) {
+  const db = getSqliteDb();
+  return db
+    .select()
+    .from(auditLogSqlite)
+    .where(eq(auditLogSqlite.actorId, actorId))
+    .orderBy(desc(auditLogSqlite.createdAt))
+    .limit(limit);
+}
+
+export async function auditStats(): Promise<{
+  dbActive: boolean;
+  entries: number;
+  oldestEntryAt: string | null;
+  approxBytes: number;
+}> {
+  const db = getSqliteDb();
+  const [countRows, oldestRows] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(auditLogSqlite),
+    db.select({ oldest: sql<number | null>`min(createdAt)` }).from(auditLogSqlite),
+  ]);
+  const entries = Number(countRows[0]?.count ?? 0);
+  const oldestRaw = oldestRows[0]?.oldest ?? null;
+  // createdAt is stored as a unix-seconds integer in SQLite
+  const oldestEntryAt = oldestRaw ? new Date(Number(oldestRaw) * 1000).toISOString() : null;
+  return { dbActive: true, entries, oldestEntryAt, approxBytes: entries * 768 };
 }

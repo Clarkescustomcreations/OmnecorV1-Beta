@@ -748,7 +748,7 @@ Your selected mode is persisted to `users.executionMode` in the database and sur
 Omnecor maintains an append-only audit log of all privileged system events.
 
 -   **Integrity**: The `audit_log` table is insert-only — entries can never be edited or rewritten. The only deletion path is the time-based retention purge below.
--   **Retention**: Default **2 weeks** — a background sweep (every 6 hours) deletes entries outside the window so the log never consumes unbounded storage. Admins can switch to **4 weeks** or **Permanent** under Settings → Security → Audit Log Retention; Permanent shows a storage warning with the current entry count and approximate size. Retention changes are themselves audit-logged.
+-   **Retention**: Default **2 weeks** — a background sweep (every 6 hours) deletes entries outside the window so the log never consumes unbounded storage. Admins can switch to **4 weeks** or **Permanent** under Settings → Security → Audit Log Retention; Permanent shows a storage warning with the current entry count and approximate size. Retention changes are themselves audit-logged. Persistence and the purge schedule are identical in MySQL and SQLite (Sovereign) mode.
 -   **Redaction**: Sensitive data (API keys, PII, tokens) is automatically scrubbed by the `redactSensitiveData()` utility before any entry is written.
 -   **Viewing**: Admin and Owner roles can access the log via Settings → Audit Log or via `audit.getAuditLog` tRPC procedure.
 -   **Export**: Use `audit.exportAuditLog` (Admin only) to download a CSV of the full log for compliance reporting.

@@ -94,6 +94,38 @@ export async function getChatMessages(...args: Parameters<DbModule["getChatMessa
   return rows as Awaited<ReturnType<DbModule["getChatMessages"]>>;
 }
 
+// ---------------------------------------------------------------------------
+// Audit log — append-only with retention purge; identical contract in both
+// backends so the retention schedule applies equally in Sovereign/SQLite mode.
+// ---------------------------------------------------------------------------
+
+export async function auditInsert(...args: Parameters<DbModule["auditInsert"]>) {
+  if (isMySql) return (await mysql()).auditInsert(...args);
+  return (await sqlite()).auditInsert(...args as Parameters<SqliteModule["auditInsert"]>);
+}
+
+export async function auditPurgeBefore(...args: Parameters<DbModule["auditPurgeBefore"]>) {
+  if (isMySql) return (await mysql()).auditPurgeBefore(...args);
+  return (await sqlite()).auditPurgeBefore(...args);
+}
+
+export async function auditList(...args: Parameters<DbModule["auditList"]>) {
+  if (isMySql) return (await mysql()).auditList(...args);
+  const r = await (await sqlite()).auditList(...args);
+  return r as Awaited<ReturnType<DbModule["auditList"]>>;
+}
+
+export async function auditListByActor(...args: Parameters<DbModule["auditListByActor"]>) {
+  if (isMySql) return (await mysql()).auditListByActor(...args);
+  const rows = await (await sqlite()).auditListByActor(...args);
+  return rows as Awaited<ReturnType<DbModule["auditListByActor"]>>;
+}
+
+export async function auditStats(): ReturnType<DbModule["auditStats"]> {
+  if (isMySql) return (await mysql()).auditStats();
+  return (await sqlite()).auditStats();
+}
+
 export async function updateUserExecutionMode(userId: number, mode: "sovereign" | "scrapper" | "big_spender") {
   const { eq } = await import("drizzle-orm");
   if (isMySql) {

@@ -65,9 +65,9 @@ export default function PodcastScreen() {
       setAudioPath(result.audioPath);
       setGenerationProgress(100);
       setIsGenerating(false);
-    } catch (err: any) {
+    } catch (err) {
       setIsGenerating(false);
-      Alert.alert("Error", err?.message ?? "Podcast generation failed");
+      Alert.alert("Error", err instanceof Error ? err.message : "Podcast generation failed");
     }
   };
 

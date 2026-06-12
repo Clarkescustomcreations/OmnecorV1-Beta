@@ -11,6 +11,7 @@ import { ProcessManagerService } from "./ProcessManagerService.js";
 import { ENV } from "../../_core/env.js";
 import { AuditLogService } from "./AuditLogService.js";
 import { PromptSanitizer } from "./PromptSanitizer.js";
+import { PYTHON_SCRIPTS } from "../config/index.js";
 
 // ── RecursiveMAS types ────────────────────────────────────────────────────────
 
@@ -118,7 +119,7 @@ export class AgentService extends EventEmitter {
         result: null,
         ipAddress: null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
       this.emit("security:injection_attempt", { procedure: "agent.runCrew", violations: sanitized.violations });
     }
     const safeConfig = { ...config, goal: sanitized.clean };
@@ -135,10 +136,10 @@ export class AgentService extends EventEmitter {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch(() => {});
+    }).catch((err) => console.warn("[AuditLog] write failed:", err));
     return this.processManager.spawn({
       type: "custom",
-      command: "python3",
+      command: PYTHON_SCRIPTS.pythonBin,
       args: ["server/python_bridges/crewai_bridge.py", JSON.stringify(safeConfig)],
       label: `CrewAI: ${safeConfig.goal.slice(0, 30)}...`,
     });
@@ -161,7 +162,7 @@ export class AgentService extends EventEmitter {
         result: null,
         ipAddress: null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
       this.emit("security:injection_attempt", { procedure: "agent.runLiteAgent", violations: sanitized.violations });
     }
     const safeConfig = { ...config, goal: sanitized.clean };
@@ -175,10 +176,10 @@ export class AgentService extends EventEmitter {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch(() => {});
+    }).catch((err) => console.warn("[AuditLog] write failed:", err));
     return this.processManager.spawn({
       type: "custom",
-      command: "python3",
+      command: PYTHON_SCRIPTS.pythonBin,
       args: ["server/python_bridges/liteagent_bridge.py", JSON.stringify(safeConfig)],
       label: `LiteAgent: ${safeConfig.goal.slice(0, 30)}...`,
     });
@@ -231,7 +232,7 @@ export class AgentService extends EventEmitter {
         result: null,
         ipAddress: null,
         sessionId: null,
-      }).catch(() => {});
+      }).catch((err) => console.warn("[AuditLog] write failed:", err));
       this.emit("security:injection_attempt", {
         procedure: "agent.runRecursiveMAS",
         violations: sanitized.violations,

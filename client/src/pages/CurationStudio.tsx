@@ -93,7 +93,7 @@ export default function CurationStudio() {
     onSuccess: () => {
       toast.success(autoPilot ? "Auto-Pilot enabled" : "Auto-Pilot disabled");
     },
-    onError: (err: any) => toast.error("Auto-Pilot update failed: " + err.message),
+    onError: (err) => toast.error("Auto-Pilot update failed: " + err.message),
   });
 
   return (

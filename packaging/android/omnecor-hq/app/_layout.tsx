@@ -1,11 +1,11 @@
 import "@/global.css";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { MutationCache, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import "react-native-reanimated";
-import { Platform } from "react-native";
+import { Alert, Platform } from "react-native";
 import "@/lib/_core/nativewind-pressable";
 import { ThemeProvider } from "@/lib/theme-provider";
 import {
@@ -53,6 +53,18 @@ export default function RootLayout() {
   const [queryClient] = useState(
     () =>
       new QueryClient({
+        // Global safety net so no mutation can ever fail silently: any
+        // mutation without its own onError handler surfaces the failure.
+        // Mutations that do define onError keep full control (no double alert).
+        mutationCache: new MutationCache({
+          onError: (error, _variables, _context, mutation) => {
+            console.warn("[API Mutation Error]", error);
+            if (!mutation.options.onError) {
+              const message = error instanceof Error ? error.message : String(error);
+              Alert.alert("Request failed", message.length > 200 ? `${message.slice(0, 200)}…` : message);
+            }
+          },
+        }),
         defaultOptions: {
           queries: {
             // Disable automatic refetching on window focus for mobile

@@ -73,10 +73,7 @@ export function AuditRetentionPanel() {
               )}
             </>
           ) : (
-            <span>
-              Audit log persistence requires MySQL — in SQLite (Sovereign) mode entries are not stored,
-              so retention has no effect.
-            </span>
+            <span>Audit log database unavailable — stats will appear once the database is reachable.</span>
           )}
         </div>
       )}

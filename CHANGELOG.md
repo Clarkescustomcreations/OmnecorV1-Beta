@@ -27,6 +27,13 @@
 - Setup wizard surfaces API-key save failures; platform-aware knowledge-base path placeholder (was hardcoded `/home/linux/...`).
 - APK `ai-node` useEffect cleanup type error (all three workspaces now typecheck clean).
 
+### Added (v1.0-tag blockers pass)
+
+- **No silent mutations, by construction:** global `MutationCache.onError` in both the desktop GUI and the Android APK — every tRPC mutation without a local `onError` now surfaces its failure (toast on desktop, alert on mobile). Remaining server-side audit-log catches all log warnings.
+- **SQLite audit-log parity:** the `audit_log` table now exists in the SQLite (Sovereign) backend with the identical retention windows and 6-hour purge schedule as MySQL, routed through new `audit*` functions in `db.factory.ts`. Live-verified end-to-end.
+- **Real OAuth token refresh:** `integrationManagement.refreshToken` now performs the OAuth2 `refresh_token` grant and persists rotated credentials (was a logged no-op returning fake success).
+- Last `err: any` usages removed (CurationStudio, APK podcast screen); zero TODO/FIXME comments remain in server/client/shared; hardcoded `python3` spawns in AgentService/trainingRouter now use the platform-aware Python resolver.
+
 ### Removed
 
 - Dead/no-op endpoints with zero callers: `agentSettings.updateBotTheme`, `agentSettings.updateDiscoveryKeywords`, the `brainmap` router, and `modelMarketplace.pullOllama`.

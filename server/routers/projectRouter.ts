@@ -355,11 +355,11 @@ export const projectRouter = router({
         const targetDir = stat?.isDirectory() ? resolved : path.dirname(resolved);
         const platform = process.platform;
         if (platform === "linux") {
-          execAsync(`xdg-open "${targetDir}"`).catch(() => {});
+          execAsync(`xdg-open "${targetDir}"`).catch((err) => console.warn("[Project] Failed to open folder:", err));
         } else if (platform === "darwin") {
-          execAsync(`open "${targetDir}"`).catch(() => {});
+          execAsync(`open "${targetDir}"`).catch((err) => console.warn("[Project] Failed to open folder:", err));
         } else if (platform === "win32") {
-          execAsync(`explorer "${targetDir.replace(/\//g, "\\")}"`).catch(() => {});
+          execAsync(`explorer "${targetDir.replace(/\//g, "\\")}"`).catch((err) => console.warn("[Project] Failed to open folder:", err));
         }
         return { success: true, openedPath: targetDir };
       } catch (error) {

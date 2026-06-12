@@ -1,12 +1,14 @@
-import { eq, asc, desc } from "drizzle-orm";
+import { eq, asc, desc, lt, sql } from "drizzle-orm";
 import { drizzle } from "drizzle-orm/mysql2";
 import {
   InsertUser,
   users,
   chatSessions,
   chatMessages,
+  auditLog,
   InsertChatSession,
   InsertChatMessage,
+  InsertAuditLog,
 } from "../drizzle/schema.js";
 import { ENV } from "./_core/env.js";
 
@@ -161,4 +163,74 @@ export async function getChatMessages(sessionId: string) {
     .from(chatMessages)
     .where(eq(chatMessages.sessionId, sessionId))
     .orderBy(asc(chatMessages.createdAt));
+}
+
+// ---------------------------------------------------------------------------
+// Audit log — append-only; the retention purge is the only deletion path
+// ---------------------------------------------------------------------------
+
+export async function auditInsert(entry: InsertAuditLog): Promise<void> {
+  const db = await getDb();
+  if (!db) return;
+  await db.insert(auditLog).values(entry);
+}
+
+/** Delete entries older than `cutoff`; returns the number of rows removed. */
+export async function auditPurgeBefore(cutoff: Date): Promise<number> {
+  const db = await getDb();
+  if (!db) return 0;
+  const result = await db.delete(auditLog).where(lt(auditLog.createdAt, cutoff));
+  return Number((result as unknown as [{ affectedRows?: number }])[0]?.affectedRows ?? 0);
+}
+
+export async function auditList(limit: number, offset: number) {
+  const db = await getDb();
+  if (!db) return { entries: [], total: 0 };
+  const [entries, countRows] = await Promise.all([
+    db.select().from(auditLog).orderBy(desc(auditLog.createdAt)).limit(limit).offset(offset),
+    db.select({ count: sql<number>`count(*)` }).from(auditLog),
+  ]);
+  return { entries, total: Number(countRows[0]?.count ?? 0) };
+}
+
+export async function auditListByActor(actorId: number, limit: number) {
+  const db = await getDb();
+  if (!db) return [];
+  return db
+    .select()
+    .from(auditLog)
+    .where(eq(auditLog.actorId, actorId))
+    .orderBy(desc(auditLog.createdAt))
+    .limit(limit);
+}
+
+export async function auditStats(): Promise<{
+  dbActive: boolean;
+  entries: number;
+  oldestEntryAt: string | null;
+  approxBytes: number;
+}> {
+  const db = await getDb();
+  if (!db) return { dbActive: false, entries: 0, oldestEntryAt: null, approxBytes: 0 };
+  const [countRows, oldestRows, sizeRows] = await Promise.all([
+    db.select({ count: sql<number>`count(*)` }).from(auditLog),
+    db.select({ oldest: sql<Date | null>`min(${auditLog.createdAt})` }).from(auditLog),
+    // information_schema gives real table+index size on MySQL; fall back to a
+    // conservative per-row estimate if the query fails.
+    db
+      .execute(
+        sql`SELECT (data_length + index_length) AS bytes FROM information_schema.tables WHERE table_schema = DATABASE() AND table_name = 'audit_log'`
+      )
+      .catch(() => null),
+  ]);
+  const entries = Number(countRows[0]?.count ?? 0);
+  const oldestRaw = oldestRows[0]?.oldest ?? null;
+  const oldestEntryAt = oldestRaw ? new Date(oldestRaw).toISOString() : null;
+  let approxBytes = entries * 768;
+  if (sizeRows) {
+    const rows = (sizeRows as unknown as [Array<{ bytes?: number | string }>])[0];
+    const bytes = Number(rows?.[0]?.bytes ?? 0);
+    if (bytes > 0) approxBytes = bytes;
+  }
+  return { dbActive: true, entries, oldestEntryAt, approxBytes };
 }

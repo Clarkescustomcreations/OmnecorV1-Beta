@@ -32,7 +32,7 @@ export const mcpRouter = router({
           ipAddress: ctx.req.ip ?? null,
           sessionId: null,
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[AuditLog] write failed:", err));
       return { connected: true };
     }),
   disconnectServer: protectedProcedure
@@ -50,7 +50,7 @@ export const mcpRouter = router({
           ipAddress: ctx.req.ip ?? null,
           sessionId: null,
         })
-        .catch(() => {});
+        .catch((err) => console.warn("[AuditLog] write failed:", err));
       return { disconnected: true };
     }),
   listTools: protectedProcedure
