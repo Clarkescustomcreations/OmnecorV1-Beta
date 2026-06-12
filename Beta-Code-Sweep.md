@@ -82,6 +82,25 @@ Also: `engines` (node ≥20, pnpm ≥10) added to root package.json; `cross-env`
 | client/src/components/SpecializedModuleLauncher.tsx | 3 toast-only Configure/Settings buttons now navigate to `/settings?tab=valet` / `?tab=hardware` |
 | packaging/android/omnecor-hq/app/(tabs)/ai-node.tsx | useEffect cleanup type fix (workspace tsc now 0 errors) |
 
+## Follow-up Round (2026-06-12, same day)
+
+### Audit Log Retention (storage-growth fix)
+The append-only audit log had no pruning — every tRPC call is logged, so it would grow without bound. Added:
+- `AuditLogService`: `getRetentionDays` / `setRetentionDays` / `purgeExpired` / `getStorageStats` / `startRetentionScheduler` (boot + 6-hour sweep). Retention persisted as `auditRetentionDays` in `settings.json`. Default **14 days**; options 28 days / 0 (permanent).
+- `auditRouter`: `getRetention` (window + entry count + approx table size via information_schema) and `setRetention` (applies immediately, audit-logs itself as `audit_retention_changed`). Admin-only.
+- `client/src/components/settings/AuditRetentionPanel.tsx`: new section in Settings → Security — 2 weeks (default) / 4 weeks / Permanent radio group, live storage stats, amber storage warning when Permanent is selected, SQLite-mode notice.
+- Scheduler started in `server/_core/index.ts` at boot.
+
+### Documentation sweep (previous round + retention)
+- `CHANGELOG.md`: new 2.4.1-beta.1 entry covering the entire production-readiness sweep + retention.
+- `SECURITY.md`: audit-log section rewritten (append-only + retention); new "Production-Readiness Hardening (2026-06-12)" section (WS auth, OMMESH fail-closed, OAuth rate limit, upload hardening, SESSION_TTL_MS, dependency floors); stale "intentional stubs" note corrected.
+- `docs/api/WEBSOCKET_API.md`: new §2.1 Authentication (cookie / Bearer / ?token=, loopback + zero-login exceptions, 4401 close, registration-only gating).
+- `docs/api/TRPC_API.md`: audit router section updated (all 5 procedures incl. getRetention/setRetention).
+- `docs/architecture/ROUTER_INVENTORY.md`: brainmap router removed; audit, agentSettings, modelMarketplace entries corrected to current procedure sets.
+- `docs/user-guides/SECURITY_FEATURES.md` + `docs/user-guides/Omnecor User Guide.md` §14.2: retention table, UI path, MySQL-only note.
+- `docs/backend/DATABASE_SCHEMA.md` + `docs/backend/SERVICES_OVERVIEW.md`: audit_log/AuditLogService descriptions updated for retention semantics.
+- `master-feature-plan.md`: pullOllama removal noted.
+
 ## Accepted / Deferred (documented, not blockers)
 
 - **`as any` debt (~38 server instances)** — concentrated in sdk.ts OAuth response shaping and settings-file reads; all behind validated boundaries. Typed-schema refactor deferred post-beta (no behavior risk found).

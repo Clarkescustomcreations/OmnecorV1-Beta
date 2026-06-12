@@ -176,12 +176,15 @@ Manages Lithic virtual credit cards for financial isolation per project or agent
 | `virtualCard.getCardStatus` | Query (`cloudProcedure`) | Returns the current status, spend, and limits of an issued virtual card. |
 
 ### 7.3. `audit` Router
-Read-only access to the immutable audit log. All procedures require `adminProcedure`.
+Access to the append-only audit log. Entries can never be edited; the only deletion path is the time-based retention purge (default **14 days**, configurable in Settings → Security). All procedures require `adminProcedure`.
 
 | Procedure | Type | Description |
 |---|---|---|
 | `audit.getAuditLog` | Query (`adminProcedure`) | Returns paginated audit log entries, filterable by `eventType`, `actorId`, and date range. |
-| `audit.exportAuditLog` | Mutation (`adminProcedure`) | Streams the full audit log as a CSV download. |
+| `audit.getAuditLogByActor` | Query (`adminProcedure`) | Returns recent entries for a specific actor. |
+| `audit.exportAuditLog` | Query (`adminProcedure`) | Returns the audit log as CSV (formula-injection-safe escaping). |
+| `audit.getRetention` | Query (`adminProcedure`) | Returns the current retention window (14 / 28 / 0 = permanent) plus storage stats (entry count, approximate table size, oldest entry). |
+| `audit.setRetention` | Mutation (`adminProcedure`) | Sets the retention window. Applies immediately (shrinking the window purges out-of-window entries) and the change itself is written to the audit log. A background sweep enforces the window every 6 hours. |
 
 ### 7.4. `system` Router
 System-wide configuration procedures.

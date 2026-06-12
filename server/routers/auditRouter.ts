@@ -1,9 +1,10 @@
 /**
  * @file server/routers/auditRouter.ts
- * @description Omnecor — Immutable Audit Log Router (Phase 20)
+ * @description Omnecor — Append-Only Audit Log Router (Phase 20)
  *
  * All procedures are admin-only. The audit log is insert-only by design —
- * no mutation endpoints are exposed here.
+ * the only mutation exposed here is the retention-window setting; the actual
+ * purge is time-based and handled by AuditLogService.
  */
 
 import { z } from "zod";
@@ -11,6 +12,10 @@ import { router, adminProcedure } from "../_core/trpc.js";
 import { getDb } from "../db.factory.js";
 import { auditLog } from "../../drizzle/schema.js";
 import { desc, eq, sql } from "drizzle-orm";
+import {
+  AuditLogService,
+  type AuditRetentionDays,
+} from "../phase2/services/AuditLogService.js";
 
 export const auditRouter = router({
   getAuditLog: adminProcedure
@@ -65,5 +70,36 @@ export const auditRouter = router({
           .join(",")
       ).join("\n");
       return { csv: header + rows };
+    }),
+
+  /** Current retention window + storage stats for the Settings → Security panel. */
+  getRetention: adminProcedure.query(async () => {
+    const service = AuditLogService.getInstance();
+    const stats = await service.getStorageStats();
+    return { retentionDays: service.getRetentionDays(), ...stats };
+  }),
+
+  /**
+   * Change the retention window (14 days default / 28 days / 0 = permanent).
+   * Applies immediately: shrinking the window purges out-of-window entries.
+   * The change itself is recorded in the audit log.
+   */
+  setRetention: adminProcedure
+    .input(z.object({ retentionDays: z.union([z.literal(14), z.literal(28), z.literal(0)]) }))
+    .mutation(async ({ ctx, input }) => {
+      const service = AuditLogService.getInstance();
+      const previous = service.getRetentionDays();
+      const { purged } = await service.setRetentionDays(input.retentionDays as AuditRetentionDays);
+      await service.log({
+        eventType: "audit_retention_changed",
+        actorId: ctx.user?.id ?? null,
+        actorType: "user",
+        procedure: "audit.setRetention",
+        args: { previousDays: previous, retentionDays: input.retentionDays, purged },
+        result: null,
+        ipAddress: ctx.req.ip ?? null,
+        sessionId: null,
+      });
+      return { success: true, retentionDays: input.retentionDays, purged };
     }),
 });

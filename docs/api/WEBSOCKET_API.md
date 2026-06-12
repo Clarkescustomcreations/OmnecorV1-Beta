@@ -18,6 +18,16 @@ The WebSocket server is integrated into the main Express HTTP server and is acce
 
 Clients connect to the WebSocket server at the `/ws` endpoint of the Omnecor instance. For example, if Omnecor is running on `http://localhost:3000`, the WebSocket endpoint would be `ws://localhost:3000/ws`.
 
+### 2.1. Authentication
+
+The upgrade request must carry a valid session credential, supplied one of three ways:
+
+1. **Session cookie** — the browser SPA sends it automatically.
+2. **`Authorization: Bearer <token>` header** — for clients that can set upgrade headers.
+3. **`?token=<session-token>` query parameter** — used by the mobile APK, whose React Native WebSockets don't reliably attach cookies (`ws://<pc-ip>:3000/ws?token=...`).
+
+Connections are also accepted without a credential when the peer is loopback (127.0.0.1/::1) or `ZERO_LOGIN_MODE` is enabled. Otherwise, an unauthenticated connection is only permitted when `OMMESH_SECRET` is configured, and it may send **only** a `mobile_node_register` message (authenticated by the shared secret, compared in constant time) — every other message type and channel subscription is refused until registration succeeds. Unauthenticated connections with no `OMMESH_SECRET` configured are closed with code `4401`.
+
 ```typescript
 const socket = new WebSocket("ws://localhost:3000/ws");
 

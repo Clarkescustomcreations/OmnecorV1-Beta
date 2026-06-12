@@ -1,5 +1,36 @@
 # Changelog
 
+## [2.4.1-beta.1] - 2026-06-12 — Production-Readiness Sweep & Audit Log Retention
+
+### Added
+
+- **Audit Log Retention (storage control):** The append-only audit log now purges itself automatically — default **2 weeks**, with **4 weeks** and **Permanent** selectable under Settings → Security → Audit Log Retention (admin/owner only). Permanent shows a storage warning with the live entry count and approximate table size. A background sweep runs every 6 hours (and at boot); shrinking the window purges immediately; retention changes are themselves audit-logged (`audit_retention_changed`). New procedures: `audit.getRetention`, `audit.setRetention`.
+- **WebSocket upgrade authentication:** `/ws` now verifies the session cookie, an `Authorization: Bearer` header, or a `?token=` query parameter. The Android APK's channel + terminal sockets attach the stored session token automatically. Unauthenticated LAN sockets are restricted to `mobile_node_register` (and rejected entirely when `OMMESH_SECRET` is unset).
+- **`SESSION_TTL_MS`:** configurable session lifetime (default one year for local-first installs).
+- **Settings deep links:** `/settings?tab=<id>` opens a specific tab directly.
+- **`engines` field + cross-platform scripts:** Node ≥20 / pnpm ≥10 enforced; `dev`/`start` use cross-env; Python scripts launch via `scripts/run-python.mjs` (resolves `python3`/`python`/`py`); `.gitattributes` normalizes line endings.
+
+### Security
+
+- Timing-safe OMMESH secret comparison; fail-closed mobile node registration when `OMMESH_SECRET` is unset.
+- Dedicated rate limit on `/api/oauth/*` (10 req / 15 min / IP).
+- Attachment upload extension allowlist; `/uploads` served with nosniff + forced download + sandbox CSP.
+- `pnpm audit` clean across all workspaces (was 2 critical / 2 high / 4 moderate): drizzle-orm ≥0.45.2, @trpc/* 11.17.0, vitest ≥3.2.6, shell-quote ≥1.8.4, joi ≥18.2.1, uuid ≥11.1.1.
+
+### Fixed
+
+- N+1 query in PCB `deleteProject` (batched `inArray` deletes).
+- 9 silent `.catch(() => {})` blocks on audit-log writes now log warnings.
+- ESM-unsafe `require()` calls in `AgentService` converted to dynamic imports.
+- ComfyUI panel validates workflow JSON before queueing (raw text was silently invalid).
+- Chat live-preview panel overlays on phones instead of crushing the chat column; PCB editor toolbar wraps on narrow screens.
+- Setup wizard surfaces API-key save failures; platform-aware knowledge-base path placeholder (was hardcoded `/home/linux/...`).
+- APK `ai-node` useEffect cleanup type error (all three workspaces now typecheck clean).
+
+### Removed
+
+- Dead/no-op endpoints with zero callers: `agentSettings.updateBotTheme`, `agentSettings.updateDiscoveryKeywords`, the `brainmap` router, and `modelMarketplace.pullOllama`.
+
 ## [2.4.0-beta.1] - 2026-06-12 — Unified Notifications & Agent Messenger
 
 ### Added

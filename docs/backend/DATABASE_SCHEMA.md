@@ -102,7 +102,7 @@ Defines per-project spending limits and alerting behaviour. The `mode` column co
 
 ### 2.7. `audit_log` Table
 
-> **INSERT-ONLY (append-only).** No `UPDATE` or `DELETE` is ever performed. Sensitive data is redacted before insertion via `redactSensitiveData()`.
+> **APPEND-ONLY.** No `UPDATE` is ever performed and application code cannot delete entries. The only deletion path is the time-based retention purge in `AuditLogService` (default 14 days; configurable to 28 days or permanent in Settings → Security). Sensitive data is redacted before insertion via `redactSensitiveData()`.
 
 | Column Name | Type | Description | Constraints |
 |---|---|---|---|

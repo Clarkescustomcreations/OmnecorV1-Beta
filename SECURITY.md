@@ -18,7 +18,7 @@ Omnecor incorporates several security features to protect your data and system:
 
 -   **Human-in-the-Loop (HITL) Gates**: Dangerous or irreversible operations (firmware flash, virtual card issuance, MCP tool calls marked `dangerous:true`, peer federation approval, multi-agent crew runs with >3 agents) require explicit human approval before execution. Loop detection (action hash tracking, 3-repetition threshold) triggers HITL alerts and logs violations to the audit trail.
 
--   **Immutable Audit Log**: Every `protectedProcedure` call is automatically logged to the `audit_log` table via `auditMiddleware`. PII and secrets are redacted before insertion via `PromptSanitizer`. Logs are accessible via `auditRouter` and displayed in the Settings → Audit Log panel.
+-   **Append-Only Audit Log with Retention**: Every `protectedProcedure` call is automatically logged to the `audit_log` table via `auditMiddleware`. PII and secrets are redacted before insertion via `PromptSanitizer`. Entries can never be edited; the only deletion path is a time-based retention purge (default **14 days**, configurable to 28 days or permanent under Settings → Security → Audit Log Retention — permanent shows a storage-size warning). A background sweep enforces the window every 6 hours, and retention changes are themselves audit-logged. Logs are accessible via `auditRouter` and displayed in the Settings → Audit Log panel.
 
 -   **Integration Lifecycle Management**: All third-party OAuth integrations (GitHub, Notion, Slack, Google Drive, Dropbox, OneDrive, social platforms) are managed by `IntegrationManagementService`. Users can inspect health status, refresh OAuth tokens, and fully disconnect any integration via `trpc.integrationManagement.*` — no orphaned tokens left in the database. Health state is cached (60s TTL) to prevent API throttling. All operations are scoped to the authenticated user.
 
@@ -58,15 +58,26 @@ As part of the V1-Beta finalization sweep, all stale diagnostic comments were re
 
 -   **484 `UI-AUDIT-FINDING/SUGGESTION` comment lines** removed from 6 client-side TSX files. These were injected by an automated scanner in earlier sessions and did not reflect actual code defects — their presence could mislead future auditors.
 -   **140 `UI-LOGIC-AUDIT` comment lines** removed from 24 server router files.
--   **Misleading placeholder comments** removed from `discoveryRouter.ts` (which already queries the database), `agentSettingsRouter.ts` (`updateBotTheme`/`updateDiscoveryKeywords` are intentional stubs, not unimplemented), and `brainmapRouter.ts` (file-level JSDoc already explains the stub contract).
+-   **Misleading placeholder comments** removed from `discoveryRouter.ts` (which already queries the database), `agentSettingsRouter.ts`, and `brainmapRouter.ts`. *(Update 2026-06-12: the `updateBotTheme`/`updateDiscoveryKeywords` stubs and the `brainmap` router were removed entirely in the production-readiness sweep — they had zero callers and silently dropped data.)*
 -   **TypeScript gate**: `pnpm check` passes with 0 errors after all removals.
 
 These removals are purely cosmetic but security-relevant: misleading comments can cause reviewers to trust that a check is performed when it is not (or vice versa). The current comment state now reflects actual behavior.
 
-## 4. Reporting Security Vulnerabilities
+## 4. Production-Readiness Hardening (2026-06-12)
+
+The V1-Beta production-readiness sweep (see `Beta-Code-Sweep.md`) added the following protections:
+
+-   **WebSocket upgrade authentication**: `/ws` connections now verify a session credential — the session cookie (browser SPA), an `Authorization: Bearer` header, or a `?token=` query parameter (mobile APK). Unauthenticated LAN sockets may only attempt `mobile_node_register`, and only when `OMMESH_SECRET` is configured.
+-   **Timing-safe OMMESH secret comparison**: mobile node registration compares secrets with SHA-256 + `crypto.timingSafeEqual` (no timing or length leak), and registration **fails closed** when `OMMESH_SECRET` is unset (loopback and zero-login excepted).
+-   **OAuth endpoint rate limiting**: all `/api/oauth/*` routes have a dedicated limiter (10 requests / 15 minutes per IP) on top of the global limiter.
+-   **Upload hardening**: attachment uploads use an extension allowlist — executables, scripts, and active content (exe, dll, bat, cmd, ps1, sh, msi, jar, apk, svg, html, …) are stored as `.bin`; the `/uploads` route is served with `X-Content-Type-Options: nosniff`, `Content-Disposition: attachment`, and a sandboxing `Content-Security-Policy` so uploaded HTML/SVG can never execute in the app origin.
+-   **Configurable session lifetime**: `SESSION_TTL_MS` controls the session JWT + cookie lifetime (default one year for local-first installs; network deployments should set e.g. `604800000` = 7 days).
+-   **Dependency floor pins**: `pnpm audit` is clean across all workspaces; security floors live in `pnpm-workspace.yaml` (drizzle-orm ≥0.45.2, @trpc/server ≥11.8.0, shell-quote ≥1.8.4, joi ≥18.2.1, uuid ≥11.1.1, and others).
+
+## 5. Reporting Security Vulnerabilities
 
 If you discover a security vulnerability in Omnecor, please report it responsibly by contacting the maintainers directly. Do not disclose the vulnerability publicly until it has been addressed.
 
-## 5. License
+## 6. License
 
 This security policy is part of the Omnecor project, which is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.

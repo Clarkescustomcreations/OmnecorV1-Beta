@@ -11,7 +11,7 @@ graph TD
     Input[Incoming Data / Files / API Calls] --> PS[PromptSanitizer\nInjection Defense]
     PS --> VS[YARA Vulnerability Scanner\nIoC Detection]
     VS --> AES[AES-256-GCM File Encryption\nAt-Rest Protection]
-    AES --> AL[Immutable Audit Log\nAppend-Only Ledger]
+    AES --> AL[Append-Only Audit Log\n14-Day Default Retention]
     AL --> BK[Backup System\nFull / Incremental]
     
     Auth[OAuth / Zero-Login Auth] --> RBAC[RBAC Enforcement\nviewer / user / admin / owner]
@@ -141,11 +141,25 @@ Omnecor scans uploaded and processed files against threat intelligence feeds bef
 
 ---
 
-## 5. Immutable Audit Log
+## 5. Append-Only Audit Log
 
-Every privileged system action is written to an append-only audit log. No update or delete API exists for this table.
+Every privileged system action is written to an append-only audit log. Entries can never be edited or rewritten by application code — the only deletion path is the time-based retention purge described below.
 
 **Implementation:** `AuditLogService` + `audit_log` database table
+
+### Retention & Storage
+
+Without a retention window an append-only log grows without bound (every tRPC call is logged), so entries are purged automatically once they age out:
+
+| Option | Behavior |
+|---|---|
+| **2 weeks (default)** | Entries older than 14 days are deleted by a background sweep that runs every 6 hours. |
+| **4 weeks** | Same sweep, 28-day window. |
+| **Permanent** | Nothing is ever deleted. The Settings panel shows a storage warning with the current entry count and approximate table size — busy workstations can add tens of thousands of entries per week, so export and prune periodically if disk space matters. |
+
+Change it under **Settings → Security → Audit Log Retention** (Admin/Owner role required). Shrinking the window applies immediately, and the retention change itself is recorded in the audit log (`audit_retention_changed`).
+
+> Note: the audit log persists only in MySQL mode. In SQLite (Sovereign) mode entries are not stored, so retention has no effect.
 
 ### What Gets Logged
 

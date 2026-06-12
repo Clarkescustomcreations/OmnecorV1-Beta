@@ -25,6 +25,7 @@ import CloudComputePanel from "../components/settings/CloudComputePanel";
 import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
 import ValetRouterPanel from "../components/settings/ValetRouterPanel";
+import { AuditRetentionPanel } from "../components/settings/AuditRetentionPanel";
 import AgenticWalletPanel from "../components/settings/AgenticWalletPanel";
 import { advancedSettings } from "../lib/advancedSettings";
 import OmnecorDashboardLayout from "../components/OmnecorDashboardLayout";
@@ -672,6 +673,8 @@ export const Settings: React.FC = () => {
                           </div>
                         </div>
                       </div>
+                      <AuditRetentionPanel />
+
                       <div className="pt-6 border-t space-y-6">
                         <h3 className="text-lg font-semibold">Encryption Settings</h3>
                         <div className="flex items-center justify-between">

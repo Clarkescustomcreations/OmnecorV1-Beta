@@ -30,6 +30,7 @@ import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
+import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { createLogger, closeAuditLog } from "./logger.js";
 import { SERVER_CONFIG } from "../phase2/config/index.js";
 import { ENV } from "./env.js";
@@ -308,6 +309,12 @@ async function startServer() {
     );
     TokenRefreshService.getInstance().start();
     console.info("[Omnecor] Token refresh service started");
+    AuditLogService.getInstance().startRetentionScheduler();
+    console.info(
+      `[Omnecor] Audit log retention scheduler started (window: ${
+        AuditLogService.getInstance().getRetentionDays() || "permanent"
+      }${AuditLogService.getInstance().getRetentionDays() ? " days" : ""})`
+    );
   });
 
   async function logStartupChecklist() {
