@@ -4,6 +4,10 @@ Last updated: 2026-06-14
 
 ---
 
+## DO NOT REMOVE THIS NOTE **Important Read AGENTS.md Before Begining The Next Sesssion**
+ 
+---
+
 ## What was built
 
 ### Phase 3: Core AI Services & Pipeline Repairs (F11–F15 — all complete)
