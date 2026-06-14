@@ -114,6 +114,12 @@ export default function Designer3D() {
   // Selection / Highlight state
   const [selectedText, setSelectedText] = useState("");
   const [aiInstructions, setAiInstructions] = useState("");
+  const [threeDSelectionName, setThreeDSelectionName] = useState<string | null>(null);
+
+  // Clear 3D selection when mode changes
+  useEffect(() => {
+    setThreeDSelectionName(null);
+  }, [mode]);
 
   const [mdSearchText, setMdSearchText] = useState("");
 
@@ -541,7 +547,12 @@ export default function Designer3D() {
 
   const renderDesignerContent = () => (
     <div className="relative w-full h-full flex flex-col overflow-hidden">
-      {mode === "3d" && <ThreeViewer code={activeFileCode} />}
+      {mode === "3d" && (
+        <ThreeViewer
+          code={activeFileCode}
+          onObjectSelect={(name) => setThreeDSelectionName(name || null)}
+        />
+      )}
       {mode === "pcb" && <EnhancedPCBEditor />}
       {mode === "web" && (
         <WebPreview
@@ -839,7 +850,7 @@ export default function Designer3D() {
       )}
 
       {/* Floating "Ask AI" button for 3D and PCB modes (no text selection in those views) */}
-      {(mode === "3d" || mode === "pcb") && selectedText.trim().length === 0 && (
+      {(mode === "3d" || mode === "pcb") && selectedText.trim().length === 0 && !threeDSelectionName && (
         <button
           className="absolute bottom-5 right-5 flex items-center gap-2 bg-slate-900 border border-accent/40 hover:border-accent text-accent text-[11px] font-semibold px-3 py-2 rounded-xl shadow-xl z-30 transition-all hover:bg-slate-800 font-sans"
           onClick={() => {

@@ -44,6 +44,7 @@ import { createGzip, createGunzip } from "zlib";
 import { spawn, type SpawnOptions } from "child_process";
 import { createLogger } from "../../_core/logger.js";
 import { PATHS } from "../../_core/paths.js";
+import { getSetting } from "./SettingsService.js";
 const log = createLogger("Security");
 
 type CommandOptions = SpawnOptions & { allowNonZero?: boolean };
@@ -425,6 +426,22 @@ export class SecurityService {
   async scanFile(filePath: string): Promise<FileScanResult> {
     const threats: string[] = [];
     const resolvedPath = path.resolve(filePath);
+
+    // Master switch — Settings → Security "Malicious File Scanning". When the
+    // operator disables scanning, report the file as unscanned rather than
+    // running the (potentially expensive) YARA/signature analysis.
+    if (!getSetting<boolean>("maliciousFileScan", true)) {
+      const stat = await fs.stat(resolvedPath).catch(() => null);
+      return {
+        filePath: resolvedPath,
+        isSafe: true,
+        threats: [],
+        fileType: "unscanned",
+        fileSize: stat?.size ?? 0,
+        sha256: "",
+        scannedAt: new Date().toISOString(),
+      };
+    }
 
     // Check for symlink traversal
     const realPath = await fs.realpath(resolvedPath).catch(() => resolvedPath);

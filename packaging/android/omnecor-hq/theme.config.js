@@ -1,6 +1,7 @@
 /** @type {const} */
 const themeColors = {
-  primary: { light: '#0a7ea4', dark: '#0a7ea4' },
+  // Matches the main Omnecor GUI primary (Tailwind blue-700 light / blue-500 dark sidebar accent).
+  primary: { light: '#1d4ed8', dark: '#3b82f6' },
   background: { light: '#ffffff', dark: '#151718' },
   surface: { light: '#f5f5f5', dark: '#1e2022' },
   foreground: { light: '#11181C', dark: '#ECEDEE' },

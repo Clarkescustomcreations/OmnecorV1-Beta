@@ -1,3 +1,5 @@
+import { getSetting } from "./SettingsService.js";
+
 export interface LlamaCppGenerateOptions {
   maxTokens?: number;
   temperature?: number;
@@ -25,6 +27,10 @@ export class LlamaCppService {
   }
 
   async generate(prompt: string, modelPath: string, options?: LlamaCppGenerateOptions): Promise<string> {
+    // Hardware/inference tuning from Settings → Model: cpuThreads sets the
+    // worker count, inferenceTimeout (seconds) bounds the request.
+    const cpuThreads = getSetting<number>("cpuThreads", 0);
+    const timeoutMs = getSetting<number>("inferenceTimeout", 60) * 1000;
     const resp = await fetch(`${this.bridgeUrl}/generate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -33,8 +39,9 @@ export class LlamaCppService {
         model_path: modelPath,
         max_tokens: options?.maxTokens ?? 256,
         temperature: options?.temperature ?? 0.7,
+        ...(cpuThreads > 0 ? { n_threads: cpuThreads } : {}),
       }),
-      signal: AbortSignal.timeout(60000),
+      signal: AbortSignal.timeout(timeoutMs > 0 ? timeoutMs : 60000),
     });
     if (!resp.ok) {
       const err = await resp.json().catch(() => ({ detail: resp.statusText })) as { detail: string };

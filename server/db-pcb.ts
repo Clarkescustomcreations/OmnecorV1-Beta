@@ -1,6 +1,6 @@
 /**
  * PCB Editor Database Helpers
- * 
+ *
  * Query functions for:
  * - Project management
  * - Design persistence
@@ -37,17 +37,16 @@ export async function createProject(
   const db = await getDb();
   if (!db) return null;
 
-  const result = await db
+  const [row] = await db
     .insert(designProjects)
-    .values({ userId, name, description, mode });
-
-  const insertId = (result as any)[0]?.insertId;
+    .values({ userId, name, description, mode })
+    .returning({ id: designProjects.id });
 
   return {
-    id: insertId || 0,
+    id: row.id,
     userId,
     name,
-    description: description || null,
+    description: description ?? null,
     mode,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -97,29 +96,21 @@ export async function deleteProject(projectId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
 
-  // Delete all related saves and exports
-  const saves = await db
-    .select({ id: designSaves.id })
-    .from(designSaves)
-    .where(eq(designSaves.projectId, projectId));
+  await db.transaction(async (tx) => {
+    const saves = await tx
+      .select({ id: designSaves.id })
+      .from(designSaves)
+      .where(eq(designSaves.projectId, projectId));
 
-  const saveIds = saves.map((save) => save.id);
-  if (saveIds.length > 0) {
-    await db
-      .delete(designExports)
-      .where(inArray(designExports.designSaveId, saveIds));
-    await db
-      .delete(aiDesignReviews)
-      .where(inArray(aiDesignReviews.designSaveId, saveIds));
-  }
+    const saveIds = saves.map((s) => s.id);
+    if (saveIds.length > 0) {
+      await tx.delete(designExports).where(inArray(designExports.designSaveId, saveIds));
+      await tx.delete(aiDesignReviews).where(inArray(aiDesignReviews.designSaveId, saveIds));
+    }
 
-  await db
-    .delete(designSaves)
-    .where(eq(designSaves.projectId, projectId));
-
-  await db
-    .delete(designProjects)
-    .where(eq(designProjects.id, projectId));
+    await tx.delete(designSaves).where(eq(designSaves.projectId, projectId));
+    await tx.delete(designProjects).where(eq(designProjects.id, projectId));
+  });
 
   return true;
 }
@@ -132,48 +123,43 @@ export async function saveDesign(
   projectId: number,
   userId: number,
   name: string,
-  canvasData: any,
+  canvasData: unknown,
   description?: string
 ): Promise<DesignSave | null> {
   const db = await getDb();
   if (!db) return null;
 
-  const componentCount = canvasData.nodes?.length || 0;
-  const connectionCount = canvasData.edges?.length || 0;
+  const componentCount = (canvasData as { nodes?: unknown[] })?.nodes?.length ?? 0;
+  const connectionCount = (canvasData as { edges?: unknown[] })?.edges?.length ?? 0;
 
-  // Mark previous saves as not latest
-  await db
-    .update(designSaves)
-    .set({ isLatest: 0 })
-    .where(
-      and(
-        eq(designSaves.projectId, projectId),
-        eq(designSaves.isLatest, 1)
-      )
-    );
+  const [row] = await db.transaction(async (tx) => {
+    await tx
+      .update(designSaves)
+      .set({ isLatest: 0 })
+      .where(and(eq(designSaves.projectId, projectId), eq(designSaves.isLatest, 1)));
 
-  const result = await db
-    .insert(designSaves)
-    .values({
-      projectId,
-      userId,
-      name,
-      description: description || null,
-      canvasData: JSON.stringify(canvasData),
-      componentCount,
-      connectionCount,
-      version: 1,
-      isLatest: 1,
-    });
-
-  const insertId = (result as any)[0]?.insertId;
+    return tx
+      .insert(designSaves)
+      .values({
+        projectId,
+        userId,
+        name,
+        description: description ?? null,
+        canvasData: JSON.stringify(canvasData),
+        componentCount,
+        connectionCount,
+        version: 1,
+        isLatest: 1,
+      })
+      .returning({ id: designSaves.id });
+  });
 
   return {
-    id: insertId || 0,
+    id: row.id,
     projectId,
     userId,
     name,
-    description: description || null,
+    description: description ?? null,
     canvasData: JSON.stringify(canvasData),
     componentCount,
     connectionCount,
@@ -204,12 +190,7 @@ export async function getLatestDesign(projectId: number): Promise<DesignSave | n
   const result = await db
     .select()
     .from(designSaves)
-    .where(
-      and(
-        eq(designSaves.projectId, projectId),
-        eq(designSaves.isLatest, 1)
-      )
-    )
+    .where(and(eq(designSaves.projectId, projectId), eq(designSaves.isLatest, 1)))
     .limit(1);
 
   return result.length > 0 ? result[0] : null;
@@ -230,18 +211,11 @@ export async function deleteDesign(designSaveId: number): Promise<boolean> {
   const db = await getDb();
   if (!db) return false;
 
-  // Delete related exports and reviews
-  await db
-    .delete(designExports)
-    .where(eq(designExports.designSaveId, designSaveId));
-
-  await db
-    .delete(aiDesignReviews)
-    .where(eq(aiDesignReviews.designSaveId, designSaveId));
-
-  await db
-    .delete(designSaves)
-    .where(eq(designSaves.id, designSaveId));
+  await db.transaction(async (tx) => {
+    await tx.delete(designExports).where(eq(designExports.designSaveId, designSaveId));
+    await tx.delete(aiDesignReviews).where(eq(aiDesignReviews.designSaveId, designSaveId));
+    await tx.delete(designSaves).where(eq(designSaves.id, designSaveId));
+  });
 
   return true;
 }
@@ -257,7 +231,7 @@ export async function addComponentToLibrary(
   const db = await getDb();
   if (!db) return null;
 
-  const result = await db
+  const [row] = await db
     .insert(componentLibraryItems)
     .values({
       ...component,
@@ -265,12 +239,11 @@ export async function addComponentToLibrary(
       properties: JSON.stringify(component.properties),
       handles: JSON.stringify(component.handles),
       tags: JSON.stringify(component.tags),
-    });
-
-  const insertId = (result as any)[0]?.insertId;
+    })
+    .returning({ id: componentLibraryItems.id });
 
   return {
-    id: insertId || 0,
+    id: row.id,
     ...component,
     userId,
     createdAt: new Date(),
@@ -299,12 +272,7 @@ export async function getComponentById(
   const result = await db
     .select()
     .from(componentLibraryItems)
-    .where(
-      and(
-        eq(componentLibraryItems.componentId, componentId),
-        eq(componentLibraryItems.userId, userId)
-      )
-    )
+    .where(and(eq(componentLibraryItems.componentId, componentId), eq(componentLibraryItems.userId, userId)))
     .limit(1);
 
   return result.length > 0 ? result[0] : null;
@@ -319,12 +287,7 @@ export async function deleteComponent(
 
   await db
     .delete(componentLibraryItems)
-    .where(
-      and(
-        eq(componentLibraryItems.componentId, componentId),
-        eq(componentLibraryItems.userId, userId)
-      )
-    );
+    .where(and(eq(componentLibraryItems.componentId, componentId), eq(componentLibraryItems.userId, userId)));
 
   return true;
 }
@@ -343,25 +306,18 @@ export async function createExport(
   const db = await getDb();
   if (!db) return null;
 
-  const result = await db
+  const [row] = await db
     .insert(designExports)
-    .values({
-      designSaveId,
-      userId,
-      format,
-      fileUrl,
-      fileSize: fileSize || null,
-    });
-
-  const insertId = (result as any)[0]?.insertId;
+    .values({ designSaveId, userId, format, fileUrl, fileSize: fileSize ?? null })
+    .returning({ id: designExports.id });
 
   return {
-    id: insertId || 0,
+    id: row.id,
     designSaveId,
     userId,
     format,
     fileUrl,
-    fileSize: fileSize || null,
+    fileSize: fileSize ?? null,
     createdAt: new Date(),
   };
 }
@@ -393,29 +349,28 @@ export async function createAIReview(
   const db = await getDb();
   if (!db) return null;
 
-  const result = await db
+  const [row] = await db
     .insert(aiDesignReviews)
     .values({
       designSaveId,
       userId,
       prompt,
       response,
-      componentCount: componentCount || null,
-      connectionCount: connectionCount || null,
-      mode: mode || null,
-    });
-
-  const insertId = (result as any)[0]?.insertId;
+      componentCount: componentCount ?? null,
+      connectionCount: connectionCount ?? null,
+      mode: mode ?? null,
+    })
+    .returning({ id: aiDesignReviews.id });
 
   return {
-    id: insertId || 0,
+    id: row.id,
     designSaveId,
     userId,
     prompt,
     response,
-    componentCount: componentCount || null,
-    connectionCount: connectionCount || null,
-    mode: mode || null,
+    componentCount: componentCount ?? null,
+    connectionCount: connectionCount ?? null,
+    mode: mode ?? null,
     createdAt: new Date(),
   };
 }

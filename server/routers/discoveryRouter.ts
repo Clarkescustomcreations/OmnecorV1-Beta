@@ -4,6 +4,7 @@ import { getDb } from "../db.factory.js";
 import { discoveredArticles } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { ArticleDiscoveryService } from "../phase2/services/ArticleDiscoveryService.js";
 
 export const discoveryRouter = router({
   listUnprocessed: protectedProcedure
@@ -29,14 +30,19 @@ export const discoveryRouter = router({
       const db = await getDb();
       if (!db) return { success: false, articlesAdded: 0, articles: [] };
 
+      // Actually pull and ingest fresh articles from RSS/Atom feeds.
+      const added = await ArticleDiscoveryService.getInstance().discover(input.source, input.limit);
+
+      // Return the latest unprocessed set (includes the rows just ingested).
       const articles = await db.select()
         .from(discoveredArticles)
         .where(eq(discoveredArticles.isProcessed, 0))
+        .orderBy(desc(discoveredArticles.fetchedAt))
         .limit(input.limit);
 
       return {
         success: true,
-        articlesAdded: articles.length,
+        articlesAdded: added.length,
         articles,
       };
     }),

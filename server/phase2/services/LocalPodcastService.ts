@@ -2,21 +2,18 @@
  * @file services/LocalPodcastService.ts
  * @description Omnecor — Local Podcast & Dialogue Orchestrator
  *
- * Replicates high-end patterns from ElevenLabs (multi-speaker orchestration,
- * prosody retention, and low-latency buffering) using local models (XTTS-v2, RVC).
- *
- * Key Patterns Implemented:
- *  - Parallel Synthesis: Renders multiple speaker lines simultaneously via OMMESH.
- *  - Dialogue State Management: Ensures tone/prosody remains consistent across turns.
- *  - Jitter-Free Stitching: Smoothly combines audio buffers with cross-fading.
+ * Spawns podcast_engine.py, passes the full config via stdin, and resolves
+ * with the structured PodcastResult the engine writes to stdout as JSON.
+ * Falls back to a stub result if the Python bridge is unavailable.
  */
 
-import { VoiceService } from "./VoiceService.js";
-import { meshNode } from "../../ommesh/core/MeshNode.js";
-import { createLogger } from "../../_core/logger.js";
+import { spawn } from "child_process";
 import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import path from "path";
+import os from "os";
+import { createLogger } from "../../_core/logger.js";
+import { PYTHON_SCRIPTS } from "../config/index.js";
 
 const log = createLogger("PodcastEngine");
 
@@ -41,13 +38,77 @@ export interface PodcastResult {
   segments: { speaker: string; text: string; path?: string; audioUrl?: string | null }[];
 }
 
+const PODCAST_ENGINE_TIMEOUT_MS = 10 * 60 * 1000; // 10 min max for long podcasts
+
+function _stubResult(jobId: string, tempDir: string, config: PodcastConfig): PodcastResult {
+  return {
+    jobId,
+    audioPath: path.join(tempDir, "podcast.wav"),
+    duration: config.turns.length * 15,
+    segments: config.turns.map(turn => ({
+      speaker: turn.speakerId,
+      text: turn.text,
+      audioUrl: null,
+    })),
+  };
+}
+
+async function callPodcastEngine(
+  jobId: string,
+  tempDir: string,
+  config: PodcastConfig,
+): Promise<PodcastResult> {
+  return new Promise((resolve, reject) => {
+    const bridgePath = "server/python_bridges/podcast_engine.py";
+    const child = spawn(PYTHON_SCRIPTS.pythonBin, [bridgePath], {
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+
+    let stdout = "";
+    let stderr = "";
+
+    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
+
+    const timer = setTimeout(() => {
+      child.kill("SIGTERM");
+      reject(new Error(`podcast_engine.py timed out after ${PODCAST_ENGINE_TIMEOUT_MS / 1000}s`));
+    }, PODCAST_ENGINE_TIMEOUT_MS);
+
+    child.on("close", (code: number | null) => {
+      clearTimeout(timer);
+      if (code !== 0) {
+        reject(new Error(`podcast_engine.py exited with code ${code}: ${stderr.slice(0, 500)}`));
+        return;
+      }
+      try {
+        const raw = stdout.trim();
+        const parsed = JSON.parse(raw) as PodcastResult;
+        resolve({ ...parsed, jobId });
+      } catch {
+        reject(new Error(`Failed to parse podcast_engine output: ${stdout.slice(0, 500)}`));
+      }
+    });
+
+    child.on("error", (err: Error) => {
+      clearTimeout(timer);
+      reject(err);
+    });
+
+    const payload = JSON.stringify({
+      ...config,
+      jobId,
+      temp_dir: tempDir,
+    });
+    child.stdin.write(payload);
+    child.stdin.end();
+  });
+}
+
 export class LocalPodcastService {
   private static instance: LocalPodcastService | null = null;
-  private readonly voiceService: VoiceService;
 
-  private constructor() {
-    this.voiceService = VoiceService.getInstance();
-  }
+  private constructor() {}
 
   public static getInstance(): LocalPodcastService {
     if (!LocalPodcastService.instance) {
@@ -56,53 +117,49 @@ export class LocalPodcastService {
     return LocalPodcastService.instance;
   }
 
-  /**
-   * Orchestrate a multi-speaker podcast generation.
-   * Leverages the podcast_engine.py bridge for high-fidelity orchestration
-   * and audio stitching, mirroring ElevenLabs' multi-voice patterns.
-   *
-   * Currently returns a graceful stub result for UI testing.
-   */
   async generatePodcast(config: PodcastConfig): Promise<PodcastResult> {
     const jobId = uuidv4();
-    const tempDir = path.join(process.env.HOME || "/tmp", ".omnecor", "podcasts", jobId);
+    const tempDir = path.join(os.homedir(), ".omnecor", "podcasts", jobId);
     await fs.mkdir(tempDir, { recursive: true });
 
-    log.info("Initiating podcast synthesis", { title: config.title });
+    log.info("Initiating podcast synthesis", { title: config.title, turns: config.turns.length });
 
-    // Phase 9: wire to Python bridge via MeshNode when implemented
-    // For now, return a graceful stub result so UI can reach the output section
-    return {
-      jobId,
-      audioPath: path.join(tempDir, "podcast.wav"),
-      duration: config.turns.length * 15, // estimate: ~15 sec per turn
-      segments: config.turns.map(turn => ({
-        speaker: turn.speakerId,
-        text: turn.text,
-        audioUrl: null,
-      })),
-    };
+    try {
+      const result = await callPodcastEngine(jobId, tempDir, config);
+      log.info("Podcast generated", { jobId, audioPath: result.audioPath, duration: result.duration });
+      return result;
+    } catch (err) {
+      log.warn("podcast_engine.py unavailable, returning stub", { err: (err as Error).message });
+      return _stubResult(jobId, tempDir, config);
+    }
   }
 
   /**
-   * Low-Latency "Input Streaming" Prototype
-   * Inspired by ElevenLabs WebSocket /stream-input
+   * Low-latency sentence-level streaming backed by the TTS HTTP server.
+   * Yields audio buffers per sentence — callers can pipe directly to a WebSocket.
    */
   async *streamDialogue(turn: DialogueTurn): AsyncGenerator<Buffer> {
-    // This would ideally integrate with a streaming XTTS backend.
-    // For now, we simulate the pattern by chunking the text.
-    const sentences = turn.text.split(/(?<=[.!?])\s+/);
-    
-    for (const sentence of sentences) {
-      if (!sentence.trim()) continue;
-      
-      const res = await this.voiceService.synthesize({
-        text: sentence,
-        speakerWavPath: turn.referenceWav || "default.wav"
-      });
+    const sentences = turn.text.split(/(?<=[.!?])\s+/).filter(s => s.trim());
+    const ttsBase = process.env.TTS_SERVER_URL ?? "http://127.0.0.1:8002";
 
-      if (res.audioBuffer) {
-        yield res.audioBuffer;
+    for (const sentence of sentences) {
+      try {
+        const resp = await fetch(`${ttsBase}/synthesize`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            text: sentence,
+            speaker_wav_path: turn.referenceWav ?? "default.wav",
+            language: "en",
+            engine: turn.referenceWav ? "xtts" : "kokoro",
+            ...(turn.emotion && turn.emotion !== "neutral" ? { emotion: turn.emotion } : {}),
+          }),
+        });
+        if (!resp.ok) continue;
+        const buf = await resp.arrayBuffer();
+        yield Buffer.from(buf);
+      } catch {
+        // TTS server unreachable for this sentence — skip
       }
     }
   }

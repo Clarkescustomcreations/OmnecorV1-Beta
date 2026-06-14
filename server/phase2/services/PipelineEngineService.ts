@@ -4,11 +4,20 @@ import { getDb } from "../../db.factory.js";
 import { pipelines, pipelinePhases, type Pipeline, type PipelinePhase } from "../../../drizzle/schema.js";
 import { PromptSanitizer } from "./PromptSanitizer.js";
 import { AuditLogService } from "./AuditLogService.js";
+import { AiProviderService } from "./AiProviderService.js";
 
 const PHASE_ORDER = ["DEFINE", "PLAN", "EXECUTE", "REVIEW", "SHIP"] as const;
 type PhaseName = typeof PHASE_ORDER[number];
 
-function phaseOutput(phase: PhaseName, goal: string): string {
+const PHASE_SYSTEM_PROMPTS: Record<PhaseName, string> = {
+  DEFINE: "You are a technical project analyst. Given a goal, write a clear scope document covering: objectives, requirements, constraints, and success criteria. Be concise and actionable. Do not include commands — this is analysis only.",
+  PLAN:   "You are a senior software architect. Given a goal, produce a numbered step-by-step breakdown covering tasks, dependencies, and effort estimates. Be specific and realistic. No commands will be executed automatically.",
+  EXECUTE:"You are a lead engineer. Given a goal, generate a detailed execution checklist with exact steps, file paths, and validation checkpoints. Prefix dangerous steps with '⚠️'. No commands run automatically — this is a plan only.",
+  REVIEW: "You are a QA engineer. Given a goal, write a concise review checklist: what to verify, potential edge cases, and a go/no-go recommendation. Be specific.",
+  SHIP:   "You are a DevOps engineer. Given a goal, produce a manual deployment plan listing each step in order with rollback notes. This is a plan only — no commands execute automatically.",
+};
+
+function _staticPhaseOutput(phase: PhaseName, goal: string): string {
   switch (phase) {
     case "DEFINE":
       return `## DEFINE Phase\n\nGoal: ${goal}\n\nThis phase defines the scope and objectives of the pipeline. Review and approve to proceed to PLAN.`;
@@ -21,6 +30,25 @@ function phaseOutput(phase: PhaseName, goal: string): string {
     case "SHIP":
       return `## SHIP Phase\n\n### Deployment Plan\n\nThis is a deployment plan only — no commands will be executed automatically.\n\n1. Review the plan\n2. Execute steps manually in your environment\n\nApprove to mark pipeline complete.`;
   }
+}
+
+async function generatePhaseOutput(phase: PhaseName, goal: string): Promise<string> {
+  try {
+    const result = await AiProviderService.getInstance().chat({
+      providerId: "ollama",
+      modelId: "llama3.2:latest",
+      systemPrompt: PHASE_SYSTEM_PROMPTS[phase],
+      messages: [{ role: "user", content: goal }],
+      maxTokens: 800,
+      temperature: 0.3,
+    });
+    if (result && result.trim().length > 0) {
+      return `## ${phase} Phase\n\n${result.trim()}`;
+    }
+  } catch {
+    // Ollama unavailable or model not loaded — fall through to static output
+  }
+  return _staticPhaseOutput(phase, goal);
 }
 
 export class PipelineEngineService {
@@ -52,7 +80,7 @@ export class PipelineEngineService {
     };
 
     const phaseId = randomUUID();
-    const output = PromptSanitizer.getInstance().sanitize(phaseOutput("DEFINE", sanitized)).clean;
+    const output = PromptSanitizer.getInstance().sanitize(await generatePhaseOutput("DEFINE", sanitized)).clean;
     const newPhase: PipelinePhase = {
       id: phaseId,
       pipelineId: id,
@@ -128,7 +156,7 @@ export class PipelineEngineService {
       } else {
         pipeline.currentPhase = nextPhase;
         pipeline.updatedAt = new Date();
-        const output = PromptSanitizer.getInstance().sanitize(phaseOutput(nextPhase, pipeline.goal)).clean;
+        const output = PromptSanitizer.getInstance().sanitize(await generatePhaseOutput(nextPhase, pipeline.goal)).clean;
         const newPhase: PipelinePhase = {
           id: randomUUID(),
           pipelineId,
@@ -162,7 +190,7 @@ export class PipelineEngineService {
       AuditLogService.getInstance().log({ eventType: "pipeline_complete", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
     } else {
       await db.update(pipelines).set({ currentPhase: nextPhase }).where(eq(pipelines.id, pipelineId));
-      const output = PromptSanitizer.getInstance().sanitize(phaseOutput(nextPhase, pipeline.goal)).clean;
+      const output = PromptSanitizer.getInstance().sanitize(await generatePhaseOutput(nextPhase, pipeline.goal)).clean;
       await db.insert(pipelinePhases).values({
         id: randomUUID(),
         pipelineId,

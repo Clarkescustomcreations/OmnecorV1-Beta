@@ -17,15 +17,12 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import path from "path";
 import fs from "fs/promises";
-import { exec } from "child_process";
-import { promisify } from "util";
+import { spawn } from "child_process";
 import { validatePath } from "../_core/security.js";
-
-const execAsync = promisify(exec);
 
 // ---------------------------------------------------------------------------
 // FileTreeNode — matches fileTreeToNetwork.ts on the frontend exactly
@@ -273,7 +270,7 @@ export const projectRouter = router({
   /**
    * PRESERVED — original flat string[] version for any existing internal callers.
    */
-  getFileTreeFlat: publicProcedure
+  getFileTreeFlat: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       try {
@@ -290,7 +287,7 @@ export const projectRouter = router({
   // =========================================================================
   // Loop Detector (AI Agent Safety) — unchanged
   // =========================================================================
-  checkAgentLoop: publicProcedure
+  checkAgentLoop: protectedProcedure
     .input(loopCheckSchema)
     .mutation(async ({ ctx, input }) => {
       const hash = ctx.services.hashTracker.hashAction(
@@ -300,13 +297,13 @@ export const projectRouter = router({
       );
       return ctx.services.hashTracker.checkAndRecord(input.sessionId, hash);
     }),
-  resetLoopDetector: publicProcedure
+  resetLoopDetector: protectedProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       ctx.services.hashTracker.resetSession(input.sessionId);
       return { success: true };
     }),
-  getLoopDetectorState: publicProcedure
+  getLoopDetectorState: protectedProcedure
     .input(z.object({ sessionId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const snapshot = ctx.services.hashTracker.getSessionSnapshot(input.sessionId);
@@ -345,22 +342,34 @@ export const projectRouter = router({
     }),
 
   // Open a file or directory path in the OS file manager
-  openPath: publicProcedure
+  openPath: protectedProcedure
     .input(z.object({ path: z.string().min(1) }))
     .mutation(async ({ input }) => {
       try {
-        const resolved = path.resolve(input.path);
+        // Contain the path inside an allowed root before touching the filesystem.
+        const resolved = await validatePath(input.path);
         const stat = await fs.stat(resolved).catch(() => null);
         // Open the directory itself; for files, open the containing folder
         const targetDir = stat?.isDirectory() ? resolved : path.dirname(resolved);
         const platform = process.platform;
-        if (platform === "linux") {
-          execAsync(`xdg-open "${targetDir}"`).catch((err) => console.warn("[Project] Failed to open folder:", err));
-        } else if (platform === "darwin") {
-          execAsync(`open "${targetDir}"`).catch((err) => console.warn("[Project] Failed to open folder:", err));
-        } else if (platform === "win32") {
-          execAsync(`explorer "${targetDir.replace(/\//g, "\\")}"`).catch((err) => console.warn("[Project] Failed to open folder:", err));
-        }
+        // Pass the path as a discrete spawn argument (no shell) to eliminate
+        // command-injection: the value is never interpolated into a shell string.
+        const opener =
+          platform === "darwin"
+            ? "open"
+            : platform === "win32"
+              ? "explorer"
+              : "xdg-open";
+        const openTarget =
+          platform === "win32" ? targetDir.replace(/\//g, "\\") : targetDir;
+        const child = spawn(opener, [openTarget], {
+          detached: true,
+          stdio: "ignore",
+        });
+        child.on("error", (err) =>
+          console.warn("[Project] Failed to open folder:", err),
+        );
+        child.unref();
         return { success: true, openedPath: targetDir };
       } catch (error) {
         throw new TRPCError({

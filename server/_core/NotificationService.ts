@@ -21,6 +21,7 @@ import type {
   OmnecorNotification,
   NotificationKind,
 } from "../../shared/notifications.js";
+import { getSetting } from "../phase2/services/SettingsService.js";
 
 export interface NotifyInput {
   kind: NotificationKind;
@@ -67,7 +68,12 @@ export class NotificationService extends EventEmitter {
       this.store.length = MAX_NOTIFICATIONS;
     }
 
-    this.emit("notification", notification);
+    // Settings → General "Notifications": when disabled, the record is still
+    // stored (visible in the feed) but not actively pushed/broadcast so the
+    // user isn't interrupted with live toasts.
+    if (getSetting<boolean>("notifications", true)) {
+      this.emit("notification", notification);
+    }
     return notification;
   }
 

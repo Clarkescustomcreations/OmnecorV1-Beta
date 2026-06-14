@@ -67,7 +67,8 @@ export const neuralMapsRouter = router({
         projectContext: input.projectContext ?? null,
         labelOverrides: input.labelOverrides ?? null,
         settings: input.settings,
-      }).onDuplicateKeyUpdate({
+      }).onConflictDoUpdate({
+        target: neuralMaps.id,
         set: { name: input.name, updatedAt: new Date() },
       });
 
@@ -160,7 +161,7 @@ export const neuralMapsRouter = router({
             labelOverrides: map.labelOverrides ?? null,
             settings: map.settings,
             createdAt: map.createdAt ? new Date(map.createdAt) : new Date(),
-          }).onDuplicateKeyUpdate({ set: { updatedAt: new Date() } });
+          }).onConflictDoUpdate({ target: neuralMaps.id, set: { updatedAt: new Date() } });
           migrated++;
         } catch {
           // Skip maps that fail to insert (e.g. invalid UUID format)

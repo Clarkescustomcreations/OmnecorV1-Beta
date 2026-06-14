@@ -1,7 +1,8 @@
-import { View, type ViewProps } from "react-native";
+import { View, KeyboardAvoidingView, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
 
 import { cn } from "@/lib/utils";
+import { ConnectionBanner } from "@/components/connection-banner";
 
 export interface ScreenContainerProps extends ViewProps {
   /**
@@ -21,6 +22,10 @@ export interface ScreenContainerProps extends ViewProps {
    * Additional className for the SafeAreaView (content layer).
    */
   safeAreaClassName?: string;
+  /**
+   * Hide the global "No PC connection" banner (e.g. on the setup screen).
+   */
+  hideConnectionBanner?: boolean;
 }
 
 /**
@@ -44,6 +49,7 @@ export function ScreenContainer({
   className,
   containerClassName,
   safeAreaClassName,
+  hideConnectionBanner,
   style,
   ...props
 }: ScreenContainerProps) {
@@ -61,7 +67,17 @@ export function ScreenContainer({
         className={cn("flex-1", safeAreaClassName)}
         style={style}
       >
-        <View className={cn("flex-1", className)}>{children}</View>
+        {!hideConnectionBanner && <ConnectionBanner />}
+        {/* Lift bottom-anchored inputs above the on-screen keyboard. Under
+            Android edge-to-edge the window doesn't auto-resize for the IME, so
+            we drive it here (height shrinks the content above the keyboard;
+            iOS uses padding). */}
+        <KeyboardAvoidingView
+          className={cn("flex-1", className)}
+          behavior="padding"
+        >
+          {children}
+        </KeyboardAvoidingView>
       </SafeAreaView>
     </View>
   );

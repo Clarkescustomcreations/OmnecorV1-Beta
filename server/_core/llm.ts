@@ -1,4 +1,5 @@
 import { ENV } from "./env.js";
+import { getSetting } from "../phase2/services/SettingsService.js";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -74,6 +75,8 @@ export type InvokeParams = {
   provider?: string;
   model?: string;
   temperature?: number;
+  topP?: number;
+  top_p?: number;
 };
 
 export type ToolCall = {
@@ -285,8 +288,14 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     response_format,
     provider = "forge",
     model = "gemini-2.5-flash",
-    temperature,
   } = params;
+
+  // Generation defaults come from the Settings → Advanced panel when the caller
+  // doesn't specify them explicitly, so those sliders drive real model behavior.
+  const temperature =
+    params.temperature ?? getSetting<number | undefined>("temperature", undefined);
+  const topP =
+    params.topP ?? params.top_p ?? getSetting<number | undefined>("topP", undefined);
 
   // We still use the native fetch logic for 'forge' to support tool calling and schemas
   // which AiProviderService doesn't fully support yet in its simple implementation.
@@ -312,6 +321,10 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
     if (temperature !== undefined) {
       payload.temperature = temperature;
+    }
+
+    if (topP !== undefined) {
+      payload.top_p = topP;
     }
 
     payload.max_tokens = 32768;

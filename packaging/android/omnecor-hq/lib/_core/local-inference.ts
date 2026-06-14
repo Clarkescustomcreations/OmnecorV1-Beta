@@ -40,36 +40,42 @@ export interface ModelInfo {
   sizeGb: number;
   description: string;
   recommendedForPhone: boolean;
+  /** Direct single-file GGUF download URL (HuggingFace, bartowski Q4_K_M quants). */
+  url: string;
 }
 
 export const RECOMMENDED_MODELS: ModelInfo[] = [
   {
     name: "Qwen2.5-7B (Q4_K_M)",
-    filename: "qwen2.5-7b-instruct-q4_k_m.gguf",
+    filename: "Qwen2.5-7B-Instruct-Q4_K_M.gguf",
     sizeGb: 4.7,
     description: "Best quality/speed balance for S25 Ultra NPU",
     recommendedForPhone: true,
+    url: "https://huggingface.co/bartowski/Qwen2.5-7B-Instruct-GGUF/resolve/main/Qwen2.5-7B-Instruct-Q4_K_M.gguf",
   },
   {
     name: "Llama-3.2-3B (Q4_K_M)",
-    filename: "llama-3.2-3b-instruct-q4_k_m.gguf",
+    filename: "Llama-3.2-3B-Instruct-Q4_K_M.gguf",
     sizeGb: 2.0,
     description: "Fast & compact — 55+ tok/s on Snapdragon 8 Elite",
     recommendedForPhone: true,
+    url: "https://huggingface.co/bartowski/Llama-3.2-3B-Instruct-GGUF/resolve/main/Llama-3.2-3B-Instruct-Q4_K_M.gguf",
   },
   {
     name: "Mistral-7B (Q4_K_M)",
-    filename: "mistral-7b-instruct-v0.3-q4_k_m.gguf",
+    filename: "Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
     sizeGb: 4.4,
     description: "Strong instruction following",
     recommendedForPhone: false,
+    url: "https://huggingface.co/bartowski/Mistral-7B-Instruct-v0.3-GGUF/resolve/main/Mistral-7B-Instruct-v0.3-Q4_K_M.gguf",
   },
   {
     name: "Llama-3.1-8B (Q4_K_M)",
-    filename: "meta-llama-3.1-8b-instruct-q4_k_m.gguf",
+    filename: "Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
     sizeGb: 4.9,
     description: "Meta's latest — good for OMMESH worker role",
     recommendedForPhone: false,
+    url: "https://huggingface.co/bartowski/Meta-Llama-3.1-8B-Instruct-GGUF/resolve/main/Meta-Llama-3.1-8B-Instruct-Q4_K_M.gguf",
   },
 ];
 

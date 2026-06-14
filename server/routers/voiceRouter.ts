@@ -19,7 +19,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure, cloudProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import { ElevenLabsService } from "../phase2/services/ElevenLabsService.js";
@@ -73,7 +73,7 @@ export const voiceRouter = router({
    * Check health of all voice microservices.
    * Returns the status of Whisper, TTS, and RVC servers.
    */
-  healthCheck: publicProcedure.query(async ({ ctx }) => {
+  healthCheck: protectedProcedure.query(async ({ ctx }) => {
     const results = await ctx.services.voice.checkAllHealth();
     return {
       whisper: results[0],
@@ -86,34 +86,35 @@ export const voiceRouter = router({
   /**
    * Check Whisper server health specifically.
    */
-  whisperHealth: publicProcedure.query(async ({ ctx }) => {
+  whisperHealth: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.voice.checkWhisperHealth();
   }),
 
   /**
    * Check TTS server health specifically.
    */
-  ttsHealth: publicProcedure.query(async ({ ctx }) => {
+  ttsHealth: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.voice.checkTTSHealth();
   }),
 
   /**
    * Check RVC server health specifically.
    */
-  rvcHealth: publicProcedure.query(async ({ ctx }) => {
+  rvcHealth: protectedProcedure.query(async ({ ctx }) => {
     return ctx.services.voice.checkRVCHealth();
   }),
 
   /**
    * List available RVC models in a directory.
    */
-  listRvcModels: publicProcedure
+  listRvcModels: protectedProcedure
     .input(rvcListModelsInputSchema)
     .query(async ({ ctx, input }) => {
-      const models = await ctx.services.voice.listRVCModels(input.modelsDir);
+      const validatedDir = await validatePath(input.modelsDir);
+      const models = await ctx.services.voice.listRVCModels(validatedDir);
       return {
         success: true,
-        modelsDir: input.modelsDir,
+        modelsDir: validatedDir,
         count: models.length,
         models,
       };
@@ -122,11 +123,18 @@ export const voiceRouter = router({
   /**
    * Convert voice using RVC model.
    */
-  convertVoice: publicProcedure
+  convertVoice: protectedProcedure
     .input(rvcConvertInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        const result = await ctx.services.voice.convertVoice(input);
+        // Contain both the source audio and the RVC model path before use.
+        const audioFilePath = await validatePath(input.audioFilePath);
+        const modelPath = await validatePath(input.modelPath);
+        const result = await ctx.services.voice.convertVoice({
+          ...input,
+          audioFilePath,
+          modelPath,
+        });
         return {
           success: true,
           data: result,
@@ -148,7 +156,7 @@ export const voiceRouter = router({
    *
    * Returns full transcription with word-level timestamps.
    */
-  transcribe: publicProcedure
+  transcribe: protectedProcedure
     .input(transcribeInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {
@@ -195,7 +203,7 @@ export const voiceRouter = router({
    * Requires a reference WAV file (3-30s of clean speech) for voice cloning.
    * Returns the path to the generated audio file.
    */
-  synthesize: publicProcedure
+  synthesize: protectedProcedure
     .input(synthesizeInputSchema)
     .mutation(async ({ ctx, input }) => {
       try {

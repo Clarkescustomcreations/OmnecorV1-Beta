@@ -5,7 +5,7 @@ import { adminProcedure, protectedProcedure, publicProcedure, router } from "./t
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
 import { join } from "path";
 import { homedir, platform, cpus, totalmem, freemem } from "os";
-import { execFile, exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { getDb, updateUserExecutionMode } from "../db.factory.js";
 import { users } from "../../drizzle/schema.js";
@@ -15,7 +15,6 @@ import { getPermissionsForRole, type Role } from "../phase2/config/rbac.js";
 import { PATHS } from "./paths.js";
 
 const execFileAsync = promisify(execFile);
-const execAsync = promisify(exec);
 
 async function findExecutable(candidates: string[]): Promise<string | null> {
   for (const candidate of candidates) {
@@ -96,6 +95,18 @@ export const systemRouter = router({
     .query(() => {
       return readSettingsFile();
     }),
+
+  /**
+   * Report which social-login providers are configured (booleans only — never
+   * returns the secrets). Drives the Settings → Social Login UI badges.
+   */
+  oauthStatus: publicProcedure.query(() => {
+    const s = (readSettingsFile() as Record<string, string>) || {};
+    return {
+      google: !!(s.googleClientId || process.env.GOOGLE_CLIENT_ID),
+      microsoft: !!(s.microsoftClientId || process.env.MICROSOFT_CLIENT_ID),
+    };
+  }),
 
   saveSettings: publicProcedure
     .input(z.object({ settings: z.record(z.string(), z.unknown()) }))
@@ -190,10 +201,22 @@ export const systemRouter = router({
       // ZRAM Setup
       if (settings.zramEnabled) {
         try {
-          const sizeGB = settings.zramSizeGB || 4;
-          // Attempt to initialize zram device (requires root/sudo, usually handled by workstation-setup script)
-          // Here we just verify availability and trigger if possible
-          await execAsync(`sudo modprobe zram && sudo zramctl --find --size ${sizeGB}G --algorithm zstd`);
+          // Coerce to a bounded integer so it can never carry shell metacharacters.
+          const sizeGB = Math.min(
+            1024,
+            Math.max(1, Math.floor(Number(settings.zramSizeGB) || 4)),
+          );
+          // Attempt to initialize zram device (requires root/sudo, usually handled by workstation-setup script).
+          // execFile runs without a shell and each argument is passed discretely — no injection surface.
+          await execFileAsync("sudo", ["modprobe", "zram"]);
+          await execFileAsync("sudo", [
+            "zramctl",
+            "--find",
+            "--size",
+            `${sizeGB}G`,
+            "--algorithm",
+            "zstd",
+          ]);
           results.push(`Initialized ${sizeGB}GB ZRAM device.`);
         } catch (e) {
           console.warn("[SystemRouter] ZRAM activation failed (likely missing sudo permissions):", e);

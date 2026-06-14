@@ -110,7 +110,7 @@ export const ollamaRouter = router({
       const approved = await HITLApprovalService.getInstance().requestApproval("ollama.deleteModel", {
         name: input.name,
         warning: "This will permanently delete the model and its weights from disk.",
-      });
+      }, "file");
       if (!approved) {
         throw new TRPCError({ code: "FORBIDDEN", message: "Model deletion rejected by HITL." });
       }

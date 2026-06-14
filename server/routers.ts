@@ -78,6 +78,7 @@ import { agentSettingsRouter } from "./routers/agentSettingsRouter.js";
 import { oauthRouter } from "./routers/oauthRouter.js";
 import { attachmentsRouter } from "./routers/attachmentsRouter.js";
 import { neuralMapsRouter } from "./routers/neuralMapsRouter.js";
+import { mobileSyncRouter } from "./routers/mobileSyncRouter.js";
 import { personaRouter } from "./routers/personaRouter.js";
 import { integrationManagementRouter } from "./routers/integrationManagementRouter.js";
 import { hitlRouter } from "./routers/hitlRouter.js";
@@ -217,6 +218,9 @@ export const appRouter = router({
 
   // ─── Agent Messenger (per-persona WhatsApp/Discord-style threads) ─────────
   agentMessenger: agentMessengerRouter,
+
+  // ─── Mobile chat sync (Omnecor HQ app → Notifications + Add-to-project) ───
+  mobileSync: mobileSyncRouter,
 });
 
 export type AppRouter = typeof appRouter;

@@ -1,7 +1,7 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem } from 'electron'
-import { join } from 'path'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem, protocol, net } from 'electron'
+import { join, extname } from 'path'
 import { randomBytes } from 'crypto'
-import { appendFile } from 'fs'
+import { appendFile, readFileSync, writeFileSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import { spawn, ChildProcess, exec } from 'child_process'
 import os from 'os'
@@ -33,7 +33,24 @@ const execAsync = util.promisify(exec)
 
 let backendProcess: ChildProcess | null = null
 let isQuitting = false
-const BACKEND_PORT = process.env.PORT || 3000
+// Fixed port for the embedded backend. High port avoids conflicts with `pnpm dev` on 3000.
+const BACKEND_PORT = process.env.PORT || 37291
+
+// Register the custom protocol before app is ready (required by Electron).
+// app://omnecor/ serves the built frontend from the bundled public directory.
+// This avoids loading via http://localhost so dynamic imports resolve via file
+// I/O rather than a network fetch that can fail if the backend is slow to start.
+protocol.registerSchemesAsPrivileged([
+  {
+    scheme: 'app',
+    privileges: {
+      standard: true,   // enables relative URL resolution (needed for dynamic import())
+      secure: true,     // treated as a secure origin (same-origin fetch, WebCrypto, etc.)
+      supportFetchAPI: true,
+      corsEnabled: true,
+    }
+  }
+])
 
 /**
  * Only allow opening external URLs with safe schemes. Restricting to https/mailto
@@ -48,6 +65,32 @@ function isSafeExternalUrl(urlString: string): boolean {
   } catch {
     return false
   }
+}
+
+/**
+ * Returns a stable JWT signing secret for the embedded backend, persisted in the
+ * app's userData directory. A random secret regenerated on every launch would
+ * invalidate the session cookie each restart, logging the user out constantly.
+ */
+function getPersistentJwtSecret(): string {
+  if (process.env.JWT_SECRET) return process.env.JWT_SECRET
+  const secretPath = join(app.getPath('userData'), 'jwt-secret')
+  try {
+    if (existsSync(secretPath)) {
+      const existing = readFileSync(secretPath, 'utf8').trim()
+      if (existing) return existing
+    }
+  } catch (err) {
+    log(`Failed to read persisted JWT secret: ${String(err)}`)
+  }
+  const secret = randomBytes(32).toString('hex')
+  try {
+    writeFileSync(secretPath, secret, { mode: 0o600 })
+    log(`Generated and persisted new JWT secret at ${secretPath}`)
+  } catch (err) {
+    log(`Failed to persist JWT secret (sessions will reset on restart): ${String(err)}`)
+  }
+  return secret
 }
 
 function startBackend(): void {
@@ -79,8 +122,11 @@ function startBackend(): void {
     env: {
       ...process.env,
       NODE_ENV: is.dev ? 'development' : 'production',
-      JWT_SECRET: process.env.JWT_SECRET || randomBytes(32).toString('hex'),
-      ZERO_LOGIN_MODE: 'true',
+      PORT: String(BACKEND_PORT),
+      JWT_SECRET: getPersistentJwtSecret(),
+      // NOTE: ZERO_LOGIN_MODE must NOT be set here. The desktop app uses real
+      // authentication (Google / Microsoft OAuth or a local account) via the
+      // setup wizard. In production, env.ts throws if ZERO_LOGIN_MODE=true.
       OMNECOR_DB: 'sqlite',
       ...(is.dev ? {} : { ELECTRON_RUN_AS_NODE: '1' })
     },
@@ -150,15 +196,12 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Block in-page navigation away from the app's own content. The window only
-  // ever legitimately shows the local setup wizard (file://), the dev renderer,
-  // or the local backend. Anything else is prevented (and opened externally if
-  // it's a safe scheme).
+  // Block navigation away from the app's own origin. The window only ever
+  // legitimately shows app://omnecor/ (production) or the dev renderer URL.
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const devUrl = process.env['ELECTRON_RENDERER_URL']
     const allowed =
-      url.startsWith('file://') ||
-      url.startsWith(`http://localhost:${BACKEND_PORT}`) ||
+      url.startsWith('app://omnecor/') ||
       (!!devUrl && url.startsWith(devUrl))
     if (!allowed) {
       event.preventDefault()
@@ -170,7 +213,10 @@ function createWindow(): void {
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
+    // Load the production frontend via the custom app:// protocol.
+    // This gives dynamic import() a real origin so relative chunk URLs
+    // resolve correctly without fetching from localhost.
+    mainWindow.loadURL('app://omnecor/')
   }
 }
 
@@ -280,17 +326,17 @@ app.whenReady().then(async () => {
     return info
   })
 
-  // Backend ready — swap loading screen for the live web app
-  waitForBackend(`http://localhost:${BACKEND_PORT}/health`).then((ready) => {
-    const windows = BrowserWindow.getAllWindows()
-    if (ready && windows.length > 0) {
-      windows[0].loadURL(`http://localhost:${BACKEND_PORT}`)
-    } else if (!ready) {
-      dialog.showErrorBox(
-        'Connection Timeout',
-        'Could not connect to the Omnecor backend. Please check the logs at:\n' + LOG_FILE
-      )
-    }
+  // Serve the built frontend via app://omnecor/ using net.createURLLoader.
+  // All asset requests (JS chunks, CSS, fonts, images) are handled here —
+  // nothing is fetched from localhost, so dynamic import() always resolves.
+  const publicDir = join(process.resourcesPath, 'app.asar.unpacked', 'backend', 'public')
+  protocol.handle('app', (request) => {
+    const url = new URL(request.url)
+    // Strip the host (omnecor) and leading slash, default to index.html
+    let relPath = url.pathname.replace(/^\//, '') || 'index.html'
+    // SPA fallback: paths without a file extension serve index.html
+    if (!extname(relPath)) relPath = 'index.html'
+    return net.fetch(`file://${join(publicDir, relPath)}`)
   })
 
   // --- IPC: open external URL (validated — defence in depth with preload) ---

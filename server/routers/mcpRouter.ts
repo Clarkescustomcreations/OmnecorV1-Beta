@@ -76,7 +76,7 @@ export const mcpRouter = router({
           toolName: input.toolName,
           args: input.args,
           riskLevel: "high",
-        });
+        }, "command");
         if (!approved) {
           throw new TRPCError({ code: "FORBIDDEN", message: "HITL approval denied for dangerous MCP tool." });
         }

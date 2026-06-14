@@ -72,7 +72,7 @@ export const virtualCardRouter = router({
           memo: input.memo,
           riskNote:
             "This action issues a real virtual credit card charged against the Lithic account.",
-        }),
+        }, "financial"),
         new Promise<boolean>((_, reject) =>
           setTimeout(() => reject(new Error("timeout")), 5 * 60 * 1000)
         ),

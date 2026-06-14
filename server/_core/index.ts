@@ -24,7 +24,7 @@ import rateLimit from "express-rate-limit";
 import { createServer } from "http";
 import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
-import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes, registerSocialMediaOAuthRoutes } from "./oauth";
+import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes, registerSocialMediaOAuthRoutes, registerLocalAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
@@ -43,6 +43,8 @@ import { OmnecorWebSocketServer, setWsInstance } from "../phase2/websocket/WebSo
 import { ProcessManagerService } from "../phase2/services/ProcessManagerService";
 import { SecurityService } from "../phase2/services/SecurityService";
 import { VectorDBService } from "../phase2/services/VectorDBService";
+import { startBackupScheduler } from "./backupScheduler";
+import { startPublishWorker } from "./publishWorker";
 import { meshNode } from "../ommesh/core/MeshNode.js";
 import { ValetServerService } from "../phase2/services/ValetServerService.js";
 
@@ -85,6 +87,10 @@ async function startServer() {
     const security = SecurityService.getInstance();
     await security.initialize();
     log.info("[Omnecor] SecurityService initialized");
+    // Drive the Settings → General "Automatic Backups" toggle/frequency.
+    startBackupScheduler();
+    // Publish scheduled social posts when their time arrives.
+    startPublishWorker();
   } catch (error) {
     log.warn(
       "[Omnecor] SecurityService init warning:",
@@ -188,6 +194,7 @@ async function startServer() {
 
   // ─── Storage & OAuth ────────────────────────────────────────────────────
   registerStorageProxy(app);
+  registerLocalAuthRoutes(app);
   if (!ENV.zeroLoginMode) {
     registerOAuthRoutes(app);
     registerGoogleOAuthRoutes(app);
@@ -210,6 +217,12 @@ async function startServer() {
     const origin = req.get("origin");
     if (!origin) {
       // Non-browser clients (CLI, native app, server-to-server) omit Origin.
+      next();
+      return;
+    }
+    // Electron desktop app loads the frontend via app://omnecor/ — a custom
+    // privileged scheme. Its requests are as trusted as same-origin; allow them.
+    if (origin.startsWith("app://omnecor")) {
       next();
       return;
     }

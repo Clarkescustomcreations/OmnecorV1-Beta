@@ -15,7 +15,12 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import { FictionModeProvider } from "./contexts/FictionModeContext";
 import { IS_DEMO } from "@/lib/demo";
-import "./index.css";
+import { applyFontSize, getStoredFontSize } from "@/lib/fontSize";
+import "./Globals.css";
+
+// Apply the persisted base font size before first paint so the UI doesn't
+// flash at the default size on reload.
+applyFontSize(getStoredFontSize(), false);
 
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
@@ -55,6 +60,16 @@ queryClient.getQueryCache().subscribe(event => {
 function getServerBase(): { host: string; proto: string; wsProto: string } {
   if (typeof window === "undefined") {
     return { host: "localhost:3000", proto: "http:", wsProto: "ws:" };
+  }
+  // Electron desktop app: preload exposes the embedded backend base URL via
+  // window.api.backendBase (e.g. "http://localhost:37291"). The page origin is
+  // app://omnecor/ so window.location.host is unusable for API calls.
+  const electronBase = (window as Window & { api?: { backendBase?: string } }).api?.backendBase;
+  if (electronBase) {
+    try {
+      const u = new URL(electronBase);
+      return { host: u.host, proto: u.protocol, wsProto: "ws:" };
+    } catch { /* fall through */ }
   }
   // Capacitor thin-client: server runs on desktop, not on this origin
   const capacitorHost = localStorage.getItem("omnecor_server_ip");
@@ -97,10 +112,13 @@ const trpcClient = trpc.createClient({
           false: httpBatchLink({
             url: (() => {
               const { host, proto } = getServerBase();
+              // Use absolute URL for Electron (app:// origin) and Capacitor
+              // (remote host). Fall back to relative for normal web serving.
+              const isElectron = !!(window as Window & { api?: { backendBase?: string } }).api?.backendBase;
               const capacitorHost =
                 typeof window !== "undefined" &&
                 localStorage.getItem("omnecor_server_ip");
-              if (capacitorHost && capacitorHost !== "localhost") {
+              if (isElectron || (capacitorHost && capacitorHost !== "localhost")) {
                 return `${proto}//${host}/api/trpc`;
               }
               return "/api/trpc";

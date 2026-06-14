@@ -30,7 +30,7 @@ export const pipelineRouter = router({
       const approved = await HITLApprovalService.getInstance().requestApproval("pipeline.approvePhase", {
         pipelineId: input.pipelineId,
         phase: input.phase,
-      });
+      }, "command");
       if (!approved) throw new TRPCError({ code: "FORBIDDEN", message: "HITL approval denied for pipeline phase." });
       AuditLogService.getInstance().log({
         eventType: "pipeline_phase_approve",

@@ -4,7 +4,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../../_core/trpc.js";
+import { router, protectedProcedure } from "../../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { AuditLogService } from "../services/AuditLogService.js";
 
@@ -21,7 +21,7 @@ export const agentRouter = router({
   /**
    * Run a CrewAI crew.
    */
-  runCrew: publicProcedure
+  runCrew: protectedProcedure
     .input(agentTaskSchema)
     .mutation(async ({ ctx, input }) => {
       return ctx.services.agent.runCrew(input);
@@ -30,7 +30,7 @@ export const agentRouter = router({
   /**
    * Run a LiteAgent task.
    */
-  runLiteAgent: publicProcedure
+  runLiteAgent: protectedProcedure
     .input(agentTaskSchema)
     .mutation(async ({ ctx, input }) => {
       return ctx.services.agent.runLiteAgent(input);
@@ -39,7 +39,7 @@ export const agentRouter = router({
   /**
    * Trigger an n8n webhook.
    */
-  triggerN8n: publicProcedure
+  triggerN8n: protectedProcedure
     .input(agentTaskSchema)
     .mutation(async ({ ctx, input }) => {
       return ctx.services.agent.triggerN8n(input);
@@ -67,7 +67,8 @@ export const agentRouter = router({
             goal: input.goal,
             agentCount: input.agentIds.length,
             riskLevel: "high",
-          }
+          },
+          "command",
         );
         if (!approved) {
           throw new TRPCError({

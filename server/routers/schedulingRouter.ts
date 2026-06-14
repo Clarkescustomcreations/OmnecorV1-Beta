@@ -4,6 +4,7 @@ import { getDb } from "../db.factory.js";
 import { scheduledPosts, curatedPosts, platformAccounts } from "../../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { publishScheduledPostIds } from "../phase2/services/publishExecutor.js";
 
 export const schedulingRouter = router({
   listScheduledPosts: protectedProcedure
@@ -83,7 +84,7 @@ export const schedulingRouter = router({
         platform: "direct",
         content: input.content,
         status: "approved",
-      }).$returningId();
+      }).returning({ id: curatedPosts.id });
 
       await db.insert(scheduledPosts).values({
         curatedPostId: newCuratedId,
@@ -109,16 +110,16 @@ export const schedulingRouter = router({
   publishNow: protectedProcedure
     .input(z.object({ postIds: z.array(z.number()) }))
     .mutation(async ({ input }) => {
-      const db = await getDb();
-      if (!db) return { success: false, error: "Database not available" };
-
-      await db.update(scheduledPosts)
-        .set({
-          status: "published",
-          publishedAt: new Date(),
-        })
-        .where(inArray(scheduledPosts.id, input.postIds));
-
-      return { success: true, publishedCount: input.postIds.length };
+      // Actually publish to the connected platforms (X/LinkedIn/Facebook/IG),
+      // writing real outcomes (published/failed + platformPostId/errorMessage).
+      const outcomes = await publishScheduledPostIds(input.postIds);
+      const published = outcomes.filter((o) => o.ok);
+      const failed = outcomes.filter((o) => !o.ok);
+      return {
+        success: failed.length === 0,
+        publishedCount: published.length,
+        failedCount: failed.length,
+        results: outcomes,
+      };
     }),
 });

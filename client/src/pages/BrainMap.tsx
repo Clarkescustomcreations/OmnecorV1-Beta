@@ -199,8 +199,8 @@ function NeuralMapToolbar() {
               <Slider
                 value={[nodeSize]}
                 onValueChange={([v]) => setNodeSize(v)}
-                min={5}
-                max={30}
+                min={20}
+                max={50}
                 step={1}
               />
             </div>
@@ -635,7 +635,7 @@ function BrainMapContent() {
                                 />
                               )}
                             </div>
-                            <details className="absolute bottom-2 left-2 z-10 text-xs bg-card/90 border border-border rounded p-1">
+                            <details className="absolute bottom-2 left-14 z-10 text-xs bg-card/90 border border-border rounded p-1">
                               <summary className="cursor-pointer text-muted-foreground select-none">Text view</summary>
                               <ul className="mt-1 h-40 overflow-y-auto space-y-0.5 pl-2">
                                 {displayNetwork.nodes.map(n => (

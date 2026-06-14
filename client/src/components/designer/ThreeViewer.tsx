@@ -25,12 +25,13 @@ interface SelectableMeshProps {
   geometry: THREE.BufferGeometry;
   material: THREE.MeshStandardMaterial;
   position?: [number, number, number];
+  rotation?: [number, number, number];
   name: string;
   isSelected: boolean;
   onSelect: (name: string) => void;
 }
 
-function SelectableMesh({ geometry, material, position, name, isSelected, onSelect }: SelectableMeshProps) {
+function SelectableMesh({ geometry, material, position, rotation, name, isSelected, onSelect }: SelectableMeshProps) {
   const meshRef = useRef<THREE.Mesh>(null!);
   const [hovered, setHovered] = useState(false);
 
@@ -51,6 +52,7 @@ function SelectableMesh({ geometry, material, position, name, isSelected, onSele
       geometry={geometry}
       material={baseMat}
       position={position}
+      rotation={rotation}
       name={name}
       castShadow
       receiveShadow
@@ -71,6 +73,100 @@ function SelectableMesh({ geometry, material, position, name, isSelected, onSele
   );
 }
 
+// ── Cube Faces selection helper ─────────────────────────────────────────────
+const CUBE_FACES = [
+  { name: "Cube (Front Face)", position: [0, 0, 1] as [number, number, number], rotation: [0, 0, 0] as [number, number, number] },
+  { name: "Cube (Back Face)", position: [0, 0, -1] as [number, number, number], rotation: [0, Math.PI, 0] as [number, number, number] },
+  { name: "Cube (Right Face)", position: [1, 0, 0] as [number, number, number], rotation: [0, Math.PI / 2, 0] as [number, number, number] },
+  { name: "Cube (Left Face)", position: [-1, 0, 0] as [number, number, number], rotation: [0, -Math.PI / 2, 0] as [number, number, number] },
+  { name: "Cube (Top Face)", position: [0, 1, 0] as [number, number, number], rotation: [-Math.PI / 2, 0, 0] as [number, number, number] },
+  { name: "Cube (Bottom Face)", position: [0, -1, 0] as [number, number, number], rotation: [Math.PI / 2, 0, 0] as [number, number, number] },
+];
+
+function SelectableCube({ selectedName, onSelect, material }: { selectedName: string | null; onSelect: (name: string) => void; material: THREE.MeshStandardMaterial }) {
+  const planeGeo = new THREE.PlaneGeometry(2, 2);
+  return (
+    <group position={[0, 0, 0]}>
+      {CUBE_FACES.map(face => (
+        <SelectableMesh
+          key={face.name}
+          geometry={planeGeo}
+          material={material}
+          position={face.position}
+          rotation={face.rotation}
+          name={face.name}
+          isSelected={selectedName === face.name}
+          onSelect={onSelect}
+        />
+      ))}
+    </group>
+  );
+}
+
+// ── Sphere Hemispheres selection helper ─────────────────────────────────────
+function SelectableSphere({ selectedName, onSelect, material, position }: { selectedName: string | null; onSelect: (name: string) => void; material: THREE.MeshStandardMaterial; position: [number, number, number] }) {
+  const topGeo = new THREE.SphereGeometry(0.9, 32, 16, 0, Math.PI * 2, 0, Math.PI / 2);
+  const bottomGeo = new THREE.SphereGeometry(0.9, 32, 16, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2);
+
+  return (
+    <group position={position}>
+      <SelectableMesh
+        geometry={topGeo}
+        material={material}
+        position={[0, 0, 0]}
+        name="Sphere (Upper Hemisphere)"
+        isSelected={selectedName === "Sphere (Upper Hemisphere)"}
+        onSelect={onSelect}
+      />
+      <SelectableMesh
+        geometry={bottomGeo}
+        material={material}
+        position={[0, 0, 0]}
+        name="Sphere (Lower Hemisphere)"
+        isSelected={selectedName === "Sphere (Lower Hemisphere)"}
+        onSelect={onSelect}
+      />
+    </group>
+  );
+}
+
+// ── Cylinder Caps and Wall selection helper ─────────────────────────────────
+function SelectableCylinder({ selectedName, onSelect, material, position }: { selectedName: string | null; onSelect: (name: string) => void; material: THREE.MeshStandardMaterial; position: [number, number, number] }) {
+  const circleGeo = new THREE.CircleGeometry(0.6, 32);
+  const sideGeo = new THREE.CylinderGeometry(0.6, 0.6, 2.2, 32, 1, true); // open-ended
+
+  return (
+    <group position={position}>
+      <SelectableMesh
+        geometry={circleGeo}
+        material={material}
+        position={[0, 1.1, 0]}
+        rotation={[-Math.PI / 2, 0, 0]}
+        name="Cylinder (Top Cap)"
+        isSelected={selectedName === "Cylinder (Top Cap)"}
+        onSelect={onSelect}
+      />
+      <SelectableMesh
+        geometry={sideGeo}
+        material={material}
+        position={[0, 0, 0]}
+        name="Cylinder (Side Body)"
+        isSelected={selectedName === "Cylinder (Side Body)"}
+        onSelect={onSelect}
+      />
+      <SelectableMesh
+        geometry={circleGeo}
+        material={material}
+        position={[0, -1.1, 0]}
+        rotation={[Math.PI / 2, 0, 0]}
+        name="Cylinder (Bottom Cap)"
+        isSelected={selectedName === "Cylinder (Bottom Cap)"}
+        onSelect={onSelect}
+      />
+    </group>
+  );
+}
+
 // ── Default scene — placeholder geometry ────────────────────────────────────
 
 interface DefaultSceneProps {
@@ -79,39 +175,28 @@ interface DefaultSceneProps {
 }
 
 function DefaultScene({ selectedName, onSelect }: DefaultSceneProps) {
-  const boxGeo = new THREE.BoxGeometry(2, 2, 2);
-  const sphereGeo = new THREE.SphereGeometry(0.9, 32, 32);
-  const cylGeo = new THREE.CylinderGeometry(0.6, 0.6, 2.2, 32);
-
   const redMat = new THREE.MeshStandardMaterial({ color: "#e24b6e" });
   const blueMat = new THREE.MeshStandardMaterial({ color: "#4e8ef7" });
   const greenMat = new THREE.MeshStandardMaterial({ color: "#4ecb71" });
 
   return (
     <>
-      <SelectableMesh
-        geometry={boxGeo}
-        material={redMat}
-        position={[0, 0, 0]}
-        name="Cube"
-        isSelected={selectedName === "Cube"}
+      <SelectableCube
+        selectedName={selectedName}
         onSelect={onSelect}
+        material={redMat}
       />
-      <SelectableMesh
-        geometry={sphereGeo}
+      <SelectableSphere
+        selectedName={selectedName}
+        onSelect={onSelect}
         material={blueMat}
         position={[2.5, 0, 0]}
-        name="Sphere"
-        isSelected={selectedName === "Sphere"}
-        onSelect={onSelect}
       />
-      <SelectableMesh
-        geometry={cylGeo}
+      <SelectableCylinder
+        selectedName={selectedName}
+        onSelect={onSelect}
         material={greenMat}
         position={[-2.5, 0, 0]}
-        name="Cylinder"
-        isSelected={selectedName === "Cylinder"}
-        onSelect={onSelect}
       />
     </>
   );
@@ -139,9 +224,19 @@ export default function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerPr
   const [aiQuery, setAiQuery] = useState("");
 
   const OBJECT_DESCRIPTIONS: Record<string, string> = {
-    Cube:     "A 2×2×2 unit cube mesh at the origin. Standard box primitive.",
-    Sphere:   "A sphere with radius 0.9, 32×32 segments. Placed at X+2.5.",
-    Cylinder: "A cylinder, radius 0.6, height 2.2, 32 radial segments. Placed at X-2.5.",
+    "Cube (Front Face)":      "The forward-facing flat surface of the central 2x2x2 cube, situated at Z+1.",
+    "Cube (Back Face)":       "The rear-facing flat surface of the central 2x2x2 cube, situated at Z-1.",
+    "Cube (Right Face)":      "The right-hand flat surface of the central 2x2x2 cube, situated at X+1.",
+    "Cube (Left Face)":       "The left-hand flat surface of the central 2x2x2 cube, situated at X-1.",
+    "Cube (Top Face)":        "The top flat surface of the central 2x2x2 cube, situated at Y+1.",
+    "Cube (Bottom Face)":     "The bottom flat surface of the central 2x2x2 cube, situated at Y-1.",
+    
+    "Sphere (Upper Hemisphere)": "The upper dome section of the blue sphere. Placed at X+2.5, Y > 0.",
+    "Sphere (Lower Hemisphere)": "The lower dome section of the blue sphere. Placed at X+2.5, Y < 0.",
+    
+    "Cylinder (Top Cap)":     "The circular flat top end of the green cylinder, placed at Y+1.1, X-2.5.",
+    "Cylinder (Side Body)":   "The cylindrical outer surface/wall of the green cylinder, extending between Y-1.1 and Y+1.1 at X-2.5.",
+    "Cylinder (Bottom Cap)":  "The circular flat bottom end of the green cylinder, placed at Y-1.1, X-2.5.",
   };
 
   const handleSelect = useCallback((name: string) => {
@@ -152,7 +247,8 @@ export default function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerPr
 
   const handleDeselect = useCallback(() => {
     setSelectedName(null);
-  }, []);
+    onObjectSelect?.("", "");
+  }, [onObjectSelect]);
 
   const handleSendToAI = () => {
     if (!selectedName) return;
@@ -165,6 +261,7 @@ export default function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerPr
     localStorage.setItem("omnecor:pending_ai_query", JSON.stringify(payload));
     setSelectedName(null);
     setAiQuery("");
+    onObjectSelect?.("", "");
     window.location.href = "/chat";
   };
 
@@ -247,6 +344,7 @@ export default function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerPr
                 localStorage.setItem("omnecor:pending_ai_query", JSON.stringify(payload));
                 setSelectedName(null);
                 setAiQuery("");
+                onObjectSelect?.("", "");
                 window.location.href = "/chat";
               }}
               className="flex-1 flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold rounded-lg py-1.5 transition-colors font-sans"

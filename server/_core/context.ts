@@ -136,6 +136,7 @@ export async function createContext(
       name: "Local Admin",
       email: null,
       loginMethod: "zero-login",
+      passwordHash: null,
       role: "admin",
       executionMode: dbUser?.executionMode ?? "scrapper",
       createdAt: dbUser?.createdAt ?? new Date(),

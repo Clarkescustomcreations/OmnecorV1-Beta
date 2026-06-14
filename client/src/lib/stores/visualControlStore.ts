@@ -8,7 +8,7 @@ type LockedPositions = Array<{ id: string; position: { x: number; y: number } }>
 
 interface VisualControlState {
   layout: LayoutEngine;
-  nodeSize: number;        // 5–30, default 10
+  nodeSize: number;        // 20–50, default 20
   simSpeed: number;        // 0.1–3, default 1 (controls edge animation speed)
   gpuEnabled: boolean;     // default true — disabling hides animations
   autoClustering: boolean; // default false — groups same-type nodes spatially
@@ -34,7 +34,7 @@ export const useVisualControlStore = create<VisualControlState>()(
   persist(
     (set, get) => ({
       layout: "force",
-      nodeSize: 10,
+      nodeSize: 20,
       simSpeed: 1,
       gpuEnabled: true,
       autoClustering: false,
@@ -43,7 +43,7 @@ export const useVisualControlStore = create<VisualControlState>()(
       lockedLayouts: {},
 
       setLayout: (layout) => set({ layout }),
-      setNodeSize: (nodeSize) => set({ nodeSize }),
+      setNodeSize: (nodeSize) => set({ nodeSize: Math.max(20, Math.min(50, nodeSize)) }),
       setSimSpeed: (simSpeed) => set({ simSpeed }),
       setGpuEnabled: (gpuEnabled) => set({ gpuEnabled }),
       setAutoClustering: (autoClustering) => set({ autoClustering }),

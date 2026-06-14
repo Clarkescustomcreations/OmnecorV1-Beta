@@ -15,6 +15,7 @@ import {
   saveOAuthState,
   getOAuthState,
   deleteOAuthState,
+  setSocialOAuthStateCookie,
   OAUTH_STATE_TTL,
 } from "../_core/oauth.js";
 
@@ -60,6 +61,10 @@ export const oauthRouter = router({
           userId: ctx.user.id,
           codeVerifier,
         });
+
+        // Plant the double-submit CSRF cookie so the Express callback can verify
+        // the completing browser is the one that started this flow.
+        setSocialOAuthStateCookie(ctx.req, ctx.res, state);
 
         const authUrl = await getOAuthAuthorizationUrl(
           input.platform,

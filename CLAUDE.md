@@ -53,12 +53,13 @@ All tRPC routers are composed in `server/routers.ts` into a single `appRouter`. 
 
 ### Database
 
-`server/db.factory.ts` selects the backend at startup via `OMNECOR_DB` env var:
-- `auto` (default): MySQL when `DATABASE_URL` is set, else local SQLite
-- `sqlite`: always use `data/omnecor.db` (zero-infra, Sovereign mode)
-- `mysql`: requires `DATABASE_URL`
+**Single unified engine: libSQL / SQLite** (Drizzle ORM). One schema, one dialect, works in every mode:
+- **Local (default):** an embedded file database (`~/.omnecor/data/omnecor.db`) — zero-infra, air-gappable Sovereign mode. No external DB required.
+- **Networked / multi-node:** set `LIBSQL_URL` (or `TURSO_DATABASE_URL`) + `LIBSQL_AUTH_TOKEN` to use a libsql/Turso endpoint or embedded replicas.
 
-**MySQL schema** lives in `drizzle/schema.ts`. **SQLite schema** is defined inline in `server/db.sqlite.ts` — it must mirror the MySQL schema for shared callers. Always call through `db.factory.ts` exports, not `db.ts` or `db.sqlite.ts` directly.
+The **single schema** lives in `drizzle/schema.ts` (`sqlite-core`). `server/db.ts` owns the connection: `getDb()` **always returns a live drizzle instance** (never null) and applies generated migrations (`drizzle/migrations/`) on first connect. `server/db.factory.ts` re-exports `db.ts` and is the canonical import path. Use `getDb()` freely in routers — there is no MySQL-only tier anymore.
+
+Use Drizzle's query builder (not raw SQL) and `$inferSelect`/`$inferInsert` for types. After changing the schema, run `pnpm build:push` (drizzle-kit generate + migrate) to produce a new migration. SQLite caveats: enums are `text({ enum: [...] })`, timestamps are `integer({ mode: "timestamp" })` (→ `Date`), JSON is `text({ mode: "json" })`; upserts use `.onConflictDoUpdate({ target, set })` and inserts return ids via `.returning({ id })`.
 
 ### Frontend
 
@@ -110,8 +111,9 @@ Copy `.env.example` to `.env`. Critical ones for local dev:
 | Variable | Purpose |
 |---|---|
 | `JWT_SECRET` | Session cookie signing (required in production) |
-| `OMNECOR_DB` | `auto` / `sqlite` / `mysql` |
-| `DATABASE_URL` | MySQL connection string (omit to use SQLite) |
+| `LIBSQL_URL` | libsql/Turso endpoint for networked mode (omit for local embedded SQLite) |
+| `LIBSQL_AUTH_TOKEN` | Auth token for the libsql/Turso endpoint |
+| `SQLITE_PATH` | Override the local embedded DB file path |
 | `ZERO_LOGIN_MODE=true` | Skip auth — all requests become local admin. **Never expose to network.** |
 | `OLLAMA_URL` | Local Ollama instance (default: `http://localhost:11434`) |
 | `ANTHROPIC_API_KEY` | Claude API access |

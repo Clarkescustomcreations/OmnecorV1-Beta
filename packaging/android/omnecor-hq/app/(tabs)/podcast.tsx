@@ -1,9 +1,18 @@
-import { ScrollView, Text, View, TextInput, Pressable, Alert } from "react-native";
+import { ScrollView, Text, View, TextInput, Alert } from "react-native";
+import { Pressable } from "@/components/pressable";
 import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { trpcMutate } from "@/lib/_core/trpc-fetch";
 import { isServerConfigured } from "@/lib/_core/server-config";
+import { askAi } from "@/lib/_core/ai-chat";
+
+const LENGTH_OPTIONS: { value: string; label: string; desc: string; turnCount: number }[] = [
+  { value: "short",     label: "Short",     desc: "~5 min · 4–6 turns",   turnCount: 6  },
+  { value: "medium",    label: "Medium",    desc: "~15 min · 10–14 turns", turnCount: 12 },
+  { value: "long",      label: "Long",      desc: "~30 min · 20–26 turns", turnCount: 24 },
+  { value: "deep-dive", label: "Deep Dive", desc: "~60 min · 40+ turns",   turnCount: 40 },
+];
 
 export default function PodcastScreen() {
   const colors = useColors();
@@ -11,16 +20,14 @@ export default function PodcastScreen() {
   const [description, setDescription] = useState("");
   const [script, setScript] = useState("");
   const [selectedVoice, setSelectedVoice] = useState("Default");
-  const [duration, setDuration] = useState("10");
-  const [quality, setQuality] = useState("High");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [audioPath, setAudioPath] = useState<string | null>(null);
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
-  const [showQualitySelector, setShowQualitySelector] = useState(false);
+  const [podcastLength, setPodcastLength] = useState("medium");
+  const [isScripting, setIsScripting] = useState(false);
 
   const voices = ["Default", "Male", "Female", "Narrator", "Casual"];
-  const qualities = ["Low", "Medium", "High", "Ultra"];
 
   const handleGenerate = async () => {
     if (!title.trim() || !script.trim()) {
@@ -52,6 +59,11 @@ export default function PodcastScreen() {
               text,
             }));
 
+      // Use the description as a real spoken intro turn so the field isn't dead.
+      if (description.trim()) {
+        turns.unshift({ speakerId: "host", text: description.trim() });
+      }
+
       // Map selectedVoice to useRVC
       const useRVC = selectedVoice === "Female";
 
@@ -68,6 +80,30 @@ export default function PodcastScreen() {
     } catch (err) {
       setIsGenerating(false);
       Alert.alert("Error", err instanceof Error ? err.message : "Podcast generation failed");
+    }
+  };
+
+  const handleGenerateScript = async () => {
+    if (!title.trim()) {
+      Alert.alert("Topic needed", "Enter a podcast title first");
+      return;
+    }
+    if (!isServerConfigured()) {
+      Alert.alert("No server configured", "Go to Settings and enter your PC's IP address.");
+      return;
+    }
+    const turnCount = LENGTH_OPTIONS.find((l) => l.value === podcastLength)!.turnCount;
+    setIsScripting(true);
+    try {
+      const text = await askAi({
+        prompt: `Generate a ${turnCount}-turn podcast script between two hosts named Host and Guest about: "${title.trim()}".${description.trim() ? " Context: " + description.trim() + "." : ""} Put each turn on its own line, alternating Host: and Guest:, no extra commentary.`,
+        systemPrompt: "You are a podcast scriptwriter. Output only the dialogue lines.",
+      });
+      setScript(text);
+    } catch (err) {
+      Alert.alert("Script generation failed", String(err));
+    } finally {
+      setIsScripting(false);
     }
   };
 
@@ -108,6 +144,46 @@ export default function PodcastScreen() {
             />
           </View>
 
+          {/* Episode Length */}
+          <View>
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              Episode Length
+            </Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+              <View className="flex-row gap-2">
+                {LENGTH_OPTIONS.map((opt) => {
+                  const selected = podcastLength === opt.value;
+                  return (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => setPodcastLength(opt.value)}
+                      className={`rounded-lg px-3 py-2 border ${
+                        selected
+                          ? "bg-primary border-primary"
+                          : "bg-surface border-border"
+                      }`}
+                    >
+                      <Text
+                        className={`text-xs font-semibold ${
+                          selected ? "text-background" : "text-foreground"
+                        }`}
+                      >
+                        {opt.label}
+                      </Text>
+                      <Text
+                        className={`text-xs mt-0.5 ${
+                          selected ? "text-background" : "text-muted"
+                        }`}
+                      >
+                        {opt.desc}
+                      </Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+            </ScrollView>
+          </View>
+
           {/* Script/Content */}
           <View>
             <Text className="text-sm font-semibold text-foreground mb-2">
@@ -121,6 +197,24 @@ export default function PodcastScreen() {
               className="bg-surface border border-border rounded-lg px-3 py-2 text-foreground min-h-32"
               multiline
             />
+            {/* AI Script Generator */}
+            <Pressable
+              onPress={handleGenerateScript}
+              disabled={isScripting}
+              className={`rounded-lg p-3 items-center mt-2 ${
+                isScripting
+                  ? "bg-muted opacity-50"
+                  : "bg-surface border border-primary active:opacity-80"
+              }`}
+            >
+              <Text
+                className={`text-sm font-semibold ${
+                  isScripting ? "text-muted" : "text-primary"
+                }`}
+              >
+                {isScripting ? "Generating…" : "✨ Generate Script (AI)"}
+              </Text>
+            </Pressable>
           </View>
 
           {/* Voice Selection */}
@@ -161,62 +255,6 @@ export default function PodcastScreen() {
                 ))}
               </View>
             )}
-          </View>
-
-          {/* Duration and Quality */}
-          <View className="flex-row gap-3">
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Duration (min)
-              </Text>
-              <TextInput
-                value={duration}
-                onChangeText={setDuration}
-                placeholder="10"
-                placeholderTextColor={colors.muted}
-                keyboardType="number-pad"
-                className="bg-surface border border-border rounded-lg px-3 py-2 text-foreground"
-              />
-            </View>
-
-            <View className="flex-1">
-              <Text className="text-sm font-semibold text-foreground mb-2">
-                Quality
-              </Text>
-              <Pressable
-                onPress={() => setShowQualitySelector(!showQualitySelector)}
-                className="bg-surface border border-border rounded-lg p-3"
-              >
-                <Text className="text-foreground text-center">{quality}</Text>
-              </Pressable>
-
-              {showQualitySelector && (
-                <View className="bg-background border border-border rounded-lg mt-2 overflow-hidden">
-                  {qualities.map((q) => (
-                    <Pressable
-                      key={q}
-                      onPress={() => {
-                        setQuality(q);
-                        setShowQualitySelector(false);
-                      }}
-                      className={`p-3 border-b border-border ${
-                        quality === q ? "bg-primary/10" : ""
-                      }`}
-                    >
-                      <Text
-                        className={`text-sm text-center ${
-                          quality === q
-                            ? "text-primary font-semibold"
-                            : "text-foreground"
-                        }`}
-                      >
-                        {q}
-                      </Text>
-                    </Pressable>
-                  ))}
-                </View>
-              )}
-            </View>
           </View>
 
           {/* Generation Status */}

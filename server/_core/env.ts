@@ -9,13 +9,9 @@ export const ENV = {
     const raw = Number(process.env.SESSION_TTL_MS);
     return Number.isFinite(raw) && raw > 0 ? raw : undefined;
   })(),
-  databaseUrl: process.env.DATABASE_URL ?? "",
-  // Database backend selection. "auto" (default) uses MySQL when DATABASE_URL is
-  // set, otherwise falls back to the local SQLite store (Sovereign / offline
-  // mode). "mysql" / "sqlite" force a specific backend.
-  dbMode: (["auto", "mysql", "sqlite"].includes(process.env.OMNECOR_DB ?? "")
-    ? process.env.OMNECOR_DB
-    : "auto") as "auto" | "mysql" | "sqlite",
+  // Unified libSQL/SQLite engine. Local embedded file by default (zero-infra
+  // Sovereign mode); set LIBSQL_URL/TURSO_DATABASE_URL for networked/multi-node.
+  libsqlUrl: process.env.LIBSQL_URL ?? process.env.TURSO_DATABASE_URL ?? "",
   oAuthServerUrl: process.env.OAUTH_SERVER_URL ?? "",
   ownerOpenId: process.env.OWNER_OPEN_ID ?? "",
   isProduction: process.env.NODE_ENV === "production",
@@ -77,17 +73,11 @@ if (process.env.NODE_ENV === "production") {
       "FATAL: JWT_SECRET must be set in production. An empty secret allows session cookie forgery."
     );
   }
-  // Only fail hard when MySQL is explicitly requested but unconfigured. In
-  // "auto" or "sqlite" mode a missing DATABASE_URL is a supported, persistent
-  // configuration: the app uses the local SQLite store (see db.factory.ts).
-  if (ENV.dbMode === "mysql" && !ENV.databaseUrl) {
-    throw new Error(
-      "FATAL: OMNECOR_DB=mysql but DATABASE_URL is not set. Provide a MySQL connection string or use OMNECOR_DB=sqlite."
-    );
-  }
-  if (!ENV.databaseUrl) {
+  // Unified libSQL/SQLite: no fail-fast needed. Without LIBSQL_URL the app uses
+  // a local embedded file database (Sovereign mode) — a fully supported default.
+  if (!ENV.libsqlUrl) {
     console.warn(
-      "[Database] DATABASE_URL not set — using local SQLite store (Sovereign mode)."
+      "[Database] LIBSQL_URL not set — using local embedded SQLite store (Sovereign mode)."
     );
   }
 }

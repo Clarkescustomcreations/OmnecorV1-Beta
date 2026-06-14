@@ -4,17 +4,21 @@
  *  • Alerts: live feed of everything the PC surfaces that you'd wait on —
  *    new chat replies, task completion, HITL approvals, agentic-wallet budget
  *    alerts, and Agent Messenger messages (pushed on the "notifications" WS
- *    channel, hydrated from `notifications.list`).
+ *    channel, hydrated from `notifications.list`). Pending HITL approvals are
+ *    pinned to the top of this feed with inline Approve/Reject (live on the
+ *    "hitl:pending" WS channel) so you can clear them without leaving the tab.
  *  • Messenger: WhatsApp/Discord-style threads with agents/personas, separate
  *    from regular chats. Message always-on agents to plan, assist, start/check
  *    Omnecor tasks, or retrieve neural-map data.
  */
-import { Text, View, Pressable, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { Text, View, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingView, Platform } from "react-native";
+import { Pressable } from "@/components/pressable";
 import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { isServerConfigured } from "@/lib/_core/server-config";
 import { useNotifications, type OmnecorNotification, type NotificationKind } from "@/hooks/use-notifications";
 import { useAgentConversations, useAgentThread, type AgentConversation } from "@/hooks/use-agent-messenger";
+import { useHitl, type CriticalAction } from "@/hooks/use-hitl";
 
 type NotifTab = "alerts" | "messenger";
 
@@ -41,6 +45,92 @@ function timeAgo(iso: string): string {
   if (s < 3600) return `${Math.floor(s / 60)}m ago`;
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
   return `${Math.floor(s / 86400)}d ago`;
+}
+
+// ── HITL approvals (pinned to top of Alerts) ──────────────────────────────────
+
+function summarizeHitlArgs(args: any): string {
+  if (args == null) return "";
+  if (typeof args === "string") return args;
+  if (typeof args.warning === "string") return args.warning;
+  if (typeof args.reason === "string") return args.reason;
+  try {
+    return JSON.stringify(args, null, 2);
+  } catch {
+    return String(args);
+  }
+}
+
+function hitlRisk(args: any): string | null {
+  return args && typeof args.riskLevel === "string" ? args.riskLevel : null;
+}
+
+function HitlQueue() {
+  const { actions, resolve } = useHitl();
+  const [expandedId, setExpandedId] = useState<string | null>(null);
+
+  if (actions.length === 0) return null;
+
+  return (
+    <View className="border-b-4 border-warning/40">
+      <View className="flex-row items-center gap-2 px-4 pt-3 pb-2 bg-warning/10">
+        <Text className="text-base">⚠️</Text>
+        <Text className="text-sm font-bold text-warning flex-1">Awaiting your approval</Text>
+        <View className="bg-warning rounded-full px-2 py-0.5">
+          <Text className="text-background text-xs font-bold">{actions.length}</Text>
+        </View>
+      </View>
+
+      {actions.map((item: CriticalAction) => {
+        const risk = hitlRisk(item.args);
+        const expanded = expandedId === item.id;
+        return (
+          <Pressable
+            key={item.id}
+            onPress={() => setExpandedId(expanded ? null : item.id)}
+            className="border-b border-border p-4 bg-warning/5"
+          >
+            <View className="flex-row items-center gap-2">
+              <Text className="text-sm font-semibold text-foreground flex-1" numberOfLines={1}>
+                {item.toolName}
+              </Text>
+              {risk && (
+                <View className={`rounded-full px-2 py-0.5 ${risk === "high" ? "bg-error/15" : "bg-warning/15"}`}>
+                  <Text className={`text-[10px] font-semibold ${risk === "high" ? "text-error" : "text-warning"}`}>
+                    {risk} risk
+                  </Text>
+                </View>
+              )}
+            </View>
+
+            <Text className="text-xs text-muted mt-1" numberOfLines={expanded ? undefined : 2}>
+              {summarizeHitlArgs(item.args)}
+            </Text>
+            <Text className="text-[10px] text-muted mt-1">
+              {new Date(item.timestamp).toLocaleString()}
+            </Text>
+
+            {expanded && (
+              <View className="mt-4 pt-4 border-t border-border flex-row gap-2">
+                <Pressable
+                  onPress={() => resolve(item.id, true)}
+                  className="flex-1 bg-success rounded-lg p-3 items-center active:opacity-80"
+                >
+                  <Text className="text-background font-semibold text-sm">✓ Approve</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => resolve(item.id, false)}
+                  className="flex-1 bg-error rounded-lg p-3 items-center active:opacity-80"
+                >
+                  <Text className="text-background font-semibold text-sm">✕ Reject</Text>
+                </Pressable>
+              </View>
+            )}
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 // ── Alerts ───────────────────────────────────────────────────────────────────
@@ -98,6 +188,7 @@ function AlertsView() {
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
         contentContainerStyle={{ flexGrow: 1 }}
+        ListHeaderComponent={<HitlQueue />}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center py-16 px-6">
             <Text className="text-muted text-center">

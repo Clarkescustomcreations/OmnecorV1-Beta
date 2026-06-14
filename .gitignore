@@ -8,6 +8,11 @@
 # Build outputs
 dist/
 build/
+
+# Android/iOS build artifacts (exceed GitHub's 100MB limit)
+*.apk
+*.aab
+*.ipa
 *.dist
 
 # Demo build artifact — intermediate only; the served copy lives in docs/demo/
@@ -154,3 +159,14 @@ OmnecorV1-Beta-main.zip
 # Local Ollama Modelfile — references absolute machine path, not portable
 modelfile.txt
 ui_audit_report.md
+
+# Context folder — consolidated working docs (Architecture, Build-Plan, Progress-Tracker,
+# Project-Overview, UI-Registry/Rules/Tokens, Code-Standards, Library-Docs). Local-only.
+Context/
+
+# Agent / session working files — local-only, not part of the shipped repo
+CHANGELOG.md
+CLAUDE.md
+AGENTS.md
+memory.md
+.claude/

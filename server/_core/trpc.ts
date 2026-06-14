@@ -69,8 +69,20 @@ const auditMiddleware = t.middleware(async (opts) => {
 export const protectedProcedure = t.procedure.use(requireUser).use(auditMiddleware);
 
 const sovereignCheck = t.middleware(async (opts) => {
-  const { ctx, meta, next } = opts;
+  const { ctx, meta, next, path } = opts;
   if (ctx.user?.executionMode === "sovereign" && meta?.cloud === true) {
+    AuditLogService.getInstance().log({
+      eventType: "sovereign_block",
+      actorId: ctx.user.id,
+      actorType: "user",
+      procedure: path,
+      args: null,
+      result: { blocked: true, reason: "sovereign_mode" },
+      ipAddress: ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? null,
+      sessionId: null,
+    }).catch((err: unknown) => {
+      log.error(`Failed to persist sovereign-block audit log for procedure "${path}"`, err);
+    });
     throw new TRPCError({ code: "FORBIDDEN", message: "Sovereign mode: cloud calls are disabled." });
   }
   return next();

@@ -38,15 +38,10 @@ export default function TabLayout() {
         options={{ title: "Chat",
           tabBarIcon: ({ color }) => <IconSymbol size={24} name="message.fill" color={color} /> }} />
 
-      {/* HITL — Bell (notifications-active) in main GUI */}
-      <Tabs.Screen name="hitl"
-        options={{ title: "HITL",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell.badge.fill" color={color} /> }} />
-
-      {/* Notifications — unified alert feed + Agent Messenger */}
+      {/* Alerts — unified alert feed (incl. pinned HITL approvals) + Agent Messenger */}
       <Tabs.Screen name="notifications"
         options={{ title: "Alerts",
-          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell.fill" color={color} /> }} />
+          tabBarIcon: ({ color }) => <IconSymbol size={24} name="bell.badge.fill" color={color} /> }} />
 
       {/* Phone AI Node — cpu/memory */}
       <Tabs.Screen name="ai-node"

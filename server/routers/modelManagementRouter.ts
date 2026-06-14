@@ -10,6 +10,7 @@ import { router, protectedProcedure } from "../_core/trpc.js";
 import { ModelManagementService } from "../phase2/services/ModelManagementService.js";
 import { TRPCError } from "@trpc/server";
 import { createLogger } from "../_core/logger.js";
+import { validatePath } from "../_core/security.js";
 
 const log = createLogger("modelManagement");
 
@@ -85,13 +86,18 @@ export const modelManagementRouter = router({
     )
     .mutation(async ({ input }) => {
       try {
+        // A model weight path must resolve inside an allowed directory before it
+        // is persisted to the registry (and later loaded by the inference bridge).
+        const filePath = input.filePath
+          ? await validatePath(input.filePath)
+          : undefined;
         const registered = await ModelManagementService.getInstance().registerModel({
           id: input.id,
           name: input.name,
           provider: input.provider,
           version: input.version,
           quantization: input.quantization,
-          filePath: input.filePath,
+          filePath,
           sizeGb: input.sizeGb,
           isActive: input.isActive,
           metadata: input.metadata,

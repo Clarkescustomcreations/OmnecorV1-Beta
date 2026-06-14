@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useEffect, useCallback, useRef, useState } from "react";
-import { GripVertical, FolderOpen, FolderClosed, ExternalLink, Link2, FileCode } from "lucide-react";
+import { GripVertical, FolderOpen, FolderClosed, ExternalLink, Link2, FileCode, RotateCw } from "lucide-react";
 import { useNeuralContextStore, makeEntry, NEURAL_DRAG_KEY, type NeuralContextEntry } from "@/lib/neuralContextStore";
 import ReactFlow, {
   Node,
@@ -14,6 +14,7 @@ import ReactFlow, {
   NodeProps,
   ReactFlowProvider,
   useReactFlow,
+  ControlButton,
 } from "reactflow";
 import "reactflow/dist/style.css";
 import { NeuralNetwork } from "@/lib/neuralNodeTree";
@@ -37,10 +38,10 @@ import { toast } from "sonner";
 const NODE_W = 180;
 const NODE_H = 60;
 
-function applyHierarchicalLayout(nodes: Node[], edges: Edge[]): Node[] {
+function applyHierarchicalLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
   if (!nodes.length) return nodes;
-  const H_GAP = 40;
-  const V_GAP = 90;
+  const H_GAP = autoClustering ? 120 : 500;
+  const V_GAP = autoClustering ? 180 : 600;
 
   const children = new Map<string, string[]>();
   const inDegree = new Map<string, number>();
@@ -82,10 +83,10 @@ function applyHierarchicalLayout(nodes: Node[], edges: Edge[]): Node[] {
   return nodes.map(n => ({ ...n, position: posMap.get(n.id) ?? n.position }));
 }
 
-function applyCircularLayout(nodes: Node[]): Node[] {
+function applyCircularLayout(nodes: Node[], autoClustering: boolean): Node[] {
   if (!nodes.length) return nodes;
-  // Use a tighter radius so fitView shows everything in the viewport
-  const R = Math.max(160, nodes.length * 18);
+  const factor = autoClustering ? 80 : 250;
+  const R = Math.max(autoClustering ? 300 : 800, nodes.length * factor);
   return nodes.map((n, i) => ({
     ...n,
     position: {
@@ -95,9 +96,9 @@ function applyCircularLayout(nodes: Node[]): Node[] {
   }));
 }
 
-function applyMindMapLayout(nodes: Node[], edges: Edge[]): Node[] {
+function applyMindMapLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
   if (!nodes.length) return nodes;
-  const STEP = 200;
+  const STEP = autoClustering ? 380 : 900;
 
   const degree = new Map<string, number>();
   nodes.forEach(n => degree.set(n.id, 0));
@@ -150,29 +151,243 @@ function applyMindMapLayout(nodes: Node[], edges: Edge[]): Node[] {
   return nodes.map(n => ({ ...n, position: posMap.get(n.id) ?? n.position }));
 }
 
-function applyClusteredForce(nodes: Node[]): Node[] {
-  const typeOrder: Record<string, number> = { project: 0, folder: 1, file: 2, integration: 3 };
-  const sorted = [...nodes].sort((a, b) => {
-    const ao = typeOrder[a.data?.type as string] ?? 4;
-    const bo = typeOrder[b.data?.type as string] ?? 4;
-    return ao - bo;
+function applyForceLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
+  if (!nodes.length) return nodes;
+
+  const layoutNodes = nodes.map(n => ({
+    id: n.id,
+    x: typeof n.position.x === "number" ? n.position.x : (Math.random() * 100 - 50),
+    y: typeof n.position.y === "number" ? n.position.y : (Math.random() * 100 - 50),
+    type: n.data?.type || "file",
+  }));
+
+  const nodeMap = new Map(layoutNodes.map(n => [n.id, n]));
+
+  const idealLength = autoClustering ? 220 : 700;
+  const repelForce = autoClustering ? 350000 : 2500000;
+  const springCoeff = 0.04;
+  const gravity = 0.05;
+  const iterations = 80;
+
+  // Read sizes for collision resolution within simulation
+  const nodeSize = useVisualControlStore.getState().nodeSize ?? 10;
+  const scale = nodeSize / 10;
+  const nodeWidth = NODE_W * scale;
+  const nodeHeight = NODE_H * scale;
+  const S_x = autoClustering ? (nodeWidth + 24 * scale) : (nodeWidth * 2.8);
+  const S_y = autoClustering ? (nodeHeight + 36 * scale) : (nodeHeight * 3.5);
+
+  for (let iter = 0; iter < iterations; iter++) {
+    const fx = new Map<string, number>();
+    const fy = new Map<string, number>();
+    layoutNodes.forEach(n => { fx.set(n.id, 0); fy.set(n.id, 0); });
+
+    for (let i = 0; i < layoutNodes.length; i++) {
+      const n1 = layoutNodes[i];
+      for (let j = i + 1; j < layoutNodes.length; j++) {
+        const n2 = layoutNodes[j];
+        let dx = n1.x - n2.x;
+        let dy = n1.y - n2.y;
+        if (dx === 0 && dy === 0) { dx = Math.random() * 2 - 1; dy = Math.random() * 2 - 1; }
+        const distSq = dx * dx + dy * dy;
+        const dist = Math.sqrt(distSq);
+        const force = repelForce / (distSq + 100);
+        
+        const fx1 = fx.get(n1.id)! + (dx / (dist + 0.1)) * force;
+        const fy1 = fy.get(n1.id)! + (dy / (dist + 0.1)) * force;
+        const fx2 = fx.get(n2.id)! - (dx / (dist + 0.1)) * force;
+        const fy2 = fy.get(n2.id)! - (dy / (dist + 0.1)) * force;
+
+        fx.set(n1.id, fx1);
+        fy.set(n1.id, fy1);
+        fx.set(n2.id, fx2);
+        fy.set(n2.id, fy2);
+      }
+    }
+
+    edges.forEach(e => {
+      const n1 = nodeMap.get(e.source);
+      const n2 = nodeMap.get(e.target);
+      if (!n1 || !n2) return;
+
+      const dx = n1.x - n2.x;
+      const dy = n1.y - n2.y;
+      const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
+      const force = springCoeff * (dist - idealLength);
+
+      const fx1 = fx.get(n1.id)! - (dx / dist) * force;
+      const fy1 = fy.get(n1.id)! - (dy / dist) * force;
+      const fx2 = fx.get(n2.id)! + (dx / dist) * force;
+      const fy2 = fy.get(n2.id)! + (dy / dist) * force;
+
+      fx.set(n1.id, fx1);
+      fy.set(n1.id, fy1);
+      fx.set(n2.id, fx2);
+      fy.set(n2.id, fy2);
+    });
+
+    layoutNodes.forEach(n => {
+      let targetX = 0;
+      let targetY = 0;
+
+      if (autoClustering) {
+        if (n.type === "project") { targetX = -300; targetY = -300; }
+        else if (n.type === "folder") { targetX = 300; targetY = -300; }
+        else if (n.type === "file") { targetX = -300; targetY = 300; }
+        else { targetX = 300; targetY = 300; }
+      }
+
+      const dx = n.x - targetX;
+      const dy = n.y - targetY;
+      
+      const fxVal = fx.get(n.id)! - dx * gravity;
+      const fyVal = fy.get(n.id)! - dy * gravity;
+      
+      fx.set(n.id, fxVal);
+      fy.set(n.id, fyVal);
+    });
+
+    const temp = Math.max(1, 20 * (1 - iter / iterations));
+    layoutNodes.forEach(n => {
+      let dx = fx.get(n.id)!;
+      let dy = fy.get(n.id)!;
+      const forceDist = Math.sqrt(dx * dx + dy * dy);
+      if (forceDist > temp) {
+        dx = (dx / forceDist) * temp;
+        dy = (dy / forceDist) * temp;
+      }
+      n.x += dx;
+      n.y += dy;
+    });
+
+    // Enforce node separation pass during simulation iterations to guide convergence
+    for (let cIter = 0; cIter < 3; cIter++) {
+      for (let i = 0; i < layoutNodes.length; i++) {
+        const n1 = layoutNodes[i];
+        for (let j = i + 1; j < layoutNodes.length; j++) {
+          const n2 = layoutNodes[j];
+          let dx = n2.x - n1.x;
+          let dy = n2.y - n1.y;
+          if (dx === 0 && dy === 0) {
+            dx = Math.random() * 2 - 1;
+            dy = Math.random() * 2 - 1;
+          }
+          const absDx = Math.abs(dx);
+          const absDy = Math.abs(dy);
+          if (absDx < S_x && absDy < S_y) {
+            const overlapX = S_x - absDx;
+            const overlapY = S_y - absDy;
+            if (overlapX < overlapY) {
+              const pushX = (overlapX / 2) * 1.02;
+              const sign = dx >= 0 ? 1 : -1;
+              n1.x -= sign * pushX;
+              n2.x += sign * pushX;
+            } else {
+              const pushY = (overlapY / 2) * 1.02;
+              const sign = dy >= 0 ? 1 : -1;
+              n1.y -= sign * pushY;
+              n2.y += sign * pushY;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  return nodes.map(n => {
+    const layoutNode = nodeMap.get(n.id);
+    return {
+      ...n,
+      position: layoutNode ? { x: Math.round(layoutNode.x), y: Math.round(layoutNode.y) } : n.position,
+    };
   });
-  const COLS = Math.ceil(Math.sqrt(sorted.length));
-  return sorted.map((n, i) => ({
+}
+
+function resolveOverlaps(nodes: Node[], autoClustering: boolean): Node[] {
+  if (!nodes.length) return nodes;
+
+  const nodeSize = useVisualControlStore.getState().nodeSize ?? 10;
+  const scale = nodeSize / 10;
+
+  const nodeWidth = NODE_W * scale;
+  const nodeHeight = NODE_H * scale;
+
+  // When autoClustering is ON, keep them compact but never overlap.
+  // When autoClustering is OFF, spread them widely.
+  const S_x = autoClustering ? (nodeWidth + 24 * scale) : (nodeWidth * 2.8);
+  const S_y = autoClustering ? (nodeHeight + 36 * scale) : (nodeHeight * 3.5);
+
+  const layoutNodes = nodes.map(n => ({
+    id: n.id,
+    x: n.position.x,
+    y: n.position.y,
+  }));
+
+  const iterations = 80;
+  for (let iter = 0; iter < iterations; iter++) {
+    let hasOverlap = false;
+
+    for (let i = 0; i < layoutNodes.length; i++) {
+      const n1 = layoutNodes[i];
+      for (let j = i + 1; j < layoutNodes.length; j++) {
+        const n2 = layoutNodes[j];
+        
+        let dx = n2.x - n1.x;
+        let dy = n2.y - n1.y;
+
+        if (dx === 0 && dy === 0) {
+          dx = Math.random() * 2 - 1;
+          dy = Math.random() * 2 - 1;
+        }
+
+        const absDx = Math.abs(dx);
+        const absDy = Math.abs(dy);
+
+        if (absDx < S_x && absDy < S_y) {
+          hasOverlap = true;
+
+          const overlapX = S_x - absDx;
+          const overlapY = S_y - absDy;
+
+          if (overlapX < overlapY) {
+            const pushX = (overlapX / 2) * 1.05;
+            const sign = dx >= 0 ? 1 : -1;
+            n1.x -= sign * pushX;
+            n2.x += sign * pushX;
+          } else {
+            const pushY = (overlapY / 2) * 1.05;
+            const sign = dy >= 0 ? 1 : -1;
+            n1.y -= sign * pushY;
+            n2.y += sign * pushY;
+          }
+        }
+      }
+    }
+
+    if (!hasOverlap) {
+      break;
+    }
+  }
+
+  const posMap = new Map(layoutNodes.map(n => [n.id, { x: Math.round(n.x), y: Math.round(n.y) }]));
+  return nodes.map(n => ({
     ...n,
-    position: {
-      x: (i % COLS) * (NODE_W + 60) - (COLS * (NODE_W + 60)) / 2,
-      y: Math.floor(i / COLS) * (NODE_H + 60),
-    },
+    position: posMap.get(n.id) ?? n.position,
   }));
 }
 
 function computeLayout(layout: LayoutEngine, autoClustering: boolean, nodes: Node[], edges: Edge[]): Node[] {
-  if (layout === "hierarchical") return applyHierarchicalLayout(nodes, edges);
-  if (layout === "circular") return applyCircularLayout(nodes);
-  if (layout === "mindmap") return applyMindMapLayout(nodes, edges);
-  if (autoClustering) return applyClusteredForce(nodes);
-  return nodes;
+  let laidNodes: Node[];
+  if (layout === "hierarchical") {
+    laidNodes = applyHierarchicalLayout(nodes, edges, autoClustering);
+  } else if (layout === "circular") {
+    laidNodes = applyCircularLayout(nodes, autoClustering);
+  } else if (layout === "mindmap") {
+    laidNodes = applyMindMapLayout(nodes, edges, autoClustering);
+  } else {
+    laidNodes = applyForceLayout(nodes, edges, autoClustering);
+  }
+  return resolveOverlaps(laidNodes, autoClustering);
 }
 
 // ---------------------------------------------------------------------------
@@ -419,6 +634,7 @@ function BrainMapViewportInner({
 }: Partial<NeuralGraphViewProps>) {
   const { nodes, edges, onNodesChange, onEdgesChange, onConnect, projectId, collapsedFolderIds, toggleFolderCollapse } = useBrainMapStore();
   const setStoreNodes = useBrainMapStore(s => s.setNodes);
+  const { has } = useNeuralContextStore();
 
   const {
     layout, gpuEnabled, simSpeed, autoClustering, showMiniMap,
@@ -482,10 +698,49 @@ function BrainMapViewportInner({
     [nodes, hiddenNodeIds]
   );
 
-  const visibleEdges = useMemo(
-    () => edges.filter(e => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target)),
-    [edges, hiddenNodeIds]
-  );
+  const visibleEdges = useMemo(() => {
+    const nodeMap = new Map(nodes.map(n => [n.id, n]));
+
+    return edges
+      .filter(e => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target))
+      .map(edge => {
+        const srcNode = nodeMap.get(edge.source);
+        const tgtNode = nodeMap.get(edge.target);
+
+        // Helper to check context
+        const checkInContext = (path?: string) => {
+          if (!path) return false;
+          const hashKey = `nctx_${Math.abs(
+            Array.from(path).reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0)
+          ).toString(36)}`;
+          return has(hashKey);
+        };
+
+        const srcInCtx = checkInContext(srcNode?.data?.path);
+        const tgtInCtx = checkInContext(tgtNode?.data?.path);
+
+        let color = "#475569"; // slate-600
+
+        if (srcInCtx || tgtInCtx) {
+          color = "#10b981"; // Emerald context color
+        } else if (tgtNode?.data?.type === "folder" || srcNode?.data?.type === "folder") {
+          color = "#3b82f6"; // Folder blue
+        } else if (tgtNode?.data?.type === "project" || srcNode?.data?.type === "project") {
+          color = "#8b5cf6"; // Project purple
+        } else if (tgtNode?.data?.type === "file" || srcNode?.data?.type === "file") {
+          color = "#10b981"; // File green
+        }
+
+        return {
+          ...edge,
+          style: {
+            stroke: color,
+            strokeWidth: 2.5,
+            opacity: 0.85,
+          },
+        };
+      });
+  }, [edges, nodes, hiddenNodeIds, has]);
 
   const edgeAnimDuration = `${(1 / simSpeed).toFixed(2)}s`;
 
@@ -529,6 +784,36 @@ function BrainMapViewportInner({
     toast.info(`Symlink for "${label}" — drag this node to another map to create a reference link.`);
   }, []);
 
+  const handleRotateCanvas = useCallback(() => {
+    if (!nodes || nodes.length === 0) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach(n => {
+      const x = n.position.x;
+      const y = n.position.y;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    });
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
+    const rotated = nodes.map(n => {
+      const rx = n.position.x - cx;
+      const ry = n.position.y - cy;
+      return {
+        ...n,
+        position: {
+          x: cx - ry,
+          y: cy + rx
+        }
+      };
+    });
+    setStoreNodes(rotated);
+    requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
+    toast.success("Rotated neural map layout 90°");
+  }, [nodes, setStoreNodes, fitView]);
+
   return (
     <div className="w-full h-full relative" onContextMenu={e => e.preventDefault()}>
       <ReactFlow
@@ -551,7 +836,11 @@ function BrainMapViewportInner({
         className="bg-background/50"
       >
         <Background color="#333" gap={20} />
-        <Controls />
+        <Controls>
+          <ControlButton onClick={handleRotateCanvas} title="Rotate 90°">
+            <RotateCw className="w-3.5 h-3.5" />
+          </ControlButton>
+        </Controls>
         {showMiniMap && (
           <MiniMap
             nodeColor={(n) => {
@@ -588,8 +877,9 @@ function BrainMapViewportInner({
           to { opacity: 1; transform: scale(1); }
         }
         .react-flow__edge-path {
-          stroke: var(--border);
-          stroke-width: 1.5;
+          stroke-width: 2.5;
+          opacity: 0.85;
+          transition: stroke 0.3s ease, stroke-width 0.3s ease;
         }
         .react-flow__edge--animated .react-flow__edge-path {
           animation-duration: ${edgeAnimDuration};

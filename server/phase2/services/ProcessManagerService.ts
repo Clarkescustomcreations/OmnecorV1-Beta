@@ -26,7 +26,7 @@
  *  - Process output is size-limited to prevent memory exhaustion
  */
 
-import { ChildProcess, spawn, execSync } from "child_process";
+import { ChildProcess, spawn, execFileSync } from "child_process";
 import { EventEmitter } from "events";
 import path from "path";
 import fs from "fs/promises";
@@ -140,7 +140,7 @@ function killProcess(proc: ChildProcess, force = false): void {
         return;
       }
       try {
-        execSync(`taskkill /PID ${proc.pid} /T /F`, { stdio: "ignore" });
+        execFileSync("taskkill", ["/PID", String(proc.pid), "/T", "/F"], { stdio: "ignore" });
       } catch {
         // taskkill failed — fall back to direct kill
         try { proc.kill(); } catch { /* ignore if already dead */ }

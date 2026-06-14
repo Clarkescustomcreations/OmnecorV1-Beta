@@ -39,6 +39,7 @@ import type { NotificationKind } from "@shared/notifications";
 
 const KIND_META: Record<NotificationKind, { icon: LucideIcon; tone: string; label: string }> = {
   chat: { icon: MessageCircle, tone: "text-blue-400", label: "Chat" },
+  "mobile-chat": { icon: MessageCircle, tone: "text-blue-400", label: "Mobile Chat" },
   task: { icon: CheckCircle2, tone: "text-emerald-400", label: "Task" },
   hitl: { icon: ShieldAlert, tone: "text-amber-400", label: "HITL" },
   wallet: { icon: Wallet, tone: "text-fuchsia-400", label: "Wallet" },

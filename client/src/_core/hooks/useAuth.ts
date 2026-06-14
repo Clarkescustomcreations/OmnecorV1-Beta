@@ -38,6 +38,10 @@ export function useAuth(options?: UseAuthOptions) {
     } finally {
       utils.auth.me.setData(undefined, null);
       await utils.auth.me.invalidate();
+      // Always return to the setup wizard sign-in step after logout so the
+      // user can switch accounts or re-authenticate.
+      localStorage.removeItem("omnecor:setup_complete");
+      window.location.href = "/setup";
     }
   }, [logoutMutation, utils]);
 

@@ -33,10 +33,20 @@ extraResources:
   - from: ../../dist
     to: app.asar.unpacked/backend
     filter:
+      - "index.js"
+  # Frontend static assets (Vite build output)
+  - from: ../../dist/public
+    to: app.asar.unpacked/backend/public
+    filter:
       - "**/*"
-      - "!**/*.map"
-      - "!**/*.ts"
-      - "!**/*.tsx"
+  # Native modules required by backend (better-sqlite3, bindings, etc.)
+  - from: ../../node_modules
+    to: app.asar.unpacked/node_modules
+    filter:
+      - "better-sqlite3/**/*"
+      - "bindings/**/*"
+      - "file-uri-to-path/**/*"
+      - "onnxruntime-node/**/*"
   # Packaging scripts (install.sh, ollama_install.sh, post-install.sh)
   - from: ../scripts
     to: scripts
@@ -74,8 +84,8 @@ nsis:
   createStartMenuShortcut: true
   installerIcon: build/icon.ico
   uninstallerIcon: build/icon.ico
-  installerHeaderImage: build/installer_header.bmp
-  installerSidebarImage: build/installer_sidebar.bmp
+  installerHeader: build/installer_header.bmp
+  installerSidebar: build/installer_sidebar.bmp
   runAfterFinish: true
   shortcutName: Omnecor HMCI
   warningsAsErrors: false
@@ -94,7 +104,7 @@ linux:
   maintainer: Omnecor Team <dev@omnecor.local>
   vendor: Omnecor
   desktop:
-    Name: Omnecor HMCI
+    Name: Omnecor
     Comment: Human-Machine Collaboration Interface
     Categories: Development;AI;Science;
 

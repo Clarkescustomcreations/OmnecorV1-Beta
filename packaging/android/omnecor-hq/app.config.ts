@@ -118,6 +118,14 @@ const config: ExpoConfig = {
         },
       },
     ],
+    [
+      // Lets users "Share → Omnecor HQ" a model file (e.g. a .task from Google
+      // AI Edge Gallery) straight into the app — handled in app/_layout.tsx.
+      "expo-share-intent",
+      {
+        androidIntentFilters: ["*/*"],
+      },
+    ],
   ],
   experiments: {
     typedRoutes: true,

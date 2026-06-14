@@ -1,7 +1,12 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import { electronAPI } from '@electron-toolkit/preload'
 
+const BACKEND_PORT = 37291
+
 const api = {
+  // Absolute base URL for the embedded backend (http://localhost:PORT).
+  // The frontend tRPC client reads this to build API and WebSocket URLs.
+  backendBase: `http://localhost:${BACKEND_PORT}`,
   getSystemInfo: (): Promise<SystemInfo> => ipcRenderer.invoke('get-system-info'),
   setupComplete: (): void => ipcRenderer.send('setup-complete'),
   openExternal: (url: string): void => {

@@ -19,6 +19,7 @@ export type NotificationKind =
   | "hitl"
   | "wallet"
   | "agent"
+  | "mobile-chat"
   | "system";
 
 export interface OmnecorNotification {

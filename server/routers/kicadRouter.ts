@@ -220,7 +220,7 @@ export const kicadRouter = router({
       const approved = await HITLApprovalService.getInstance().requestApproval("kicad.placeOrder", {
         quoteId: input.quoteId,
         riskLevel: "high",
-      });
+      }, "financial");
       if (!approved) throw new TRPCError({ code: "FORBIDDEN", message: "HITL approval denied for PCBWay order." });
       AuditLogService.getInstance().log({
         eventType: "pcbway_order_placed",

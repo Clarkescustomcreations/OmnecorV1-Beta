@@ -328,6 +328,8 @@ export const integrationsRouter = router({
         let syncData: Record<string, unknown> = {};
 
         if (input.type === "github") {
+          const ghUser = await githubFetch("/user", token) as { login: string };
+          const owner = ghUser.login;
           const repos = await githubFetch("/user/repos?per_page=30&sort=pushed", token) as Array<{
             id: number; name: string; html_url: string; description: string | null;
             private: boolean; pushed_at: string;
@@ -339,6 +341,19 @@ export const integrationsRouter = router({
             })),
             repoCount: repos.length,
           };
+          // Enrich: fetch README of the most-recently-pushed repo
+          const top = repos[0];
+          if (top) {
+            try {
+              const readme = await githubFetch(`/repos/${owner}/${top.name}/readme`, token) as {
+                content: string; encoding: string;
+              };
+              const preview = Buffer.from(readme.content, "base64").toString("utf-8").slice(0, 4000);
+              (syncData as Record<string, unknown>).topRepoReadme = { repo: top.name, preview };
+            } catch {
+              // README missing or inaccessible — skip silently
+            }
+          }
 
         } else if (input.type === "notion") {
           const results = await notionFetch("/search", token, {
@@ -373,11 +388,24 @@ export const integrationsRouter = router({
           };
 
         } else if (input.type === "outlook") {
-          const msgs = await fetch("https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=10&$select=id,subject,from,receivedDateTime", {
-            headers: { Authorization: `Bearer ${token}` },
-          }).then(r => r.json()) as { value?: Array<{ id: string; subject: string }> };
+          const msgs = await fetch(
+            "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=10&$select=id,subject,from,bodyPreview,receivedDateTime",
+            { headers: { Authorization: `Bearer ${token}` } },
+          ).then(r => r.json()) as {
+            value?: Array<{
+              id: string;
+              subject: string;
+              bodyPreview?: string;
+              from?: { emailAddress?: { address?: string } };
+            }>;
+          };
           syncData = {
             recentCount: msgs.value?.length ?? 0,
+            recentMessages: (msgs.value ?? []).map(m => ({
+              subject: m.subject,
+              from: m.from?.emailAddress?.address ?? null,
+              snippet: m.bodyPreview ?? null,
+            })),
             lastSynced: new Date().toISOString(),
           };
 
@@ -390,6 +418,36 @@ export const integrationsRouter = router({
             threadsTotal: profile.threadsTotal ?? null,
             lastSynced: new Date().toISOString(),
           };
+          // Enrich: fetch subjects + snippets from recent messages
+          try {
+            const gmailHeaders = { Authorization: `Bearer ${token}` };
+            const list = await fetch(
+              "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=8",
+              { headers: gmailHeaders },
+            ).then(r => r.json()) as { messages?: Array<{ id: string }> };
+            const ids = (list.messages ?? []).slice(0, 8).map(m => m.id);
+            const recentMessages: Array<{ subject: string | null; from: string | null; snippet: string | null }> = [];
+            for (const id of ids) {
+              try {
+                const msg = await fetch(
+                  `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject&metadataHeaders=From`,
+                  { headers: gmailHeaders },
+                ).then(r => r.json()) as {
+                  snippet?: string;
+                  payload?: { headers?: Array<{ name: string; value: string }> };
+                };
+                const hdrs = msg.payload?.headers ?? [];
+                const subject = hdrs.find(h => h.name === "Subject")?.value ?? null;
+                const from = hdrs.find(h => h.name === "From")?.value ?? null;
+                recentMessages.push({ subject, from, snippet: msg.snippet ?? null });
+              } catch {
+                // skip individual message errors
+              }
+            }
+            (syncData as Record<string, unknown>).recentMessages = recentMessages;
+          } catch {
+            // Gmail message list unavailable — skip silently
+          }
         }
 
         bucket[input.type] = {

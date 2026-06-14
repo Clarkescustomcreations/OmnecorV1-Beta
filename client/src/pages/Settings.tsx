@@ -31,6 +31,7 @@ import { advancedSettings } from "../lib/advancedSettings";
 import OmnecorDashboardLayout from "../components/OmnecorDashboardLayout";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
+import { applyFontSize, getStoredFontSize } from "@/lib/fontSize";
 
 interface DisplayPeer {
   id?: string; name: string; address: string; port: number;
@@ -44,7 +45,7 @@ interface SavedSettings {
   vram?: number; cpuThreads?: number; inferenceTimeout?: number; autoRestart?: boolean;
   offloadLatency?: number; poolVram?: boolean;
   sttModel?: string; ttsEngine?: string; comfyUrl?: string;
-  fontSize?: number; language?: string;
+  fontSize?: number;
   autoSave?: boolean; notifications?: boolean; portableMode?: boolean;
   startupBehavior?: string; autoBackup?: boolean; backupFrequency?: string;
   googleClientId?: string; googleClientSecret?: string; microsoftClientId?: string; microsoftClientSecret?: string;
@@ -733,7 +734,10 @@ export const Settings: React.FC = () => {
                 </TabsContent>
 
                 <TabsContent value="accounts">
-                  <ConnectedAccounts loginMethod={me?.loginMethod ?? null} />
+                  <div className="space-y-6">
+                    <SocialLoginCard />
+                    <ConnectedAccounts loginMethod={me?.loginMethod ?? null} />
+                  </div>
                 </TabsContent>
 
                 <TabsContent value="valet">
@@ -1152,14 +1156,21 @@ const AppearancePanel: React.FC = () => {
     onError: (e) => toast.error(e.message),
   });
 
-  const [fontSize, setFontSize] = useState(14);
-  const [language, setLanguage] = useState("en");
+  const [fontSize, setFontSize] = useState(getStoredFontSize);
+
+  // Live-apply the font size to the document root as the slider moves so the
+  // user sees the change immediately; persist it so it survives a reload.
+  const handleFontSizeChange = (size: number) => {
+    setFontSize(size);
+    applyFontSize(size);
+  };
 
   useEffect(() => {
     if (settings) {
       const s = settings as SavedSettings;
-      setFontSize(s.fontSize || 14);
-      setLanguage(s.language || "en");
+      const nextFontSize = s.fontSize || getStoredFontSize();
+      setFontSize(nextFontSize);
+      applyFontSize(nextFontSize);
     }
   }, [settings]);
 
@@ -1167,7 +1178,6 @@ const AppearancePanel: React.FC = () => {
     saveMutation.mutate({
       settings: {
         fontSize,
-        language,
       },
     });
   };
@@ -1209,20 +1219,7 @@ const AppearancePanel: React.FC = () => {
           </div>
           <div className="space-y-2 max-w-md pt-2">
             <Label>Font Size (px): {fontSize}</Label>
-            <Slider value={[fontSize]} onValueChange={([v]) => setFontSize(v)} min={12} max={18} step={1} />
-          </div>
-          <div className="space-y-2 max-w-md">
-            <Label>Language</Label>
-            <Select value={language} onValueChange={setLanguage}>
-              <SelectTrigger><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value="en">English</SelectItem>
-                <SelectItem value="es">Español</SelectItem>
-                <SelectItem value="fr">Français</SelectItem>
-                <SelectItem value="de">Deutsch</SelectItem>
-                <SelectItem value="zh">中文</SelectItem>
-              </SelectContent>
-            </Select>
+            <Slider value={[fontSize]} onValueChange={([v]) => handleFontSizeChange(v)} min={12} max={18} step={1} />
           </div>
         </CardContent>
       </Card>
@@ -1530,6 +1527,230 @@ const HardwarePanel: React.FC = () => {
     </div>
   );
 };
+// ---------------------------------------------------------------------------
+// Social Login (OAuth) card — operator pastes their own OAuth credentials
+// ---------------------------------------------------------------------------
+
+const SocialLoginCard: React.FC = () => {
+  const { data: oauthStatus, refetch: refetchOauthStatus } = trpc.system.oauthStatus.useQuery();
+  const saveKeysMut = trpc.system.saveKeys.useMutation({
+    onSuccess: () => {
+      toast.success("Social login credentials saved");
+      setOauthInputs({ googleClientId: "", googleClientSecret: "", microsoftClientId: "", microsoftClientSecret: "" });
+      refetchOauthStatus();
+    },
+    onError: (e) => toast.error("Failed to save: " + e.message),
+  });
+
+  const [oauthInputs, setOauthInputs] = useState({
+    googleClientId: "",
+    googleClientSecret: "",
+    microsoftClientId: "",
+    microsoftClientSecret: "",
+  });
+  const [howToOpen, setHowToOpen] = useState(false);
+
+  const googleRedirectUri = `${window.location.origin}/api/oauth/google/callback`;
+  const microsoftRedirectUri = `${window.location.origin}/api/oauth/microsoft/callback`;
+
+  const handleCopy = (text: string, label: string) => {
+    navigator.clipboard.writeText(text).then(() => toast.success(`${label} copied to clipboard`));
+  };
+
+  const handleSave = () => {
+    const keys: Record<string, string> = {};
+    if (oauthInputs.googleClientId.trim()) keys.googleClientId = oauthInputs.googleClientId.trim();
+    if (oauthInputs.googleClientSecret.trim()) keys.googleClientSecret = oauthInputs.googleClientSecret.trim();
+    if (oauthInputs.microsoftClientId.trim()) keys.microsoftClientId = oauthInputs.microsoftClientId.trim();
+    if (oauthInputs.microsoftClientSecret.trim()) keys.microsoftClientSecret = oauthInputs.microsoftClientSecret.trim();
+    saveKeysMut.mutate({ keys });
+  };
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Globe className="w-4 h-4 text-blue-500" /> Social Login (OAuth)
+        </CardTitle>
+        <CardDescription>
+          Optional. Local accounts work with no setup. To enable Google / Microsoft sign-in for all your devices
+          (desktop + Omnecor HQ app), register an OAuth app and paste the credentials below — they're stored
+          locally, never committed.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+
+        {/* Status badges */}
+        <div className="flex flex-wrap gap-3">
+          {oauthStatus?.google ? (
+            <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1.5 py-1 px-2.5">
+              <CheckCircle className="w-3 h-3" /> Google: Configured
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground gap-1.5 py-1 px-2.5">
+              <Circle className="w-3 h-3" /> Google: Not configured
+            </Badge>
+          )}
+          {oauthStatus?.microsoft ? (
+            <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1.5 py-1 px-2.5">
+              <CheckCircle className="w-3 h-3" /> Microsoft: Configured
+            </Badge>
+          ) : (
+            <Badge variant="outline" className="text-muted-foreground gap-1.5 py-1 px-2.5">
+              <Circle className="w-3 h-3" /> Microsoft: Not configured
+            </Badge>
+          )}
+        </div>
+
+        {/* Redirect URIs */}
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+            Add these redirect URIs in the Google Cloud / Azure console
+          </p>
+          <div className="space-y-2">
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+              <span className="text-[11px] font-mono flex-1 break-all text-foreground/80">{googleRedirectUri}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 flex-shrink-0"
+                onClick={() => handleCopy(googleRedirectUri, "Google redirect URI")}
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+              <span className="text-[11px] font-mono flex-1 break-all text-foreground/80">{microsoftRedirectUri}</span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 flex-shrink-0"
+                onClick={() => handleCopy(microsoftRedirectUri, "Microsoft redirect URI")}
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
+          </div>
+        </div>
+
+        <div className="border-t" />
+
+        {/* Google credentials */}
+        <div className="space-y-3">
+          <p className="text-sm font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-4 h-4 rounded-full bg-blue-500/20 text-blue-500 text-[9px] font-bold flex items-center justify-center">G</span>
+            Google OAuth
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="oauth-google-id" className="text-xs">Google Client ID</Label>
+              <Input
+                id="oauth-google-id"
+                placeholder={oauthStatus?.google ? "••••••••" : "Paste your client ID"}
+                value={oauthInputs.googleClientId}
+                onChange={(e) => setOauthInputs({ ...oauthInputs, googleClientId: e.target.value })}
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="oauth-google-secret" className="text-xs">Google Client Secret</Label>
+              <Input
+                id="oauth-google-secret"
+                type="password"
+                placeholder={oauthStatus?.google ? "••••••••" : "Paste your client secret"}
+                value={oauthInputs.googleClientSecret}
+                onChange={(e) => setOauthInputs({ ...oauthInputs, googleClientSecret: e.target.value })}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* Microsoft credentials */}
+        <div className="space-y-3">
+          <p className="text-sm font-semibold flex items-center gap-1.5">
+            <span className="inline-block w-4 h-4 rounded-full bg-sky-500/20 text-sky-500 text-[9px] font-bold flex items-center justify-center">M</span>
+            Microsoft OAuth
+          </p>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="space-y-1.5">
+              <Label htmlFor="oauth-ms-id" className="text-xs">Microsoft Client ID</Label>
+              <Input
+                id="oauth-ms-id"
+                placeholder={oauthStatus?.microsoft ? "••••••••" : "Paste your application (client) ID"}
+                value={oauthInputs.microsoftClientId}
+                onChange={(e) => setOauthInputs({ ...oauthInputs, microsoftClientId: e.target.value })}
+                autoComplete="off"
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="oauth-ms-secret" className="text-xs">Microsoft Client Secret</Label>
+              <Input
+                id="oauth-ms-secret"
+                type="password"
+                placeholder={oauthStatus?.microsoft ? "••••••••" : "Paste your client secret value"}
+                value={oauthInputs.microsoftClientSecret}
+                onChange={(e) => setOauthInputs({ ...oauthInputs, microsoftClientSecret: e.target.value })}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* How-to helper */}
+        <div className="rounded-md border border-muted bg-muted/20">
+          <button
+            type="button"
+            className="w-full flex items-center justify-between px-4 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-colors"
+            onClick={() => setHowToOpen((v) => !v)}
+          >
+            <span className="flex items-center gap-1.5">
+              <Eye className="w-3.5 h-3.5" /> How to register an OAuth app
+            </span>
+            <span className="text-[10px]">{howToOpen ? "▲" : "▼"}</span>
+          </button>
+          {howToOpen && (
+            <div className="px-4 pb-4 pt-1 space-y-3 text-xs text-muted-foreground border-t border-muted">
+              <div>
+                <p className="font-semibold text-foreground/70 mb-1">Google</p>
+                <ol className="list-decimal list-inside space-y-0.5">
+                  <li>Open <span className="font-mono">console.cloud.google.com</span></li>
+                  <li>APIs &amp; Services → Credentials → Create Credentials → OAuth client ID</li>
+                  <li>Application type: <strong>Web application</strong></li>
+                  <li>Paste the redirect URI above into "Authorized redirect URIs"</li>
+                  <li>Copy the Client ID and Client Secret here</li>
+                </ol>
+              </div>
+              <div>
+                <p className="font-semibold text-foreground/70 mb-1">Microsoft</p>
+                <ol className="list-decimal list-inside space-y-0.5">
+                  <li>Open <span className="font-mono">portal.azure.com</span> → Azure Active Directory → App registrations</li>
+                  <li>New registration → choose "Accounts in any organizational directory and personal accounts"</li>
+                  <li>Redirect URI: Web → paste the Microsoft redirect URI above</li>
+                  <li>Certificates &amp; secrets → New client secret → copy the <strong>Value</strong></li>
+                  <li>Paste the Application (client) ID and the secret value here</li>
+                </ol>
+              </div>
+            </div>
+          )}
+        </div>
+      </CardContent>
+      <CardFooter className="border-t pt-4">
+        <Button
+          onClick={handleSave}
+          disabled={saveKeysMut.isPending || (!oauthInputs.googleClientId && !oauthInputs.googleClientSecret && !oauthInputs.microsoftClientId && !oauthInputs.microsoftClientSecret)}
+          className="gap-2"
+        >
+          {saveKeysMut.isPending
+            ? <><Loader2 className="w-4 h-4 animate-spin" /> Saving...</>
+            : <><Save className="w-4 h-4" /> Save OAuth Credentials</>
+          }
+        </Button>
+      </CardFooter>
+    </Card>
+  );
+};
+
 const ConnectedAccounts: React.FC<{ loginMethod: string | null }> = ({ loginMethod }) => {
   const { data: providers, refetch } = trpc.system.loginProviders.useQuery();
   const { data: settings } = trpc.system.getSettings.useQuery();

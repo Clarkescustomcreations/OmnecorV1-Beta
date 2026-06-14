@@ -3,7 +3,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as crypto from 'crypto';
 import * as tls from 'tls';
-import { execSync } from 'child_process';
+import { execFileSync } from 'child_process';
 import { MeshMessage, NodeIdentity } from '../../../shared/types/ommesh.types.js';
 import { EventEmitter } from 'events';
 import os from 'os';
@@ -138,16 +138,29 @@ export class SecurityManager extends EventEmitter {
       const hostname = os.hostname();
       const nodeId = this.identity.id;
 
-      const opensslCmds = [
-        `openssl genrsa -out ${path.join(certsDir, 'node-key.pem.new')} 4096`,
-        `openssl req -new -key ${path.join(certsDir, 'node-key.pem.new')} -out ${path.join(certsDir, 'node.csr')} ` +
-        `-subj "/C=CA/ST=NovaScotia/L=Halifax/O=Omnecor/CN=${hostname}/OU=${nodeId}"`,
-        `openssl x509 -req -in ${path.join(certsDir, 'node.csr')} -CA ${path.join(certsDir, 'ca-cert.pem')} ` +
-        `-CAkey ${path.join(certsDir, 'ca-key.pem')} -CAcreateserial -out ${path.join(certsDir, 'node-cert.pem.new')} -days 730`
+      // Each argument is passed discretely to openssl (no shell), so the
+      // hostname/nodeId embedded in the subject can never inject a command.
+      const opensslCmds: string[][] = [
+        ['genrsa', '-out', path.join(certsDir, 'node-key.pem.new'), '4096'],
+        [
+          'req', '-new',
+          '-key', path.join(certsDir, 'node-key.pem.new'),
+          '-out', path.join(certsDir, 'node.csr'),
+          '-subj', `/C=CA/ST=NovaScotia/L=Halifax/O=Omnecor/CN=${hostname}/OU=${nodeId}`,
+        ],
+        [
+          'x509', '-req',
+          '-in', path.join(certsDir, 'node.csr'),
+          '-CA', path.join(certsDir, 'ca-cert.pem'),
+          '-CAkey', path.join(certsDir, 'ca-key.pem'),
+          '-CAcreateserial',
+          '-out', path.join(certsDir, 'node-cert.pem.new'),
+          '-days', '730',
+        ],
       ];
 
-      for (const cmd of opensslCmds) {
-        execSync(cmd, { stdio: 'inherit', cwd: certsDir });
+      for (const args of opensslCmds) {
+        execFileSync('openssl', args, { stdio: 'inherit', cwd: certsDir });
       }
 
       // Atomic swap

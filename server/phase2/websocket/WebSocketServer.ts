@@ -905,6 +905,12 @@ export class OmnecorWebSocketServer {
       return true;
     }
 
+    // Electron desktop app: frontend loads via app://omnecor/ (custom privileged
+    // scheme). Treat it as a trusted local origin.
+    if (origin.startsWith("app://omnecor")) {
+      return true;
+    }
+
     // Parse the Origin and validate the hostname by *exact* match. Substring
     // checks like origin.includes("localhost") are bypassable via hostnames
     // such as "attacker.com-localhost.evil.com".

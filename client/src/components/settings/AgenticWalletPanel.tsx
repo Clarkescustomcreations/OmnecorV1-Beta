@@ -224,40 +224,49 @@ export default function AgenticWalletPanel() {
             <Badge className="bg-green-500/20 text-green-500 border-green-500/30 font-bold px-4 py-1 flex-shrink-0">CONNECTED</Badge>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Button
-              variant="outline"
-              className="h-auto py-5 px-4 sm:px-6 flex-col items-start gap-2 hover:bg-background hover:border-primary/50 transition-all border-muted-foreground/20 w-full"
-              disabled={issueCardMutation.isPending}
-              onClick={handleIssueProjectCard}
-            >
-              {issueCardMutation.isPending ? (
-                <span className="flex items-center gap-2 text-sm font-bold">
-                  <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
-                  Awaiting HITL Approval…
-                </span>
-              ) : (
-                <span className="text-sm font-bold">Issue Project Card</span>
-              )}
-              <span className="text-[10px] text-muted-foreground font-normal leading-relaxed text-left break-words w-full">
-                Create a dedicated virtual card with automatic spending limits tied to {projects?.find(p => p.id === selectedProjectId)?.name || "a project"}.
-              </span>
-            </Button>
-            <Button
-              variant="outline"
-              className="h-auto py-5 px-4 sm:px-6 flex-col items-start gap-2 hover:bg-background hover:border-primary/50 transition-all border-muted-foreground/20 w-full"
-              disabled={executionMode === "sovereign"}
-              onClick={handleOpenHitlQueue}
-              aria-label="Open HITL-review queue for pending card issuance and high-value transaction requests"
-            >
-              <span className="flex items-center gap-2 text-sm font-bold">
-                <ShieldCheck className="w-4 h-4 text-accent flex-shrink-0" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            {/* Issue Card Option */}
+            <div className="flex flex-col border border-muted bg-muted/10 rounded-xl p-5 shadow-sm min-h-[160px]">
+              <h4 className="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+                <DollarSign className="w-4 h-4 text-primary" /> Project Funding Card
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4 flex-1">
+                Create a dedicated virtual card with automatic spending limits tied to the active project. Funding is routed via Lithic's virtual card issuer.
+              </p>
+              <Button
+                className="w-full mt-auto h-9 font-medium"
+                disabled={issueCardMutation.isPending}
+                onClick={handleIssueProjectCard}
+              >
+                {issueCardMutation.isPending ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin flex-shrink-0" />
+                    Awaiting HITL Approval…
+                  </span>
+                ) : (
+                  "Issue Project Card"
+                )}
+              </Button>
+            </div>
+
+            {/* HITL Authorization Option */}
+            <div className="flex flex-col border border-muted bg-muted/10 rounded-xl p-5 shadow-sm min-h-[160px]">
+              <h4 className="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
+                <ShieldCheck className="w-4 h-4 text-accent" /> Security Authorization
+              </h4>
+              <p className="text-xs text-muted-foreground leading-relaxed mb-4 flex-1">
+                Access the Human-in-the-Loop review queue to approve pending card issuance and audit high-value transaction requests.
+              </p>
+              <Button
+                variant="outline"
+                className="w-full mt-auto h-9 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                disabled={executionMode === "sovereign"}
+                onClick={handleOpenHitlQueue}
+                aria-label="Open HITL-review queue for pending card issuance and high-value transaction requests"
+              >
                 HITL Authorization
-              </span>
-              <span className="text-[10px] text-muted-foreground font-normal leading-relaxed text-left break-words w-full">
-                HITL-review queue for pending card issuance and high-value transaction requests.
-              </span>
-            </Button>
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

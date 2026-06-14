@@ -9,14 +9,41 @@ import { exchangeCodeForToken, fetchUserProfile } from "../oauth/oauthClients.js
 import { getDb } from "../db.factory.js";
 import { platformAccounts, oauthStates } from "../../drizzle/schema.js";
 import { eq, lt } from "drizzle-orm";
-import { SettingsService } from "../phase2/services/SettingsService.js";
+import { SettingsService, getSetting } from "../phase2/services/SettingsService.js";
 
 export const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
 
-// Resolved session lifetime: SESSION_TTL_MS env when set, else one year
-// (local-first default). Used for both the JWT expiry and the cookie maxAge so
-// network deployments can shorten sessions via a single env var.
-const SESSION_TTL_MS = ENV.sessionTtlMs ?? ONE_YEAR_MS;
+// Double-submit CSRF cookie for the generic social/cloud OAuth flow
+// (`/api/oauth/callback/:platform`). The unguessable `state` is mirrored into an
+// httpOnly cookie at initiation and re-checked at the callback so the redirect
+// can only be completed by the same browser that started the flow.
+export const SOCIAL_OAUTH_STATE_COOKIE = "social_oauth_state";
+
+/**
+ * Set the social-OAuth CSRF state cookie. Uses `sameSite: "lax"` (overriding the
+ * session cookie's "strict") so the cookie is still sent on the top-level GET
+ * navigation when the external provider redirects back to our callback — a
+ * "strict" cookie would be withheld on that cross-site redirect and the flow
+ * would always fail the CSRF check.
+ */
+export function setSocialOAuthStateCookie(req: Request, res: Response, state: string): void {
+  res.cookie(SOCIAL_OAUTH_STATE_COOKIE, state, {
+    ...getSessionCookieOptions(req),
+    httpOnly: true,
+    sameSite: "lax",
+    maxAge: OAUTH_STATE_TTL,
+  });
+}
+
+// Resolved session lifetime, used for both the JWT expiry and the cookie
+// maxAge. Precedence: Settings → Security `sessionTimeout` (minutes) when set,
+// then the sessionTtlMs() env var, else one year (local-first default).
+// Computed per call so changing the slider takes effect on the next login.
+function sessionTtlMs(): number {
+  const minutes = getSetting<number>("sessionTimeout", 0);
+  if (minutes && minutes > 0) return minutes * 60 * 1000;
+  return ENV.sessionTtlMs ?? ONE_YEAR_MS;
+}
 
 // Treat a token as expired this many ms before its real expiry so an in-flight
 // request never races the expiry boundary.
@@ -259,19 +286,19 @@ export function registerOAuthRoutes(app: Express) {
 
       const sessionToken = await sdk.createSessionToken(userInfo.openId, {
         name: userInfo.name || "",
-        expiresInMs: SESSION_TTL_MS,
+        expiresInMs: sessionTtlMs(),
       });
 
       const cookieOptions = getSessionCookieOptions(req);
       res.cookie(COOKIE_NAME, sessionToken, {
         ...cookieOptions,
-        maxAge: SESSION_TTL_MS,
+        maxAge: sessionTtlMs(),
       });
 
       // Clear state cookie
       res.clearCookie("oauth_state", cookieOptions);
 
-      res.redirect(302, "/");
+      res.redirect(302, "/setup");
     } catch (error) {
       console.error("[OAuth] Callback failed", error);
       res.status(500).json({ error: "OAuth callback failed" });
@@ -358,13 +385,13 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
       const sessionToken = await sdk.createSessionToken(openId, {
         name: userInfo.name ?? "",
-        expiresInMs: SESSION_TTL_MS,
+        expiresInMs: sessionTtlMs(),
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_TTL_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: sessionTtlMs() });
       res.clearCookie("google_oauth_state", cookieOptions);
-      res.redirect(302, "/");
+      res.redirect(302, "/setup");
     } catch (error) {
       console.error("[OAuth/Google] Callback failed", error);
       res.status(500).json({ error: "Google OAuth callback failed" });
@@ -451,13 +478,13 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
 
       const sessionToken = await sdk.createSessionToken(openId, {
         name: userInfo.displayName ?? "",
-        expiresInMs: SESSION_TTL_MS,
+        expiresInMs: sessionTtlMs(),
       });
 
       const cookieOptions = getSessionCookieOptions(req);
-      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: SESSION_TTL_MS });
+      res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: sessionTtlMs() });
       res.clearCookie("ms_oauth_state", cookieOptions);
-      res.redirect(302, "/");
+      res.redirect(302, "/setup");
     } catch (error) {
       console.error("[OAuth/Microsoft] Callback failed", error);
       res.status(500).json({ error: "Microsoft OAuth callback failed" });
@@ -470,13 +497,25 @@ export function registerSocialMediaOAuthRoutes(app: Express) {
     const { platform } = req.params;
     const code = getQueryParam(req, "code");
     const state = getQueryParam(req, "state");
+    const cookieState = req.cookies?.[SOCIAL_OAUTH_STATE_COOKIE];
+    const cookieOptions = getSessionCookieOptions(req);
 
     if (!code || !state) {
       res.status(400).json({ error: "Missing code or state parameter" });
       return;
     }
 
-    // Validate state and extract userId (CSRF protection)
+    // CSRF: the state echoed back by the provider must match the httpOnly cookie
+    // planted in this browser when the flow was initiated (double-submit). This
+    // prevents an attacker from completing an OAuth account-link in a victim's
+    // session with a pre-obtained code/state pair.
+    if (!cookieState || cookieState !== state) {
+      res.clearCookie(SOCIAL_OAUTH_STATE_COOKIE, cookieOptions);
+      res.status(400).json({ error: "Invalid OAuth state" });
+      return;
+    }
+
+    // Validate state and extract userId (server-side single-use state tracker)
     const stateData = await getOAuthState(state);
     if (
       !stateData ||
@@ -484,10 +523,12 @@ export function registerSocialMediaOAuthRoutes(app: Express) {
       Date.now() - stateData.timestamp > OAUTH_STATE_TTL
     ) {
       await deleteOAuthState(state);
+      res.clearCookie(SOCIAL_OAUTH_STATE_COOKIE, cookieOptions);
       res.status(400).json({ error: "Invalid OAuth state" });
       return;
     }
     await deleteOAuthState(state);
+    res.clearCookie(SOCIAL_OAUTH_STATE_COOKIE, cookieOptions);
 
     try {
       // Exchange code for token (PKCE verifier passed through when present)
@@ -546,5 +587,109 @@ export function registerSocialMediaOAuthRoutes(app: Express) {
 
       res.redirect(302, redirectUrl.toString());
     }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Local account auth (desktop / sovereign installs with no OAuth provider)
+// ---------------------------------------------------------------------------
+// Uses scrypt via Node's built-in crypto — no extra dependency needed.
+
+function hashPassword(password: string, salt: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    crypto.scrypt(password, salt, 64, (err, derived) => {
+      if (err) reject(err);
+      else resolve(`${salt}:${derived.toString("hex")}`);
+    });
+  });
+}
+
+async function verifyPassword(password: string, stored: string): Promise<boolean> {
+  const [salt] = stored.split(":");
+  if (!salt) return false;
+  const hash = await hashPassword(password, salt);
+  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(stored));
+}
+
+export function registerLocalAuthRoutes(app: Express) {
+  // POST /api/auth/local/register — create first local account (owner)
+  app.post("/api/auth/local/register", async (req: Request, res: Response) => {
+    const { name, password } = req.body as { name?: string; password?: string };
+    if (!name || !password || password.length < 8) {
+      res.status(400).json({ error: "Name and password (min 8 chars) required" });
+      return;
+    }
+
+    // Only allow registration if no local accounts exist yet
+    const existing = await db.getUserByOpenId("local:owner");
+    if (existing) {
+      res.status(409).json({ error: "Local account already exists" });
+      return;
+    }
+
+    const salt = crypto.randomBytes(16).toString("hex");
+    const passwordHash = await hashPassword(password, salt);
+    const openId = "local:owner";
+
+    await db.upsertUser({
+      openId,
+      name,
+      email: null,
+      loginMethod: "local",
+      passwordHash,
+      role: "owner",
+      executionMode: "scrapper",
+      lastSignedIn: new Date(),
+    });
+
+    const sessionToken = await sdk.createSessionToken(openId, {
+      name,
+      expiresInMs: sessionTtlMs(),
+    });
+
+    const cookieOptions = getSessionCookieOptions(req);
+    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: sessionTtlMs() });
+    // Also return the token in the body so non-cookie clients (the Omnecor HQ
+    // mobile app, which uses Authorization: Bearer) can establish a session.
+    res.json({ ok: true, sessionToken, name });
+  });
+
+  // POST /api/auth/local/login — sign in with local account
+  app.post("/api/auth/local/login", async (req: Request, res: Response) => {
+    const { password } = req.body as { password?: string };
+    if (!password) {
+      res.status(400).json({ error: "Password required" });
+      return;
+    }
+
+    const user = await db.getUserByOpenId("local:owner");
+    if (!user?.passwordHash) {
+      res.status(401).json({ error: "No local account configured" });
+      return;
+    }
+
+    const valid = await verifyPassword(password, user.passwordHash);
+    if (!valid) {
+      res.status(401).json({ error: "Incorrect password" });
+      return;
+    }
+
+    await db.upsertUser({ openId: user.openId, lastSignedIn: new Date() });
+
+    const sessionToken = await sdk.createSessionToken(user.openId, {
+      name: user.name ?? "",
+      expiresInMs: sessionTtlMs(),
+    });
+
+    const cookieOptions = getSessionCookieOptions(req);
+    res.cookie(COOKIE_NAME, sessionToken, { ...cookieOptions, maxAge: sessionTtlMs() });
+    // Return the token for non-cookie (mobile Bearer) clients too.
+    res.json({ ok: true, sessionToken, name: user.name ?? "" });
+  });
+
+  // GET /api/auth/local/exists — check if a local account has been created
+  app.get("/api/auth/local/exists", async (_req: Request, res: Response) => {
+    const user = await db.getUserByOpenId("local:owner");
+    res.json({ exists: !!user?.passwordHash });
   });
 }

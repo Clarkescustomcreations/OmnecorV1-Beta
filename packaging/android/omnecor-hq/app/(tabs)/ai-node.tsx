@@ -8,7 +8,8 @@
  *
  * Also supports the reverse: phone uses the PC's models when available.
  */
-import { Text, View, Pressable, ScrollView, ActivityIndicator, TextInput } from "react-native";
+import { Text, View, ScrollView, ActivityIndicator, TextInput } from "react-native";
+import { Pressable } from "@/components/pressable";
 import { useState, useCallback, useEffect } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";

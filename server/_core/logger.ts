@@ -2,6 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { PATHS } from "./paths.js";
+import { getSetting } from "../phase2/services/SettingsService.js";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 
@@ -46,6 +47,12 @@ function writeAuditEntry(level: LogLevel, namespace: string, message: string, da
 // ─────────────────────────────────────────────────────────────────────────────
 
 function getConfiguredLevel(): LogLevel {
+  // Settings → Advanced "Debug Mode" forces the most verbose level; an explicit
+  // "Log Level" setting otherwise wins, then the LOG_LEVEL env var, then the
+  // NODE_ENV-based default. Read live so changing it takes effect immediately.
+  if (getSetting<boolean>("debugMode", false)) return "debug";
+  const settingLevel = getSetting<string>("logLevel", "").toLowerCase();
+  if (settingLevel && settingLevel in LEVELS) return settingLevel as LogLevel;
   const envLevel = process.env.LOG_LEVEL?.toLowerCase();
   if (envLevel && envLevel in LEVELS) return envLevel as LogLevel;
   return process.env.NODE_ENV === "production" ? "info" : "debug";

@@ -34,6 +34,7 @@ import fs from "fs";
 import path from "path";
 import { createLogger } from "../../_core/logger.js";
 import { PromptSanitizer } from "./PromptSanitizer.js";
+import { getSetting } from "./SettingsService.js";
 const log = createLogger("MemoryArchitect");
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -91,8 +92,13 @@ const INGESTIBLE_EXTENSIONS = new Set([
   ".kt",
 ]);
 
-/** Maximum file size to ingest (5 MB) */
-const MAX_FILE_SIZE = 5 * 1024 * 1024;
+/**
+ * Maximum file size to ingest, in bytes. Driven by Settings → Knowledge Base
+ * "Max File Size" (MB); defaults to 5 MB when unset.
+ */
+function maxIngestFileSize(): number {
+  return getSetting<number>("maxFileSize", 5) * 1024 * 1024;
+}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Types
@@ -520,7 +526,7 @@ export class MemoryArchitectService {
           // Check file size
           try {
             const stat = fs.statSync(fullPath);
-            if (stat.size <= MAX_FILE_SIZE) {
+            if (stat.size <= maxIngestFileSize()) {
               files.push(fullPath);
             }
           } catch {

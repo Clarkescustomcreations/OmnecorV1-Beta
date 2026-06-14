@@ -182,40 +182,49 @@ export default function ModelHub() {
           {/* Right Sidebar */}
           <div className="w-full md:w-72 flex flex-col gap-4 md:overflow-y-auto md:flex-shrink-0">
             {/* Selected Model */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Selected Model</CardTitle>
-                <CardDescription className="text-xs">Current model details</CardDescription>
+            <Card className="w-full min-w-0 overflow-hidden py-3 gap-0">
+              <CardHeader className="px-4 py-0 flex flex-row items-center justify-between gap-2">
+                <CardTitle className="text-sm font-semibold truncate">Selected Model Details</CardTitle>
+                {selectedModel && (
+                  <Button
+                    size="sm"
+                    className="h-6 px-2 text-[10px] font-bold bg-accent text-accent-foreground hover:bg-accent/90 shadow-[0_0_12px_rgba(168,85,247,0.4)] border border-accent/20 transition-all duration-300 animate-pulse flex-shrink-0"
+                    onClick={handleUseThisModel}
+                  >
+                    Use Model
+                  </Button>
+                )}
               </CardHeader>
-              <CardContent>
+              <CardContent className="px-4 pb-0 mt-1">
                 {selectedModel ? (
                   <div className="space-y-3 text-sm">
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Name</p>
-                      <p className="font-mono font-medium">{selectedModel.displayName}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Type</p>
-                      <p className="font-mono capitalize">{selectedModel.type}</p>
-                    </div>
-                    <div>
-                      <p className="text-xs text-muted-foreground mb-1">Status</p>
-                      <Badge variant={selectedModel.status === "available" ? "default" : "secondary"}>
-                        {selectedModel.status}
-                      </Badge>
-                    </div>
-                    {selectedModel.contextWindow && (
-                      <div>
-                        <p className="text-xs text-muted-foreground mb-1">Context Window</p>
-                        <p className="font-mono">{selectedModel.contextWindow.toLocaleString()} tokens</p>
+                    <div className="w-full min-w-0 max-h-40 overflow-y-auto rounded border border-border/50 bg-muted/20 p-2.5 space-y-3">
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Name</span>
+                        <p className="font-mono text-[10px] break-all bg-muted p-1 rounded mt-1">{selectedModel.displayName}</p>
                       </div>
-                    )}
-                    <Button className="w-full mt-4" size="sm" onClick={handleUseThisModel}>
-                      Use This Model
-                    </Button>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Type</span>
+                        <p className="font-mono text-[10px] break-all bg-muted p-1 rounded mt-1 capitalize">{selectedModel.type}</p>
+                      </div>
+                      <div className="flex flex-col gap-1">
+                        <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Status</span>
+                        <div className="mt-1">
+                          <Badge variant={selectedModel.status === "available" ? "default" : "secondary"} className="capitalize">
+                            {selectedModel.status}
+                          </Badge>
+                        </div>
+                      </div>
+                      {selectedModel.contextWindow && (
+                        <div className="flex flex-col gap-1">
+                          <span className="text-xs text-muted-foreground uppercase font-bold tracking-wider">Context Window</span>
+                          <p className="font-mono text-[10px] break-all bg-muted p-1 rounded mt-1">{selectedModel.contextWindow.toLocaleString()} tokens</p>
+                        </div>
+                      )}
+                    </div>
                   </div>
                 ) : (
-                  <div className="p-4 rounded-lg bg-muted/50 flex items-center justify-center text-muted-foreground text-sm h-40">
+                  <div className="p-4 rounded-lg bg-muted/50 flex items-center justify-center text-muted-foreground text-xs h-28">
                     Select a model to view details
                   </div>
                 )}
@@ -223,55 +232,38 @@ export default function ModelHub() {
             </Card>
 
             {/* API Provider Status — loaded from Settings */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">API Providers</CardTitle>
-                <CardDescription className="text-xs">
-                  Keys are managed in{" "}
-                  <button
-                    className="underline text-accent hover:text-accent/80 transition-colors"
-                    onClick={() => setLocation("/settings")}
-                  >
-                    Settings → AI Providers
-                  </button>
-                </CardDescription>
+            <Card className="w-full min-w-0 overflow-hidden py-3 gap-0">
+              <CardHeader className="px-4 py-0">
+                <CardTitle className="text-sm font-semibold">API Providers</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-2">
-                {configuredProviders.map(p => (
-                  <div key={p.id} className="flex items-center justify-between text-sm">
-                    <span className="text-muted-foreground">{p.label}</span>
-                    {p.configured ? (
-                      <span className="flex items-center gap-1 text-emerald-500 text-xs font-medium">
-                        <CheckCircle2 className="w-3.5 h-3.5" /> Configured
-                      </span>
-                    ) : (
-                      <span className="flex items-center gap-1 text-muted-foreground/50 text-xs">
-                        <XCircle className="w-3.5 h-3.5" /> Not set
-                      </span>
-                    )}
-                  </div>
-                ))}
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="w-full mt-3 gap-1.5 text-xs"
-                  onClick={() => setLocation("/settings")}
-                >
-                  <Settings className="w-3.5 h-3.5" />
-                  Add / Edit API Keys
-                </Button>
+              <CardContent className="px-4 pb-0 mt-1">
+                <div className="w-full min-w-0 max-h-32 overflow-y-auto rounded border border-border/50 bg-muted/20 p-1.5 space-y-1">
+                  {configuredProviders.map(p => (
+                    <div key={p.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-accent/5 text-[11px] font-mono min-w-0 gap-2">
+                      <span className="text-muted-foreground truncate">{p.label}</span>
+                      {p.configured ? (
+                        <span className="flex items-center gap-1 text-emerald-500 font-medium flex-shrink-0">
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Configured
+                        </span>
+                      ) : (
+                        <span className="flex items-center gap-1 text-muted-foreground/50 flex-shrink-0">
+                          <XCircle className="w-3.5 h-3.5" /> Not set
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
               </CardContent>
             </Card>
 
             {/* Model Lifecycle */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Model Lifecycle</CardTitle>
-                <CardDescription className="text-xs">Preferences for local model management</CardDescription>
+            <Card className="w-full min-w-0 overflow-hidden py-3 gap-0">
+              <CardHeader className="px-4 py-0">
+                <CardTitle className="text-sm font-semibold">Model Lifecycle</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div className="space-y-2">
-                  <Label className="text-[11px]">Preferred Quantization</Label>
+              <CardContent className="px-4 pb-0 mt-1 space-y-3">
+                <div className="space-y-1">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Preferred Quantization</span>
                   <Select
                     value={preferredQuantization}
                     onValueChange={(v) => {
@@ -279,7 +271,7 @@ export default function ModelHub() {
                       saveQuantMutation.mutate({ settings: { preferredQuantization: v } });
                     }}
                   >
-                    <SelectTrigger className="h-8 text-xs">
+                    <SelectTrigger className="h-8 text-xs mt-1">
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
@@ -290,16 +282,16 @@ export default function ModelHub() {
                     </SelectContent>
                   </Select>
                 </div>
-                <div className="space-y-2 pt-2 border-t">
-                  <Label className="text-[11px]">Role Assignments</Label>
-                  <div className="space-y-2">
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">Default Chat:</span>
-                      <span className="font-mono text-accent">Auto</span>
+                <div className="space-y-1 pt-1.5 border-t">
+                  <span className="text-[10px] text-muted-foreground uppercase font-bold tracking-wider">Role Assignments</span>
+                  <div className="w-full min-w-0 max-h-24 overflow-y-auto rounded border border-border/50 bg-muted/20 p-1.5 space-y-1 mt-1">
+                    <div className="flex items-center justify-between px-2 py-1 rounded text-[11px] font-mono min-w-0 gap-2">
+                      <span className="text-muted-foreground flex-shrink-0">Default Chat:</span>
+                      <span className="text-accent font-bold break-all ml-2 text-right">Auto</span>
                     </div>
-                    <div className="flex items-center justify-between text-[10px]">
-                      <span className="text-muted-foreground">Default Code:</span>
-                      <span className="font-mono text-accent">Auto</span>
+                    <div className="flex items-center justify-between px-2 py-1 rounded text-[11px] font-mono min-w-0 gap-2">
+                      <span className="text-muted-foreground flex-shrink-0">Default Code:</span>
+                      <span className="text-accent font-bold break-all ml-2 text-right">Auto</span>
                     </div>
                   </div>
                 </div>
@@ -307,32 +299,31 @@ export default function ModelHub() {
             </Card>
 
             {/* Statistics */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="text-base">Statistics</CardTitle>
-                <CardDescription className="text-xs">Model inventory overview</CardDescription>
+            <Card className="w-full min-w-0 overflow-hidden py-3 gap-0">
+              <CardHeader className="px-4 py-0">
+                <CardTitle className="text-sm font-semibold">Statistics</CardTitle>
               </CardHeader>
-              <CardContent>
-                <div className="space-y-2 text-sm">
-                  <div className="flex justify-between">
+              <CardContent className="px-4 pb-0 mt-1">
+                <div className="w-full min-w-0 max-h-28 overflow-y-auto rounded border border-border/50 bg-muted/20 p-1.5 space-y-1">
+                  <div className="flex justify-between px-2 py-1 text-[11px] font-mono">
                     <span className="text-muted-foreground">Total Models:</span>
-                    <span className="font-mono font-medium">{allModels.length}</span>
+                    <span className="font-medium text-foreground">{allModels.length}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between px-2 py-1 text-[11px] font-mono">
                     <span className="text-muted-foreground">Local Models:</span>
-                    <span className="font-mono font-medium">{localModels.length}</span>
+                    <span className="font-medium text-foreground">{localModels.length}</span>
                   </div>
-                  <div className="flex justify-between">
+                  <div className="flex justify-between px-2 py-1 text-[11px] font-mono">
                     <span className="text-muted-foreground">API Models:</span>
-                    <span className="font-mono font-medium">{apiModels.length}</span>
+                    <span className="font-medium text-foreground">{apiModels.length}</span>
                   </div>
-                  {pullMutation.isPending && (
-                    <div className="flex items-center gap-2 text-xs text-blue-400 mt-2">
-                      <Download className="w-3 h-3 animate-bounce" />
-                      Pulling model in background...
-                    </div>
-                  )}
                 </div>
+                {pullMutation.isPending && (
+                  <div className="flex items-center gap-2 text-xs text-blue-400 mt-2 px-1">
+                    <Download className="w-3.5 h-3.5 animate-bounce" />
+                    Pulling model in background...
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>

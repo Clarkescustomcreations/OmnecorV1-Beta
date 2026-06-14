@@ -1,4 +1,5 @@
-import { Text, View, TextInput, Pressable, FlatList, ActivityIndicator } from "react-native";
+import { Text, View, TextInput, FlatList, ActivityIndicator } from "react-native";
+import { Pressable } from "@/components/pressable";
 import { useState, useRef, useCallback, useEffect } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
@@ -6,7 +7,11 @@ import { useVoice } from "@/hooks/use-voice";
 import { getServerBaseUrl, isServerConfigured } from "@/lib/_core/server-config";
 import * as Auth from "@/lib/_core/auth";
 import { isModelLoaded, runInference } from "@/lib/_core/local-inference";
-import { trpcQuery } from "@/lib/_core/trpc-fetch";
+import { trpcQuery, trpcMutate } from "@/lib/_core/trpc-fetch";
+import * as ImagePicker from "expo-image-picker";
+import * as DocumentPicker from "expo-document-picker";
+import * as FileSystem from "expo-file-system/legacy";
+import { loadChats, saveChats, type StoredChatSession } from "@/lib/_core/chat-store";
 
 interface ChatMessage {
   id: string;
@@ -26,6 +31,7 @@ export default function ChatScreen() {
   const voice  = useVoice();
   const flatListRef = useRef<FlatList>(null);
 
+  const [hydrated, setHydrated] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([
     { id: "1", title: "New Conversation", messages: [
       { id: "1", role: "assistant", content: "Hello! I'm Omnecor HQ. Connect to your PC in Settings, then start chatting.", timestamp: new Date() },
@@ -34,6 +40,7 @@ export default function ChatScreen() {
   const [activeSessionId, setActiveSessionId]               = useState("1");
   const [messageInput, setMessageInput]                     = useState("");
   const [isSending, setIsSending]                           = useState(false);
+  const [isUploading, setIsUploading]                       = useState(false);
   const [showSessionSelector, setShowSessionSelector]       = useState(false);
   const [showNeuralMapSelector, setShowNeuralMapSelector]   = useState(false);
   const [showAgentSelector, setShowAgentSelector]           = useState(false);
@@ -51,6 +58,47 @@ export default function ChatScreen() {
   const neuralMaps    = ["Default", "Project A", "Project B"];
   const agents        = ["Default Agent", "Creative", "Technical", "Analyst"];
   const activeSession = sessions.find((s) => s.id === activeSessionId);
+
+  // ── Load persisted chats on mount ──
+  useEffect(() => {
+    loadChats()
+      .then((snapshot) => {
+        if (snapshot && snapshot.sessions.length > 0) {
+          const revived = snapshot.sessions.map((s: StoredChatSession) => ({
+            ...s,
+            messages: s.messages.map((m) => ({
+              ...m,
+              timestamp: new Date(m.timestamp),
+            })),
+          }));
+          setSessions(revived);
+          const activeExists = revived.some((s) => s.id === snapshot.activeSessionId);
+          setActiveSessionId(activeExists ? snapshot.activeSessionId : revived[0].id);
+        }
+      })
+      .finally(() => setHydrated(true));
+  }, []);
+
+  // ── Persist chats whenever sessions or activeSessionId change ──
+  useEffect(() => {
+    if (!hydrated) return;
+    const serialized: StoredChatSession[] = sessions.map((s) => {
+      const ext = s as unknown as { neuralMapId?: string | null; personaId?: string | null };
+      return {
+        id: s.id,
+        title: s.title,
+        neuralMapId: ext.neuralMapId,
+        personaId: ext.personaId,
+        messages: s.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          timestamp: new Date(m.timestamp).toISOString(),
+        })),
+      };
+    });
+    saveChats({ sessions: serialized, activeSessionId });
+  }, [sessions, activeSessionId, hydrated]);
 
   useEffect(() => {
     if (!isServerConfigured()) return;
@@ -155,6 +203,103 @@ export default function ChatScreen() {
       await voice.startRecording();
     }
   }, [voice]);
+
+  const handleAttachPhoto = useCallback(async () => {
+    try {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) return;
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: "images",
+        base64: true,
+        quality: 0.7,
+      });
+
+      if (result.canceled) return;
+      const asset = result.assets[0];
+
+      if (!isServerConfigured()) {
+        appendMessage(activeSessionId, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "⚠ Server not configured. Go to Settings to connect to your Omnecor PC.",
+          timestamp: new Date(),
+        });
+        return;
+      }
+
+      const name = asset.fileName ?? "photo.jpg";
+      const mimeType = asset.mimeType ?? "image/jpeg";
+      const dataUrl = asset.base64;
+
+      setIsUploading(true);
+      const res = await trpcMutate<{ filename: string; url: string }>("attachments.uploadFile", {
+        name,
+        mimeType,
+        dataUrl,
+      });
+
+      setMessageInput((prev) =>
+        `${prev} ![${res.filename}](${getServerBaseUrl()}${res.url})`.trim()
+      );
+    } catch (err) {
+      appendMessage(activeSessionId, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "⚠ Error uploading photo: " + String(err),
+        timestamp: new Date(),
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [activeSessionId, appendMessage]);
+
+  const handleAttachFile = useCallback(async () => {
+    try {
+      const result = await DocumentPicker.getDocumentAsync({
+        copyToCacheDirectory: true,
+        type: "*/*",
+      });
+
+      if (result.canceled) return;
+      const asset = result.assets[0];
+
+      if (!isServerConfigured()) {
+        appendMessage(activeSessionId, {
+          id: (Date.now() + 1).toString(),
+          role: "assistant",
+          content: "⚠ Server not configured. Go to Settings to connect to your Omnecor PC.",
+          timestamp: new Date(),
+        });
+        return;
+      }
+
+      const base64 = await FileSystem.readAsStringAsync(asset.uri, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+
+      const name = asset.name;
+      const mimeType = asset.mimeType ?? "application/octet-stream";
+
+      setIsUploading(true);
+      const res = await trpcMutate<{ filename: string; url: string }>("attachments.uploadFile", {
+        name,
+        mimeType,
+        dataUrl: base64,
+      });
+
+      setMessageInput((prev) => `${prev} [${res.filename}](${getServerBaseUrl()}${res.url})`.trim());
+    } catch (err) {
+      appendMessage(activeSessionId, {
+        id: (Date.now() + 1).toString(),
+        role: "assistant",
+        content: "⚠ Error uploading file: " + String(err),
+        timestamp: new Date(),
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  }, [activeSessionId, appendMessage]);
 
   return (
     <ScreenContainer className="flex-1 bg-background">
@@ -296,11 +441,13 @@ export default function ChatScreen() {
         </View>
 
         <View className="flex-row gap-2">
-          <Pressable className="flex-1 bg-surface border border-border rounded-lg p-2 items-center active:opacity-70">
-            <Text className="text-foreground text-sm">📎 File</Text>
+          <Pressable onPress={handleAttachFile} disabled={isUploading}
+            className={`flex-1 bg-surface border border-border rounded-lg p-2 items-center ${isUploading ? "opacity-50" : "active:opacity-70"}`}>
+            <Text className="text-foreground text-sm">{isUploading ? "Uploading…" : "📎 File"}</Text>
           </Pressable>
-          <Pressable className="flex-1 bg-surface border border-border rounded-lg p-2 items-center active:opacity-70">
-            <Text className="text-foreground text-sm">📷 Photo</Text>
+          <Pressable onPress={handleAttachPhoto} disabled={isUploading}
+            className={`flex-1 bg-surface border border-border rounded-lg p-2 items-center ${isUploading ? "opacity-50" : "active:opacity-70"}`}>
+            <Text className="text-foreground text-sm">{isUploading ? "Uploading…" : "📷 Photo"}</Text>
           </Pressable>
           {voice.isSpeaking && (
             <Pressable onPress={voice.stopSpeaking}

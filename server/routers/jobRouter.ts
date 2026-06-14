@@ -7,7 +7,7 @@
  */
 
 import { z } from "zod";
-import { publicProcedure, router } from "../_core/trpc.js";
+import { protectedProcedure, adminProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -40,7 +40,7 @@ export const jobRouter = router({
    * Get the current status of a specific job.
    * Includes last progress data, stderr output, and timing info.
    */
-  getStatus: publicProcedure
+  getStatus: protectedProcedure
     .input(jobIdSchema)
     .query(async ({ ctx, input }) => {
       const status = ctx.services.processManager.getJobStatus(input.jobId);
@@ -59,7 +59,7 @@ export const jobRouter = router({
    * List all jobs (running, completed, failed, cancelled).
    * Supports filtering by type and state.
    */
-  list: publicProcedure.input(listJobsSchema).query(async ({ ctx, input }) => {
+  list: protectedProcedure.input(listJobsSchema).query(async ({ ctx, input }) => {
     let jobs = ctx.services.processManager.getAllJobs();
 
     if (input?.type) {
@@ -79,7 +79,7 @@ export const jobRouter = router({
    * Cancel a running job.
    * Sends SIGTERM to the process, followed by SIGKILL after a timeout.
    */
-  cancel: publicProcedure
+  cancel: protectedProcedure
     .input(jobIdSchema)
     .mutation(async ({ ctx, input }) => {
       const success = await ctx.services.processManager.cancelJob(input.jobId);
@@ -100,7 +100,7 @@ export const jobRouter = router({
   /**
    * Run a command in a sandboxed Docker container.
    */
-  runSandboxCommand: publicProcedure
+  runSandboxCommand: adminProcedure
     .input(z.object({
       command: z.string(),
       image: z.string().default("alpine:latest"),
@@ -120,7 +120,7 @@ export const jobRouter = router({
   /**
    * Prune old job history. Keeps the last N completed jobs.
    */
-  prune: publicProcedure
+  prune: adminProcedure
     .input(
       z.object({ keepLast: z.number().int().min(0).default(20) }).optional()
     )

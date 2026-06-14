@@ -6,7 +6,8 @@
  *
  * Cancel is the only write-action the PC exposes for jobs (no pause/resume).
  */
-import { ScrollView, Text, View, Pressable, ActivityIndicator } from "react-native";
+import { ScrollView, Text, View, ActivityIndicator } from "react-native";
+import { Pressable } from "@/components/pressable";
 import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useOmmeshNode } from "@/hooks/use-ommesh-node";

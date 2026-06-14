@@ -23,11 +23,23 @@ const noopFetch: typeof fetch = () =>
     })
   );
 
+// When running inside the Electron desktop app the page origin is app://omnecor/
+// (not http://localhost) so relative URLs like /api/trpc don't resolve to the
+// backend. The preload script exposes window.api.backendBase with the absolute
+// URL of the embedded backend (e.g. http://localhost:37291).
+const electronBase: string | undefined =
+  typeof window !== "undefined"
+    ? (window as Window & { api?: { backendBase?: string } }).api?.backendBase
+    : undefined;
+
+const apiBase = electronBase ?? "";
+const wsBase = electronBase
+  ? electronBase.replace(/^http/, "ws")
+  : `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}`;
+
 const wsClient = IS_DEMO
   ? null
-  : createWSClient({
-      url: `${window.location.protocol === "https:" ? "wss" : "ws"}://${window.location.host}/ws`,
-    });
+  : createWSClient({ url: `${wsBase}/ws` });
 
 export const vanillaTrpc = createTRPCProxyClient<AppRouter>({
   links: IS_DEMO
@@ -46,7 +58,7 @@ export const vanillaTrpc = createTRPCProxyClient<AppRouter>({
             transformer: superjson,
           }),
           false: httpBatchLink({
-            url: "/api/trpc",
+            url: `${apiBase}/api/trpc`,
             transformer: superjson,
           }),
         }),

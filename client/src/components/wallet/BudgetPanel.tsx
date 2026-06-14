@@ -72,7 +72,7 @@ export default function BudgetPanel({ projectId, className }: BudgetPanelProps) 
                 </RadialBarChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-[11px] font-bold font-mono text-accent tracking-tighter">
+            <p className="text-xs font-bold font-mono text-accent tracking-tighter">
               %{percentUsed.toFixed(1)}
             </p>
           </div>

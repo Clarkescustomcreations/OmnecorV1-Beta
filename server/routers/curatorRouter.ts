@@ -5,6 +5,40 @@ import { curatedPosts, discoveredArticles } from "../../drizzle/schema";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
+/** Character budget per platform for generated post copy. */
+const PLATFORM_LIMITS: Record<string, number> = {
+  x: 280, twitter: 280, linkedin: 3000, facebook: 2000, instagram: 2200, youtube: 1000,
+};
+
+/**
+ * Generate a real, platform-appropriate social post from an article using the
+ * AI provider. Falls back to a simple template only if the model is
+ * unavailable, so curation always yields usable content (never a placeholder).
+ */
+async function generatePostDraft(
+  aiProvider: { chat: (args: any) => Promise<string> },
+  article: { title: string | null; content: string | null; summary: string | null },
+  platform: string,
+): Promise<string> {
+  const limit = PLATFORM_LIMITS[platform.toLowerCase()] ?? 280;
+  const prompt = `You are a social media content curator. Generate a concise, engaging ${platform} post (max ${limit} characters) based on the following article. Output only the post text, no preamble.
+
+Article Title: ${article.title || "Untitled"}
+Content: ${(article.content || article.summary || "").slice(0, 1500)}`;
+
+  try {
+    const draft = await aiProvider.chat({
+      providerId: "anthropic",
+      modelId: "claude-opus-4-1",
+      messages: [{ role: "user", content: prompt }],
+      maxTokens: 400,
+    });
+    return draft.trim().slice(0, limit);
+  } catch {
+    return `Check out: "${article.title || "New article"}" - ${(article.summary || article.content || "").slice(0, 80).trim()}...`;
+  }
+}
+
 export const curatorRouter = router({
   listByStatus: protectedProcedure
     .input(z.object({
@@ -38,8 +72,8 @@ export const curatorRouter = router({
       return result[0] || null;
     }),
   curateArticle: protectedProcedure
-    .input(z.object({ articleId: z.number() }))
-    .mutation(async ({ input }) => {
+    .input(z.object({ articleId: z.number(), platform: z.string().default("x") }))
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       if (!db) return { success: false, message: "Database not available" };
 
@@ -52,12 +86,20 @@ export const curatorRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
       }
 
+      // Actually generate the post copy with AI (was a hardcoded placeholder).
+      const content = await generatePostDraft(ctx.services.aiProvider, article[0], input.platform);
+
       await db.insert(curatedPosts).values({
         articleId: input.articleId,
-        platform: "x",
-        content: "AI-generated content pending review",
+        platform: input.platform,
+        content,
         status: "pending_review",
       });
+
+      // Mark the source article as processed so it isn't re-curated.
+      await db.update(discoveredArticles)
+        .set({ isProcessed: 1 })
+        .where(eq(discoveredArticles.id, input.articleId));
 
       return { success: true, message: "Article curated successfully" };
     }),
@@ -131,27 +173,7 @@ export const curatorRouter = router({
         throw new TRPCError({ code: "NOT_FOUND", message: "Article not found" });
       }
 
-      const articleData = article[0];
-      const prompt = `You are a social media content curator. Generate a concise, engaging social media post (max 280 characters for X/Twitter) based on the following article.
-
-Article Title: ${articleData.title || "Untitled"}
-Content: ${(articleData.content || articleData.summary || "").slice(0, 1000)}
-
-Create a single social media post that captures the essence of this article in an engaging way.`;
-
-      try {
-        const draft = await ctx.services.aiProvider.chat({
-          providerId: "anthropic",
-          modelId: "claude-opus-4-1",
-          messages: [{ role: "user", content: prompt }],
-          maxTokens: 300,
-        });
-
-        return { success: true, draft };
-      } catch (err) {
-        // If AI unavailable, return template
-        const fallback = `Check out: "${articleData.title || "New article"}" - ${(articleData.summary || articleData.content || "").slice(0, 80).trim()}...`;
-        return { success: true, draft: fallback };
-      }
+      const draft = await generatePostDraft(ctx.services.aiProvider, article[0], "x");
+      return { success: true, draft };
     }),
 });

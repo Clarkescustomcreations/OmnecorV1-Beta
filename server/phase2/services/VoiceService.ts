@@ -24,6 +24,7 @@
  */
 
 import { VOICE_CONFIG } from "../config/index.js";
+import { getSetting } from "./SettingsService.js";
 import fs from "fs/promises";
 import path from "path";
 import { EventEmitter } from "events";
@@ -61,6 +62,8 @@ export interface TranscribeRequest {
   audioFilePath: string;
   /** Original filename (for MIME type detection) */
   filename?: string;
+  /** Whisper model size override; defaults to the `sttModel` app setting. */
+  model?: string;
 }
 
 /** Word-level timestamp from Whisper */
@@ -97,6 +100,8 @@ export interface SynthesizeRequest {
   speakerWavPath: string;
   /** Language code (default: "en") */
   language?: string;
+  /** TTS backend override; defaults to the `ttsEngine` app setting. */
+  engine?: string;
 }
 
 /** TTS synthesis result */
@@ -277,6 +282,8 @@ export class VoiceService extends EventEmitter {
     const formData = new FormData();
     const blob = new Blob([new Uint8Array(fileBuffer)], { type: mimeType });
     formData.append("file", blob, resolvedFilename);
+    // Whisper model size is user-configurable via Settings → Voice (sttModel).
+    formData.append("model", request.model || getSetting("sttModel", "base"));
 
     try {
       const response = await fetch(`${this.whisperUrl}/transcribe`, {
@@ -403,6 +410,8 @@ export class VoiceService extends EventEmitter {
       text,
       speaker_wav_path: speakerWavPath,
       language: language || "en",
+      // TTS backend is user-configurable via Settings → Voice (ttsEngine).
+      engine: request.engine || getSetting("ttsEngine", "kokoro"),
     };
 
     try {

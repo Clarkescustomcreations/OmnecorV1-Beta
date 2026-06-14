@@ -25,7 +25,7 @@
  */
 
 import { EventEmitter } from "events";
-import { spawn, execSync } from "child_process";
+import { spawn, execFileSync } from "child_process";
 import path from "path";
 import fs from "fs/promises";
 import { ProcessManagerService } from "./ProcessManagerService.js";
@@ -182,8 +182,13 @@ export class ESPToolBridge extends EventEmitter {
     if (process.platform === "win32") {
       try {
         // Use PowerShell to list COM ports with friendly names
-        const raw = execSync(
-          "powershell -NoProfile -Command \"Get-PnpDevice -Class Ports -Status OK | Select-Object FriendlyName,InstanceId | ConvertTo-Json -Compress\"",
+        const raw = execFileSync(
+          "powershell",
+          [
+            "-NoProfile",
+            "-Command",
+            "Get-PnpDevice -Class Ports -Status OK | Select-Object FriendlyName,InstanceId | ConvertTo-Json -Compress",
+          ],
           { timeout: 5000, encoding: "utf-8" }
         );
         const items: Array<{ FriendlyName?: string; InstanceId?: string }> =

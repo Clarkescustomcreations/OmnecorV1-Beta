@@ -1,5 +1,12 @@
 # Changelog
 
+## [Unreleased] - 2026-06-14 — Documentation Consolidation
+
+### Changed
+
+- **Consolidated all working/planning docs into a single local-only `Context/` folder.** Twelve scattered markdown files were merged into the ten thematic Context documents and then removed: `input-tracker.md` + `ui_audit_report.md` + `APK-input-tracker.md` → `UI-Registry.md`; `master-feature-plan.md` → `Project-Overview.md`; `jun14-review.md` (detailed findings) + `BUILD.md` + `APK-feature-plan.md` + `APK-todo.md` → `Build-Plan.md` (appendices A–D); `master-todo.md` + `FUNCTIONAL-AUDIT.md` + `Beta-Code-Sweep.md` → `Progress-Tracker.md` (archives A–C). No information was lost in the merge.
+- **`Context/` is now git-ignored** (consolidated working docs are local-only), alongside the agent/session files `CHANGELOG.md`, `CLAUDE.md`, `AGENTS.md`, `memory.md`, and `.claude/`.
+
 ## [2.4.1-beta.1] - 2026-06-12 — Production-Readiness Sweep & Audit Log Retention
 
 ### Added

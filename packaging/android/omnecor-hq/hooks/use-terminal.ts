@@ -39,16 +39,50 @@ function clip(s: string): string {
   return s.length > MAX_BUFFER ? s.slice(s.length - MAX_BUFFER) : s;
 }
 
+type OutputListener = (chunk: string) => void;
+
 export function useTerminal() {
   const [status, setStatus]       = useState<TerminalStatus>("disconnected");
   const [output, setOutput]       = useState("");
   const [sessionId, setSessionId] = useState<string | null>(null);
   const wsRef = useRef<WebSocket | null>(null);
+  // Registry of raw-output subscribers (for the xterm.js WebView path).
+  const listenersRef = useRef<Set<OutputListener>>(new Set());
 
-  const connect = useCallback(() => {
+  /** Emit a raw chunk to all xterm subscribers. */
+  const emitRaw = useCallback((chunk: string) => {
+    listenersRef.current.forEach((fn) => {
+      try { fn(chunk); } catch { /* ignore listener errors */ }
+    });
+  }, []);
+
+  /**
+   * Register a listener for raw PTY output (including ANSI escapes).
+   * Returns an unsubscribe function.
+   */
+  const subscribeOutput = useCallback((fn: OutputListener): (() => void) => {
+    listenersRef.current.add(fn);
+    return () => { listenersRef.current.delete(fn); };
+  }, []);
+
+  /**
+   * Send a PTY resize notification to the PC.
+   * Silently ignored if the socket is not open.
+   */
+  const sendResize = useCallback((cols: number, rows: number) => {
+    const ws = wsRef.current;
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: "pty:resize", data: { cols, rows } }));
+    }
+  }, []);
+
+  /** Open (or reuse) the WebSocket and spawn a PTY with the given initial size. */
+  const connect = useCallback((cols = 80, rows = 24) => {
     if (!isServerConfigured()) {
       setStatus("error");
-      setOutput("[no server configured — set the PC IP in Settings → Omnecor Server]\n");
+      const msg = "[no server configured — set the PC IP in Settings → Omnecor Server]\r\n";
+      setOutput(msg);
+      emitRaw(msg);
       return;
     }
     const existing = wsRef.current;
@@ -79,7 +113,7 @@ export function useTerminal() {
         wsRef.current = ws;
 
         ws.onopen = () => {
-          ws.send(JSON.stringify({ type: "pty:spawn", data: { cols: 80, rows: 24 } }));
+          ws.send(JSON.stringify({ type: "pty:spawn", data: { cols, rows } }));
         };
 
         ws.onmessage = (event) => {
@@ -90,16 +124,29 @@ export function useTerminal() {
                 setSessionId(msg.data?.sessionId ?? null);
                 setStatus("ready");
                 break;
-              case "pty:output":
-                setOutput((prev) => clip(prev + clean(msg.data?.output ?? "")));
+              case "pty:output": {
+                const raw: string = msg.data?.output ?? "";
+                // Raw path: deliver to xterm.js subscribers with ANSI intact.
+                emitRaw(raw);
+                // Compat path: keep the stripped accumulated string for callers
+                // that still read `output` directly.
+                setOutput((prev) => clip(prev + clean(raw)));
                 break;
-              case "pty:exit":
+              }
+              case "pty:exit": {
+                const synthetic = `\r\n[process exited — code ${msg.data?.exitCode ?? "?"}]\r\n`;
+                emitRaw(synthetic);
                 setOutput((prev) => prev + `\n[process exited — code ${msg.data?.exitCode ?? "?"}]\n`);
                 setStatus("disconnected");
                 break;
-              case "error":
-                setOutput((prev) => prev + `\n[error] ${msg.data?.message ?? "unknown"}\n`);
+              }
+              case "error": {
+                const errMsg = msg.data?.message ?? "unknown";
+                const synthetic = `\r\n[error] ${errMsg}\r\n`;
+                emitRaw(synthetic);
+                setOutput((prev) => prev + `\n[error] ${errMsg}\n`);
                 break;
+              }
             }
           } catch {
             /* ignore malformed frames */
@@ -113,7 +160,7 @@ export function useTerminal() {
         };
       })
       .catch(() => setStatus("error"));
-  }, []);
+  }, [emitRaw]);
 
   const sendInput = useCallback((text: string) => {
     const ws = wsRef.current;
@@ -156,5 +203,17 @@ export function useTerminal() {
     };
   }, []);
 
-  return { status, output, sessionId, connect, disconnect, sendInput, sendCommand, interrupt, clear };
+  return {
+    status,
+    output,
+    sessionId,
+    connect,
+    disconnect,
+    sendInput,
+    sendCommand,
+    interrupt,
+    clear,
+    sendResize,
+    subscribeOutput,
+  };
 }
