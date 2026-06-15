@@ -118,7 +118,18 @@ function hasExt(name: string, exts: string[]): boolean {
 }
 
 function isGguf(name: string): boolean { return hasExt(name, GGUF_EXTS); }
-function isTask(name: string): boolean { return hasExt(name, TASK_EXTS); }
+
+/**
+ * whisper.rn STT models are `ggml-*.bin` (whisper.cpp GGML) and live in the same
+ * /models dir as the LLMs. They are NOT LiteRT/MediaPipe models, so they must be
+ * excluded from the `.task`/.bin/.litertlm scanner — otherwise a downloaded
+ * Whisper model would show up (and fail to load) in the MediaPipe model list.
+ */
+function isWhisperGgml(name: string): boolean {
+  const lower = name.toLowerCase();
+  return lower.startsWith("ggml-") && lower.endsWith(".bin");
+}
+function isTask(name: string): boolean { return hasExt(name, TASK_EXTS) && !isWhisperGgml(name); }
 
 /**
  * Scan the app's models directory for ALL local .gguf files — including ones

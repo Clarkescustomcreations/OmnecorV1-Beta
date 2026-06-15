@@ -62,7 +62,16 @@ const config: ExpoConfig = {
     edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
-    permissions: ["POST_NOTIFICATIONS", "RECORD_AUDIO", "INTERNET"],
+    permissions: [
+      "POST_NOTIFICATIONS",
+      "RECORD_AUDIO",
+      "INTERNET",
+      // Always-Listening voice mode runs a typed foreground service that holds
+      // the mic open for wake-word detection while the app is backgrounded.
+      "FOREGROUND_SERVICE",
+      "FOREGROUND_SERVICE_MICROPHONE",
+      "WAKE_LOCK",
+    ],
     intentFilters: [
       {
         action: "VIEW",

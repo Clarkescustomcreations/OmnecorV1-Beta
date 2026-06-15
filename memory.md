@@ -1,124 +1,128 @@
-# Memory — Omnecor Phase 4 Complete
+# Memory — Omnecor Phase 5 Started (F23 Complete)
 
-Last updated: 2026-06-14
+Last updated: 2026-06-15
 
 ---
 
-## DO NOT REMOVE THIS NOTE **Important Read AGENTS.md Before Beginning The Next Session**
+## DO NOT REMOVE THIS NOTE **Important: Read AGENTS.md Before Beginning The Next Session**
 
 ---
 
 ## What was built
 
-### Phase 4: Desktop Shell & Theme Modernization (F16–F22 — all complete)
+### Phase 5, Feature 23: Secure KeyStore Encryption — ✅ COMPLETE
 
-- **F16 React 19 Electron** (`packaging/electron-app/package.json`): bumped `react`/`react-dom` from
-  `^18.2.0` → `^19.2.1` and `@types/react`/`@types/react-dom` to `^19.1.0`. Eliminates
-  `useContext of null` duplicate-module crash in Electron builds.
+Scope: get the OMMESH secret and chat histories out of plaintext AsyncStorage and
+into the hardware KeyStore (Android KeyStore / iOS Keychain) via `expo-secure-store`.
+All changes are in `packaging/android/omnecor-hq/` (the APK workspace only).
 
-- **F17 tRPC alignment** (`packaging/android/omnecor-hq/package.json`): changed `@trpc/client`,
-  `@trpc/react-query`, `@trpc/server` from exact pin `11.17.0` → range `^11.8.0` to match server.
-  pnpm resolves all three to the same version.
+- **NEW: `lib/_core/secure-crypto.ts`** — hardware-backed **envelope encryption** helper.
+  SecureStore caps each value at ~2048 bytes, too small for chat histories, so:
+  - A random 256-bit data key (DEK) lives in SecureStore (slot `omnecor_dek_v1`), created
+    lazily on first use. Hardware-backed; never leaves the KeyStore-protected store.
+  - From the DEK we derive two domain-separated sub-keys: `encKey = SHA256(master || "omnecor-enc")`,
+    `macKey = SHA256(master || "omnecor-mac")` (cached in module memory).
+  - `encryptString(plaintext)` → `v1.<ivB64>.<ctB64>.<macHex>` — AES-256-CBC + PKCS7,
+    then HMAC-SHA256 over `ivB64.ctB64` (encrypt-then-MAC). `decryptString` verifies the
+    MAC (constant-time-ish `safeEqual`) before decrypting; returns null on any
+    format/MAC/decode failure (callers treat as "no data"). `isEncrypted(v)` heuristic =
+    `v1.` prefix + 4 dot-parts. Bulk ciphertext is stored in AsyncStorage.
 
-- **F18 Tailwind tokens** (`packaging/android/omnecor-hq/theme.config.js`): aligned all dark-mode
-  HEX values to UI-Tokens.md §5.1 (`background: #0e0f14`, `card: #151620`, `foreground: #f8f9fa`,
-  `primary: #1d4ed8`, `border: #2a2b36`). Added missing `accentCyan: #06b6d4` and
-  `destructive: #dc2626`.
+- **`lib/_core/server-config.ts`** — OMMESH secret (`omnecor_ommesh_secret`) now in SecureStore.
+  - `loadServerConfig`: reads secret from SecureStore; migrates any legacy plaintext
+    AsyncStorage secret into SecureStore, then `removeItem`s the plaintext —
+    **but only scrubs after the SecureStore write succeeds** (KeyStore-unavailable devices
+    keep the plaintext to retry next launch, so the secret is never lost).
+  - `saveServerConfig`: writes the secret ONLY to SecureStore (empty string → `deleteItemAsync`).
+    IP / port / node name stay in AsyncStorage `multiSet` (not sensitive).
+  - All secret consumers already go through `getOmmeshSecret()` (reads in-memory `_secret`),
+    so no other code touched. `mobile-mesh-node.ts` sends it over WS (expected).
 
-- **F19 Brain map external sync** (`brainMapStore.ts`, `ExternalBrainMapWindow.tsx`):
-  - Added `collapsedFolderIds` to BroadcastChannel broadcasts in `toggleFolderCollapse`.
-  - Added `requestInitialState` / `initialState` handshake — external window sends request on mount
-    via `omnecor_brain_map_store` channel; main window responds with full graph state.
-  - External window opens with correct state immediately (no stale empty-canvas flash).
+- **`lib/_core/chat-store.ts`** — chat histories encrypted at rest.
+  - `saveChats`: `encryptString(JSON.stringify(snapshot))` → AsyncStorage.
+  - `loadChats`: if stored value `isEncrypted` → `decryptString`; else treats it as a
+    legacy plaintext snapshot, uses it, and re-persists it encrypted (best-effort migration).
+  - `saveChats`/`clearChats` now `console.warn` on failure (was silent `catch {}`, per
+    AGENTS "no silent catch" rule).
 
-- **F20 Real-time telemetry** (`WebSocketServer.ts`, `Dashboard.tsx`):
-  - `startTelemetryPush()` added to WS server — 2 s interval broadcasts CPU % (os.cpus() delta),
-    RAM (os.freemem/totalmem), GPU VRAM (nvidia-smi, 5 s cache) to `system:metrics` channel.
-  - `"systemMetrics"` added to `ServerMessage` type union.
-  - Dashboard subscribes via `useOmnecorSocket` + `subscribe("system:metrics")`. Renders a System
-    Monitor card with live progress bars (CPU / RAM / VRAM) above the features grid.
-  - `startTelemetryPush()` called in `server/_core/index.ts` after WS init.
+- **Dependency added:** `crypto-js ^4.2.0` (+ dev `@types/crypto-js ^4.2.2`) in the APK
+  workspace package.json. Pure-JS, Hermes-safe. Its `WordArray.random` pulls from
+  `crypto.getRandomValues`, which is polyfilled app-wide by `react-native-get-random-values`
+  (already imported at `app/_layout.tsx:4`).
 
-- **F21 mDNS discovery** (`MeshDiscoveryService.ts`):
-  - Replaced stub constructor with real `bonjour` implementation.
-  - Advertises this node as `omnecor-<local-ip>` type `omnecor` on `$PORT`.
-  - Browses for peers; emits `nodeDiscovered` / `nodeLost` events; maintains live `nodes` map.
-  - `destroy()` method for clean shutdown. Graceful fallback if bonjour unavailable.
-  - Import: uses static `import bonjour from "bonjour"` (moduleResolution: bundler allows synthetic default).
-
-- **F22 RVC stub fix** (`rvc_server.py`):
-  - `_stub_synthesise` now returns original 16 kHz audio (identity pass-through) instead of fake
-    220 Hz sine wave. Falls back to zero-filled silence only when audio is unavailable.
-  - `convert()` passes `audio_16k` down to `_synthesise` → `_stub_synthesise` via keyword arg.
-  - Real HuBERT + SynthesizerTrnMs768NSFsid path is unchanged.
+Also ran `/review` (project skill) on the change — it found 2 minor issues, both fixed
+(the secret-loss-on-write-failure guard, and the silent chat-store catches above).
 
 ---
 
 ## Decisions made
 
-- **Single libSQL/SQLite engine** — no MySQL tier; canonical local DB is `~/.omnecor/data/omnecor.db`.
-- **No MySQL migration** — user never hosted on external server; DB starts fresh.
-- **Mobile buttons**: always import `Pressable` from `@/components/pressable` (cssInterop'd gesture-handler).
-- **APK must be RELEASE build** — debug APK doesn't bundle JS (needs Metro dev server).
-- **Release APK signing**: env-var override pattern for CI; dev defaults in build.gradle only.
-- **nanoid Metro fix is permanent** — intercepts `moduleName === "nanoid"` → `index.browser.js`.
-- **Settings deferred controls**: build when subsystems exist (Phase 5 F26).
-- **LLM procedure tiers**: `cloudProcedure` for any external-network call.
-- **APK CSPRNG**: real `react-native-get-random-values` (Web Crypto).
-- **bonjour import**: static `import bonjour from "bonjour"` (not dynamic) — moduleResolution: bundler enables synthetic default for CJS `export =` modules.
-- **APK rebuild + device test**: deferred to end of Phase 5 (F27 End-to-End Smoke Tests).
+- **Envelope encryption, not raw SecureStore for chat histories.** SecureStore's ~2048-byte
+  value limit makes storing chat JSON directly impossible/unreliable — the KeyStore holds the
+  *key*, AsyncStorage holds the AES-256 ciphertext. This is the correct realization of the
+  F23 plan wording ("save chat histories inside the hardware KeyStore").
+- **crypto-js chosen** over aes-js: single self-contained pure-JS dep providing AES + HMAC-SHA256
+  + base64, Hermes-compatible, uses the existing CSPRNG. Hand-rolling AES would violate good
+  security practice; WebCrypto `subtle` is not available in Hermes; `expo-crypto` lacks a cipher.
+- **IP/port/nodeName are NOT secrets** — they stay in AsyncStorage; only the OMMESH secret moved.
+- Plaintext is scrubbed only after a confirmed SecureStore write (no data-loss window).
+
+(Carried-forward decisions from prior phases still hold — single libSQL/SQLite engine;
+`cloudProcedure` for external APIs; `Pressable` from `@/components/pressable`; release APK
+required; `bonjour` static import; integer PKs → `z.number()`; nanoid Metro fix permanent.)
 
 ---
 
 ## Problems solved
 
-- **`crypto.randomFillSync is not a function`**: Metro intercepts nanoid → `index.browser.js`.
-- **`libcdsprpc.so not found`**: `patches/llama.rn.patch` forces `hasHexagon=false`.
-- **Duplicate-React crash**: Metro resolver pins `react`/`react-dom` to app's single copy.
-- **`VoiceService` speaker wav path throws**: `streamDialogue()` bypasses VoiceService.
-- **crewai `step_callback` TypeError**: guarded with try/except.
-- **`"systemMetrics"` not in ServerMessage union**: added to type — was causing TS2322 errors.
-- **bonjour CJS dynamic import type error**: use static import, not `import()`.
-- **`ENV.port` doesn't exist**: use `parseInt(process.env.PORT ?? "3000", 10)` in MeshDiscoveryService.
+- **SecureStore 2048-byte limit** would break direct chat-history storage → solved with
+  envelope encryption (key in KeyStore, ciphertext in AsyncStorage).
+- **crypto-js randomness in Hermes**: crypto-js 4.x THROWS (no Math.random fallback) if
+  `crypto.getRandomValues` is absent. It's present because `react-native-get-random-values`
+  is imported at app entry — confirmed before relying on it.
+- **pnpm transient `ENOENT ... rename ... esbuild`** during `pnpm add` (electron-vite nested
+  esbuild race) left package.json half-written. Fix: re-run `pnpm add crypto-js@^4.2.0`, then
+  `pnpm install` from repo root to relink the workspace symlink
+  (`packaging/android/omnecor-hq/node_modules/crypto-js`).
+- **Secret-loss edge case** (review finding): scrubbing plaintext before confirming the
+  KeyStore write could lose the secret on KeyStore-unavailable devices → reordered.
 
 ---
 
 ## Current state
 
-- Desktop: `pnpm check` (tsc --noEmit) clean. `pnpm test` → 18 files / **323/323 passing**.
-- `Context/Progress-Tracker.md`: F16–F22 marked [x]; Phase 4 ✅ COMPLETE.
-- `Context/Build-Plan.md`: status 22/27 features done.
-- **APK**: nanoid Metro fix in `metro.config.js` but APK NOT rebuilt yet — deferred to Phase 5 F27.
-
----
-
-## What was completed across ALL prior sessions (consolidated)
-
-**Phase 1 (Security hardening)** — F1–F5 complete.
-**Phase 2 (DB layer)** — F6–F10 complete.
-**Phase 3 (AI services)** — F11–F15 complete.
-**Phase 4 (Desktop/Theme)** — F16–F22 complete.
-**Mobile APK overhaul** — complete (screens wired, APK built, not yet retested post-nanoid-fix).
-**Desktop social pipeline** — complete (discovery, curation, publish, schedule).
-**DB unification** — complete (single libSQL/SQLite, mysql2 removed).
+- **Gates GREEN:** APK `tsc --noEmit` = 0 · root `pnpm check` = 0 · `pnpm test` = 323/323.
+- `Context/Progress-Tracker.md`: F23 marked [x] with Done note; "Current Status" → Phase 5
+  (1/5), Next Task = Feature 24.
+- **APK NOT rebuilt** — crypto-js is a new bundle dep; the rebuild + device test is scoped
+  under F27 (no rebuild needed now; `tsc` validates types).
 
 ---
 
 ## Next session starts with
 
-1. **Always read `/home/linux/Documents/OmnecorV1-Beta/AGENTS.md` first.**
-2. **Phase 5, Feature 23**: Secure KeyStore Encryption — replace unencrypted `AsyncStorage` with
-   `expo-secure-store` in `packaging/android/omnecor-hq/lib/_core/server-config.ts` for
-   `omnecor_ommesh_secret` and chat histories.
-3. Continue F24 → F25 → F26 → F27 per Build-Plan order.
-4. **F27 includes**: rebuild APK (`pnpm prebuild:android && pnpm apk:release`), test on Samsung
-   S25 Ultra (nanoid crypto fix, local-account register, tabs load).
+1. **Read `/home/linux/Documents/OmnecorV1-Beta/AGENTS.md` first** (mandatory reading order).
+2. **Phase 5, Feature 24: Mobile 3D Canvas Interactivity** —
+   File: `client/src/pages/3DDesigner.tsx` (per Build-Plan). Task: implement real
+   touch-rotation, mesh selection, and format-export logic inside the mobile 3D Viewer
+   WebView container. NOTE: APK-todo currently says the mobile 3D viewer is "preview-only,
+   AI panel removed" — reconcile what F24 actually targets (mobile viewer wiring to
+   `blender`/`comfy` for real models) before building.
+3. Continue F25 → F26 → F27 in order.
+4. **F27** includes: rebuild APK (`pnpm prebuild:android && pnpm apk:release`) — will now
+   bundle crypto-js — and device-test on Samsung S25 Ultra (nanoid crypto fix, local
+   register, tabs load, plus verify F23: secret persists in KeyStore, chats survive restart).
 
 ---
 
 ## Open questions
 
-- APK crypto fix not yet validated on device — must rebuild and test in F27.
-- On-device CPU inference speed (NPU/Hexagon disabled) — acceptable for target use cases?
-- Live end-to-end publishing test against real X/LinkedIn/FB/IG APIs (needs connected OAuth tokens).
-- Phase 5 F26 Settings controls (telemetry, apiServerEnabled/Port, etc.) — need subsystems first.
+- APK not yet validated on device (crypto fix + now F23 KeyStore/encryption) — must rebuild
+  and test in F27.
+- F24 scope ambiguity: Build-Plan says "mobile 3D Viewer WebView container" but the APK
+  3D screen was made preview-only (AI panel removed) in a prior pass. Confirm target before coding.
+- Auto-memory note ([[omnecor-audit]]) still flags the social pipeline (discovery + publishing)
+  as a shell, which contradicts the "social pipeline NOW REAL" entry in Progress-Tracker —
+  worth reconciling (⚠️ "not yet live-tested against real platform APIs" is the likely truth).
+- On-device CPU inference speed (NPU/Hexagon disabled) — acceptable for target use?
+- Phase 5 F26 Settings controls need their subsystems to exist first.

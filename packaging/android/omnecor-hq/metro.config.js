@@ -31,11 +31,23 @@ const nwConfig = withNativeWind(config, {
 // fall through to normal resolution.
 const NANOID_BROWSER = path.resolve(__dirname, "node_modules/nanoid/index.browser.js");
 
+// ── whisper.rn: redirect the bare root specifier ──────────────────────────────
+// whisper.rn's package.json "exports" map only declares subpaths ("./*") and has
+// NO "." root entry. With Metro's package-exports enabled (Expo SDK 54 default),
+// the documented `import ... from "whisper.rn"` cannot resolve. Point the root
+// specifier at the package's CommonJS entry; subpaths (whisper.rn/realtime-
+// transcription, …) still resolve normally through exports. Mirrors the nanoid
+// intercept below. tsconfig `paths` maps the same specifier for type-checking.
+const WHISPER_RN_INDEX = path.resolve(__dirname, "node_modules/whisper.rn/lib/commonjs/index.js");
+
 const SINGLETONS = ["react", "react-dom"];
 const prevResolveRequest = nwConfig.resolver.resolveRequest;
 nwConfig.resolver.resolveRequest = (context, moduleName, platform) => {
   if (moduleName === "nanoid") {
     return { type: "sourceFile", filePath: NANOID_BROWSER };
+  }
+  if (moduleName === "whisper.rn") {
+    return { type: "sourceFile", filePath: WHISPER_RN_INDEX };
   }
   const hit = SINGLETONS.find((n) => moduleName === n || moduleName.startsWith(n + "/"));
   if (hit) {

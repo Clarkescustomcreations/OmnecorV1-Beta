@@ -4,9 +4,13 @@
  * derive the correct base URL without relying on a compile-time env var.
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import * as SecureStore from "expo-secure-store";
 
 const KEY_IP     = "omnecor_server_ip";
 const KEY_PORT   = "omnecor_server_port";
+// The OMMESH secret is a credential — it lives in the hardware KeyStore via
+// SecureStore, never plaintext AsyncStorage. IP / port / node name are not
+// sensitive and stay in AsyncStorage.
 const KEY_SECRET = "omnecor_ommesh_secret";
 const KEY_NAME   = "omnecor_node_name";
 
@@ -20,8 +24,34 @@ let _name   = "Phone";
 export async function loadServerConfig(): Promise<void> {
   _ip     = (await AsyncStorage.getItem(KEY_IP))     ?? "";
   _port   = (await AsyncStorage.getItem(KEY_PORT))   ?? "3000";
-  _secret = (await AsyncStorage.getItem(KEY_SECRET)) ?? "";
   _name   = (await AsyncStorage.getItem(KEY_NAME))   ?? "Phone";
+
+  // Read the OMMESH secret from the hardware KeyStore. Migrate any pre-existing
+  // plaintext secret left in AsyncStorage by older builds, then scrub it.
+  let secret = "";
+  try {
+    secret = (await SecureStore.getItemAsync(KEY_SECRET)) ?? "";
+  } catch (e) {
+    console.warn("[ServerConfig] SecureStore read failed:", e);
+  }
+  if (!secret) {
+    const legacy = await AsyncStorage.getItem(KEY_SECRET);
+    if (legacy) {
+      secret = legacy; // keep working this session regardless of KeyStore state
+      try {
+        await SecureStore.setItemAsync(KEY_SECRET, legacy);
+        // Only scrub the plaintext copy once it is safely in the KeyStore —
+        // otherwise a KeyStore-unavailable device would lose the secret entirely.
+        await AsyncStorage.removeItem(KEY_SECRET);
+      } catch (e) {
+        console.warn(
+          "[ServerConfig] SecureStore migration write failed; leaving plaintext secret in place to retry next launch:",
+          e,
+        );
+      }
+    }
+  }
+  _secret = secret;
 }
 
 export function getServerBaseUrl(): string {
@@ -78,9 +108,15 @@ export async function saveServerConfig(opts: {
   _secret = (opts.secret ?? _secret).trim();
   _name   = (opts.nodeName ?? _name).trim();
   await AsyncStorage.multiSet([
-    [KEY_IP,     _ip],
-    [KEY_PORT,   _port],
-    [KEY_SECRET, _secret],
-    [KEY_NAME,   _name],
+    [KEY_IP,   _ip],
+    [KEY_PORT, _port],
+    [KEY_NAME, _name],
   ]);
+  // Secret goes to the KeyStore, not AsyncStorage. Empty string clears it.
+  try {
+    if (_secret) await SecureStore.setItemAsync(KEY_SECRET, _secret);
+    else await SecureStore.deleteItemAsync(KEY_SECRET);
+  } catch (e) {
+    console.warn("[ServerConfig] SecureStore secret write failed:", e);
+  }
 }

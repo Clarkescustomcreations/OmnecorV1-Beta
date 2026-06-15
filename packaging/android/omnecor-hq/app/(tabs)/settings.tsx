@@ -28,6 +28,7 @@ import {
   loadTaskModel, isMediapipeAvailable, getLoadedTaskPath,
 } from "@/lib/_core/mediapipe-inference";
 import * as Auth from "@/lib/_core/auth";
+import { AlwaysListenSettings } from "@/components/always-listen-settings";
 
 export default function SettingsScreen() {
   const colors      = useColors();
@@ -371,6 +372,9 @@ export default function SettingsScreen() {
               </View>
             )}
           </View>
+
+          {/* ── Always Listening ────────────────────────────────────────── */}
+          <AlwaysListenSettings />
 
           {/* ── Phone AI Model ───────────────────────────────────────────── */}
           <View>

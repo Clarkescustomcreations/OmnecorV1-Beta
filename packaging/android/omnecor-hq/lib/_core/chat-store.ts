@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { decryptString, encryptString, isEncrypted } from "./secure-crypto";
 
 const STORAGE_KEY = "omnecor_chats";
 
@@ -26,7 +27,23 @@ export async function loadChats(): Promise<ChatSnapshot | null> {
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) return null;
-    const parsed = JSON.parse(raw) as ChatSnapshot;
+
+    let json: string | null;
+    if (isEncrypted(raw)) {
+      json = await decryptString(raw);
+    } else {
+      // Legacy plaintext snapshot from an older build — read it, then re-persist
+      // it encrypted so it never sits in plaintext again.
+      json = raw;
+      try {
+        await AsyncStorage.setItem(STORAGE_KEY, await encryptString(raw));
+      } catch {
+        /* migration is best-effort; fall through with the plaintext we read */
+      }
+    }
+    if (!json) return null;
+
+    const parsed = JSON.parse(json) as ChatSnapshot;
     if (!parsed || !Array.isArray(parsed.sessions) || parsed.sessions.length === 0) {
       return null;
     }
@@ -38,16 +55,18 @@ export async function loadChats(): Promise<ChatSnapshot | null> {
 
 export async function saveChats(snapshot: ChatSnapshot): Promise<void> {
   try {
-    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(snapshot));
-  } catch {
-    // swallow errors — persistence is best-effort
+    const cipher = await encryptString(JSON.stringify(snapshot));
+    await AsyncStorage.setItem(STORAGE_KEY, cipher);
+  } catch (e) {
+    // persistence is best-effort, but surface why it failed
+    console.warn("[ChatStore] Failed to persist encrypted chats:", e);
   }
 }
 
 export async function clearChats(): Promise<void> {
   try {
     await AsyncStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // swallow errors
+  } catch (e) {
+    console.warn("[ChatStore] Failed to clear chats:", e);
   }
 }

@@ -25,6 +25,8 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
 import { loadServerConfig } from "@/lib/_core/server-config";
+import { loadListenConfig } from "@/lib/_core/always-listen-config";
+import { useAlwaysListenCapture } from "@/hooks/use-always-listen";
 import { startConnectionMonitor, subscribeConnection } from "@/lib/_core/connection";
 import { loadAccount, isOnboarded, getAccount, syncAccountToPc } from "@/lib/_core/account";
 import { syncChatsToPc } from "@/lib/_core/chat-sync";
@@ -49,6 +51,10 @@ export default function RootLayout() {
   useEffect(() => {
     initManusRuntime();
   }, []);
+
+  // Register the app-wide utterance capture provider for Always-Listening, so a
+  // wake event works regardless of which screen is mounted.
+  useAlwaysListenCapture();
 
   const handleSafeAreaUpdate = useCallback((metrics: Metrics) => {
     setInsets(metrics.insets);
@@ -98,6 +104,7 @@ export default function RootLayout() {
     let cancelled = false;
     (async () => {
       try { await loadServerConfig(); } catch { /* offline-safe */ }
+      try { await loadListenConfig(); } catch { /* offline-safe */ }
       try { await loadAccount(); } catch { /* offline-safe */ }
       if (cancelled) return;
       setOnboarded(isOnboarded());

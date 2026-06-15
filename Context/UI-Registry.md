@@ -2203,6 +2203,21 @@ Boots fully offline (no PC required). `app/_layout.tsx` loads config + account a
 | STT / TTS enable toggles | TOGGLE | Whisper / Device TTS | ✅ CONNECTED | Gate mic + speak() behavior |
 | Speed: 0.75× / 1.0× / 1.25× / 1.5× | BUTTON | Reading speed | ✅ CONNECTED | Sets `ttsRate` |
 
+### Section: Always Listening (added 2026-06-15, `components/always-listen-settings.tsx`)
+| Item | Type | Name | Status | Notes |
+|------|------|------|--------|-------|
+| Enable Always Listening | TOGGLE | master switch | 🟡 PARTIAL | `useAlwaysListen().start/stop` → Porcupine wake → STT → `agentMessenger.send`. Foreground-only until native FGS (build machine) |
+| Live status line | OUTPUT | state label | ✅ CONNECTED | `subscribeListenState` → off/listening/capturing/transcribing/thinking/speaking/error |
+| Picovoice access key | INPUT+BUTTON | secureTextEntry + Save | ✅ CONNECTED | `savePicovoiceAccessKey()` → SecureStore (KeyStore), never AsyncStorage |
+| Persona picker | BUTTON (list) | per-persona card | ✅ CONNECTED | `personas.list`; `saveListenConfig({personaId})` (string id) |
+| Speak replies | TOGGLE | read answer aloud | ✅ CONNECTED | `expo-speech`; `saveListenConfig({speakReplies})` |
+| Wake sensitivity Low/Medium/High | BUTTON | 0.3/0.5/0.7 | ✅ CONNECTED | `saveListenConfig({sensitivity})` |
+| Whisper model Download/Use/Delete (×3) | BUTTON | on-device STT model | ✅ CONNECTED | `WHISPER_MODELS` (`ggml-*.bin`, verified HF URLs) via `downloadModel/isModelDownloaded/deleteModel`; excluded from MediaPipe `.bin` scan |
+| Test a voice turn | BUTTON | manual one-shot | 🟡 PARTIAL | `captureAndRun()` (records ~6s) — runs once whisper.rn/Porcupine libs are in the built APK |
+| Recent activations + Clear | OUTPUT+BUTTON | audit log | ✅ CONNECTED | `getAuditLog()`/`clearAuditLog()` — encrypted ring buffer via `secure-crypto.ts` |
+
+> **Visual pattern (mobile Settings section — reuse for new APK setting blocks):** section heading `text-lg font-bold text-foreground mb-1` + subcaption `text-xs text-muted mb-4`. Cards/rows: `bg-surface border border-border rounded-lg p-4` (toggle rows add `flex-row justify-between items-center mb-3`). **Selected** card: `border-primary bg-primary/10` with label `text-primary`; unselected `border-border bg-surface` with label `text-foreground`. Primary action button: `bg-primary rounded-lg p-2 items-center active:opacity-80` + label `text-background font-semibold text-xs`. Destructive: `bg-error/20 border border-error` + `text-error`. Segmented selectors (sensitivity/speed): equal `flex-1 rounded-lg p-2 items-center`, active `bg-primary` / `text-background`, inactive `bg-surface border border-border` / `text-foreground`. Inputs: `bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm`. `Switch` uses `colors.border`/`colors.primary` track + `colors.background`/`colors.foreground` thumb. `Pressable` from `@/components/pressable`. **No hex / no raw color classes** — semantic tokens only.
+
 ### Section: Phone AI Model — download + import (added 2026-06-13, `lib/_core/model-download.ts`)
 | Item | Type | Name | Status | Notes |
 |------|------|------|--------|-------|
