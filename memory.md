@@ -1,150 +1,124 @@
-# Memory — Omnecor Phase 3 Complete / Issues Resolved
+# Memory — Omnecor Phase 4 Complete
 
 Last updated: 2026-06-14
 
 ---
 
-## DO NOT REMOVE THIS NOTE **Important Read AGENTS.md Before Begining The Next Sesssion**
- 
+## DO NOT REMOVE THIS NOTE **Important Read AGENTS.md Before Beginning The Next Session**
+
 ---
 
 ## What was built
 
-### Phase 3: Core AI Services & Pipeline Repairs (F11–F15 — all complete)
+### Phase 4: Desktop Shell & Theme Modernization (F16–F22 — all complete)
 
-- **F11 BPE tokenizer** (`server/phase2/services/ONNXEmbeddingService.ts`): replaced whitespace
-  pseudo-tokenizer with `@anthropic-ai/tokenizer` BPE encoder. `getTokenizer()` cached as class
-  member; `.encode(text, 'all')` → `Uint32Array`; capped at 512 tokens; fed to ONNX session as
-  `int64` tensor.
+- **F16 React 19 Electron** (`packaging/electron-app/package.json`): bumped `react`/`react-dom` from
+  `^18.2.0` → `^19.2.1` and `@types/react`/`@types/react-dom` to `^19.1.0`. Eliminates
+  `useContext of null` duplicate-module crash in Electron builds.
 
-- **F12 warm model cache** (`server/python_bridges/llamacpp_bridge.py`): module-level `_gen_cache`
-  / `_emb_cache` dicts + per-model `threading.Lock`; double-checked locking; `/load`, `/unload`,
-  `/loaded` endpoints added.
+- **F17 tRPC alignment** (`packaging/android/omnecor-hq/package.json`): changed `@trpc/client`,
+  `@trpc/react-query`, `@trpc/server` from exact pin `11.17.0` → range `^11.8.0` to match server.
+  pnpm resolves all three to the same version.
 
-- **F13 agent bridges** (both new files):
-  - `server/python_bridges/crewai_bridge.py` — CrewAI crew runner; falls back to Ollama httpx if
-    crewai not installed; `step_callback` guarded with `TypeError` catch for older crewai versions.
-  - `server/python_bridges/liteagent_bridge.py` — LiteAgent ReAct loop via Ollama; 8-iteration cap;
-    "Final Answer:" early-exit detection; each step emitted as JSON line to stdout.
+- **F18 Tailwind tokens** (`packaging/android/omnecor-hq/theme.config.js`): aligned all dark-mode
+  HEX values to UI-Tokens.md §5.1 (`background: #0e0f14`, `card: #151620`, `foreground: #f8f9fa`,
+  `primary: #1d4ed8`, `border: #2a2b36`). Added missing `accentCyan: #06b6d4` and
+  `destructive: #dc2626`.
 
-- **F14 LLM-driven pipeline phases** (`server/phase2/services/PipelineEngineService.ts`): replaced
-  static `phaseOutput()` with `async generatePhaseOutput()` backed by `AiProviderService.chat()`.
-  Five phase-specific system prompts (DEFINE/PLAN/EXECUTE/REVIEW/SHIP); falls back to static text
-  when Ollama offline.
+- **F19 Brain map external sync** (`brainMapStore.ts`, `ExternalBrainMapWindow.tsx`):
+  - Added `collapsedFolderIds` to BroadcastChannel broadcasts in `toggleFolderCollapse`.
+  - Added `requestInitialState` / `initialState` handshake — external window sends request on mount
+    via `omnecor_brain_map_store` channel; main window responds with full graph state.
+  - External window opens with correct state immediately (no stale empty-canvas flash).
 
-- **F15 real TTS podcast**:
-  - `server/python_bridges/podcast_engine.py`: async httpx calls to TTS server (port 8002);
-    soundfile + numpy WAV stitching with 0.25s gaps; nearest-neighbour resample to 44100 Hz.
-  - `server/phase2/services/LocalPodcastService.ts`: replaced stub with `callPodcastEngine()`
-    spawner; `streamDialogue()` calls TTS server directly via `fetch` (no VoiceService dependency).
+- **F20 Real-time telemetry** (`WebSocketServer.ts`, `Dashboard.tsx`):
+  - `startTelemetryPush()` added to WS server — 2 s interval broadcasts CPU % (os.cpus() delta),
+    RAM (os.freemem/totalmem), GPU VRAM (nvidia-smi, 5 s cache) to `system:metrics` channel.
+  - `"systemMetrics"` added to `ServerMessage` type union.
+  - Dashboard subscribes via `useOmnecorSocket` + `subscribe("system:metrics")`. Renders a System
+    Monitor card with live progress bars (CPU / RAM / VRAM) above the features grid.
+  - `startTelemetryPush()` called in `server/_core/index.ts` after WS init.
 
-### Issue resolution (open issues from prior sessions)
+- **F21 mDNS discovery** (`MeshDiscoveryService.ts`):
+  - Replaced stub constructor with real `bonjour` implementation.
+  - Advertises this node as `omnecor-<local-ip>` type `omnecor` on `$PORT`.
+  - Browses for peers; emits `nodeDiscovered` / `nodeLost` events; maintains live `nodes` map.
+  - `destroy()` method for clean shutdown. Graceful fallback if bonjour unavailable.
+  - Import: uses static `import bonjour from "bonjour"` (moduleResolution: bundler allows synthetic default).
 
-- **nanoid / Hermes crypto fix** (`packaging/android/omnecor-hq/metro.config.js`): intercepts
-  `moduleName === "nanoid"` → returns `index.browser.js` (Web Crypto path). Root cause: nanoid's
-  `"react-native": "index.js"` Metro field loads Node.js `crypto.randomFillSync` not present in
-  Hermes; `react-native-get-random-values` patches `global.crypto.getRandomValues` (different API).
-  Sub-paths fall through to default resolution.
-
-- **Release keystore** (`packaging/android/omnecor-hq/android/app/`): 4096-bit RSA keystore
-  generated (alias `omnecor-release`, 10,000-day validity). `build.gradle` configured with
-  `signingConfigs.release`; passwords via env vars `OMNECOR_KEYSTORE_PASSWORD` /
-  `OMNECOR_KEY_PASSWORD` (defaults redacted — stored in build.gradle dev defaults only).
-  `*.keystore` gitignored; `!debug.keystore` allowed.
-
-- **MySQL migration**: confirmed not needed. User never ran Omnecor on an external server.
-  `~/.omnecor/data/omnecor.db` is the libSQL embedded file created fresh by current code.
-
-- **Settings 5 controls** (telemetry, apiServerEnabled/Port, offloadLatency/poolVram, autoRestart,
-  scanOnUpload): deferred to Phase 4 F26 per user decision. No server code consumes them yet.
-
-- **Build-Plan.md updated**: added "Release Signing" section, "nanoid/Hermes crypto fix" section;
-  removed "release signing keystore" from Remaining list.
+- **F22 RVC stub fix** (`rvc_server.py`):
+  - `_stub_synthesise` now returns original 16 kHz audio (identity pass-through) instead of fake
+    220 Hz sine wave. Falls back to zero-filled silence only when audio is unavailable.
+  - `convert()` passes `audio_16k` down to `_synthesise` → `_stub_synthesise` via keyword arg.
+  - Real HuBERT + SynthesizerTrnMs768NSFsid path is unchanged.
 
 ---
 
 ## Decisions made
 
-- **Single libSQL/SQLite engine** — no MySQL tier; `~/.omnecor/data/omnecor.db` is canonical local
-  DB; `LIBSQL_URL` + `LIBSQL_AUTH_TOKEN` for networked/Turso mode.
-- **No MySQL migration** — user never hosted on a server; database starts fresh.
-- **Mobile buttons**: always import `Pressable` from `@/components/pressable` (cssInterop'd
-  gesture-handler), never from `react-native`. NativeWind v4 + new-arch swallows onPress otherwise.
+- **Single libSQL/SQLite engine** — no MySQL tier; canonical local DB is `~/.omnecor/data/omnecor.db`.
+- **No MySQL migration** — user never hosted on external server; DB starts fresh.
+- **Mobile buttons**: always import `Pressable` from `@/components/pressable` (cssInterop'd gesture-handler).
 - **APK must be RELEASE build** — debug APK doesn't bundle JS (needs Metro dev server).
 - **Release APK signing**: env-var override pattern for CI; dev defaults in build.gradle only.
-- **nanoid Metro fix is permanent** — root cause in nanoid package.json field, not a polyfill issue.
-- **Settings deferred controls**: build when subsystems exist (Phase 4 F26).
-- **LLM procedure tiers**: `cloudProcedure` for any external-network call (Sovereign mode enforced).
-- **APK CSPRNG**: real `react-native-get-random-values` (Web Crypto), not nanoid/non-secure.
+- **nanoid Metro fix is permanent** — intercepts `moduleName === "nanoid"` → `index.browser.js`.
+- **Settings deferred controls**: build when subsystems exist (Phase 5 F26).
+- **LLM procedure tiers**: `cloudProcedure` for any external-network call.
+- **APK CSPRNG**: real `react-native-get-random-values` (Web Crypto).
+- **bonjour import**: static `import bonjour from "bonjour"` (not dynamic) — moduleResolution: bundler enables synthetic default for CJS `export =` modules.
+- **APK rebuild + device test**: deferred to end of Phase 5 (F27 End-to-End Smoke Tests).
 
 ---
 
 ## Problems solved
 
-- **`crypto.randomFillSync is not a function`** on device register: Metro routes nanoid to Node.js
-  entry; fix is `index.browser.js` intercept in metro.config.js (not a polyfill import issue).
-- **`libcdsprpc.so not found` model crash**: `patches/llama.rn.patch` forces `hasHexagon=false` →
-  CPU `dotprod_i8mm` variant.
-- **Duplicate-React crash** (`useContext of null`): Metro resolver pins `react`/`react-dom` (not
-  react-native) to app's single copy.
-- **`VoiceService` speaker wav path throws**: `streamDialogue()` bypasses VoiceService, calls TTS
-  server directly via `fetch`.
-- **crewai `step_callback` TypeError**: guarded with try/except for older crewai versions.
+- **`crypto.randomFillSync is not a function`**: Metro intercepts nanoid → `index.browser.js`.
+- **`libcdsprpc.so not found`**: `patches/llama.rn.patch` forces `hasHexagon=false`.
+- **Duplicate-React crash**: Metro resolver pins `react`/`react-dom` to app's single copy.
+- **`VoiceService` speaker wav path throws**: `streamDialogue()` bypasses VoiceService.
+- **crewai `step_callback` TypeError**: guarded with try/except.
+- **`"systemMetrics"` not in ServerMessage union**: added to type — was causing TS2322 errors.
+- **bonjour CJS dynamic import type error**: use static import, not `import()`.
+- **`ENV.port` doesn't exist**: use `parseInt(process.env.PORT ?? "3000", 10)` in MeshDiscoveryService.
 
 ---
 
 ## Current state
 
 - Desktop: `pnpm check` (tsc --noEmit) clean. `pnpm test` → 18 files / **323/323 passing**.
-- Mobile: `tsc --noEmit` clean.
-- `Context/Progress-Tracker.md`: F11–F15 marked [x]; Phase 3 ✅ COMPLETE.
-- `Context/Build-Plan.md`: Phase 3 header updated ✅ COMPLETE (5/5); status 15/27 features done.
-- **APK**: nanoid Metro fix is in `metro.config.js` but APK has NOT been rebuilt yet. Current APK
-  on device still has the old nanoid resolution. Must rebuild before on-device crypto fix is live.
+- `Context/Progress-Tracker.md`: F16–F22 marked [x]; Phase 4 ✅ COMPLETE.
+- `Context/Build-Plan.md`: status 22/27 features done.
+- **APK**: nanoid Metro fix in `metro.config.js` but APK NOT rebuilt yet — deferred to Phase 5 F27.
 
 ---
 
 ## What was completed across ALL prior sessions (consolidated)
 
-**Phase 1 (Security hardening)** — F1–F5 complete: JWT_SECRET enforcement, session hardening,
-  adminProcedure/ownerProcedure tiers, audit logging, `cloudProcedure` Sovereign enforcement.
-
-**Phase 2 (DB layer)** — F6–F10 complete: Drizzle relations, out-of-band migrations, safe
-  transactions, SQLite `.returning()` for insert IDs, sovereign audit logging.
-
-**Phase 3 (AI services)** — F11–F15 complete: see above.
-
-**Mobile APK overhaul** — complete: interactive 3D viewer, offline-first load, local account auth,
-  chat with file attach + PC sync, integrations, on-device GGUF + MediaPipe inference, Terminal PTY,
-  Podcast AI script generation, desktop OAuth social login card.
-
-**Desktop social pipeline** — complete: `ArticleDiscoveryService`, `curatorRouter` AI drafts,
-  `PublishingService`/`publishExecutor`/`publishWorker` for X/LinkedIn/FB/IG.
-
-**DB unification** — complete: single libSQL/SQLite engine, `drizzle/schema.ts` sqlite-core,
-  `server/db.ts` on `@libsql/client`, auto-applied migrations, mysql2 removed.
+**Phase 1 (Security hardening)** — F1–F5 complete.
+**Phase 2 (DB layer)** — F6–F10 complete.
+**Phase 3 (AI services)** — F11–F15 complete.
+**Phase 4 (Desktop/Theme)** — F16–F22 complete.
+**Mobile APK overhaul** — complete (screens wired, APK built, not yet retested post-nanoid-fix).
+**Desktop social pipeline** — complete (discovery, curation, publish, schedule).
+**DB unification** — complete (single libSQL/SQLite, mysql2 removed).
 
 ---
 
 ## Next session starts with
 
 1. **Always read `/home/linux/Documents/OmnecorV1-Beta/AGENTS.md` first.**
-2. **Rebuild APK** with the nanoid Metro fix:
-   ```
-   cd packaging/android/omnecor-hq
-   pnpm prebuild:android && pnpm apk:release
-   ```
-3. **Test on Samsung S25 Ultra**: install new APK, verify local-account register succeeds (no
-   "crypto" error), verify tabs load.
-4. **Phase 4, Feature 16**: React 19 Version Alignment — upgrade
-   `packaging/electron-app/package.json` from React `^18.2.0` to `^19.2.1`. Then continue F17–F20
-   per Build-Plan.md order.
+2. **Phase 5, Feature 23**: Secure KeyStore Encryption — replace unencrypted `AsyncStorage` with
+   `expo-secure-store` in `packaging/android/omnecor-hq/lib/_core/server-config.ts` for
+   `omnecor_ommesh_secret` and chat histories.
+3. Continue F24 → F25 → F26 → F27 per Build-Plan order.
+4. **F27 includes**: rebuild APK (`pnpm prebuild:android && pnpm apk:release`), test on Samsung
+   S25 Ultra (nanoid crypto fix, local-account register, tabs load).
 
 ---
 
 ## Open questions
 
-- APK crypto fix not yet validated on device — must rebuild and test first.
+- APK crypto fix not yet validated on device — must rebuild and test in F27.
 - On-device CPU inference speed (NPU/Hexagon disabled) — acceptable for target use cases?
 - Live end-to-end publishing test against real X/LinkedIn/FB/IG APIs (needs connected OAuth tokens).
-- Phase 4 F26 (Settings 5 controls) — build the subsystems or remove the controls?
+- Phase 5 F26 Settings controls (telemetry, apiServerEnabled/Port, etc.) — need subsystems first.

@@ -1,15 +1,18 @@
 /** @type {const} */
 const themeColors = {
-  // Matches the main Omnecor GUI primary (Tailwind blue-700 light / blue-500 dark sidebar accent).
-  primary: { light: '#1d4ed8', dark: '#3b82f6' },
-  background: { light: '#ffffff', dark: '#151718' },
-  surface: { light: '#f5f5f5', dark: '#1e2022' },
-  foreground: { light: '#11181C', dark: '#ECEDEE' },
-  muted: { light: '#687076', dark: '#9BA1A6' },
-  border: { light: '#E5E7EB', dark: '#334155' },
-  success: { light: '#22C55E', dark: '#4ADE80' },
-  warning: { light: '#F59E0B', dark: '#FBBF24' },
-  error: { light: '#EF4444', dark: '#F87171' },
+  // Light mode values
+  // Dark mode values match UI-Tokens.md §5.1 OKLCH→HEX fallbacks exactly
+  background:  { light: '#ffffff',  dark: '#0e0f14' },
+  foreground:  { light: '#11181C',  dark: '#f8f9fa' },
+  card:        { light: '#f5f5f5',  dark: '#151620' },
+  primary:     { light: '#1d4ed8',  dark: '#1d4ed8' },
+  accent:      { light: '#7c3aed',  dark: '#8b5cf6' },
+  accentCyan:  { light: '#0891b2',  dark: '#06b6d4' },
+  destructive: { light: '#dc2626',  dark: '#dc2626' },
+  border:      { light: '#E5E7EB',  dark: '#2a2b36' },
+  muted:       { light: '#687076',  dark: '#9BA1A6' },
+  success:     { light: '#22C55E',  dark: '#4ADE80' },
+  warning:     { light: '#F59E0B',  dark: '#FBBF24' },
 };
 
 module.exports = { themeColors };

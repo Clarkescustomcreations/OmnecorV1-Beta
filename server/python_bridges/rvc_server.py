@@ -233,7 +233,7 @@ class RVCModel:
         f0, f0_coarse = self._extract_f0(audio_16k, pitch_shift)
 
         # ── Step 4: Voice synthesis (VC forward pass) ─────────────────────
-        audio_out = self._synthesise(feats, f0, f0_coarse, pitch_shift)
+        audio_out = self._synthesise(feats, f0, f0_coarse, pitch_shift, audio_16k=audio_16k)
 
         # ── Step 5: Resample output to target SR if needed ────────────────
         if HUBERT_SAMPLE_RATE != self.tgt_sr:
@@ -294,9 +294,10 @@ class RVCModel:
         f0: np.ndarray,
         f0_coarse: np.ndarray,
         pitch_shift: int,
+        audio_16k: np.ndarray | None = None,
     ) -> np.ndarray:
         if getattr(self.net_g, "infer", None) is None:
-            return self._stub_synthesise(feats, f0, pitch_shift)
+            return self._stub_synthesise(feats, f0, pitch_shift, audio_16k=audio_16k)
 
         f0_tensor = torch.FloatTensor(f0).unsqueeze(0).to(self.device)
         f0_coarse_tensor = torch.LongTensor(f0_coarse).unsqueeze(0).to(self.device)
@@ -353,28 +354,30 @@ class RVCModel:
         feats: torch.Tensor,
         f0: np.ndarray,
         pitch_shift: int,
+        audio_16k: np.ndarray | None = None,
     ) -> np.ndarray:
         """
-        STUB: VC synthesis forward pass.
+        Fallback synthesis when the real RVC SynthesizerTrnMs768NSFsid is not
+        installed.  Instead of a misleading sine tone, pass the source audio
+        through unchanged (identity conversion at 16 kHz).  The caller in
+        convert() will resample to self.tgt_sr if needed.
 
         Real call (net_g is SynthesizerTrnMs768NSFsid):
-            f0_tensor       = torch.FloatTensor(f0).unsqueeze(0).to(self.device)
+            f0_tensor        = torch.FloatTensor(f0).unsqueeze(0).to(self.device)
             f0_coarse_tensor = torch.LongTensor(f0_coarse).unsqueeze(0).to(self.device)
-            feats_len = torch.LongTensor([feats.shape[1]]).to(self.device)
+            feats_len        = torch.LongTensor([feats.shape[1]]).to(self.device)
             with torch.no_grad():
                 audio = self.net_g.infer(
                     feats, feats_len, f0_coarse_tensor, f0_tensor,
                     sid=torch.LongTensor([0]).to(self.device)
                 )[0, 0].float().cpu().numpy()
             return audio
-
-        The stub returns the input audio unchanged (identity conversion)
-        so the server is testable end-to-end before the real model is wired in.
         """
+        if audio_16k is not None and len(audio_16k) > 0:
+            return audio_16k.astype(np.float32)
+        # audio_16k not available — return silence of expected length
         n_samples = int(len(f0) * HUBERT_SAMPLE_RATE / 100)
-        t         = np.linspace(0, n_samples / HUBERT_SAMPLE_RATE, n_samples)
-        base_freq = 220.0 * (2 ** (pitch_shift / 12.0))
-        return (np.sin(2 * np.pi * base_freq * t) * 0.3).astype(np.float32)
+        return np.zeros(max(n_samples, 1), dtype=np.float32)
 
 
 # ─────────────────────────────────────────────────────────────────────────────

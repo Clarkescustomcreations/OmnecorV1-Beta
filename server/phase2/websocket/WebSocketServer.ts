@@ -35,7 +35,8 @@
 import { WebSocketServer as WSServer, WebSocket } from "ws";
 import { IncomingMessage, Server as HttpServer } from "http";
 import { v4 as uuidv4 } from "uuid";
-import { homedir } from "os";
+import { homedir, cpus as osCpus, totalmem, freemem } from "os";
+import { execFile } from "child_process";
 import { createHash, timingSafeEqual } from "crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { ENV } from "../../_core/env.js";
@@ -127,7 +128,8 @@ interface ServerMessage {
     | "pty:output"
     | "pty:ready"
     | "pty:exit"
-    | "terminal:toChatOutput";
+    | "terminal:toChatOutput"
+    | "systemMetrics";
   channel?: string;
   data?: any;
   timestamp?: string;
@@ -203,6 +205,10 @@ export class OmnecorWebSocketServer {
   private mobileNodes: Map<string, MobileNodeInfo> = new Map();
   private pendingInferences: Map<string, PendingInference> = new Map();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
+  private telemetryInterval: ReturnType<typeof setInterval> | null = null;
+  private prevCpuTimes: ReturnType<typeof osCpus> | null = null;
+  private gpuCache: { usedGb: number; totalGb: number; percent: number; name: string } | null = null;
+  private gpuCacheExpiry = 0;
   private fileWatcher: FileSystemWatcherService;
   private processManager: ProcessManagerService;
   private hashTracker: HashTrackerService;
@@ -1053,10 +1059,94 @@ export class OmnecorWebSocketServer {
     };
   }
 
+  /** Start pushing system metrics (CPU / RAM / GPU) to the system:metrics channel every 2 s */
+  startTelemetryPush(): void {
+    this.prevCpuTimes = osCpus();
+    this.telemetryInterval = setInterval(() => {
+      const cpu = this.calcCpuPercent();
+      const ram = this.calcRamMetrics();
+      const payload: Record<string, unknown> = { cpu, ram };
+      const now = Date.now();
+      if (this.gpuCache && now < this.gpuCacheExpiry) {
+        payload.gpu = this.gpuCache;
+        this.broadcastToChannel("system:metrics", { type: "systemMetrics", data: payload });
+      } else {
+        this.fetchGpuMetrics().then(gpu => {
+          this.gpuCache = gpu;
+          this.gpuCacheExpiry = Date.now() + 5000;
+          payload.gpu = gpu;
+          this.broadcastToChannel("system:metrics", { type: "systemMetrics", data: payload });
+        }).catch(() => {
+          this.broadcastToChannel("system:metrics", { type: "systemMetrics", data: payload });
+        });
+      }
+    }, 2000);
+  }
+
+  private calcCpuPercent(): number {
+    const current = osCpus();
+    if (!this.prevCpuTimes || this.prevCpuTimes.length !== current.length) {
+      this.prevCpuTimes = current;
+      return 0;
+    }
+    let totalIdle = 0;
+    let totalTick = 0;
+    for (let i = 0; i < current.length; i++) {
+      const prev = this.prevCpuTimes[i].times;
+      const cur = current[i].times;
+      const idle = cur.idle - prev.idle;
+      const total = (cur.user - prev.user) + (cur.nice - prev.nice) +
+                    (cur.sys - prev.sys) + idle + (cur.irq - prev.irq);
+      totalIdle += idle;
+      totalTick += total;
+    }
+    this.prevCpuTimes = current;
+    return totalTick > 0 ? Math.round((1 - totalIdle / totalTick) * 100) : 0;
+  }
+
+  private calcRamMetrics(): { usedGb: number; totalGb: number; percent: number } {
+    const total = totalmem();
+    const free = freemem();
+    const used = total - free;
+    return {
+      usedGb: Math.round((used / 1e9) * 10) / 10,
+      totalGb: Math.round((total / 1e9) * 10) / 10,
+      percent: Math.round((used / total) * 100),
+    };
+  }
+
+  private fetchGpuMetrics(): Promise<{ usedGb: number; totalGb: number; percent: number; name: string } | null> {
+    return new Promise(resolve => {
+      execFile(
+        "nvidia-smi",
+        ["--query-gpu=name,memory.used,memory.total", "--format=csv,noheader,nounits"],
+        { timeout: 3000 },
+        (err, stdout) => {
+          if (err || !stdout.trim()) { resolve(null); return; }
+          const parts = stdout.trim().split(",").map(s => s.trim());
+          if (parts.length < 3) { resolve(null); return; }
+          const name = parts[0];
+          const usedMb = parseFloat(parts[1]);
+          const totalMb = parseFloat(parts[2]);
+          if (isNaN(usedMb) || isNaN(totalMb) || totalMb === 0) { resolve(null); return; }
+          resolve({
+            name,
+            usedGb: Math.round((usedMb / 1024) * 10) / 10,
+            totalGb: Math.round((totalMb / 1024) * 10) / 10,
+            percent: Math.round((usedMb / totalMb) * 100),
+          });
+        },
+      );
+    });
+  }
+
   /** Gracefully shut down the WebSocket server */
   async shutdown(): Promise<void> {
     if (this.heartbeatInterval) {
       clearInterval(this.heartbeatInterval);
+    }
+    if (this.telemetryInterval) {
+      clearInterval(this.telemetryInterval);
     }
 
     // Close all client connections

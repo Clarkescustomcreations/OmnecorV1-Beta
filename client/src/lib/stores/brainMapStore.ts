@@ -81,6 +81,7 @@ export const useBrainMapStore = create<BrainMapState>((set, get) => ({
         ? s.collapsedFolderIds.filter(x => x !== id)
         : [...s.collapsedFolderIds, id],
     }));
+    syncChannel.postMessage({ type: 'toggleFolderCollapse', payload: id });
   },
 
   isFolderCollapsed: (id) => get().collapsedFolderIds.includes(id),
@@ -101,7 +102,7 @@ syncChannel.onmessage = (event) => {
 
   switch (type) {
     case 'setProjectId':
-      if (store.projectId !== payload) useBrainMapStore.setState({ projectId: payload });
+      if (store.projectId !== payload) useBrainMapStore.setState({ projectId: payload, collapsedFolderIds: [] });
       break;
     case 'setNodes':
       useBrainMapStore.setState({ nodes: payload });
@@ -111,6 +112,34 @@ syncChannel.onmessage = (event) => {
       break;
     case 'setWindowMode':
       if (store.windowMode !== payload) useBrainMapStore.setState({ windowMode: payload });
+      break;
+    case 'toggleFolderCollapse':
+      useBrainMapStore.setState(s => ({
+        collapsedFolderIds: s.collapsedFolderIds.includes(payload)
+          ? s.collapsedFolderIds.filter((x: string) => x !== payload)
+          : [...s.collapsedFolderIds, payload],
+      }));
+      break;
+    case 'requestInitialState': {
+      const s = useBrainMapStore.getState();
+      syncChannel.postMessage({
+        type: 'initialState',
+        payload: {
+          nodes: s.nodes,
+          edges: s.edges,
+          projectId: s.projectId,
+          collapsedFolderIds: s.collapsedFolderIds,
+        },
+      });
+      break;
+    }
+    case 'initialState':
+      useBrainMapStore.setState({
+        nodes: payload.nodes,
+        edges: payload.edges,
+        projectId: payload.projectId,
+        collapsedFolderIds: payload.collapsedFolderIds,
+      });
       break;
   }
 };

@@ -5,8 +5,8 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 ---
 
 ## 🚦 Current Status
-*   **Active Phase:** Phase 3 ✅ COMPLETE — next: Phase 4: Desktop Shell & Theme Modernization
-*   **Next Task:** Feature 16: React 19 Version Alignment
+*   **Active Phase:** Phase 4 ✅ COMPLETE — next: Phase 5: Mobile App Realization & Verification
+*   **Next Task:** Feature 23: Secure KeyStore Encryption
 
 ---
 
@@ -71,21 +71,28 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 
 ---
 
-## 💻 Phase 4: Desktop Shell & Theme Modernization
-- [ ] **Feature 16: React 19 Version Alignment**
+## 💻 Phase 4: Desktop Shell & Theme Modernization — ✅ COMPLETE (7/7)
+- [x] **Feature 16: React 19 Version Alignment**
   *   *File:* [package.json (Electron)](file:///home/linux/Documents/OmnecorV1-Beta/packaging/electron-app/package.json)
-- [ ] **Feature 17: tRPC Client Alignment**
+  *   *Done:* `react`/`react-dom` bumped from `^18.2.0` → `^19.2.1`; `@types/react`/`@types/react-dom` bumped to `^19.1.0`. Eliminates duplicate-module crash (`useContext of null`) in Electron builds.
+- [x] **Feature 17: tRPC Client Alignment**
   *   *File:* [package.json (Mobile)](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/package.json)
-- [ ] **Feature 18: Tailwind Token Drift Resolution**
+  *   *Done:* `@trpc/client`, `@trpc/react-query`, `@trpc/server` changed from exact pin `11.17.0` → `^11.8.0` range to match server. pnpm now resolves all three to the same version — eliminates schema-definition mismatch logs.
+- [x] **Feature 18: Tailwind Token Drift Resolution**
   *   *File:* [theme.config.js](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/theme.config.js)
-- [ ] **Feature 19: Multi-Window External Brain Map**
-  *   *File:* [ExternalBrainMapWindow.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/window-system/ExternalBrainMapWindow.tsx)
-- [ ] **Feature 20: Real-Time Telemetry Upgrades**
-  *   *File:* [Dashboard.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/Dashboard.tsx)
-- [ ] **Feature 21: mDNS Discovery Integration**
+  *   *Done:* All dark-mode HEX values aligned to UI-Tokens.md §5.1 spec (`background: #0e0f14`, `card: #151620`, `foreground: #f8f9fa`, `primary: #1d4ed8`, `border: #2a2b36`). Added missing `accentCyan: #06b6d4` and `destructive: #dc2626` tokens.
+- [x] **Feature 19: Multi-Window External Brain Map**
+  *   *File:* [brainMapStore.ts](file:///home/linux/Documents/OmnecorV1-Beta/client/src/lib/stores/brainMapStore.ts), [ExternalBrainMapWindow.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/window-system/ExternalBrainMapWindow.tsx)
+  *   *Done:* Added `collapsedFolderIds` to BroadcastChannel sync (previously unsynced). Added `requestInitialState` / `initialState` handshake — external window sends request on mount, main window responds with full state. External window now receives correct node/edge/collapse state immediately on open.
+- [x] **Feature 20: Real-Time Telemetry Upgrades**
+  *   *File:* [WebSocketServer.ts](file:///home/linux/Documents/OmnecorV1-Beta/server/phase2/websocket/WebSocketServer.ts), [Dashboard.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/Dashboard.tsx)
+  *   *Done:* `startTelemetryPush()` added to WS server — every 2 s broadcasts CPU % (from `os.cpus()` delta), RAM used/total/%, GPU VRAM (nvidia-smi, 5 s cache) to `system:metrics` channel. Dashboard subscribes and renders System Monitor progress bars (CPU / RAM / VRAM) with live pulse indicator.
+- [x] **Feature 21: mDNS Discovery Integration**
   *   *File:* [MeshDiscoveryService.ts](file:///home/linux/Documents/OmnecorV1-Beta/server/phase2/services/MeshDiscoveryService.ts)
-- [ ] **Feature 22: RVC Server Fallback Repair**
+  *   *Done:* Replaced constructor stub with real `bonjour` mDNS implementation. Advertises this node as `omnecor-<ip>` on port `$PORT`. Browsers for other Omnecor nodes; emits `nodeDiscovered` / `nodeLost` events and maintains live `nodes` map. Graceful fallback with warning if bonjour unavailable.
+- [x] **Feature 22: RVC Server Fallback Repair**
   *   *File:* [rvc_server.py](file:///home/linux/Documents/OmnecorV1-Beta/server/python_bridges/rvc_server.py)
+  *   *Done:* `_stub_synthesise` replaced flat 220 Hz sine tone with identity pass-through — returns the original 16 kHz audio unchanged (no mock signal). Falls back to zero-filled silence only if audio is unavailable. Real HuBERT + SynthesizerTrnMs768NSFsid path is called first; stub is used only when RVC libs not installed. `py_compile` OK.
 
 ---
 
@@ -202,6 +209,62 @@ Also: `engines` (node ≥20, pnpm ≥10) added; `cross-env` added to `dev`/`star
 
 ---
 
+# 📋 Code-Sweep — 10-Domain Beta Audit (2026-06-14)
+
+> `/code-sweep` full run. Scope: all 10 domains (typescript, database, routers, security, frontend, ui, mobile, dependencies, mock, architecture).
+
+## Gate metrics — baseline → final
+| Gate | Baseline | Final |
+|---|---|---|
+| `tsc --noEmit` (root) | ✅ 0 | ✅ 0 |
+| `vitest run` | ✅ 323/323 | ✅ 323/323 |
+| `pnpm build` | ✅ clean | ✅ clean |
+| `pnpm audit --prod` | ❌ 2 (1 high, 1 low) | ✅ **0** |
+
+## Fixed
+| Severity | File | Issue | Fix |
+|---|---|---|---|
+| **HIGH** | [aiRouter.ts](file:///home/linux/Documents/OmnecorV1-Beta/server/routers/aiRouter.ts) `chat`/`chatStream` | **Sovereign-mode bypass** — both `protectedProcedure`, accept any `providerId`, and neither the router nor `AiProviderService` guarded `executionMode`; a sovereign (air-gapped) user could call `providerId:"openai"`/`anthropic`/`gemini`/`grok`/`huggingface` and reach the cloud. | Added `CLOUD_PROVIDER_IDS` set + `assertProviderAllowedInMode()` per-provider guard in both procedures. Local providers (ollama/llamacpp/ommesh/forge) still work in sovereign mode — deliberately *not* flipped to `cloudProcedure` (that would block local chat). |
+| **HIGH** | [pnpm-workspace.yaml](file:///home/linux/Documents/OmnecorV1-Beta/pnpm-workspace.yaml) | **Audit regression 0→2** — esbuild RCE via `NPM_CONFIG_REGISTRY` (GHSA-gv7w-rqvm-qjhr) + Windows dev-server file read (GHSA-g7r4-m6w7-qqqr) via `nativewind>tailwindcss>postcss-load-config>tsx>esbuild@0.28.0`. | Added scoped override `"tsx>esbuild": ">=0.28.1"` (kept narrow so the legacy `@esbuild-kit` esbuild pin is untouched). `pnpm audit` → 0. |
+| **MEDIUM** | [shared/hitl.ts](file:///home/linux/Documents/OmnecorV1-Beta/shared/hitl.ts) | `CriticalAction.args: any` in the shared layer (should be clean). | → `Record<string, unknown>` (creation site already cast to it; consumers only `JSON.stringify`). |
+
+## Correction — securityRouter "HIGH" was a FALSE POSITIVE
+The initial sweep flagged `securityRouter` encrypt/decrypt/backup/scan as unauthenticated `publicProcedure`. On verification this was read from the **unregistered** legacy duplicate `server/phase2/routers/securityRouter.ts`. The **live** router `server/routers/securityRouter.ts` (the one wired in `routers.ts:55`) was **already fully `protectedProcedure`** — no real vulnerability existed. Lesson logged: always confirm a router is registered in `routers.ts` before assessing its tier.
+
+## Dead-code cleanup (AGENTS.md — "delete leftover unused files") — 6 files removed
+The `server/phase2/routers/` tree held stale duplicates of routers that were unified into `server/routers/`. Only `agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter` are still registered. Deleted (each confirmed **zero importers**, tsc/test/build green after):
+- `server/phase2/routers/securityRouter.ts` (dupe of live `routers/securityRouter.ts`)
+- `server/phase2/routers/voiceRouter.ts` (dupe of live `routers/voiceRouter.ts`)
+- `server/phase2/routers/projectRouter.ts` (dupe of live `routers/projectRouter.ts`)
+- `server/phase2/routers/trainingRouter.ts` (dupe of live `routers/trainingRouter.ts`)
+- `server/phase2/routers/hardwareRouter.ts` (unregistered, no live equivalent wired)
+- `server/phase2/routers/trpc.ts` (orphaned compat-shim; the 3 kept routers import from `_core/trpc.js`)
+- `client/src/components/ManusDialog.tsx` (unused template-brand leftover, zero importers)
+
+Re-verified after cleanup: `tsc` 0 · `vitest` 323/323 · `pnpm build` clean.
+
+## Follow-up hardening — legacy `aiProvider.chatStream`
+[phase2/routers/aiProviderRouter.ts](file:///home/linux/Documents/OmnecorV1-Beta/server/phase2/routers/aiProviderRouter.ts) is the legacy router kept registered as `aiProvider` (CLAUDE.md). Its `chatStream` was **`publicProcedure` (unauthenticated) AND cloud-capable with no sovereign guard** — worse than the `aiRouter` case (which is at least authenticated). Hardened:
+- `chatStream`: `publicProcedure` → `protectedProcedure` (requires a session).
+- Added the same per-provider sovereign guard (cloud providers blocked for air-gapped users; local ollama/llamacpp still allowed).
+- Left `getProviders`/`discoverOllamaModels`/`checkHealth` public (read-only status, consistent with `aiRouter.getProviders`).
+
+Verified: live `trainingRouter` (`routers/trainingRouter.ts`) is **already fully `protectedProcedure`** — the earlier `startTraining` flag was the deleted phase2 dupe (false flag). Re-verified: `tsc` 0 · `vitest` 323/323 · `pnpm build` clean. No `chat`/`chatStream` endpoint is public anymore.
+
+## Flagged for decision (not auto-fixed)
+- **`MapManager.tsx`** — Neural Maps "cloud indexing is coming soon" (toast + badge). Genuine unbuilt feature, not in Phase 5 list. Build it, or keep as honest placeholder?
+- **Remaining `publicProcedure` endpoints are intentional** (verified): `systemRouter.getSettings`/`saveSettings` (Setup Wizard pre-login), `honchoRouter` (explicitly public-by-design for zero-login), and read-only `*.status`/`getProviders`/health probes. No further action recommended unless the threat model changes to untrusted-network multi-user — flagging only so the decision is on record.
+- **`dangerouslySetInnerHTML`** in `pcb/SchematicNode.tsx`, `pcb/PCBNode.tsx`, `pcb/ComponentLibraryPanel.tsx` — appear to inject static component SVG (not user content); `ui/chart.tsx` is the standard shadcn CSS-var pattern. Recommend a confirm-static review.
+
+## Known debt (documented, not sweep-fixable — pervasive/established, would require a rewrite)
+- ~100 leftover `if (!db)` null-guards (e.g. `db-pcb.ts`) — harmless dead branches since `getDb()` is never null. Cleanup candidate, not a bug.
+- ~60 default-export components vs Code-Standards §1.1 "named exports only" — established page/lazy pattern.
+- ~649 raw Tailwind color classes + scattered hex literals in `client/src` vs AGENTS "no hardcoded colors" — established status-color style (emerald=ok, rose=err). Legit hex: `EmbeddedTerminal` (xterm theme), `ThreeViewer`/`SchematicEditor` (three.js/reactflow), `WebPreview` (iframe).
+- Template-brand ("Manus") leftovers remain only in `server/_core/{notification,map,sdk,storage}.ts` **comments/default strings** (active files — cosmetic, not dead code). `ManusDialog.tsx` itself was deleted (see cleanup above).
+- ~38 server `as any` behind validated boundaries — already on the accepted list above.
+
+---
+
 # 📋 Archive C: Completed Work Log (merged from master-todo.md)
 
 > Historical record of completed roadmap work. `[x]` = done, `[~]` = partial, `[ ]` = pending.
@@ -234,6 +297,21 @@ Dataset builder / LoRA trainer / orchestration / inference server / TS bridge ex
 
 ## Android APK integration — ✅ DONE (build-machine steps [~])
 RN/Expo app scaffolded as `packaging/android/omnecor-hq/` workspace; 8 tab screens wired to real PC tRPC; PC WS mobile-node handlers; `hitlRouter`; `auth.setExecutionMode`; `aiRouter` `"ommesh"` provider; Chat selectors from `neuralMaps.list`/`personas.list`; Podcast `podcast.generate`; `expo-file-system`; 0 tsc errors. `pnpm install` (Node 24.16/pnpm 10.34.1); `prebuild:android` (NDK 30.0.14904198); **APK built 2026-06-12** (100 MB, `android/app/build/outputs/apk/debug/app-debug.apk`); release follows same pipeline (needs keystore). **[ ] 4.15** sideload to physical device; **[ ] 4.16** download GGUF + test on-device inference. ⚠️ `OMMESH_SECRET` not yet set in `.env` (nodes accepted with warning).
+
+## CI / GitHub Actions repairs — ✅ DONE (2026-06-14)
+Four broken checks fixed across two workflows:
+
+**`build.yml` — `typecheck-and-test` (was failing in 10s):**
+`pnpm/action-setup@v4` now throws a hard error when both `version:` in the workflow config and `packageManager` in `package.json` are set. Removed `version: 10` from both jobs (`typecheck-and-test` and `linux-build`) — the action now reads the pinned version (`pnpm@10.34.1`) from `packageManager` automatically. Unblocks `linux-build` (which `needs: typecheck-and-test`).
+
+**`webpack.yml` — `build (18.x)` (was failing at smoke tests) + `build (20.x)` (cancelled as cascade):**
+- Removed `18.x` from node-version matrix. Node 18 is EOL (April 2025); `globalThis.crypto.getRandomValues` is undefined in Vitest's Node 18 test environment. Project already declares `engines.node: ">=20.0.0"`.
+- Updated matrix from `[18.x, 20.x, 22.x]` → `[22.x, 24.x]`. Node 20 also EOL (April 2026) with two months of no security patches; forward-looking matrix uses current active LTS.
+- Added `--frozen-lockfile` to the install step (was the only workflow in the repo without it — non-deterministic CI anti-pattern).
+
+**Result:** All four failing/cancelled/skipped jobs now expected to pass. Matrix now tests the two supported Node LTS versions (22 + 24). Install is deterministic across all workflows.
+
+---
 
 ## Other completed sessions
 *   **API/Provider Settings reorg (2026-06-07):** Settings `api` tab → 4 sections (Local AI / Cloud AI / Specialty / Local Endpoints); Ollama Base URL + Hugging Face + ElevenLabs + fal.ai + Forge + n8n URL + ComfyUI URL fields; Configured/Not-set badges; single Save; `env.ts` `huggingfaceApiKey`/`falaiApiKey`; `systemRouter` aiProviders/saveKeys expanded; `aiProviderRouter` enum + `chatHuggingFace()` + streamChat switch; SetupWizard provider sync + Skip Setup + Browse/Run Scan fixes.

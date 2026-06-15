@@ -3,25 +3,29 @@
 import React, { useEffect } from "react";
 import { BrainMapViewport } from "@/components/neural/NeuralGraphView";
 import { useBrainMapStore } from "@/lib/stores/brainMapStore";
-import { Brain, Anchor, Minimize2 } from "lucide-react";
+import { Brain, Anchor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export default function ExternalBrainMapWindow() {
   const { setWindowMode } = useBrainMapStore();
 
   useEffect(() => {
-    // Set document title for the separate window
     document.title = "Omnecor Neural Brain Map (External)";
-    
-    // Listen for redock message from parent if needed
-    const bc = new BroadcastChannel('omnecor_neural_sync');
-    bc.onmessage = (event) => {
-      if (event.data === 'redock') {
-        window.close();
-      }
+
+    // Request current state from main window immediately
+    const storeChannel = new BroadcastChannel('omnecor_brain_map_store');
+    storeChannel.postMessage({ type: 'requestInitialState' });
+
+    // Listen for redock signal from main window
+    const controlChannel = new BroadcastChannel('omnecor_neural_sync');
+    controlChannel.onmessage = (event) => {
+      if (event.data === 'redock') window.close();
     };
-    
-    return () => bc.close();
+
+    return () => {
+      storeChannel.close();
+      controlChannel.close();
+    };
   }, []);
 
   const handleRedock = () => {

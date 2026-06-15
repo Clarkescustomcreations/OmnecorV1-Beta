@@ -27,6 +27,11 @@ overrides:
   # Build/tooling pins
   "@builder.io/vite-plugin-jsx-loc": "0.1.1"
   "@esbuild-kit/core-utils>esbuild": ">=0.25.0"
+  # esbuild RCE via NPM_CONFIG_REGISTRY (GHSA-gv7w-rqvm-qjhr, high) + arbitrary
+  # file read on Windows dev server (GHSA-g7r4-m6w7-qqqr, low). Only reaches us
+  # through the mobile chain nativewind>tailwindcss>postcss-load-config>tsx>esbuild.
+  # Scoped to tsx so the legacy @esbuild-kit chain above keeps its old esbuild.
+  "tsx>esbuild": ">=0.28.1"
   "@expo/ngrok>uuid": ">=11.1.1"
   # Security pins (CVE / GHSA remediation — keep floors, allow forward patches)
   "@trpc/server": ">=11.8.0"

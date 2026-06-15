@@ -261,6 +261,7 @@ async function startServer() {
   try {
     wsServer = new OmnecorWebSocketServer(server);
     setWsInstance(wsServer);
+    wsServer.startTelemetryPush();
     log.info("[Omnecor] WebSocket server attached at /ws");
   } catch (error) {
     log.warn(

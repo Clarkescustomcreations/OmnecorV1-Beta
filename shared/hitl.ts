@@ -1,7 +1,7 @@
 export interface CriticalAction {
   id: string;
   toolName: string;
-  args: any;
+  args: Record<string, unknown>;
   status: "pending" | "approved" | "rejected";
   timestamp: string;
 }

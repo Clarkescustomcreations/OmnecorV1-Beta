@@ -23,15 +23,23 @@ import {
   Box,
   UserCircle2,
   Wallet,
+  Activity,
 } from "lucide-react";
 import { Link } from "wouter";
 import ProcessManagerPanel from "@/components/ProcessManagerPanel";
 import { trpc } from "@/lib/trpc";
-import { useState } from "react";
+import { useState, useCallback, useEffect } from "react";
+import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
 
 interface SelectedModel {
   providerId: "ollama" | "anthropic" | "openai" | "gemini" | "grok";
   modelId: string;
+}
+
+interface SystemMetrics {
+  cpu: number;
+  ram: { usedGb: number; totalGb: number; percent: number };
+  gpu: { usedGb: number; totalGb: number; percent: number; name: string } | null;
 }
 
 /**
@@ -43,6 +51,23 @@ export default function Dashboard() {
     try { model = JSON.parse(localStorage.getItem("omnecor:selectedModel") ?? "null") as SelectedModel | undefined ?? undefined; } catch { model = undefined; }
     return model;
   });
+
+  const [systemMetrics, setSystemMetrics] = useState<SystemMetrics | null>(null);
+
+  const handleWsEvent = useCallback((type: string, data: Record<string, unknown>) => {
+    if (type === "systemMetrics") {
+      setSystemMetrics(data as unknown as SystemMetrics);
+    }
+  }, []);
+
+  const { subscribe, unsubscribe } = useOmnecorSocket({
+    onEvent: handleWsEvent as (type: import("@/hooks/useOmnecorSocket").OmnecorEventType, data: Record<string, unknown>) => void,
+  });
+
+  useEffect(() => {
+    subscribe("system:metrics");
+    return () => unsubscribe("system:metrics");
+  }, [subscribe, unsubscribe]);
 
   const { data: watcherStatus } = trpc.project.getWatcherStatus.useQuery();
   const { data: kbStatus } = trpc.knowledgeBase.status.useQuery();
@@ -167,9 +192,69 @@ export default function Dashboard() {
             </p>
           </div>
 
+          {/* System Hardware Monitor */}
+          <div
+            id="system-hardware-monitor"
+            className="mb-6 p-4 rounded-xl border border-border bg-card/50 backdrop-blur-sm"
+          >
+            <div className="flex items-center gap-2 mb-3">
+              <Activity className="w-4 h-4 text-accent" />
+              <span className="text-sm font-semibold">System Monitor</span>
+              <div
+                className={`ml-auto h-1.5 w-1.5 rounded-full ${systemMetrics ? "bg-accent animate-pulse" : "bg-muted"}`}
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>CPU</span>
+                  <span>{systemMetrics ? `${systemMetrics.cpu}%` : "--"}</span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${systemMetrics?.cpu ?? 0}%`, backgroundColor: "var(--accent-cyan)" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>RAM</span>
+                  <span>
+                    {systemMetrics
+                      ? `${systemMetrics.ram.usedGb} / ${systemMetrics.ram.totalGb} GB`
+                      : "--"}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${systemMetrics?.ram.percent ?? 0}%`, backgroundColor: "var(--accent-success)" }}
+                  />
+                </div>
+              </div>
+              <div>
+                <div className="flex justify-between text-xs text-muted-foreground mb-1">
+                  <span>{systemMetrics?.gpu ? `VRAM · ${systemMetrics.gpu.name}` : "VRAM"}</span>
+                  <span>
+                    {systemMetrics?.gpu
+                      ? `${systemMetrics.gpu.usedGb} / ${systemMetrics.gpu.totalGb} GB`
+                      : "No GPU"}
+                  </span>
+                </div>
+                <div className="h-1.5 bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full rounded-full transition-all duration-500"
+                    style={{ width: `${systemMetrics?.gpu?.percent ?? 0}%`, backgroundColor: "var(--accent-purple)" }}
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Agentic Wallet Header Block */}
-          <HowToTooltip 
-            title="Agentic Wallet" 
+          <HowToTooltip
+            title="Agentic Wallet"
             description="A real-time financial monitor for your AI agents. Set hard/soft budgets, track spending by provider, and manage virtual Lithic cards."
           >
             <Link href="/wallet" className="block mb-6">

@@ -4,7 +4,7 @@ This document outlines the step-by-step roadmap for resolving the security vulne
 
 The build is partitioned into **5 phases containing 27 features**, creating a linear execution path to achieve a fully functional application.
 
-**Status legend:** ✅ done · ⬜ pending. Phases 1–3 complete (15/27); Phases 4–5 pending.
+**Status legend:** ✅ done · ⬜ pending. Phases 1–4 complete (22/27); Phase 5 pending.
 
 ---
 
