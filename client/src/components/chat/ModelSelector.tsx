@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Cpu, Cloud, Check } from "lucide-react";
-import { getAllModels, type AIModel } from "@/lib/aiModels";
+import { getAllModels, API_MODEL_CATALOG, type AIModel } from "@/lib/aiModels";
 import { cn } from "@/lib/utils";
 import type { SelectedModel } from "@/lib/chatContext";
 import { trpc } from "@/lib/trpc";
@@ -61,23 +61,31 @@ export default function ModelSelector({
     },
   }));
 
+  // Expand each online cloud provider into its concrete models (one row per
+  // model), gated by live provider health. Providers not representable as a
+  // chat providerId (forge/huggingface/llamacpp/custom) are intentionally
+  // excluded — they aren't selectable as a chat model.
   const apiModels: AIModel[] = providerHealth
-    .filter(p => p.id !== "ollama" && p.status === "online")
-    .map(p => ({
-      id: p.id,
-      name: p.name,
-      displayName: p.name,
-      type: "api" as const,
-      source: p.id as AIModel["source"],
-      status: "available" as const,
-      capabilities: {
-        chat: true,
-        completion: true,
-        embedding: p.id === "openai",
-        vision: p.id === "openai" || p.id === "gemini",
-        functionCalling: p.id === "openai" || p.id === "anthropic",
-      },
-    }));
+    .filter(p => p.status === "online" && p.id in API_MODEL_CATALOG)
+    .flatMap(p => {
+      const source = p.id as keyof typeof API_MODEL_CATALOG;
+      return API_MODEL_CATALOG[source].map<AIModel>(model => ({
+        id: model.id,
+        name: model.name,
+        displayName: model.name,
+        type: "api" as const,
+        source,
+        status: "available" as const,
+        costPer1kTokens: model.costPer1kTokens,
+        capabilities: {
+          chat: true,
+          completion: true,
+          embedding: source === "openai",
+          vision: source === "openai" || source === "gemini",
+          functionCalling: source === "openai" || source === "anthropic",
+        },
+      }));
+    });
 
   const fetchedModels = [...localModels, ...apiModels];
 
@@ -116,7 +124,9 @@ export default function ModelSelector({
           ) : (
             local.map(m => {
               const providerId = SOURCE_TO_PROVIDER[m.source] ?? "ollama";
-              const isActive = selectedModel?.modelId === m.id;
+              const isActive =
+                selectedModel?.modelId === m.id &&
+                selectedModel?.providerId === providerId;
               return (
                 <DropdownMenuItem
                   key={m.id}
@@ -148,9 +158,15 @@ export default function ModelSelector({
           API Models
         </DropdownMenuLabel>
         <DropdownMenuGroup>
-          {api.map(m => {
+          {api.length === 0 ? (
+            <DropdownMenuItem disabled className="text-xs text-muted-foreground">
+              No API providers online
+            </DropdownMenuItem>
+          ) : api.map(m => {
             const providerId = (SOURCE_TO_PROVIDER[m.source] ?? "openai") as ProviderId;
-            const isActive = selectedModel?.modelId === m.id;
+            const isActive =
+              selectedModel?.modelId === m.id &&
+              selectedModel?.providerId === providerId;
             return (
               <DropdownMenuItem
                 key={m.id}

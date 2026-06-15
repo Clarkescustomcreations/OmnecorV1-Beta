@@ -5,7 +5,7 @@ import { SecurityManager } from './SecurityManager.js';
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("OMMESH:Discovery");
 
-interface PeerInfo {
+export interface PeerInfo {
   name: string;
   address: string;
   port: number;
@@ -20,7 +20,8 @@ export class DiscoveryService {
   private peers = new Map<string, PeerInfo>();
 
   constructor(private identity: NodeIdentity, private security: SecurityManager) {
-    this.bonjourInstance = (bonjour as any)();
+    const bonjourFactory = bonjour as unknown as () => any;
+    this.bonjourInstance = bonjourFactory();
   }
 
   async startMdnsBeacon() {

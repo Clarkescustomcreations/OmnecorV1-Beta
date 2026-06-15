@@ -225,7 +225,8 @@ export class SecurityManager extends EventEmitter {
 
     if (targetFingerprint) {
       options.checkServerIdentity = (_hostname, cert) => {
-        const fp = (cert as any).fingerprint256.replace(/:/g, '');
+        const peerCert = cert as tls.DetailedPeerCertificate;
+        const fp = peerCert.fingerprint256.replace(/:/g, '');
         if (fp !== targetFingerprint) {
           throw new Error(`mTLS fingerprint mismatch. Expected: ${targetFingerprint}, Got: ${fp}`);
         }

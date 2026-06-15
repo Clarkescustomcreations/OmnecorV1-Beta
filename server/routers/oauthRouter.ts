@@ -130,14 +130,6 @@ export const oauthRouter = router({
 
         // Save to database
         const db = await getDb();
-        if (!db) {
-          return {
-            success: false,
-            accountName: "Offline Account",
-            platform: input.platform,
-            error: "Database not available in local mode",
-          };
-        }
 
         const accountName =
           (profile.name ||
@@ -174,7 +166,6 @@ export const oauthRouter = router({
     .input(z.object({ accountId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available in local mode" };
 
       const account = await db
         .select()

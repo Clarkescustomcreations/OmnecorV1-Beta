@@ -242,9 +242,6 @@ export class IntegrationManagementService {
     userId: string,
     db: any,
   ): Promise<{ success: boolean; message: string; tokenExpiresAt?: string }> {
-    if (!db) {
-      return { success: false, message: "Database unavailable" };
-    }
 
     try {
       const { platformAccounts } = await import("../../../drizzle/schema.js");
@@ -332,9 +329,6 @@ export class IntegrationManagementService {
     userId: string,
     db: any,
   ): Promise<{ success: boolean; message: string }> {
-    if (!db) {
-      return { success: false, message: "Database unavailable" };
-    }
 
     try {
       const { platformAccounts } = await import("../../../drizzle/schema.js");

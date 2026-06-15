@@ -163,9 +163,17 @@ export async function getOAuthAuthorizationUrl(
       code_challenge: codeChallenge,
       code_challenge_method: "S256",
     }),
-  } as any);
+  } as Parameters<AuthorizationCode["authorizeURL"]>[0] & Record<string, unknown>);
 
   return url;
+}
+
+interface RawToken {
+  access_token?: string;
+  refresh_token?: string;
+  token_type?: string;
+  expires_in?: number;
+  [key: string]: unknown;
 }
 
 export async function exchangeCodeForToken(
@@ -177,14 +185,14 @@ export async function exchangeCodeForToken(
   const client = getOAuthClient(platform);
   const redirectUri = `${process.env.PUBLIC_URL || "http://localhost:5173"}/api/oauth/callback/${platform}`;
 
-  const tokenParams: any = {
+  const tokenParams: Parameters<AuthorizationCode["getToken"]>[0] & Record<string, unknown> = {
     code,
     redirect_uri: redirectUri,
     ...(codeVerifier && { code_verifier: codeVerifier }),
   };
 
   const result = await client.getToken(tokenParams);
-  const token = result.token as any;
+  const token = result.token as RawToken;
 
   return {
     access_token: token.access_token || "",
@@ -203,11 +211,11 @@ export async function refreshOAuthToken(
   const token = {
     access_token: "",
     refresh_token: refreshToken,
-  } as any;
+  } as Parameters<AuthorizationCode["createToken"]>[0];
 
   const result = await client.createToken(token);
   const refreshedToken = await result.refresh();
-  const refreshedTokenData = refreshedToken.token as any;
+  const refreshedTokenData = refreshedToken.token as RawToken;
 
   return {
     access_token: refreshedTokenData.access_token || "",

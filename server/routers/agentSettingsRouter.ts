@@ -10,7 +10,6 @@ export const agentSettingsRouter = router({
     .input(z.object({ platform: z.string().optional() }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return [];
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const conditions = input.platform
@@ -33,7 +32,6 @@ export const agentSettingsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const existing = await db.select()

@@ -93,7 +93,6 @@ export class TokenRefreshService {
 
   private async checkExpiring(): Promise<void> {
     const db = await this.getDbInstance();
-    if (!db) return;
 
     const soonExpiry = new Date(Date.now() + 30 * 60 * 1000);
 
@@ -116,7 +115,6 @@ export class TokenRefreshService {
 
   private async refreshProvider(provider: string): Promise<void> {
     const db = await this.getDbInstance();
-    if (!db) return;
 
     const [integration] = await db
       .select()

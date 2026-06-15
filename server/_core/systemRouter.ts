@@ -13,6 +13,7 @@ import { eq } from "drizzle-orm";
 import { ENV } from "./env.js";
 import { getPermissionsForRole, type Role } from "../phase2/config/rbac.js";
 import { PATHS } from "./paths.js";
+import { type OmnecorSettings } from "../phase2/services/SettingsService.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -43,10 +44,10 @@ async function findExecutable(candidates: string[]): Promise<string | null> {
 const SETTINGS_PATH = join(PATHS.base, "settings.json");
 
 // Helper — read settings file, return null if not found
-function readSettingsFile(): unknown {
+function readSettingsFile(): OmnecorSettings | null {
   try {
     if (!existsSync(SETTINGS_PATH)) return null;
-    return JSON.parse(readFileSync(SETTINGS_PATH, "utf-8"));
+    return JSON.parse(readFileSync(SETTINGS_PATH, "utf-8")) as OmnecorSettings;
   } catch {
     return null;
   }
@@ -67,7 +68,7 @@ export const systemRouter = router({
     })),
 
   loginProviders: publicProcedure.query(() => {
-    const settings = (readSettingsFile() as any) || {};
+    const settings = readSettingsFile() || {};
     return {
       google: !!(ENV.googleClientId && ENV.googleClientSecret) || !!(settings.googleClientId && settings.googleClientSecret),
       microsoft: !!(ENV.microsoftClientId && ENV.microsoftClientSecret) || !!(settings.microsoftClientId && settings.microsoftClientSecret),
@@ -75,7 +76,7 @@ export const systemRouter = router({
   }),
 
   aiProviders: publicProcedure.query(() => {
-    const settings = (readSettingsFile() as any) || {};
+    const settings = readSettingsFile() || {};
     return {
       openai: !!ENV.openaiApiKey || !!settings.openaiApiKey,
       anthropic: !!ENV.anthropicApiKey || !!settings.anthropicApiKey,
@@ -111,7 +112,7 @@ export const systemRouter = router({
   saveSettings: publicProcedure
     .input(z.object({ settings: z.record(z.string(), z.unknown()) }))
     .mutation(({ input }) => {
-      const current = (readSettingsFile() as any) || {};
+      const current = readSettingsFile() || {};
       const updated = { ...current, ...input.settings };
       const dir = join(homedir(), ".omnecor");
       if (!existsSync(dir)) {
@@ -128,7 +129,7 @@ export const systemRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const current = (readSettingsFile() as any) || {};
+      const current = readSettingsFile() || {};
       // Map frontend key names to internal setting names if necessary
       const keyMap: Record<string, string> = {
         openai: "openaiApiKey",
@@ -191,7 +192,7 @@ export const systemRouter = router({
 
   applyOptimizations: adminProcedure
     .mutation(async () => {
-      const settings = (readSettingsFile() as any) || {};
+      const settings = readSettingsFile() || {};
       if (platform() !== "linux") {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Workstation optimizations are currently only supported on Linux." });
       }
@@ -278,7 +279,6 @@ export const systemRouter = router({
 
   listUsers: adminProcedure.query(async () => {
     const db = await getDb();
-    if (!db) return { users: [] };
     const allUsers = await db.select({
       id: users.id,
       name: users.name,
@@ -298,9 +298,6 @@ export const systemRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) {
-        throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "DB not available" });
-      }
       // Prevent self-demotion
       if (input.userId === ctx.user.id) {
         throw new TRPCError({ code: "BAD_REQUEST", message: "Cannot change your own role." });

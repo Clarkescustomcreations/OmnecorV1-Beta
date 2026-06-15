@@ -152,7 +152,7 @@ export class FileSystemWatcherService extends EventEmitter {
 
     // Create the chokidar watcher
     const watcher = chokidar.watch(resolvedRoot, {
-      ignored: (ignored || WATCHER_CONFIG.ignored) as any,
+      ignored: (ignored || WATCHER_CONFIG.ignored) as (string | RegExp)[],
       persistent: true,
       ignoreInitial: false,
       followSymlinks: false,

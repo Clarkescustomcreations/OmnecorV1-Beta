@@ -35,7 +35,6 @@ export async function createProject(
   mode: "schematic" | "pcb" = "schematic"
 ): Promise<DesignProject | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const [row] = await db
     .insert(designProjects)
@@ -55,7 +54,6 @@ export async function createProject(
 
 export async function getProjectsByUserId(userId: number): Promise<DesignProject[]> {
   const db = await getDb();
-  if (!db) return [];
 
   return db
     .select()
@@ -66,7 +64,6 @@ export async function getProjectsByUserId(userId: number): Promise<DesignProject
 
 export async function getProjectById(projectId: number): Promise<DesignProject | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const result = await db
     .select()
@@ -82,7 +79,6 @@ export async function updateProject(
   updates: Partial<{ name: string; description: string; mode: string }>
 ): Promise<DesignProject | null> {
   const db = await getDb();
-  if (!db) return null;
 
   await db
     .update(designProjects)
@@ -94,7 +90,6 @@ export async function updateProject(
 
 export async function deleteProject(projectId: number): Promise<boolean> {
   const db = await getDb();
-  if (!db) return false;
 
   await db.transaction(async (tx) => {
     const saves = await tx
@@ -127,7 +122,6 @@ export async function saveDesign(
   description?: string
 ): Promise<DesignSave | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const componentCount = (canvasData as { nodes?: unknown[] })?.nodes?.length ?? 0;
   const connectionCount = (canvasData as { edges?: unknown[] })?.edges?.length ?? 0;
@@ -172,7 +166,6 @@ export async function saveDesign(
 
 export async function getDesignById(designSaveId: number): Promise<DesignSave | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const result = await db
     .select()
@@ -185,7 +178,6 @@ export async function getDesignById(designSaveId: number): Promise<DesignSave | 
 
 export async function getLatestDesign(projectId: number): Promise<DesignSave | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const result = await db
     .select()
@@ -198,7 +190,6 @@ export async function getLatestDesign(projectId: number): Promise<DesignSave | n
 
 export async function getDesignVersions(projectId: number): Promise<DesignSave[]> {
   const db = await getDb();
-  if (!db) return [];
 
   return db
     .select()
@@ -209,7 +200,6 @@ export async function getDesignVersions(projectId: number): Promise<DesignSave[]
 
 export async function deleteDesign(designSaveId: number): Promise<boolean> {
   const db = await getDb();
-  if (!db) return false;
 
   await db.transaction(async (tx) => {
     await tx.delete(designExports).where(eq(designExports.designSaveId, designSaveId));
@@ -229,7 +219,6 @@ export async function addComponentToLibrary(
   component: Omit<ComponentLibraryItem, "id" | "createdAt" | "updatedAt">
 ): Promise<ComponentLibraryItem | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const [row] = await db
     .insert(componentLibraryItems)
@@ -253,7 +242,6 @@ export async function addComponentToLibrary(
 
 export async function getComponentLibrary(userId: number): Promise<ComponentLibraryItem[]> {
   const db = await getDb();
-  if (!db) return [];
 
   return db
     .select()
@@ -267,7 +255,6 @@ export async function getComponentById(
   userId: number
 ): Promise<ComponentLibraryItem | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const result = await db
     .select()
@@ -283,7 +270,6 @@ export async function deleteComponent(
   userId: number
 ): Promise<boolean> {
   const db = await getDb();
-  if (!db) return false;
 
   await db
     .delete(componentLibraryItems)
@@ -304,7 +290,6 @@ export async function createExport(
   fileSize?: number
 ): Promise<DesignExport | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const [row] = await db
     .insert(designExports)
@@ -324,7 +309,6 @@ export async function createExport(
 
 export async function getExportsByDesign(designSaveId: number): Promise<DesignExport[]> {
   const db = await getDb();
-  if (!db) return [];
 
   return db
     .select()
@@ -347,7 +331,6 @@ export async function createAIReview(
   mode?: "schematic" | "pcb"
 ): Promise<AIDesignReview | null> {
   const db = await getDb();
-  if (!db) return null;
 
   const [row] = await db
     .insert(aiDesignReviews)
@@ -377,7 +360,6 @@ export async function createAIReview(
 
 export async function getAIReviewsByDesign(designSaveId: number): Promise<AIDesignReview[]> {
   const db = await getDb();
-  if (!db) return [];
 
   return db
     .select()
@@ -388,7 +370,6 @@ export async function getAIReviewsByDesign(designSaveId: number): Promise<AIDesi
 
 export async function getAIReviewsByUser(userId: number): Promise<AIDesignReview[]> {
   const db = await getDb();
-  if (!db) return [];
 
   return db
     .select()

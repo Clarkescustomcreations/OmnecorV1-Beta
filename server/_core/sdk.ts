@@ -136,15 +136,16 @@ class SDKServer {
     const data = await this.oauthService.getUserInfoByToken({
       accessToken,
     } as ExchangeTokenResponse);
+    const rawData = data as GetUserInfoResponse & { platforms?: unknown; platform?: unknown };
     const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
+      rawData.platforms,
+      (rawData.platform as string | null) ?? data.platform ?? null
     );
     return {
-      ...(data as any),
+      ...data,
       platform: loginMethod,
       loginMethod,
-    } as GetUserInfoResponse;
+    };
   }
 
   private parseCookies(cookieHeader: string | undefined) {
@@ -248,15 +249,16 @@ class SDKServer {
       payload
     );
 
+    const rawData = data as GetUserInfoWithJwtResponse & { platforms?: unknown; platform?: unknown };
     const loginMethod = this.deriveLoginMethod(
-      (data as any)?.platforms,
-      (data as any)?.platform ?? data.platform ?? null
+      rawData.platforms,
+      (rawData.platform as string | null) ?? data.platform ?? null
     );
     return {
-      ...(data as any),
+      ...data,
       platform: loginMethod,
       loginMethod,
-    } as GetUserInfoWithJwtResponse;
+    };
   }
 
   async authenticateRequest(req: Request): Promise<AuthenticatedUser> {

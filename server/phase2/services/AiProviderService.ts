@@ -11,7 +11,7 @@
 
 import { ENV } from "../../_core/env.js";
 import { createLogger } from "../../_core/logger.js";
-import { ValetRouterService } from "./ValetRouterService.js";
+import { ValetRouterService, type RoutingMode } from "./ValetRouterService.js";
 
 const log = createLogger("AiProvider");
 // PromptSanitizer imported dynamically to avoid hard dep (Phase 22 parallel work)
@@ -22,6 +22,7 @@ import { spendLog, projectBudgets } from "../../../drizzle/schema.js";
 import { calculateCostMicrocents } from "../config/providerPricing.js";
 import { SettingsService } from "./SettingsService.js";
 import { NotificationService } from "../../_core/NotificationService.js";
+import { type PeerInfo } from "../../ommesh/core/DiscoveryService.js";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -42,6 +43,8 @@ export interface ChatInput {
   isFictionMode?: boolean;
   projectId?: string;  // for Agentic Wallet budget tracking
   sessionId?: string;  // for spend log correlation
+  routingMode?: RoutingMode;
+  modelPath?: string;
 }
 
 export interface ChatChunk {
@@ -247,12 +250,12 @@ export class AiProviderService {
 
     // Valet pre-routing: consult the Valet Router for routing decisions
     // Only if not api_direct mode and valet is configured
-    const routingMode = (chatInput as any).routingMode as string | undefined;
+    const routingMode = chatInput.routingMode;
     if (routingMode !== "api_direct") {
       try {
         const valetDecision = await ValetRouterService.getInstance().route({
           task: chatInput.messages[chatInput.messages.length - 1]?.content?.slice(0, 500) ?? "chat",
-          preferredMode: (routingMode as any) ?? "main_api",
+          preferredMode: routingMode ?? "main_api",
           availableProviders: [chatInput.providerId],
           taskType: "chat",
         });
@@ -328,7 +331,7 @@ export class AiProviderService {
             break;
           case "llamacpp": {
             const { LlamaCppService } = await import("./LlamaCppService.js") as typeof import("./LlamaCppService.js");
-            const modelPath = (chatInput as any).modelPath ?? "";
+            const modelPath = chatInput.modelPath ?? "";
             if (!modelPath) throw new Error("modelPath required for llamacpp provider");
             const text = await LlamaCppService.getInstance().generate(
               chatInput.messages.map((m: any) => m.content).join("\n"),
@@ -517,8 +520,8 @@ export class AiProviderService {
 
     if (decision.targetNodeId === meshNode.getIdentity().id) return null;
 
-    const peers = meshNode.getDiscovery().getPeers() as any[];
-    return peers.find(p => p.id === decision.targetNodeId);
+    const peers = meshNode.getDiscovery().getPeers();
+    return peers.find(p => p.name === decision.targetNodeId);
   }
 
   // ... rest of the private chat methods remain the same ...

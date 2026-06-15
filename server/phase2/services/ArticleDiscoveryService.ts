@@ -89,10 +89,6 @@ export class ArticleDiscoveryService {
    */
   async discover(source?: string, limit = 50): Promise<DiscoveredArticleInput[]> {
     const db = await getDb();
-    if (!db) {
-      log.warn("Discovery skipped — database unavailable");
-      return [];
-    }
 
     const feeds = this.resolveFeeds(source);
     const parsed: DiscoveredArticleInput[] = [];

@@ -53,8 +53,6 @@ async function generatePhaseOutput(phase: PhaseName, goal: string): Promise<stri
 
 export class PipelineEngineService {
   private static instance: PipelineEngineService | null = null;
-  private inMemoryPipelines: Pipeline[] = [];
-  private inMemoryPhases: PipelinePhase[] = [];
 
   static getInstance(): PipelineEngineService {
     if (!PipelineEngineService.instance) {
@@ -94,12 +92,6 @@ export class PipelineEngineService {
       updatedAt: new Date(),
     };
 
-    if (!db) {
-      this.inMemoryPipelines.push(newPipeline);
-      this.inMemoryPhases.push(newPhase);
-      return newPipeline;
-    }
-
     await db.insert(pipelines).values({
       id,
       name,
@@ -134,45 +126,6 @@ export class PipelineEngineService {
 
   async approvePhase(pipelineId: string, phase: string, userId: number): Promise<Pipeline> {
     const db = await getDb();
-    if (!db) {
-      const pipeline = this.inMemoryPipelines.find(p => p.id === pipelineId);
-      if (!pipeline) throw new Error("Pipeline not found");
-
-      const phaseObj = this.inMemoryPhases.find(p => p.pipelineId === pipelineId && p.phase === phase);
-      if (phaseObj) {
-        phaseObj.status = "complete";
-        phaseObj.approvedBy = userId;
-        phaseObj.approvedAt = new Date();
-        phaseObj.updatedAt = new Date();
-      }
-
-      const currentIdx = PHASE_ORDER.indexOf(phase as PhaseName);
-      const nextPhase = currentIdx < PHASE_ORDER.length - 1 ? PHASE_ORDER[currentIdx + 1] : null;
-
-      if (!nextPhase) {
-        pipeline.status = "complete";
-        pipeline.currentPhase = "DONE";
-        pipeline.updatedAt = new Date();
-      } else {
-        pipeline.currentPhase = nextPhase;
-        pipeline.updatedAt = new Date();
-        const output = PromptSanitizer.getInstance().sanitize(await generatePhaseOutput(nextPhase, pipeline.goal)).clean;
-        const newPhase: PipelinePhase = {
-          id: randomUUID(),
-          pipelineId,
-          phase: nextPhase,
-          status: "awaiting_approval",
-          inputText: null,
-          outputText: output,
-          approvedBy: null,
-          approvedAt: null,
-          createdAt: new Date(),
-          updatedAt: new Date(),
-        };
-        this.inMemoryPhases.push(newPhase);
-      }
-      return pipeline;
-    }
 
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
     if (!pipeline) throw new Error("Pipeline not found");
@@ -207,13 +160,6 @@ export class PipelineEngineService {
 
   async abortPipeline(pipelineId: string): Promise<Pipeline> {
     const db = await getDb();
-    if (!db) {
-      const pipeline = this.inMemoryPipelines.find(p => p.id === pipelineId);
-      if (!pipeline) throw new Error("Pipeline not found");
-      pipeline.status = "aborted";
-      pipeline.updatedAt = new Date();
-      return pipeline;
-    }
 
     await db.update(pipelines).set({ status: "aborted" }).where(eq(pipelines.id, pipelineId));
     AuditLogService.getInstance().log({ eventType: "pipeline_aborted", actorId: null, actorType: "user", procedure: "pipeline.abort", args: { pipelineId }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
@@ -223,12 +169,6 @@ export class PipelineEngineService {
 
   async getPipeline(pipelineId: string): Promise<{ pipeline: Pipeline; phases: PipelinePhase[] } | null> {
     const db = await getDb();
-    if (!db) {
-      const pipeline = this.inMemoryPipelines.find(p => p.id === pipelineId);
-      if (!pipeline) return null;
-      const phases = this.inMemoryPhases.filter(p => p.pipelineId === pipelineId).sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
-      return { pipeline, phases };
-    }
 
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
     if (!pipeline) return null;
@@ -238,9 +178,6 @@ export class PipelineEngineService {
 
   async listPipelines(ownerId: number): Promise<Pipeline[]> {
     const db = await getDb();
-    if (!db) {
-      return this.inMemoryPipelines.filter(p => p.ownerId === ownerId);
-    }
     return db.select().from(pipelines).where(eq(pipelines.ownerId, ownerId));
   }
 }

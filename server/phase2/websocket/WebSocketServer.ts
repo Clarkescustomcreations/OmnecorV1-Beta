@@ -660,17 +660,17 @@ export class OmnecorWebSocketServer {
     // --- Process Lifecycle Events ---
     this.processManager.on("lifecycle", (event: ProcessLifecycleEvent) => {
       // Task completion / failure → notification feed.
-      const state = (event as any).state as string | undefined;
+      const state = event.state;
       if (state === "completed" || state === "failed") {
-        const label = (event as any).label ?? (event as any).type ?? "Background task";
+        const label = event.label || event.type || "Background task";
         this.notificationService.notify({
           kind: "task",
           title: state === "completed" ? "Task completed" : "Task failed",
           body:
             state === "completed"
               ? `${label} finished successfully.`
-              : `${label} failed${(event as any).error ? `: ${(event as any).error}` : "."}`,
-          data: { jobId: (event as any).jobId, type: (event as any).type, state },
+              : `${label} failed${event.error ? `: ${event.error}` : "."}`,
+          data: { jobId: event.jobId, type: event.type, state },
         });
       }
 

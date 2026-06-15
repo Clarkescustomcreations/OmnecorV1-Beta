@@ -10,7 +10,6 @@ export const analyticsRouter = router({
     .input(z.object({}).optional())
     .query(async () => {
       const db = await getDb();
-      if (!db) return [];
 
       const accounts = await db.select()
         .from(platformAccounts)
@@ -48,7 +47,6 @@ export const analyticsRouter = router({
     .input(z.object({ scheduledPostId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return null;
 
       const result = await db.select()
         .from(postAnalytics)
@@ -69,7 +67,6 @@ export const analyticsRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available" };
 
       const existing = await db.select()
         .from(postAnalytics)

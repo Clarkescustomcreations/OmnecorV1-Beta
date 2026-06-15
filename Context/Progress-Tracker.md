@@ -108,8 +108,12 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 - [x] **Ad-hoc: Mobile Layout Bottom Tab Bar Clipping Fix**
   *   *File:* [screen-container.tsx](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/components/screen-container.tsx)
   *   *Done (2026-06-15):* Offset the scrollable views in the mobile APK tab screens so the bottom-most elements (e.g. settings Logout button, AI Node architecture notes) are fully visible above the app tab navigation bar instead of being clipped behind it. Imported `BottomTabBarHeightContext` from `@react-navigation/bottom-tabs` and applied a dynamic `paddingBottom` of `tabBarHeight` to the container `SafeAreaView` style when rendered inside the tab navigator context. This resolves the clipping issue globally across all tab screens. Gates: APK `tsc` 0 · root `tsc` 0 · `vitest` 323/323.
+- [x] **Ad-hoc: Mobile APK App Icon Fallback Resolution**
+  *   *Files:* [package.json](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/package.json), [app.config.ts](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/app.config.ts)
+  *   *Done (2026-06-15):* Diagnosed the generic Android robot placeholder app icon issue. Discovered that (1) missing local `sharp` dependency forced Expo to fallback to `jimp` during prebuild, resulting in PNG data mistakenly written with `.webp` extension (which AAPT2/Android rejected or failed to decode, causing launcher fallback), and (2) build scripts did not run `./gradlew clean`, meaning Gradle used cached built assets containing default placeholder icons. Fixed by adding `sharp` to development dependencies and updating the mobile `package.json` build scripts to include a `clean` task (`./gradlew clean assembleDebug` / `clean assembleRelease`) to invalidate resource caches. Gates: APK `tsc` 0 · root `tsc` 0.
 - [ ] **Feature 24: Mobile 3D Canvas Interactivity**
-  *   *File:* [3DDesigner.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/3DDesigner.tsx)
+  *   *File:* [viewer.tsx](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/app/(tabs)/viewer.tsx) — the **mobile** viewer screen. *(The old pointer to the desktop `client/src/pages/3DDesigner.tsx` was wrong — F24 targets the mobile APK viewer.)*
+  *   *Scope clarified (2026-06-15):* The mobile 3D viewer is **interactive and the AI panel is restored** — a prior "preview-only / AI-panel-removed" change was a mistake (made without sign-off) and has been reverted. `viewer.tsx` already ships: three.js WebView with drag-orbit / pinch-zoom / tap-to-select raycaster; selection→`ai.chat` context; and the Ask AI · Analyze · Modify · Export action bar dispatching to real endpoints per mode (3D→`ai.chat`; PCB→`pcbEditor.reviewDesign`/`saveDesign`/`exportDesign`; Code→`project.readFile`/`writeFile`). **Remaining to close F24:** load real `blender`/`comfy`-generated meshes into the 3D scene (current scene is a Cube/Sphere/Cylinder demo; 3D-mode Export delegates to the desktop Blender bridge) + on-device verification (F27).
 - [ ] **Feature 25: Mobile Podcast Controls and Settings**
   *   *File:* [PodcastStudio.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/PodcastStudio.tsx)
 - [ ] **Feature 26: Unwired Frontend Elements**
@@ -214,7 +218,7 @@ Also: `engines` (node ≥20, pnpm ≥10) added; `cross-env` added to `dev`/`star
 - **Bonus:** hardcoded `python3` spawns in AgentService (×2) + trainingRouter (×2) → `PYTHON_SCRIPTS.pythonBin`.
 
 ## Accepted / deferred (documented, not blockers)
-`as any` debt (~38 server, behind validated boundaries); electron-app Vite 5→7 / Electron 28→39 toolchain upgrade (needs build machine — `/finish-electron-security`); `valet:fetch`/`valet:setup-ml` maintainer-only scripts; `0o600/0o700` file perms no-op on Windows by design; Android Gradle build + Windows/Linux installer builds (need physical machines); Valet 6.4 final sign-off (needs clean GPU box).
+`as any` **casts** — 100% eliminated (all ~38 server-side `as any` casts replaced with type-safe interfaces; `grep "as any" server/ --include=*.ts` → 0 outside tests). Note this does **not** cover `: any` **type annotations**, which remain by design behind validated boundaries (untyped libs like `bonjour`/ChromaClient, dynamic WS event payloads — see "Known debt" below); electron-app Vite 5→7 / Electron 28→39 toolchain upgrade (needs build machine — `/finish-electron-security`); `valet:fetch`/`valet:setup-ml` maintainer-only scripts; `0o600/0o700` file perms no-op on Windows by design; Android Gradle build + Windows/Linux installer builds (need physical machines); Valet 6.4 final sign-off (needs clean GPU box).
 
 ---
 
@@ -266,11 +270,11 @@ Verified: live `trainingRouter` (`routers/trainingRouter.ts`) is **already fully
 - **`dangerouslySetInnerHTML`** in `pcb/SchematicNode.tsx`, `pcb/PCBNode.tsx`, `pcb/ComponentLibraryPanel.tsx` — appear to inject static component SVG (not user content); `ui/chart.tsx` is the standard shadcn CSS-var pattern. Recommend a confirm-static review.
 
 ## Known debt (documented, not sweep-fixable — pervasive/established, would require a rewrite)
-- ~100 leftover `if (!db)` null-guards (e.g. `db-pcb.ts`) — harmless dead branches since `getDb()` is never null. Cleanup candidate, not a bug.
+- **RESOLVED (2026-06-15):** Cleaned up all 83 leftover `if (!db)` null-guards (harmless dead branches since `getDb()` is never null) across the server codebase.
 - ~60 default-export components vs Code-Standards §1.1 "named exports only" — established page/lazy pattern.
 - ~649 raw Tailwind color classes + scattered hex literals in `client/src` vs AGENTS "no hardcoded colors" — established status-color style (emerald=ok, rose=err). Legit hex: `EmbeddedTerminal` (xterm theme), `ThreeViewer`/`SchematicEditor` (three.js/reactflow), `WebPreview` (iframe).
 - Template-brand ("Manus") leftovers remain only in `server/_core/{notification,map,sdk,storage}.ts` **comments/default strings** (active files — cosmetic, not dead code). `ManusDialog.tsx` itself was deleted (see cleanup above).
-- ~38 server `as any` behind validated boundaries — already on the accepted list above.
+- Server `: any` **type annotations** (not `as any` casts — those are eliminated, see accepted list above) remain behind validated boundaries: untyped third-party libs (`bonjour`, ChromaClient), dynamic WS event payloads, and the `db: any` context field. Intentional, not sweep-fixable.
 
 ---
 

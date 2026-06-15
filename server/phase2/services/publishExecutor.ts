@@ -105,7 +105,6 @@ async function publishOne(
 /** Publish a specific set of scheduled posts (manual "Publish now"). */
 export async function publishScheduledPostIds(ids: number[]): Promise<PublishOutcome[]> {
   const db = await getDb();
-  if (!db) return ids.map((id) => ({ scheduledPostId: id, ok: false, error: "Database unavailable" }));
   if (ids.length === 0) return [];
 
   const rows = await db
@@ -127,7 +126,6 @@ export async function publishScheduledPostIds(ids: number[]): Promise<PublishOut
 /** Publish every scheduled post whose time has arrived (worker tick). */
 export async function publishDuePosts(): Promise<PublishOutcome[]> {
   const db = await getDb();
-  if (!db) return [];
 
   const rows = await db
     .select({

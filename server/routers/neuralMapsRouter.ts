@@ -28,7 +28,6 @@ export const neuralMapsRouter = router({
   /** List all maps for the current user */
   list: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) return [];
 
     const userId = ctx.user?.id;
     if (!userId) return [];
@@ -53,7 +52,6 @@ export const neuralMapsRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database unavailable in offline mode" };
 
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -88,7 +86,6 @@ export const neuralMapsRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database unavailable in offline mode" };
 
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -114,7 +111,6 @@ export const neuralMapsRouter = router({
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database unavailable in offline mode" };
 
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -143,7 +139,6 @@ export const neuralMapsRouter = router({
     })))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { success: false, migrated: 0 };
 
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });

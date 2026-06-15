@@ -46,7 +46,6 @@ export const walletRouter = router({
     .input(z.object({ projectId: projectIdSchema }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return null;
       const rows = await db
         .select()
         .from(projectBudgets)
@@ -60,7 +59,6 @@ export const walletRouter = router({
     .input(setBudgetSchema)
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const existing = await db
         .select()
@@ -94,7 +92,6 @@ export const walletRouter = router({
     .input(getSpendLogSchema)
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
       return db
         .select()
         .from(spendLog)
@@ -108,7 +105,6 @@ export const walletRouter = router({
     .input(z.object({ projectId: projectIdSchema }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { totalMicrocents: 0, byProvider: [] };
 
       const rows = await db
         .select({
@@ -140,7 +136,6 @@ export const walletRouter = router({
     .input(z.object({ projectId: projectIdSchema, confirm: z.literal(true) }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db.delete(spendLog).where(eq(spendLog.projectId, input.projectId));
       return { success: true };
     }),

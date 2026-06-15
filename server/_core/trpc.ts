@@ -55,7 +55,7 @@ const auditMiddleware = t.middleware(async (opts) => {
       actorId: ctx.user.id,
       actorType: "user",
       procedure: path,
-      args: redactSensitiveData((opts as any).rawInput) as Record<string, unknown> | null,
+      args: redactSensitiveData((opts as { rawInput?: unknown }).rawInput) as Record<string, unknown> | null,
       result: result.ok ? null : { error: true },
       ipAddress: ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? null,
       sessionId: null,

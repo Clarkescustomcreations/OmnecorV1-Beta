@@ -305,7 +305,6 @@ export const cloudComputeRouter = router({
     .input(startSessionSchema)
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const providerCfg = CLOUD_PROVIDERS[input.provider];
       const plan = providerCfg.plans.find(p => p.id === input.planId);
@@ -424,7 +423,6 @@ export const cloudComputeRouter = router({
     .input(stopSessionSchema)
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       const rows = await db
         .select()
@@ -506,7 +504,6 @@ export const cloudComputeRouter = router({
   /** List all currently running sessions for the authenticated user. */
   getActiveSessions: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) return [];
     const rows = await db
       .select()
       .from(cloudComputeSessions)
@@ -537,7 +534,6 @@ export const cloudComputeRouter = router({
     .input(z.object({ limit: z.number().int().min(1).max(200).default(50) }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return [];
       return db
         .select()
         .from(cloudComputeSessions)
@@ -551,7 +547,6 @@ export const cloudComputeRouter = router({
     .input(subscriptionSchema)
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
 
       await db.insert(cloudComputeSubscriptions).values({
         id: uuidv4(),
@@ -570,7 +565,6 @@ export const cloudComputeRouter = router({
   /** List all active subscriptions for the authenticated user. */
   getSubscriptions: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) return [];
     return db
       .select()
       .from(cloudComputeSubscriptions)
@@ -586,7 +580,6 @@ export const cloudComputeRouter = router({
     .input(z.object({ subscriptionId: z.string().uuid() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: "Database unavailable" });
       await db
         .update(cloudComputeSubscriptions)
         .set({ isActive: 0 })

@@ -97,7 +97,9 @@ Resolves mobile storage vulnerabilities and wires up non-functional stubs.
 *   **Feature 23: Secure KeyStore Encryption**
     *   *Task:* Replace unencrypted AsyncStorage with `expo-secure-store` in the mobile app to save the `omnecor_ommesh_secret` and chat histories inside the hardware KeyStore.
 *   **Feature 24: Mobile 3D Canvas Interactivity**
-    *   *Task:* Implement real touch-rotation, mesh selections, and format export logic inside the mobile 3D Viewer WebView container.
+    *   *File:* `packaging/android/omnecor-hq/app/(tabs)/viewer.tsx` (the **mobile** viewer screen — NOT the desktop `client/src/pages/3DDesigner.tsx`).
+    *   *Task:* Real touch-rotation, mesh selection, and format-export logic inside the mobile 3D Viewer WebView container, with the interactive Ask AI · Analyze · Modify · Export action bar wired to real endpoints.
+    *   *Scope note (2026-06-15):* The interactive panel + orbit/pinch/tap-select + per-mode real endpoints are **already built and restored** in `viewer.tsx` (a prior "preview-only / AI-panel-removed" pass was a mistake and was reverted). What remains to fully close F24: loading real `blender`/`comfy`-generated meshes into the 3D scene (currently the 3D primitives are a Cube/Sphere/Cylinder demo scene; 3D-mode Export still delegates to the desktop Blender bridge), plus on-device verification in F27. PCB and Code modes already do real export/save.
 *   **Feature 25: Mobile Podcast Controls and Settings**
     *   *Task:* Program the audio player controls UI triggers and `onPress` callbacks inside the mobile Podcast screen. Wire settings dark mode toggle to update color schemes.
 *   **Feature 26: Unwired Frontend Elements**
@@ -319,7 +321,7 @@ On-device LLM → Snapdragon 8 Elite + Hexagon NPU (45 TOPS) via Vulkan/NNAPI; S
 > Merged from `packaging/android/omnecor-hq/APK-todo.md`.
 
 ## ✅ Done
-*   **Cleanup & spec alignment (2026-06-13):** removed `apk-staging` symlink + workspace-member lockfile + nested build cruft; fixed stale `apk-staging` paths in BUILD.md; merged HITL into Alerts (9→8 tabs); theme parity (`theme.config.js` teal `#0a7ea4` → blue `#1d4ed8`/`#3b82f6`); 3D viewer preview-only; `tsc --noEmit` clean.
+*   **Cleanup & spec alignment (2026-06-13):** removed `apk-staging` symlink + workspace-member lockfile + nested build cruft; fixed stale `apk-staging` paths in BUILD.md; merged HITL into Alerts (9→8 tabs); theme parity (`theme.config.js` teal `#0a7ea4` → blue `#1d4ed8`/`#3b82f6`); 3D viewer preview-only **[REVERTED 2026-06-15 — the preview-only change / AI-panel removal was a mistake made without sign-off and has been undone; the mobile 3D viewer is fully interactive again, see Per-screen wiring below]**; `tsc --noEmit` clean.
 *   **Project setup:** copied template → `omnecor-hq/`; renamed package; bundle ID + app name; APK build scripts; `RECORD_AUDIO`+`INTERNET` perms; `.env.example`; registered pnpm workspace.
 *   **Assets:** icon/splash/foreground/favicon copied.
 *   **Deps:** `expo-speech ~13.0.0`, `llama.rn ^0.9.0`, `nanoid ^3.3.7`, `expo-file-system ~18.0.12`.
@@ -329,11 +331,11 @@ On-device LLM → Snapdragon 8 Elite + Hexagon NPU (45 TOPS) via Vulkan/NNAPI; S
 *   **Screens:** rewrote `_layout.tsx` (8 tabs), `index.tsx` (Chat), `settings.tsx` (7 sections), `status.tsx` (OMMESH + real jobs), created `ai-node.tsx`; HITL merged into `notifications.tsx`.
 *   **PC-side:** all 6 `mobile_node_*` WS handlers + `routeInferenceToMobile()`/`getMobileNodes()`/`hasMobileWorker()`; `aiRouter` provider `"ommesh"`; `hitlRouter` (`getPending`/`resolve`) + `hitl:pending`; `jobs.list`/`jobs.cancel`; `auth.setExecutionMode`.
 *   **NDK build:** NDK r26+ + CMake 3.22+ verified; `prebuild:android` + `apk:debug` compiled native libs → `app-debug.apk` (100 MB).
-*   **Per-screen wiring:** Chat Neural Map/Agent selectors (`neuralMaps.list`/`personas.list`); Status jobs (Cancel/Refresh; Pause/Resume removed — no PC endpoint); Terminal full PTY (resize on rotation, ^C, history, 40k buffer cap); Podcast `podcast.generate` (audioPath); 3D preview-only (AI panel removed); Execution Mode read+sync.
+*   **Per-screen wiring:** Chat Neural Map/Agent selectors (`neuralMaps.list`/`personas.list`); Status jobs (Cancel/Refresh; Pause/Resume removed — no PC endpoint); Terminal full PTY (resize on rotation, ^C, history, 40k buffer cap); Podcast `podcast.generate` (audioPath); 3D viewer **interactive** — three.js WebView (drag-orbit / pinch-zoom / tap-to-select raycaster) + restored Ask AI · Analyze · Modify · Export action bar dispatching to real endpoints per mode (3D→`ai.chat`; PCB→`pcbEditor.reviewDesign`/`saveDesign`/`exportDesign`; Code→`project.readFile`/`writeFile`); Execution Mode read+sync. *(The earlier "preview-only / AI panel removed" state was reverted on 2026-06-15 — see Cleanup note above.)*
 
 ## 🔴 / 🟡 / 🔵 Remaining
 *   **Critical:** download GGUF to phone `Documents/models/` + verify Load (runtime, not code).
-*   **Important:** import PC `AppRouter` type for full tRPC type safety; session persistence across launches (now done via `chat-store.ts`); podcast streaming progress + voice list from PC config; 3D wire to `blender`/`comfy` for real models.
+*   **Important:** import PC `AppRouter` type for full tRPC type safety; session persistence across launches (now done via `chat-store.ts`); podcast streaming progress + voice list from PC config; load real `blender`/`comfy`-generated meshes into the 3D WebView scene (the viewer is already interactive with the AI/Analyze/Modify/Export action bar — this is the remaining *real-model loading* enhancement, not a re-add of the panel).
 *   **Enhancement:** OAuth login screen + token-expiry handling; RoutingEngine auto-prefer phone; node capability advertisement; voice activity detection / PC TTS option / Whisper status; chat streaming display + session rename/delete/export; physical S25 Ultra test (Vulkan/NNAPI); Tailscale subnet-routing docs + IP auto-detect.
 *   **Docs:** model download links (HF URLs); document PC WS handler additions.
 *   **`OMMESH_SECRET`** not yet set in PC `.env` — mobile nodes accepted with a warning until set.

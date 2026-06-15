@@ -26,7 +26,6 @@ export const platformsRouter = router({
     .input(z.object({}).optional())
     .query(async ({ ctx }) => {
       const db = await getDb();
-      if (!db) return [];
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const accounts = await db.select(SAFE_ACCOUNT_COLUMNS)
@@ -42,7 +41,6 @@ export const platformsRouter = router({
     .input(z.object({ accountId: z.number() }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return null;
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       const result = await db.select(SAFE_ACCOUNT_COLUMNS)
@@ -65,7 +63,6 @@ export const platformsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       await db.insert(platformAccounts).values({
@@ -90,7 +87,6 @@ export const platformsRouter = router({
     }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       await assertAccountOwnership(db, input.accountId, ctx.user.id);
@@ -113,7 +109,6 @@ export const platformsRouter = router({
     .input(z.object({ accountId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available" };
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
       await assertAccountOwnership(db, input.accountId, ctx.user.id);

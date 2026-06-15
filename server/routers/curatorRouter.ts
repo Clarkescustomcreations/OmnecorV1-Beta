@@ -48,7 +48,6 @@ export const curatorRouter = router({
     }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
 
       const posts = await db.select()
         .from(curatedPosts)
@@ -62,7 +61,6 @@ export const curatorRouter = router({
     .input(z.object({ postId: z.number() }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return null;
 
       const result = await db.select()
         .from(curatedPosts)
@@ -75,7 +73,6 @@ export const curatorRouter = router({
     .input(z.object({ articleId: z.number(), platform: z.string().default("x") }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return { success: false, message: "Database not available" };
 
       const article = await db.select()
         .from(discoveredArticles)
@@ -109,7 +106,6 @@ export const curatorRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false, approvedCount: 0 };
 
       for (const postId of input.postIds) {
         await db.update(curatedPosts)
@@ -126,7 +122,6 @@ export const curatorRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false, rejectedCount: 0 };
 
       for (const postId of input.postIds) {
         await db.update(curatedPosts)
@@ -147,7 +142,6 @@ export const curatorRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false };
 
       await db.update(curatedPosts)
         .set({
@@ -162,7 +156,6 @@ export const curatorRouter = router({
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ input, ctx }) => {
       const db = await getDb();
-      if (!db) return { success: false, draft: "Database not available" };
 
       const article = await db.select()
         .from(discoveredArticles)

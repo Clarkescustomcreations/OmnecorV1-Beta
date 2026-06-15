@@ -372,7 +372,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
     providerId: provider,
     modelId: model,
     messages: messages.map(m => ({
-      role: m.role as any,
+      role: m.role,
       content:
         typeof m.content === "string" ? m.content : JSON.stringify(m.content),
     })),

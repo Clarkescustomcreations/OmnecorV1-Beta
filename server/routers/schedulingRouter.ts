@@ -11,7 +11,6 @@ export const schedulingRouter = router({
     .input(z.object({ limit: z.number().default(50) }))
     .query(async ({ input }) => {
       const db = await getDb();
-      if (!db) return [];
       const posts = await db.select({
         id: scheduledPosts.id,
         curatedPostId: scheduledPosts.curatedPostId,
@@ -41,7 +40,6 @@ export const schedulingRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available in local mode", postId: input.curatedPostId };
 
       await db.insert(scheduledPosts).values({
         curatedPostId: input.curatedPostId,
@@ -62,7 +60,6 @@ export const schedulingRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database not available in local mode" };
 
       await db.update(scheduledPosts)
         .set({ scheduledAt: input.newScheduledAt })
@@ -78,7 +75,6 @@ export const schedulingRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false, error: "Database unavailable in offline mode" };
 
       const [{ id: newCuratedId }] = await db.insert(curatedPosts).values({
         platform: "direct",
@@ -99,7 +95,6 @@ export const schedulingRouter = router({
     .input(z.object({ scheduledPostId: z.number() }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-      if (!db) return { success: false };
 
       await db.update(scheduledPosts)
         .set({ status: "cancelled" })
@@ -111,7 +106,6 @@ export const schedulingRouter = router({
     .input(z.object({ scheduledPostId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { success: false, status: "failed" };
 
       // Verify the post exists and belongs to the calling user (ownership flows
       // through the connected platform account → platformAccounts.userId).

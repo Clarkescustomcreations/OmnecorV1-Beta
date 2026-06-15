@@ -187,6 +187,38 @@ export const mockAPIModels: APIModel[] = [
 ];
 
 /**
+ * Per-provider catalog of selectable API models, keyed by the provider id
+ * returned by `aiProvider.getProviders`. Used by the chat ModelSelector to
+ * expand an online provider into its concrete models (instead of a single
+ * provider-level row). Only providers representable as a chat `providerId`
+ * (openai/anthropic/gemini/grok) appear here.
+ */
+export const API_MODEL_CATALOG: Record<
+  "openai" | "anthropic" | "gemini" | "grok",
+  Array<{ id: string; name: string; costPer1kTokens?: { input: number; output: number } }>
+> = {
+  openai: [
+    { id: "gpt-4o", name: "GPT-4o", costPer1kTokens: { input: 0.0025, output: 0.01 } },
+    { id: "gpt-4o-mini", name: "GPT-4o mini", costPer1kTokens: { input: 0.00015, output: 0.0006 } },
+    { id: "o1", name: "o1", costPer1kTokens: { input: 0.015, output: 0.06 } },
+  ],
+  anthropic: [
+    { id: "claude-opus-4-8", name: "Claude Opus 4.8" },
+    { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
+    { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
+  ],
+  gemini: [
+    { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+    { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
+    { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash" },
+  ],
+  grok: [
+    { id: "grok-2", name: "Grok 2" },
+    { id: "grok-2-mini", name: "Grok 2 mini" },
+  ],
+};
+
+/**
  * Convert local and API models to unified AIModel format
  */
 export function convertToAIModel(

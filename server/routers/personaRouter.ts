@@ -10,7 +10,6 @@ const personaDataSchema = z.record(z.string(), z.unknown());
 export const personaRouter = router({
   list: protectedProcedure.query(async ({ ctx }) => {
     const db = await getDb();
-    if (!db) return [];
     const userId = ctx.user?.id;
     if (!userId) return [];
     const rows = await db.select().from(personas).where(eq(personas.userId, userId));
@@ -34,7 +33,6 @@ export const personaRouter = router({
     }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database unavailable" });
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
       const existing = await db.select({ id: personas.id }).from(personas)
@@ -63,7 +61,6 @@ export const personaRouter = router({
     .input(z.object({ id: z.string().uuid() }))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) throw new TRPCError({ code: "PRECONDITION_FAILED", message: "Database unavailable" });
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
       await db.delete(personas).where(
@@ -82,7 +79,6 @@ export const personaRouter = router({
     })))
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
-      if (!db) return { migrated: 0 };
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
       let migrated = 0;

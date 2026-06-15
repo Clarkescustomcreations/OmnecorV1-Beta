@@ -133,6 +133,34 @@ export interface RVCResult {
   fileSizeBytes: number;
 }
 
+interface WhisperResponse {
+  text: string;
+  language: string;
+  language_probability: number;
+  duration: number;
+  segments: Array<{
+    id: number;
+    start: number;
+    end: number;
+    text: string;
+    words: Array<{
+      word: string;
+      start: number;
+      end: number;
+      probability: number;
+    }>;
+  }>;
+}
+
+interface SynthesisJsonResponse {
+  output_path: string;
+}
+
+interface HealthJsonResponse {
+  model?: string;
+  device?: string;
+}
+
 // ---------------------------------------------------------------------------
 // Service Implementation
 // ---------------------------------------------------------------------------
@@ -304,19 +332,19 @@ export class VoiceService extends EventEmitter {
         throw new Error(error);
       }
 
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as WhisperResponse;
 
       const result: TranscriptionResult = {
         text: data.text,
         language: data.language,
         languageProbability: data.language_probability,
         duration: data.duration,
-        segments: (data.segments || []).map((seg: any) => ({
+        segments: (data.segments || []).map((seg) => ({
           id: seg.id,
           start: seg.start,
           end: seg.end,
           text: seg.text,
-          words: (seg.words || []).map((w: any) => ({
+          words: (seg.words || []).map((w) => ({
             word: w.word,
             start: w.start,
             end: w.end,
@@ -446,7 +474,7 @@ export class VoiceService extends EventEmitter {
         };
       } else {
         // Otherwise, it's a JSON response with the file path
-        const data = (await response.json()) as any;
+        const data = (await response.json()) as SynthesisJsonResponse;
         result = {
           outputPath: data.output_path,
           contentType: "audio/wav",
@@ -676,7 +704,7 @@ export class VoiceService extends EventEmitter {
         };
       }
 
-      const data = (await response.json()) as any;
+      const data = (await response.json()) as HealthJsonResponse;
 
       return {
         service,
