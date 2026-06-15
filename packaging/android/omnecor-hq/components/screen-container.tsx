@@ -1,5 +1,7 @@
 import { View, KeyboardAvoidingView, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
+import { useContext } from "react";
+import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 
 import { cn } from "@/lib/utils";
 import { ConnectionBanner } from "@/components/connection-banner";
@@ -53,6 +55,8 @@ export function ScreenContainer({
   style,
   ...props
 }: ScreenContainerProps) {
+  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
+
   return (
     <View
       className={cn(
@@ -65,7 +69,7 @@ export function ScreenContainer({
       <SafeAreaView
         edges={edges}
         className={cn("flex-1", safeAreaClassName)}
-        style={style}
+        style={[style, tabBarHeight > 0 ? { paddingBottom: tabBarHeight } : undefined]}
       >
         {!hideConnectionBanner && <ConnectionBanner />}
         {/* Lift bottom-anchored inputs above the on-screen keyboard. Under

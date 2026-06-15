@@ -25,8 +25,11 @@ import ReactFlow, {
   EdgeTypes,
   useReactFlow,
   ReactFlowProvider,
+  ControlButton,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
+import { RotateCw } from 'lucide-react';
+
 
 import { SchematicNode } from './SchematicNode';
 import { PCBNode } from './PCBNode';
@@ -58,13 +61,15 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
-  const { getNodes, getEdges } = useReactFlow();
+  const { getNodes, getEdges, fitView } = useReactFlow();
 
   // Editor settings
   const [mode, setMode] = useState<'schematic' | 'pcb'>('schematic');
   const [gridVisible, setGridVisible] = useState(true);
   const [snapToGrid, setSnapToGrid] = useState(true);
   const [gridSize] = useState(20);
+  const [showMiniMap, setShowMiniMap] = useState(true);
+
 
   // UI panels
   const [showLibrary, setShowLibrary] = useState(true);
@@ -344,6 +349,38 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
     [selectedNodeIds, setNodes, addToHistory]
   );
 
+  // Handle rotate canvas layout by 90 degrees
+  const handleRotateCanvas = useCallback(() => {
+    if (!nodes || nodes.length === 0) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach((n) => {
+      const x = n.position.x;
+      const y = n.position.y;
+      if (x < minX) minX = x;
+      if (x > maxX) maxX = x;
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+    });
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+
+    const rotated = nodes.map((n) => {
+      const rx = n.position.x - cx;
+      const ry = n.position.y - cy;
+      return {
+        ...n,
+        position: {
+          x: cx - ry,
+          y: cy + rx,
+        },
+      };
+    });
+    setNodes(rotated);
+    addToHistory();
+    requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
+    toast.success("Rotated schematic/PCB layout 90°");
+  }, [nodes, setNodes, fitView, addToHistory]);
+
   // Save design
   const handleSaveDesign = useCallback(async () => {
     if (!projectId) {
@@ -402,6 +439,42 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col bg-background">
+      <style dangerouslySetInnerHTML={{ __html: `
+        .react-flow__controls {
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+          border: 1px solid var(--border) !important;
+          border-radius: 0.375rem !important;
+          overflow: hidden !important;
+          background: var(--bg-elevated) !important;
+          display: flex !important;
+          flex-direction: column !important;
+        }
+        .react-flow__controls-button {
+          background: var(--bg-elevated) !important;
+          border-bottom: 1px solid var(--border) !important;
+          color: var(--foreground) !important;
+          fill: var(--muted-foreground) !important;
+          border-left: none !important;
+          border-right: none !important;
+          border-top: none !important;
+          width: 28px !important;
+          height: 28px !important;
+          display: flex !important;
+          align-items: center !important;
+          justify-content: center !important;
+          transition: background-color 0.2s ease !important;
+        }
+        .react-flow__controls-button:last-child {
+          border-bottom: none !important;
+        }
+        .react-flow__controls-button:hover {
+          background: var(--bg-secondary) !important;
+        }
+        .react-flow__controls-button svg {
+          fill: currentColor !important;
+        }
+      `}} />
+
       {/* Toolbar */}
       <EditorToolbar
         mode={mode}
@@ -417,6 +490,8 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
         onShowProperties={() => setShowProperties(!showProperties)}
         onShowAI={() => setShowAI(!showAI)}
         onShowNetlist={() => setShowNetlist(!showNetlist)}
+        showMiniMap={showMiniMap}
+        onMiniMapToggle={() => setShowMiniMap(!showMiniMap)}
       />
 
       {/* Main Editor Area */}
@@ -452,16 +527,23 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
                 size={1}
               />
             )}
-            <Controls className="bg-card border border-border rounded shadow" />
-            <MiniMap
-              nodeColor="#f59e0b"
-              maskColor={isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.1)'}
-              style={{
-                backgroundColor: isDark ? '#0f172a' : '#f3f4f6',
-                border: `1px solid ${isDark ? '#334155' : '#d1d5db'}`,
-                borderRadius: '0.375rem',
-              }}
-            />
+            <Controls>
+              <ControlButton onClick={handleRotateCanvas} title="Rotate Layout 90°">
+                <RotateCw className="w-3.5 h-3.5" />
+              </ControlButton>
+            </Controls>
+            {showMiniMap && (
+              <MiniMap
+                nodeColor="#f59e0b"
+                maskColor={isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.1)'}
+                style={{
+                  backgroundColor: isDark ? '#0f172a' : '#f3f4f6',
+                  border: `1px solid ${isDark ? '#334155' : '#d1d5db'}`,
+                  borderRadius: '0.375rem',
+                  bottom: 75,
+                }}
+              />
+            )}
           </ReactFlow>
         </div>
 

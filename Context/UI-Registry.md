@@ -1357,13 +1357,16 @@ Read-only 3D canvas. OrbitControls only (pan/zoom/rotate). No interactive form e
 | Component Drag-Drop (from library panel) | drag | handleAddComponent | None | LOCAL |
 | Rotate (from toolbar callback) | callback | handleRotateNode | None | LOCAL |
 | Flip (from toolbar callback) | callback | handleFlipNode | None | LOCAL |
+| Rotate Canvas Button | click | handleRotateCanvas (rotates all nodes 90°) | None | LOCAL |
+| Mini Map Toggle | click | setShowMiniMap state toggle | None | LOCAL |
 
 ### COMPONENT: EditorToolbar.tsx
 Pure callback-based toolbar. All handlers passed from parent (EnhancedPCBEditor).
 
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
-| ToggleGroup (Schematic/PCB) | mode | onValueChange callback | None | LOCAL |
+| Schematic Button | btn-schematic-mode | onModeChange('schematic') callback | None | LOCAL |
+| PCB Button | btn-pcb-mode | onModeChange('pcb') callback | None | LOCAL |
 | Grid On/Off Button | grid | onGridToggle callback | None | LOCAL |
 | Snap to Grid Button | snap | onSnapToggle callback | None | LOCAL |
 | Rotate Button | rotate | onRotate(90) callback | None | LOCAL |
@@ -1373,6 +1376,7 @@ Pure callback-based toolbar. All handlers passed from parent (EnhancedPCBEditor)
 | Properties Button | properties | onShowProperties callback | None | LOCAL |
 | AI Button | AI | onShowAI callback | None | LOCAL |
 | Netlist Button | netlist | onShowNetlist callback | None | LOCAL |
+| Mini Map Toggle Button | btn-toggle-minimap | onMiniMapToggle callback | None | LOCAL |
 
 ### COMPONENT: AIAssistantPanel.tsx
 **Note (S11 correction): AI Send Button is CONNECTED — calls `trpc.ai.chat.useMutation()`. Earlier DEAD claim was stale.**
@@ -1950,9 +1954,11 @@ Additionally fixed in S13: the three toast-only section Configure/Settings butto
 | EditorToolbar | properties panel toggle | `setShowProperties()` | LOCAL state | LOCAL |
 | EditorToolbar | AI panel toggle | `setShowAI()` | LOCAL state | LOCAL |
 | EditorToolbar | netlist panel toggle | `setShowNetlist()` | LOCAL state | LOCAL |
+| EditorToolbar | minimap toggle | `setShowMiniMap()` | LOCAL state | LOCAL |
 | ReactFlow Canvas | node click | `setSelectedNodeId()` | LOCAL state | LOCAL |
 | ReactFlow Canvas | canvas click | deselect node | LOCAL state | LOCAL |
 | ReactFlow Canvas | edge connection | `handleConnect()` adds edge | LOCAL state | LOCAL |
+| ReactFlow Canvas | rotate controls | `handleRotateCanvas()` (rotates all nodes 90°) | LOCAL state | LOCAL |
 | ComponentLibraryPanel | add component | `handleAddComponent()` | LOCAL state | LOCAL |
 
 #### COMPONENT: SchematicNode.tsx (Audited Session 12)
