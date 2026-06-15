@@ -56,6 +56,22 @@ import { Brain } from "lucide-react";
 
 const PERSONA_STORE_KEY = "omnecor_personas";
 
+// Per-platform content character limits (publish-time enforcement).
+const CHAR_LIMITS: Record<string, number> = {
+  twitter: 280, x: 280,
+  linkedin: 3000,
+  instagram: 2200,
+  facebook: 63206,
+  youtube: 5000,
+  tiktok: 2200,
+};
+
+/** Resolve the character limit for a platform key, or null if unknown. */
+function charLimitFor(platform: string | null | undefined): number | null {
+  if (!platform) return null;
+  return CHAR_LIMITS[platform.toLowerCase()] ?? null;
+}
+
 function loadPersonaList(): Array<{ id: string; name: string; type: string; avatarDataUrl: string | null }> {
   try { return JSON.parse(localStorage.getItem(PERSONA_STORE_KEY) ?? "[]"); }
   catch { return []; }
@@ -259,6 +275,15 @@ export default function AgentNetworking() {
     onError: (error) => toast.error(`Error: ${error.message}`),
   });
 
+  const retryPostMutation = trpc.scheduling.retryPost.useMutation({
+    onSuccess: (data) => {
+      if (data.status === "published") toast.success("Post published");
+      else toast.error("Retry failed — publish did not succeed");
+      refetchScheduled();
+    },
+    onError: (error) => toast.error(`Retry failed: ${error.message}`),
+  });
+
   const fetchDiscoveryMutation = trpc.discovery.fetchArticles.useMutation({
     onSuccess: (data) => {
       toast.success(`Found ${data.articlesAdded} articles`);
@@ -272,6 +297,12 @@ export default function AgentNetworking() {
   const publishedCount = scheduledPostsData?.filter(p => p.status === "published").length || 0;
   const totalEngagement = analyticsSummary?.reduce((acc, curr) =>
     acc + (curr.totalLikes || 0) + (curr.totalShares || 0) + (curr.totalComments || 0), 0) || 0;
+
+  // Character-limit enforcement for the new-post form (per selected platform).
+  const newPostAccount = accountsData?.find((a) => String(a.id) === newPostForm.platformAccountId);
+  const newPostPlatform = (newPostAccount?.platform as string | undefined) ?? undefined;
+  const newPostLimit = charLimitFor(newPostPlatform);
+  const newPostOverLimit = newPostLimit != null && newPostForm.content.length > newPostLimit;
 
   return (
     <OmnecorDashboardLayout>
@@ -450,11 +481,19 @@ export default function AgentNetworking() {
                   <div className="space-y-1">
                     <label className="text-xs font-medium">Content</label>
                     <textarea
-                      className="w-full text-sm border rounded-md px-2 py-1.5 bg-background min-h-[80px] resize-none"
+                      className={cn(
+                        "w-full text-sm border rounded-md px-2 py-1.5 bg-background min-h-[80px] resize-none",
+                        newPostOverLimit && "border-destructive",
+                      )}
                       placeholder="What do you want to post?"
                       value={newPostForm.content}
                       onChange={e => setNewPostForm(f => ({ ...f, content: e.target.value }))}
                     />
+                    {newPostLimit != null && (
+                      <p className={cn("text-[11px] text-right", newPostOverLimit ? "text-destructive font-medium" : "text-muted-foreground")}>
+                        {newPostForm.content.length} / {newPostLimit}
+                      </p>
+                    )}
                   </div>
                   <div className="space-y-1">
                     <label className="text-xs font-medium">Schedule Time</label>
@@ -469,7 +508,8 @@ export default function AgentNetworking() {
                     <Button variant="ghost" size="sm" onClick={() => setNewPostOpen(false)}>Cancel</Button>
                     <Button
                       size="sm"
-                      disabled={!newPostForm.platformAccountId || !newPostForm.content || !newPostForm.scheduledAt || createDirectPostMutation.isPending}
+                      title={newPostOverLimit ? `Exceeds ${newPostPlatform} character limit` : undefined}
+                      disabled={!newPostForm.platformAccountId || !newPostForm.content || !newPostForm.scheduledAt || newPostOverLimit || createDirectPostMutation.isPending}
                       onClick={() => createDirectPostMutation.mutate({
                         platformAccountId: parseInt(newPostForm.platformAccountId),
                         content: newPostForm.content,
@@ -489,10 +529,18 @@ export default function AgentNetworking() {
                     <p className="text-center py-8 text-muted-foreground">No posts scheduled yet. Curate content to begin.</p>
                   ) : (
                     scheduledPostsData?.map((post) => (
-                      <div key={post.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div
+                        key={post.id}
+                        className={cn(
+                          "flex items-center justify-between p-4 border rounded-lg transition-colors",
+                          post.status === "failed"
+                            ? "border-l-4 border-l-destructive bg-destructive/5 hover:bg-destructive/10"
+                            : "hover:bg-muted/50",
+                        )}
+                      >
                         <div className="space-y-1">
                           <div className="flex items-center gap-2">
-                            <Badge variant={post.status === "published" ? "secondary" : "default"}>
+                            <Badge variant={post.status === "failed" ? "destructive" : post.status === "published" ? "secondary" : "default"}>
                               {post.status?.toUpperCase() || 'UNKNOWN'}
                             </Badge>
                             <span className="text-sm font-medium">Post #{post.id}</span>
@@ -500,8 +548,25 @@ export default function AgentNetworking() {
                           <p className="text-xs text-muted-foreground">
                             {post.scheduledAt ? `Scheduled for ${new Date(post.scheduledAt).toLocaleString()}` : 'Not scheduled'}
                           </p>
+                          {post.status === "failed" && (
+                            <p className="text-xs text-destructive font-medium">
+                              {post.errorMessage || "Publish failed — check platform connection"}
+                            </p>
+                          )}
                         </div>
                         <div className="flex gap-2">
+                          {post.status === "failed" && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              className="gap-1.5 border-destructive/30 text-destructive hover:bg-destructive/10"
+                              onClick={() => retryPostMutation.mutate({ scheduledPostId: post.id })}
+                              disabled={retryPostMutation.isPending}
+                            >
+                              <RefreshCw className={cn("w-3.5 h-3.5", retryPostMutation.isPending && "animate-spin")} />
+                              Retry
+                            </Button>
+                          )}
                           {editPostId === post.id ? (
                             <div className="flex items-center gap-2">
                               <input
@@ -1285,7 +1350,11 @@ function CurationPanel() {
                 <p className="text-muted-foreground text-sm max-w-xs">No posts are awaiting review. Curation will populate this queue automatically.</p>
               </div>
             ) : (
-              pendingPosts?.map((post) => (
+              pendingPosts?.map((post) => {
+                const draftLimit = charLimitFor(post.platform);
+                const draftLen = (post.content ?? "").length;
+                const draftOverLimit = draftLimit != null && draftLen > draftLimit;
+                return (
                 <Card key={post.id} className="overflow-hidden border-accent/20">
                   <div className="flex flex-col md:flex-row h-full">
                     <div className="p-6 flex-1 space-y-4">
@@ -1298,6 +1367,7 @@ function CurationPanel() {
                           variant="ghost"
                           size="sm"
                           className="h-8 gap-2 text-xs"
+                          title={draftOverLimit ? `Exceeds ${post.platform} character limit` : undefined}
                           onClick={() => {
                             // Get first available platform account ID or use default platform
                             const defaultAccountId = accountsData?.[0]?.id || 1;
@@ -1308,7 +1378,7 @@ function CurationPanel() {
                               autoPublish: true,
                             });
                           }}
-                          disabled={schedulePostMutation.isPending}
+                          disabled={schedulePostMutation.isPending || draftOverLimit}
                         >
                           <Clock className="w-3 h-3" /> {schedulePostMutation.isPending ? "Scheduling..." : "Schedule"}
                         </Button>
@@ -1335,11 +1405,17 @@ function CurationPanel() {
                           )}
                         </Button>
                       </div>
+                      {draftLimit != null && (
+                        <p className={cn("text-[11px] text-right", draftOverLimit ? "text-destructive font-medium" : "text-muted-foreground")}>
+                          {draftLen} / {draftLimit}
+                        </p>
+                      )}
                       <div className="flex gap-3 pt-2">
                         <Button
                           className="flex-1 h-10 gap-2 bg-green-600 hover:bg-green-700"
+                          title={draftOverLimit ? `Exceeds ${post.platform} character limit` : undefined}
                           onClick={() => approveMutation.mutate({ postIds: [post.id] })}
-                          disabled={approveMutation.isPending}
+                          disabled={approveMutation.isPending || draftOverLimit}
                         >
                           <CheckCircle2 className="w-4 h-4" />
                           Approve & Publish
@@ -1370,7 +1446,8 @@ function CurationPanel() {
                     </div>
                   </div>
                 </Card>
-              ))
+                );
+              })
             )}
           </div>
         </TabsContent>

@@ -265,6 +265,34 @@ Verified: live `trainingRouter` (`routers/trainingRouter.ts`) is **already fully
 
 ---
 
+# 📋 4-Area Feature Fix — AI Context · Podcast · Social (2026-06-14)
+
+> Scoped gap-fix across four features. No UI layout/routing changes. Gates: `tsc` 0 errors · `vitest` 323/323.
+
+## Area 1 — 3D Viewer: real AI context for user-loaded models
+[ThreeViewer.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/designer/ThreeViewer.tsx)
+- Made the previously-inert `url` prop functional: loads GLTF/GLB via `GLTFLoader`, OBJ via `OBJLoader` (`three/examples/jsm/loaders`) in a cancel-safe effect; renders via `<primitive>` with raycast selection + emissive highlight (`UserModel`).
+- `buildSceneContext()` walks `object.traverse()`, collecting each mesh's name, parent chain, `geometry.attributes.position.count` (verts) and `Box3` bounding-box dims → multi-line summary + per-mesh description map.
+- AI payload `code` field now carries the full scene structure + `Selected mesh: <name>` (both "Ask AI" and "Suggest Changes") when a real model is loaded; the hardcoded `OBJECT_DESCRIPTIONS` table is kept as the demo-scene fallback. Added a load-error overlay.
+
+## Area 2 — PCB AI panel: netlist context instead of counts
+[AIAssistantPanel.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/pcb/AIAssistantPanel.tsx)
+- `buildDesignContext()` serializes `canvasState` into a human-readable netlist: components (`data.label`/`name`/`ref` + `componentType`/`type` + `value`) and connections (source→target labels with `sourceHandle`/`targetHandle`). Defensive key fallbacks (no guessed field names). Capped at 2000 chars with truncation note. Replaces the `{nodes,edges,mode}` count blob as the system prompt.
+
+## Area 3 — Podcast Studio: persistence · per-segment regen · audio download
+[PodcastStudio.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/PodcastStudio.tsx)
+- **3a** Session persistence: `turns`/`sources`/`podcastLength` mirrored to `localStorage["omnecor:podcast_session"]` (lazy-init restore on mount, write-on-change effect) + "Clear session" header button (resets to defaults).
+- **3b** Per-segment regeneration: `RefreshCw` button per result segment → `podcast.generate` (single turn) via `mutateAsync`, replaces only that segment; per-segment spinner (`regenIndex`), rest stays playable.
+- **3c** "Download Audio (.wav)" button shown when `audioUrl` is set (anchor + `download="podcast-episode.wav"`).
+
+## Area 4 — Social automation: failed posts · retry · char limits
+[AgentNetworking.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/AgentNetworking.tsx) · [schedulingRouter.ts](file:///home/linux/Documents/OmnecorV1-Beta/server/routers/schedulingRouter.ts)
+- **4a** Calendar tab now renders `status:"failed"` posts with a destructive badge, red left border + `errorMessage` (generic fallback when null).
+- **4b** New `scheduling.retryPost` (protected): verifies ownership via `platformAccounts.userId` (scheduledPosts has no userId), resets to `scheduled` + clears error, calls `publishScheduledPostIds([id])`, returns `{success,status}`. UI `retryPostMutation` + "Retry" button on failed posts. (Used `z.number()` for the id to match the real integer PK, not the prompt's `z.string()`.)
+- **4c** `CHAR_LIMITS` map + `charLimitFor()`; live `len / limit` counter under the new-post textarea and curation draft, turns red + disables Schedule/Approve (with tooltip) when over the selected platform's limit. Unknown platform → count only.
+
+---
+
 # 📋 Archive C: Completed Work Log (merged from master-todo.md)
 
 > Historical record of completed roadmap work. `[x]` = done, `[~]` = partial, `[ ]` = pending.

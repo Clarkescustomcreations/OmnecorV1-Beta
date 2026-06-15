@@ -35,6 +35,60 @@ interface Message {
   timestamp: Date;
 }
 
+/** Max characters of serialized design context to send to the model. */
+const CONTEXT_CHAR_CAP = 2000;
+
+/** Best-effort human label for a node (ref designator / component name). */
+function nodeLabel(node: Node): string {
+  const d = (node.data ?? {}) as Record<string, unknown>;
+  const label = d.label ?? d.name ?? d.ref ?? d.reference ?? d.id;
+  return String(label ?? node.id);
+}
+
+/** Best-effort component type for a node (Resistor, Capacitor, IC, …). */
+function nodeType(node: Node): string {
+  const d = (node.data ?? {}) as Record<string, unknown>;
+  const type = d.componentType ?? d.type ?? node.type;
+  return type ? String(type) : 'Component';
+}
+
+/**
+ * Serialize the canvas into a human-readable netlist so the AI knows the actual
+ * component references, types, values, and how they're wired — not just counts.
+ */
+function buildDesignContext(state: AIAssistantPanelProps['canvasState']): string {
+  const { nodes, edges, mode } = state;
+  const byId = new Map(nodes.map((n) => [n.id, n]));
+
+  const componentLines = nodes.map((n) => {
+    const d = (n.data ?? {}) as Record<string, unknown>;
+    const value = d.value != null && d.value !== '' ? ` ${String(d.value)}` : '';
+    return `  - ${nodeLabel(n)}: ${nodeType(n)}${value}`;
+  });
+
+  const connectionLines = edges.map((e) => {
+    const src = byId.get(e.source);
+    const tgt = byId.get(e.target);
+    const s = src ? nodeLabel(src) : e.source;
+    const t = tgt ? nodeLabel(tgt) : e.target;
+    const sh = e.sourceHandle ? `.${e.sourceHandle}` : '';
+    const th = e.targetHandle ? `.${e.targetHandle}` : '';
+    return `  - ${s}${sh} → ${t}${th}`;
+  });
+
+  let out =
+    `You are a PCB/schematic design assistant. The user's current ${mode} design contains:\n\n` +
+    `Components (${nodes.length}):\n${componentLines.join('\n') || '  (none)'}\n\n` +
+    `Connections (${edges.length}):\n${connectionLines.join('\n') || '  (none)'}\n\n` +
+    `Answer questions about this circuit. If you suggest changes, describe them in terms ` +
+    `of the component references shown above.`;
+
+  if (out.length > CONTEXT_CHAR_CAP) {
+    out = out.slice(0, CONTEXT_CHAR_CAP) + '\n…(design truncated — too large to fully include)';
+  }
+  return out;
+}
+
 export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   canvasState,
   onClose,
@@ -109,7 +163,7 @@ What would you like help with?`,
       messages: [
         {
           role: "system",
-          content: `PCB Design Context:\n${JSON.stringify({ nodes: canvasState.nodes.length, edges: canvasState.edges.length, mode: canvasState.mode }, null, 2)}`,
+          content: buildDesignContext(canvasState),
         },
         ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         { role: "user", content: prompt },

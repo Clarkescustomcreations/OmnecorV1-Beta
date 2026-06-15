@@ -379,13 +379,54 @@ const LENGTH_OPTIONS = [
 
 type PodcastLength = typeof LENGTH_OPTIONS[number]["value"];
 
+// ─── Session persistence ────────────────────────────────────────────────────────
+// The full editable session (dialogue, sources, episode length) is mirrored to
+// localStorage so closing the tab or navigating away never loses work.
+
+const SESSION_KEY = "omnecor:podcast_session";
+
+interface PodcastSessionState {
+  turns: DialogueTurn[];
+  sources: PodcastSource[];
+  podcastLength: PodcastLength;
+}
+
+function loadPodcastSession(): Partial<PodcastSessionState> | null {
+  try {
+    const raw = localStorage.getItem(SESSION_KEY);
+    return raw ? (JSON.parse(raw) as Partial<PodcastSessionState>) : null;
+  } catch {
+    return null;
+  }
+}
+
 export default function PodcastStudio() {
-  const [turns, setTurns] = useState<DialogueTurn[]>(DEFAULT_TURNS);
-  const [sources, setSources] = useState<PodcastSource[]>([]);
+  const [turns, setTurns] = useState<DialogueTurn[]>(() => loadPodcastSession()?.turns ?? DEFAULT_TURNS);
+  const [sources, setSources] = useState<PodcastSource[]>(() => loadPodcastSession()?.sources ?? []);
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<{ segments: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
-  const [podcastLength, setPodcastLength] = useState<PodcastLength>("medium");
+  const [podcastLength, setPodcastLength] = useState<PodcastLength>(() => loadPodcastSession()?.podcastLength ?? "medium");
+  const [regenIndex, setRegenIndex] = useState<number | null>(null);
+
+  // Persist the editable session whenever it changes.
+  useEffect(() => {
+    try {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({ turns, sources, podcastLength }));
+    } catch {
+      /* storage quota / unavailable — non-fatal */
+    }
+  }, [turns, sources, podcastLength]);
+
+  const clearSession = useCallback(() => {
+    try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+    setTurns(DEFAULT_TURNS);
+    setSources([]);
+    setPodcastLength("medium");
+    setResult(null);
+    setAudioUrl(null);
+    toast.info("Session cleared");
+  }, []);
 
   // Neural map link
   const { activeMap } = useNeuralMap();
@@ -486,6 +527,40 @@ export default function PodcastStudio() {
     }
   });
 
+  // Per-segment regeneration — re-synthesizes a single speaker turn via the same
+  // local podcast engine, replacing only that segment in the results.
+  const regenerateSegmentMutation = trpc.podcast.generate.useMutation();
+
+  const handleRegenerateSegment = async (index: number) => {
+    const seg = result?.segments[index];
+    if (!seg) return;
+    const text = seg.text || seg.content || "";
+    if (!text.trim()) {
+      toast.error("Segment has no text to regenerate.");
+      return;
+    }
+    setRegenIndex(index);
+    try {
+      const data = await regenerateSegmentMutation.mutateAsync({
+        title: "Segment regeneration",
+        turns: [{ speakerId: seg.speaker, text }],
+      });
+      const newSeg = (data as { segments?: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] }).segments?.[0];
+      if (newSeg) {
+        setResult(prev => prev
+          ? { ...prev, segments: prev.segments.map((s, i) => (i === index ? { ...s, ...newSeg } : s)) }
+          : prev);
+        toast.success("Segment regenerated");
+      } else {
+        toast.error("No audio returned for segment.");
+      }
+    } catch (e) {
+      toast.error("Regeneration failed: " + (e as Error).message);
+    } finally {
+      setRegenIndex(null);
+    }
+  };
+
   const addTurn = () => {
     const lastSpeaker = turns[turns.length - 1]?.speakerId;
     const nextSpeaker = lastSpeaker === "Alex" ? "Sam" : "Alex";
@@ -566,6 +641,9 @@ export default function PodcastStudio() {
             </Button>
             <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Podcast history: browse completed episodes in the podcast list page or check your /podcast-studio/history.")}>
               <History className="w-4 h-4" /> History
+            </Button>
+            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={clearSession} title="Clear saved session and reset to defaults">
+              <Trash2 className="w-4 h-4" /> Clear session
             </Button>
             <Button size="sm" className="gap-2" onClick={handleGenerate} disabled={isGenerating}>
               {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
@@ -736,24 +814,54 @@ export default function PodcastStudio() {
                             <User className="w-3 h-3 text-accent" />
                             <span className="font-bold">{seg.speaker}</span>
                           </div>
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="h-6 w-6"
-                            onClick={() => {
-                              const text = seg.text || seg.content || "";
-                              if (text && "speechSynthesis" in window) {
-                                window.speechSynthesis.cancel();
-                                const utt = new SpeechSynthesisUtterance(text);
-                                window.speechSynthesis.speak(utt);
-                              }
-                            }}
-                          >
-                            <Play className="w-3 h-3" />
-                          </Button>
+                          <div className="flex items-center gap-1">
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              onClick={() => {
+                                const text = seg.text || seg.content || "";
+                                if (text && "speechSynthesis" in window) {
+                                  window.speechSynthesis.cancel();
+                                  const utt = new SpeechSynthesisUtterance(text);
+                                  window.speechSynthesis.speak(utt);
+                                }
+                              }}
+                            >
+                              <Play className="w-3 h-3" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="h-6 w-6"
+                              title="Regenerate this segment"
+                              disabled={regenIndex !== null}
+                              onClick={() => handleRegenerateSegment(i)}
+                            >
+                              {regenIndex === i
+                                ? <Loader2 className="w-3 h-3 animate-spin" />
+                                : <RefreshCw className="w-3 h-3" />}
+                            </Button>
+                          </div>
                         </div>
                       ))}
                     </div>
+                    {audioUrl && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="w-full text-[10px] h-8 gap-1.5"
+                        onClick={() => {
+                          const a = document.createElement("a");
+                          a.href = audioUrl;
+                          a.download = "podcast-episode.wav";
+                          a.click();
+                          toast.success("Audio downloaded");
+                        }}
+                      >
+                        <Download className="w-3 h-3" /> Download Audio (.wav)
+                      </Button>
+                    )}
                     <div className="grid grid-cols-2 gap-2 pt-2">
                       <Button
                         size="sm"

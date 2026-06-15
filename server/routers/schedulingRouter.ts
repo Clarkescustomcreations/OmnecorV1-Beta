@@ -107,6 +107,42 @@ export const schedulingRouter = router({
 
       return { success: true };
     }),
+  retryPost: protectedProcedure
+    .input(z.object({ scheduledPostId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (!db) return { success: false, status: "failed" };
+
+      // Verify the post exists and belongs to the calling user (ownership flows
+      // through the connected platform account → platformAccounts.userId).
+      const [post] = await db
+        .select({
+          id: scheduledPosts.id,
+          ownerId: platformAccounts.userId,
+        })
+        .from(scheduledPosts)
+        .leftJoin(platformAccounts, eq(platformAccounts.id, scheduledPosts.platformAccountId))
+        .where(eq(scheduledPosts.id, input.scheduledPostId))
+        .limit(1);
+
+      if (!post) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Scheduled post not found" });
+      }
+      if (post.ownerId !== ctx.user.id) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "This post does not belong to you" });
+      }
+
+      // Reset to scheduled + clear the prior error, then publish immediately
+      // (publishScheduledPostIds writes the real published/failed outcome back).
+      await db
+        .update(scheduledPosts)
+        .set({ status: "scheduled", errorMessage: null })
+        .where(eq(scheduledPosts.id, input.scheduledPostId));
+
+      const [outcome] = await publishScheduledPostIds([input.scheduledPostId]);
+      const ok = !!outcome?.ok;
+      return { success: ok, status: ok ? "published" : "failed" };
+    }),
   publishNow: protectedProcedure
     .input(z.object({ postIds: z.array(z.number()) }))
     .mutation(async ({ input }) => {
