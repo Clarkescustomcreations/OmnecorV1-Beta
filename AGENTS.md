@@ -18,7 +18,6 @@ Do not skip. Do not reorder. Each file builds on the last.
 8. `Context/Build-Plan.md` — The 5-phase, 27-feature roadmap (current phase and feature)
 9. `Context/Progress-Tracker.md` — What is done, what is in progress, what is next
 10. `Context/Installed Skill Docs.md` — All installed skills and when to use them
-11. `memory.md` — Last session state, decisions made, open problems, next task
 
 Only after completing this list should you open any source file.
 
@@ -314,11 +313,13 @@ Load the relevant skill before working in its domain.
 |---|---|
 | Tailwind CSS | `tailwind-css`, `tailwind-css-patterns`, `tailwind-best-practices` |
 | React | `react`, `react-patterns` |
+| Vite | `vite`, `vite-patterns`, `vite-development`, `vite-build-tool` |
+| tRPC | `trpc-router`, `trpc-patterns`, `trpc-type-safety`, `react-query-setup` |
 | Zod | `zod`, `zod-validation-expert`, `zod-validation-utilities`, `form-validation-with-zod` |
 | Drizzle ORM | `drizzle-orm-patterns`, `drizzle-orm-expert`, `drizzle-migrations`, `drizzle-queries`, `drizzle-best-practices` |
-| OAuth | `oauth-implementation`, `oauth2`, `api-authentication` |
+| OAuth | `oauth-expert`, `oauth-implementation`, `oauth2`, `api-authentication` |
 | Expo / React Native | `expo-modules`, `expo-build`, `expo-config`, `expo-dev-client`, `react-native-expo`, `expo-deployment` |
-| Zustand | `zustand`, `zustand-typescript`, `zustand-middleware`, `zustand-advanced-patterns` |
+| Zustand | `zustand`, `zustand-typescript`, `zustand-middleware`, `zustand-advanced-patterns`, `zustand-store-ts`, `react-state-management` |
 | Node.js | `node-inspect-debugger`, `repo-healthcheck-node` |
 | SQL | `sql-pro`, `sql-expert`, `drizzle-queries` |
 | Auth | `better-auth`, `better-auth-setup`, `better-auth-integrations` |

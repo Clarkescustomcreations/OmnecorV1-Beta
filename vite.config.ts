@@ -174,8 +174,9 @@ export default defineConfig({
   build: {
     outDir: path.resolve(import.meta.dirname, "dist/public"),
     emptyOutDir: true,
-    // Lazily-loaded page chunks (Chat ~1025kB gzip 293kB) and language syntax files
-    // (emacs-lisp ~780kB) are acceptably large for on-demand loads.
+    // Remaining over-limit chunks are all lazily-loaded: per-page bundles
+    // (WebPreview, Chat) and Shiki language-syntax files (emacs-lisp ~780kB,
+    // cpp ~626kB) that load on demand, so their size never blocks first paint.
     chunkSizeWarningLimit: 1100,
     rollupOptions: {
       output: {
@@ -188,14 +189,18 @@ export default defineConfig({
           if (id.includes("node_modules/lucide-react")) {
             return "vendor-icons";
           }
-          // Three.js, ReactFlow, Recharts ecosystem — heavy visualization runtime
-          if (
-            id.includes("node_modules/three") ||
-            id.includes("node_modules/@react-three") ||
-            id.includes("node_modules/recharts") ||
-            id.includes("node_modules/reactflow")
-          ) {
-            return "vendor-viz";
+          // Three.js 3D runtime — designer, PCB 3D viewer, chat canvas. Split out
+          // so chart/graph-only pages never download the full 3D engine.
+          if (id.includes("node_modules/three") || id.includes("node_modules/@react-three")) {
+            return "vendor-three";
+          }
+          // ReactFlow node-graph runtime — PCB editor, neural graph, workspace canvas.
+          if (id.includes("node_modules/reactflow") || id.includes("node_modules/@xyflow")) {
+            return "vendor-flow";
+          }
+          // Recharts charting — wallet/budget panels only; kept apart from the 3D runtime.
+          if (id.includes("node_modules/recharts")) {
+            return "vendor-charts";
           }
           // Radix UI primitives — large but stable design-system dep
           if (id.includes("node_modules/@radix-ui")) {
