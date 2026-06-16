@@ -15,7 +15,13 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 GITHUB_REPO="clarkescustomcreations/omnecorv1-beta"
-GGUF_FILENAME="valet-router-q4_k_m.gguf"
+GGUF_FILENAME="valet-router-q8_0.gguf"
+
+# Default release tag + checksum for the current published artifact, so a bare
+# `./scripts/fetch-valet-model.sh` downloads and verifies the right model.
+# Override either with --tag / --checksum.
+DEFAULT_TAG="valet-router-v2-q8"
+DEFAULT_CHECKSUM="sha256:b0398f857ffb1dc6d9ae562304201c24e64ec4422cfb6b1b1391d66e21138eee"
 
 TAG=""
 CHECKSUM=""
@@ -40,9 +46,12 @@ while [[ $# -gt 0 ]]; do
   esac
 done
 
+# Fall back to the current published artifact when no tag/checksum is given.
 if [[ -z "$TAG" ]]; then
-  echo "Error: --tag is required (e.g. --tag v1.0.0)" >&2
-  exit 1
+  TAG="$DEFAULT_TAG"
+fi
+if [[ -z "$CHECKSUM" && "$TAG" == "$DEFAULT_TAG" ]]; then
+  CHECKSUM="$DEFAULT_CHECKSUM"
 fi
 
 ARTIFACT_DIR="${DEST}/${TAG}"

@@ -58,8 +58,9 @@ extraResources:
     filter:
       - "**/*"
   # Valet Router artifact registry — current.json + any gguf weights placed here by
-  # `pnpm valet:fetch` before a desktop build. GGUF is tracked via Git LFS and pulled
-  # on build machines; only current.json and metadata.json are regular git commits.
+  # `pnpm valet:fetch` before a desktop build. The GGUF is NOT in git; it is published
+  # as a GitHub Release asset and downloaded by scripts/fetch-valet-model.sh. Only
+  # current.json and metadata.json are regular git commits.
   - from: ../../models/valet-router
     to: models/valet-router
     filter:
