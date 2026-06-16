@@ -4,9 +4,11 @@ import { promisify } from "util";
 import { access, constants } from "fs/promises";
 import { homedir } from "os";
 import path from "path";
-import { router, protectedProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure, adminProcedure } from "../_core/trpc.js";
+import { validatePath } from "../_core/security.js";
 import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
 import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
+import { ValetServerService } from "../phase2/services/ValetServerService.js";
 import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
 
 const execFileAsync = promisify(execFile);
@@ -193,6 +195,60 @@ export const valetRouter = router({
         datasetHash,
       });
       return { step: "training" as const, jobId };
+    }),
+
+  /**
+   * Return the currently registered model info from current.json.
+   * Used by the Settings panel to show what model is active.
+   */
+  getModelInfo: protectedProcedure.query(async () => {
+    const record = await ValetArtifactRegistry.read();
+    return {
+      status: record.status,
+      format: record.format ?? null,
+      artifactPath: record.artifact_path ?? null,
+      ggufFile: record.gguf_file ?? null,
+      baseModel: record.base_model ?? null,
+      evalScores: record.eval_scores ?? null,
+      registryPath: ValetArtifactRegistry.currentJsonPath,
+    };
+  }),
+
+  /**
+   * Swap the active Valet Router model to a user-supplied GGUF file or directory.
+   * Validates the path exists, updates current.json, then restarts the inference server.
+   * Admin-only — mutates the shared inference registry.
+   */
+  setModelPath: adminProcedure
+    .input(z.object({
+      artifactPath: z.string().min(1).max(4096),
+      ggufFile: z.string().optional(),
+    }))
+    .mutation(async ({ input }) => {
+      // Validate against ALLOWED_DIRECTORIES + no path traversal (AGENTS.md security rule).
+      // Model files must live in PATHS.models (~/.omnecor/models/ or cwd/models/).
+      const safePath = await validatePath(input.artifactPath);
+
+      const isGguf = safePath.toLowerCase().endsWith(".gguf");
+      const resolvedPath = isGguf ? path.dirname(safePath) : safePath;
+      const resolvedGgufFile = isGguf ? path.basename(safePath) : input.ggufFile;
+
+      const current = await ValetArtifactRegistry.read();
+      await ValetArtifactRegistry.write({
+        ...current,
+        artifact_path: resolvedPath,
+        // Only overwrite gguf_file when we have a resolved value; preserve existing otherwise.
+        ...(resolvedGgufFile ? { gguf_file: resolvedGgufFile } : {}),
+        format: "gguf",
+        status: "ready",
+      });
+
+      // Fire-and-forget restart — mutation returns immediately; server reloads in background.
+      ValetServerService.getInstance().restart().catch(e =>
+        console.warn("[ValetRouter] restart after model swap failed:", e)
+      );
+
+      return { ok: true, artifactPath: resolvedPath, ggufFile: resolvedGgufFile ?? null };
     }),
 
   /**

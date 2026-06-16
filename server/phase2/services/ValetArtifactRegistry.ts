@@ -65,23 +65,39 @@ export class ValetArtifactRegistry {
     const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string })
       .resourcesPath;
 
-    const candidates = [
+    const candidates: Array<{ src: string; modelBase: string }> = [
       // dev: launched from repo root
-      path.join(process.cwd(), "models", "valet-router", "current.json"),
+      {
+        src: path.join(process.cwd(), "models", "valet-router", "current.json"),
+        modelBase: path.join(process.cwd(), "models", "valet-router"),
+      },
       // packaged electron: extraResources → <resources>/models/valet-router
-      resourcesPath
-        ? path.join(resourcesPath, "models", "valet-router", "current.json")
-        : "",
+      ...(resourcesPath
+        ? [{
+            src: path.join(resourcesPath, "models", "valet-router", "current.json"),
+            modelBase: path.join(resourcesPath, "models", "valet-router"),
+          }]
+        : []),
       // fallback relative to the compiled backend bundle
-      path.resolve(__dirname, "../../../models/valet-router/current.json"),
-    ].filter(Boolean);
+      {
+        src: path.resolve(__dirname, "../../../models/valet-router/current.json"),
+        modelBase: path.resolve(__dirname, "../../../models/valet-router"),
+      },
+    ];
 
-    for (const src of candidates) {
+    for (const { src, modelBase } of candidates) {
       try {
         const raw = await fs.readFile(src, "utf-8");
         const record = JSON.parse(raw) as ArtifactRecord;
         if (record.status !== "ready") continue;
         if (path.resolve(src) === path.resolve(CURRENT_JSON)) return false;
+
+        // Resolve a relative artifact_path to absolute using the model dir
+        // so the Python inference server always receives a usable absolute path.
+        if (record.artifact_path && !path.isAbsolute(record.artifact_path)) {
+          record.artifact_path = path.resolve(modelBase, record.artifact_path);
+        }
+
         await this.write(record);
         return true;
       } catch {

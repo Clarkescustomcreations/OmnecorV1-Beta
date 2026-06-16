@@ -137,10 +137,18 @@ client/public/__manus__/version.json
 # Debug artifacts
 tsc_output.txt
 
-# Valet Router trained / downloaded model weights (large binaries — never commit)
-# current.json and metadata.json are committed; *.gguf and adapter dirs are not.
-models/valet-router/*/
+# Valet Router trained model weights — NOT committed (too large for GitHub/LFS).
+# The GGUF ships as a GitHub Release asset and is downloaded by
+# scripts/fetch-valet-model.sh at install time; see .gitattributes.
 *.gguf
+# Merged fp16 weights (multi-GB) are a build/re-export artifact — never committed.
+# Runtime serves the self-contained GGUF instead.
+*.safetensors
+# Adapter dirs and merged_16bit dirs are too large even for LFS — keep gitignored.
+models/valet-router/*/adapter*/
+models/valet-router/*/merged*/
+models/valet-router/*/outputs*/
+models/valet-router/*/ckpts*/
 _refs/
 .claude/worktrees/
 

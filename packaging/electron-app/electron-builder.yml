@@ -58,14 +58,22 @@ extraResources:
     filter:
       - "**/*"
   # Valet Router artifact registry — current.json + any gguf weights placed here by
-  # `pnpm valet:fetch` before a desktop build. Weights are gitignored; only current.json
-  # and metadata.json are committed.
+  # `pnpm valet:fetch` before a desktop build. GGUF is tracked via Git LFS and pulled
+  # on build machines; only current.json and metadata.json are regular git commits.
   - from: ../../models/valet-router
     to: models/valet-router
     filter:
       - "current.json"
       - "**/metadata.json"
       - "**/*.gguf"
+  # Valet Router inference server — Python bridge script + training knowledge docs.
+  # These must be present in resources so the spawned Python process can find them.
+  - from: ../../server/python_bridges/valet_router_inference.py
+    to: python_bridges/valet_router_inference.py
+  - from: ../../docs/ai-agents/valet-training
+    to: docs/ai-agents/valet-training
+    filter:
+      - "**/*"
 
 # ─── Windows ────────────────────────────────────────────────────────────────
 win:

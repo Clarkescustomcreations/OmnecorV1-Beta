@@ -1,6 +1,6 @@
-# Memory — Async Long-Job Continuation + 5 Skill Commands
+# Memory — Valet Router GGUF Integration + Prior Session Work
 
-Last updated: 2026-06-15
+Last updated: 2026-06-16
 
 ---
 
@@ -10,117 +10,131 @@ Last updated: 2026-06-15
 
 ## What was built
 
-Two workstreams, both designed via `/architect` and fully implemented this session.
+### This session — Valet Router GGUF Windows prep (NOT YET COMMITTED)
 
-### Workstream 1 — Async long-job tool + token-saving continuation — ✅ COMPLETE
+All code changes are complete and reviewed (5 review issues fixed). Changes are staged but **not yet committed** — the user was not ready to commit at session end.
 
-The AI agent can fire a long shell/build/download job, end its turn immediately (no
-token-burning poll loop), and be re-prompted with a *condensed* result when the job
-finishes — the raw multi-thousand-line log never enters the model context.
+**Files modified:**
+- `models/valet-router/current.json` — `format` changed from `"ollama"` → `"gguf"`, `artifact_path` changed from hardcoded `C:\OmnecorV1-Beta\...` to portable `"./kaggle-2026-06-11"` (resolved to absolute at seed time), `base_model` updated to HuggingFace ID
+- `server/phase2/services/ValetArtifactRegistry.ts` — `seedFromRepoIfMissing()` now resolves relative `artifact_path` to absolute at seed time using the source `modelBase` dir; handles dev, packaged Electron, and fallback candidates
+- `server/phase2/services/ValetServerService.ts` — added `restart()` method (stop → reset flags → start); used for hot-swapping models
+- `server/python_bridges/valet_router_inference.py` — path detection for `_TRAINING_DIR` now checks packaged Electron location (`resources/docs/...`) before falling back to dev repo path
+- `server/routers/valetRouter.ts` — added `getModelInfo` (protectedProcedure, reads current.json) and `setModelPath` (adminProcedure, calls `validatePath`, fire-and-forget restart); also added `validatePath` import and `ValetServerService` import
+- `client/src/components/SettingsPanel.tsx` — added Valet Router model swap card in Advanced tab; fetches `trpc.auth.me` for `isAdmin` gate; non-admins see read-only message; admins get path input + save button
+- `packaging/electron-app/electron-builder.yml` — added `server/python_bridges/valet_router_inference.py` → `resources/python_bridges/` and `docs/ai-agents/valet-training/` → `resources/docs/ai-agents/valet-training/` to `extraResources`
+- `.gitattributes` — `*.gguf` changed from `binary` to `filter=lfs diff=lfs merge=lfs -text` (Git LFS)
+- `.gitignore` — removed blanket `*.gguf` and `models/valet-router/*/` ignore; replaced with specific ignores for adapter/merged/outputs/ckpts dirs only (GGUF now tracked via LFS)
 
-- `server/phase2/services/ProcessManagerService.ts` — added opt-in `captureMode: "raw"`
-  (bounded stdout ring buffer, `maxCaptureLines` default 100) + `getCapturedOutput(jobId)`.
-- `server/phase2/services/JobResultCondenser.ts` — NEW. Pure `condenseJobResult` (exit code
-  + status + last-N tail + regex-extracted error/traceback lines, deduped/capped) and
-  `formatCondensedResultForAgent`. Optional LLM summary is a pluggable hook (off by default
-  — keeps Sovereign mode air-gapped).
-- `server/phase2/services/AsyncJobService.ts` — NEW. Singleton; subscribes to ProcessManager
-  `lifecycle`, condenses tracked jobs on terminal state, emits a `result` event. `track()` /
-  `isTracked()` / `setSummarizer()`.
-- `server/routers/jobRouter.ts` — added `startAsync` (protectedProcedure): HITL-gated
-  (`command` category, deny carries reason), arg-array spawn (no shell interp), `cwd` via
-  `validatePath`, `timeoutMs: 0`, `captureMode: "raw"`, returns `{ jobId, status: "started" }`
-  immediately, then `AsyncJobService.track()`.
-- `server/phase2/websocket/WebSocketServer.ts` — added `"asyncJobResult"` to ServerMessage
-  union; broadcasts `result` to `asyncjob:{userId}` (mirrored to `asyncjob:all`).
-- `client/src/pages/Chat.tsx` — subscribes to `asyncjob:{me.id}` (NOT asyncjob:all), injects
-  the condensed result as a system message and AUTO re-prompts Valet if idle (passes
-  priorMessages incl. the result to `handleSendMessage`); if a stream is active it only
-  injects. Socket handler kept stable via refs (conversationRef/isStreamingRef/
-  handleSendMessageRef) so the WS doesn't reconnect each render.
-- HITL deny-with-reason threaded end-to-end: `requestApprovalDetailed()` in
-  `HITLApprovalService.ts` (boolean `requestApproval` kept as wrapper; 6 existing callers
-  unchanged), `approveAction(id, approved, reason?)`, `denyReason?` on `CriticalAction`
-  (`shared/hitl.ts`), `reason` on `hitlRouter.resolve`, deny textarea in
-  `client/src/components/CriticalActionChecklist.tsx`.
-- Tests: `server/__tests__/processManagerCapture.test.ts`,
-  `jobResultCondenser.test.ts`, `asyncJobService.test.ts` (13 new tests).
+**Files created:**
+- `docs/ai-agents/valet-training/Modelfile` — moved from `tmp-valet-train/Modelfile.valet-router`, `FROM` path fixed to `./kaggle-2026-06-11/valet-router-q8_0.gguf`
 
-### Workstream 2 — 5 AGENTS.md skills as Omnecor runtime commands — ✅ COMPLETE
+---
 
-architect / remember / review / recover / imprint, on BOTH the in-chat `/` slash menu AND
-the global Command Palette, as DISTINCT NEW commands (alongside existing /plan, /btw,
-/compress), full functional ports.
+### Prior session — Async Long-Job Continuation + 5 Skill Commands — ✅ COMPLETE
 
-- `server/routers/workflowRouter.ts` — NEW, registered in `server/routers.ts` as `workflow`.
-  `reviewContext` (git diff via execFile arg-array + plan excerpts), `rememberSave`
-  (compress session via AiProviderService → redactSensitive → write project memory.md),
-  `rememberRestore`, `imprint` (read component, regex-extract Tailwind classes, append entry
-  to project ui-registry.md). Side-effecting writes wrapped in try/catch → TRPCError.
-  Artifacts scoped per-project under `PATHS.projects/<projectId>/` (validatePath enforces
-  containment).
-- `client/src/lib/skillWorkflows.ts` — NEW. The 5 workflow preambles + metadata.
-- `client/src/components/chat/ChatInput.tsx` + `ChatInterface.tsx` — extended SlashCommand
-  union + COMMANDS; `onCommand` now `(cmd, arg?)`; `/remember`/`/imprint` keep input open for
-  an inline arg (like `/btw`), intercepted in `handleSend`.
-- `client/src/pages/Chat.tsx` `handleCommand` — 5 new cases (preamble inject for
-  architect/recover; reviewContext fetch + inject for review; rememberSave/Restore and
-  imprint call workflowRouter). Plus an `omnecor:run_workflow` window-event listener for the
-  palette bridge.
-- `client/src/hooks/useCommandRegistry.ts` + `client/src/components/shell/CommandPalette.tsx`
-  — added a "Workflows" group (5 entries) that navigates to /chat and dispatches
-  `omnecor:run_workflow`.
+**Async long-job tool:**
+- `server/phase2/services/ProcessManagerService.ts` — opt-in `captureMode: "raw"` (bounded stdout ring buffer, `maxCaptureLines` 100) + `getCapturedOutput(jobId)`
+- `server/phase2/services/JobResultCondenser.ts` — NEW. `condenseJobResult` (exit code + tail + regex-extracted errors, deduped/capped) and `formatCondensedResultForAgent`
+- `server/phase2/services/AsyncJobService.ts` — NEW. Singleton; tracks jobs, condenses on terminal state, emits `result` event
+- `server/routers/jobRouter.ts` — `startAsync` (protectedProcedure): HITL-gated, arg-array spawn, `cwd` via `validatePath`, returns `{jobId, status: "started"}` immediately
+- `server/phase2/websocket/WebSocketServer.ts` — `"asyncJobResult"` added to ServerMessage union; broadcasts to `asyncjob:{userId}`
+- `client/src/pages/Chat.tsx` — subscribes to `asyncjob:{me.id}`, injects condensed result as system message, auto-re-prompts Valet when idle
+- HITL deny-with-reason: `requestApprovalDetailed()` in HITLApprovalService, `denyReason?` on CriticalAction, deny textarea in CriticalActionChecklist
+- Tests: `processManagerCapture.test.ts`, `jobResultCondenser.test.ts`, `asyncJobService.test.ts` (13 new tests)
+
+**5 AGENTS.md skills as runtime commands (architect/remember/review/recover/imprint):**
+- `server/routers/workflowRouter.ts` — NEW, registered as `workflow`
+- `client/src/lib/skillWorkflows.ts` — NEW. Workflow preambles + metadata
+- `client/src/components/chat/ChatInput.tsx` + `ChatInterface.tsx` — extended slash command union
+- `client/src/pages/Chat.tsx` — 5 new `handleCommand` cases + `omnecor:run_workflow` event listener
+- `client/src/hooks/useCommandRegistry.ts` + `CommandPalette.tsx` — "Workflows" group in palette
+
+---
 
 ## Decisions made
 
-- Continuation re-prompt is event-driven via the existing terminal→chat bridge pattern (WS →
-  inject system message → auto-`handleSendMessage` when idle). Auto-re-prompt is skipped
-  while a stream is active to avoid racing it.
-- Condenser LLM-summary is a pluggable injected hook, off by default (Sovereign-safe);
-  tail+regex condensing is the always-on path.
-- Skill side-effects are deterministic server ops, not reliant on a Node LLM tool loop (the
-  in-app assistant `AiProviderService.chat` is single-shot streaming; iterative agent loops
-  live in the Python crews `recursive_mas_bridge.py`).
-- Skill artifacts live under `PATHS.projects/<projectId>/` because `validatePath`'s allow-list
-  is the app data dir (`~/.omnecor`), NOT the repo. The user's active project is the unit of
-  work, not the Omnecor repo.
+**Valet Router (this session):**
+- **Option A chosen** — self-contained GGUF via `llama-cpp-python`, no Ollama dependency required on target machine
+- `artifact_path` in `current.json` is a relative dir path (`"./kaggle-2026-06-11"`); `gguf_file` field holds the filename separately — this is the correct split for the Python `_load_gguf()` function
+- `setModelPath` is `adminProcedure` — only admin/owner can swap the model; non-admins see a read-only card
+- `restart()` is fire-and-forget in the mutation (returns immediately; server reloads in background)
+- GGUF tracked via Git LFS — the 1.6 GB weight file ships with the repo, pulled on build machines via `git lfs pull`
+- Model files must be within `PATHS.models` (`~/.omnecor/models/`) for the `validatePath` security check to pass — users must copy their GGUF there before pointing to it
+
+**Prior session:**
+- Condenser LLM-summary is a pluggable off-by-default hook (Sovereign-safe); tail+regex is the always-on path
+- Skill artifacts live under `PATHS.projects/<projectId>/` (validatePath allow-list is `~/.omnecor`, not repo root)
+- Auto-re-prompt on async job completion is skipped while a stream is active to avoid racing
+
+---
 
 ## Problems solved
 
-- HITLApprovalService signature change kept backward-compatible: added
-  `requestApprovalDetailed` (returns `{approved, reason}`) and left `requestApproval`
-  (boolean) as a wrapper, so the 6 existing callers were untouched.
-- TS doesn't narrow a `terminal` boolean — AsyncJobService uses an explicit three-literal
-  guard so `event.state` types as `CondensedJobStatus`.
-- Condenser error regex: `\berror\b` missed camelCase exceptions (ValueError); switched to
-  `error\b` so `...Error:` matches while plural "0 errors" stays excluded (+ NOISE filter).
-- imprint surfaced a raw-color violation: `text-rose-500` in CriticalActionChecklist →
-  fixed to semantic `text-destructive`.
+**Valet Router (this session):**
+- `current.json` had hardcoded `C:\OmnecorV1-Beta\...` path → made relative, resolved at seed time
+- `valet_router_inference.py` `_TRAINING_DIR` pointed to repo-relative path only → now checks packaged Electron location first, falls back to dev path
+- `setModelPath` originally used raw `stat()` without `validatePath` — security rule violation, now fixed
+- Non-admin users saw the model swap UI but hit FORBIDDEN on save — gated behind `isAdmin` check using `trpc.auth.me`
+- `gguf_file: undefined` would silently overwrite existing value — now uses conditional spread `...(resolvedGgufFile ? { gguf_file: resolvedGgufFile } : {})`
+
+**Prior session:**
+- HITLApprovalService signature kept backward-compatible: `requestApprovalDetailed` added, `requestApproval` (boolean) kept as wrapper
+- Condenser error regex switched from `\berror\b` to `error\b` so `...Error:` matches while "0 errors" stays excluded
+- `imprint` found raw-color violation `text-rose-500` in CriticalActionChecklist → fixed to `text-destructive`
+
+---
 
 ## Current state
 
-- Gates GREEN: `pnpm check` 0 errors, `pnpm test` 338 passed (22 files), `pnpm build` clean.
-- `pnpm audit --prod`: 2 LOW, PRE-EXISTING (dompurify via streamdown>mermaid — NOT introduced
-  here; no deps added). Fix is a one-line pin `dompurify >=3.4.8` in pnpm-workspace.yaml,
-  deferred (that file is being edited in the user's IDE).
-- Reference skill bodies `docs/ai-agents/Skills/` were DELETED after porting (per user); the
-  rest of `docs/ai-agents/` (valet-training, VALET_ROUTER, etc.) is intact.
-- `/review` run + all 6 findings fixed. `/imprint` run (fixed the raw color; did NOT write a
-  visual table into Context/UI-Registry.md — that file is a feature-connection audit, not a
-  visual-pattern registry).
+**Valet Router work:**
+- All 10 changed files have clean TypeScript (zero new errors beyond pre-existing WSL env `TS2688`)
+- `/review` run — 5 issues found and all fixed in the same session
+- Changes are **NOT YET COMMITTED** — user stopped before committing
+- The GGUF file `models/valet-router/kaggle-2026-06-11/valet-router-q8_0.gguf` (1.6 GB, Q8_0) exists on this Windows machine and is verified present
+- Git LFS is **not installed** in WSL — must be installed and run from Windows PowerShell
+
+**Gates (from prior session — unchanged this session):**
+- `pnpm check` 0 errors
+- `pnpm test` 338 passed (22 files)
+- `pnpm build` clean
+- `pnpm audit --prod`: 2 LOW pre-existing (dompurify via streamdown→mermaid) — fix is `dompurify >=3.4.8` pin in `pnpm-workspace.yaml`, deferred
+
+---
 
 ## Next session starts with
 
-1. Read AGENTS.md first (mandatory).
-2. Open items from THIS work (optional polish): pin `dompurify >=3.4.8` in pnpm-workspace.yaml
-   to clear the 2 low audit findings; optionally wire the condenser's LLM summary to Haiku 4.5
-   via AiProviderService behind `cloudProcedure`; decide whether to start a separate
-   `Context/UI-Visual-Registry.md` for /imprint visual patterns.
-3. Carried over from prior session (still pending): **Phase 5, Feature 27 — End-to-End Build
-   Smoke Tests** (web, Electron, Android).
+1. **Read AGENTS.md first** (mandatory)
+2. **Commit the Valet Router changes from Windows PowerShell** (Git LFS required):
+   ```powershell
+   # In Windows PowerShell as Administrator:
+   winget install GitHub.GitLFS       # skip if already installed
+   cd C:\OmnecorV1-Beta
+   git lfs install
+   git add .gitattributes .gitignore models/valet-router/current.json
+   git add models/valet-router/kaggle-2026-06-11/valet-router-q8_0.gguf
+   git add docs/ai-agents/valet-training/Modelfile
+   git add server/phase2/services/ValetArtifactRegistry.ts
+   git add server/phase2/services/ValetServerService.ts
+   git add server/python_bridges/valet_router_inference.py
+   git add server/routers/valetRouter.ts
+   git add client/src/components/SettingsPanel.tsx
+   git add packaging/electron-app/electron-builder.yml
+   git lfs status   # verify GGUF shows as LFS object
+   git commit -m "Valet Router: GGUF packaging, portable paths, model-swap UI"
+   git push
+   ```
+3. **On Linux after pull:**
+   - `git lfs pull` to fetch the GGUF binary
+   - Verify `llama-cpp-python` is available in the build environment (needs AVX2 CPU — verify before assuming it will work)
+   - Run the Electron build and test `/health` returns `model_loaded: true` with `backend: "gguf"`
+4. **Optional polish:** Pin `dompurify >=3.4.8` in `pnpm-workspace.yaml` to clear the 2 low audit findings
+5. **Feature 27:** End-to-End Build Smoke Tests (web, Electron, Android)
+
+---
 
 ## Open questions
 
-- Whether to enable the condenser LLM-summary by default (currently off for Sovereign safety).
-- Whether auto-re-prompt-on-job-completion is the desired UX vs. inject-only (currently
-  auto-re-prompts when idle).
+- Does the Linux build machine have an AVX2 CPU? `llama-cpp-python` prebuilt wheels require AVX2 — if it's Sandy Bridge (AVX1-only) like the Windows box, direct GGUF loading will crash and a different approach is needed (Ollama, or compile llama-cpp-python from source with AVX1 flags)
+- Python runtime bundling for the packaged Electron installer is not yet resolved — the inference server script is bundled but `llama-cpp-python` must be installed on the build machine and the packaged app needs Python available at runtime
+- Whether to enable the condenser LLM-summary by default (currently off for Sovereign safety)
+- Whether auto-re-prompt-on-job-completion is the desired UX vs. inject-only

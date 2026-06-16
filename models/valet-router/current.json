@@ -1,8 +1,8 @@
 {
-  "artifact_path": "c:/OmnecorV1-Beta/models/valet-router/kaggle-2026-06-11/valet-router-q8_0.gguf",
+  "artifact_path": "./kaggle-2026-06-11",
   "status": "ready",
-  "format": "ollama",
-  "base_model": "omnecor-valet-router:v2-q8",
+  "format": "gguf",
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
   "hf_base": "Qwen/Qwen2.5-1.5B-Instruct",
   "source": "trained",
   "config": {
@@ -18,7 +18,7 @@
   "merged_sha256": "f8f196d519991d49368dbdad26a6f9c39c87f21bbfb94932d635718dc6fd561a",
   "adapter_sha256": "171f0548e11f60d023b3008553a83e0204ab87d6105405cd49a2a93078d22011",
   "train_examples": 2995,
-  "serving_note": "Served via Ollama (model 'omnecor-valet-router:v2-q8', Q8_0 GGUF). Ollama is used because this box is Sandy Bridge (AVX1-only): prebuilt llama-cpp-python wheels need AVX2 and crash, and transformers serving is ~30s/route here. Ollama warm routing is ~2-3s. The merged_16bit dir remains for re-export.",
+  "serving_note": "Self-contained GGUF inference via llama-cpp-python (Option A). artifact_path is relative — resolved to an absolute path by ValetArtifactRegistry.seedFromRepoIfMissing() at first launch. The merged_16bit dir remains on the build machine for re-export/re-training.",
   "eval_scores": {
     "route_accuracy": 0.7385,
     "baseline_route_accuracy": 0.2744,

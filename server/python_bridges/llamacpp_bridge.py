@@ -51,12 +51,29 @@ def _get_or_load(model_path: str, embedding: bool = False) -> tuple:
         # double-check inside the lock
         if model_path in cache:
             return cache[model_path]
-        llm = Llama(
-            model_path=model_path,
-            n_ctx=2048,
-            verbose=False,
-            embedding=embedding,
-        )
+        # GPU offload: -1 = all layers (default), 0 = CPU-only. Override per host via
+        # env. n_ctx is env-tunable but defaults to 2048 to stay safe for large models.
+        n_ctx = int(os.environ.get("LLAMACPP_N_CTX", "2048"))
+        n_gpu_layers = int(os.environ.get("LLAMACPP_GPU_LAYERS", "-1"))
+        try:
+            llm = Llama(
+                model_path=model_path,
+                n_ctx=n_ctx,
+                n_gpu_layers=n_gpu_layers,
+                verbose=False,
+                embedding=embedding,
+            )
+        except Exception:
+            # CPU-only llama-cpp-python builds can't honor n_gpu_layers>0 — retry on CPU.
+            if n_gpu_layers == 0:
+                raise
+            llm = Llama(
+                model_path=model_path,
+                n_ctx=n_ctx,
+                n_gpu_layers=0,
+                verbose=False,
+                embedding=embedding,
+            )
         entry = (llm, threading.Lock())
         cache[model_path] = entry
         return entry

@@ -22,6 +22,9 @@
 *.woff binary
 *.woff2 binary
 *.ttf binary
+# Model weights are NOT committed — they ship as GitHub Release assets and are
+# fetched at install time via scripts/fetch-valet-model.sh. Marked binary so a
+# stray add never gets line-ending normalized (and never re-enters Git LFS).
 *.gguf binary
 *.onnx binary
 *.db binary

@@ -1,5 +1,6 @@
 FROM C:\OmnecorV1-Beta\models\valet-router\kaggle-2026-06-11\valet-router-q8_0.gguf
 
 PARAMETER temperature 0
+PARAMETER num_ctx 4096
 PARAMETER stop "<|im_end|>"
 PARAMETER stop "<|im_start|>"

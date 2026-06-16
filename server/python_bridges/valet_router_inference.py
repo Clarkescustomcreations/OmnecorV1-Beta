@@ -29,7 +29,16 @@ import urllib.request
 # ─── Paths ────────────────────────────────────────────────────────────────────
 _BRIDGES_DIR = Path(__file__).parent
 _PROJECT_ROOT = _BRIDGES_DIR.parent.parent
-_TRAINING_DIR = _PROJECT_ROOT / "docs" / "ai-agents" / "valet-training"
+
+# When bundled in the Electron installer, this script lives at
+# resources/python_bridges/valet_router_inference.py and the training docs
+# are at resources/docs/ai-agents/valet-training/.
+# In dev/standalone mode they live at docs/ai-agents/valet-training/ relative to repo root.
+_RESOURCES_DIR = _BRIDGES_DIR.parent  # resources/ (packaged) or server/ (dev)
+_PACKAGED_TRAINING_DIR = _RESOURCES_DIR / "docs" / "ai-agents" / "valet-training"
+_DEV_TRAINING_DIR = _PROJECT_ROOT / "docs" / "ai-agents" / "valet-training"
+_TRAINING_DIR = _PACKAGED_TRAINING_DIR if _PACKAGED_TRAINING_DIR.exists() else _DEV_TRAINING_DIR
+
 _SYSTEM_PROMPT_PATH = _TRAINING_DIR / "VALET_SYSTEM_PROMPT.md"
 _MANIFEST_PATH = _TRAINING_DIR / "routing_manifest.json"
 # Registry root is overridable so the TS ValetServerService can pin both sides to
@@ -194,12 +203,37 @@ def _load_gguf(artifact_path: str, registry: dict) -> bool:
             return False
         model_path = str(candidates[0])
 
+    # The system prompt (~5KB) + routing manifest (~7KB) alone is ~3-3.5k tokens
+    # before the user task, RAG context, and the 220-token JSON output. n_ctx must
+    # exceed that or the system prompt is silently truncated (the transformers path
+    # uses MAX_SEQ 3072 for the same reason). 4096 leaves headroom; override via env.
+    n_ctx = int(os.environ.get("VALET_N_CTX", "4096"))
+    # GPU offload: -1 = all layers (default), 0 = CPU-only. A 1.5B Q8 fits any modern
+    # GPU and drops warm routing from ~2-3s to sub-second. Falls back to CPU on error.
+    n_gpu_layers = int(os.environ.get("VALET_GPU_LAYERS", "-1"))
     try:
-        _model = Llama(model_path=model_path, n_ctx=2048, verbose=False)
+        _model = Llama(
+            model_path=model_path, n_ctx=n_ctx,
+            n_gpu_layers=n_gpu_layers, verbose=False,
+        )
         _backend_type = "gguf"
-        print(f"[ValetRouter] GGUF model loaded: {model_path}")
+        print(f"[ValetRouter] GGUF model loaded: {model_path} (n_ctx={n_ctx}, n_gpu_layers={n_gpu_layers})")
         return True
     except Exception as e:
+        # Common cause: a CPU-only llama-cpp-python build can't honor n_gpu_layers>0.
+        # Retry once on CPU before giving up to the rule-based fallback.
+        if n_gpu_layers != 0:
+            print(f"[ValetRouter] GGUF load failed ({e}); retrying CPU-only.")
+            try:
+                _model = Llama(
+                    model_path=model_path, n_ctx=n_ctx,
+                    n_gpu_layers=0, verbose=False,
+                )
+                _backend_type = "gguf"
+                print(f"[ValetRouter] GGUF model loaded (CPU): {model_path} (n_ctx={n_ctx})")
+                return True
+            except Exception as e2:
+                e = e2
         print(f"[ValetRouter] Could not load GGUF model: {e} — rule-based fallback active.")
         return False
 

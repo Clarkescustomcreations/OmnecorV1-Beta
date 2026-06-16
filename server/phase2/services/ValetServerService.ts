@@ -85,6 +85,18 @@ export class ValetServerService {
   }
 
   /**
+   * Restart the inference server — used after swapping the active model.
+   * Stops the running process, resets state flags, then re-starts.
+   */
+  async restart(): Promise<void> {
+    await this.stop();
+    this._started = false;
+    this._stopping = false;
+    this._restartCount = 0;
+    await this.start();
+  }
+
+  /**
    * Stop the inference server gracefully (called on app shutdown).
    */
   async stop(): Promise<void> {

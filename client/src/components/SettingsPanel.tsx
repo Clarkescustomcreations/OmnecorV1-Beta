@@ -33,7 +33,11 @@ import {
   Zap,
   Save,
   Loader2,
+  Bot,
+  CheckCircle2,
+  XCircle,
 } from "lucide-react";
+import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { getDefaultSettings, type AppSettings } from "@/lib/settings";
 import { trpc } from "@/lib/trpc";
@@ -66,6 +70,21 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
   const [settings, setSettings] = useState<AppSettings>(getDefaultSettings());
   const [activeTab, setActiveTab] = useState<string>("general");
   const [hasChanges, setHasChanges] = useState(false);
+
+  // ── Valet Router model swap ──────────────────────────────────────────────
+  const { data: me } = trpc.auth.me.useQuery();
+  const isAdmin = me?.role === "admin" || me?.role === "owner";
+  const { data: valetModelInfo, refetch: refetchValetModel } =
+    trpc.valet.getModelInfo.useQuery();
+  const [valetPathInput, setValetPathInput] = useState("");
+  const setModelPathMutation = trpc.valet.setModelPath.useMutation({
+    onSuccess: () => {
+      toast.success("Valet Router model updated — server restarting");
+      setValetPathInput("");
+      void refetchValetModel();
+    },
+    onError: (err) => toast.error("Failed to update model: " + err.message),
+  });
 
   // Populate from backend when loaded:
   useEffect(() => {
@@ -828,6 +847,87 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                   </SelectContent>
                 </Select>
               </div>
+            </CardContent>
+          </Card>
+          {/* Valet Router Model */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="text-sm flex items-center gap-2">
+                <Bot className="w-4 h-4" />
+                Valet Router Model
+              </CardTitle>
+              <CardDescription>
+                The Valet Router intelligently routes tasks to the best AI provider.
+                Swap in a custom GGUF after training a new one.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              {valetModelInfo && (
+                <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1 text-sm">
+                  <div className="flex items-center gap-2">
+                    {valetModelInfo.status === "ready" ? (
+                      <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                    ) : (
+                      <XCircle className="w-4 h-4 text-destructive shrink-0" />
+                    )}
+                    <span className="font-medium">
+                      {valetModelInfo.status === "ready" ? "Model registered" : "No model registered"}
+                    </span>
+                    {valetModelInfo.format && (
+                      <Badge variant="outline" className="ml-auto text-xs">
+                        {valetModelInfo.format.toUpperCase()}
+                      </Badge>
+                    )}
+                  </div>
+                  {valetModelInfo.artifactPath && (
+                    <p className="text-muted-foreground text-xs font-mono truncate pl-6">
+                      {valetModelInfo.artifactPath}
+                    </p>
+                  )}
+                  {valetModelInfo.evalScores && typeof valetModelInfo.evalScores === "object" && "route_accuracy" in valetModelInfo.evalScores && (
+                    <p className="text-muted-foreground text-xs pl-6">
+                      Route accuracy: {((valetModelInfo.evalScores as Record<string, number>).route_accuracy * 100).toFixed(1)}%
+                    </p>
+                  )}
+                </div>
+              )}
+              {isAdmin ? (
+                <div className="space-y-2">
+                  <label className="text-sm font-semibold">
+                    Custom Model Path
+                  </label>
+                  <p className="text-xs text-muted-foreground">
+                    Path to a .gguf file or directory inside the models folder. Train a new router
+                    on Kaggle using <code className="bg-muted px-1 rounded">pnpm valet:build</code>,
+                    copy it to <code className="bg-muted px-1 rounded">~/.omnecor/models/</code>, then point here.
+                  </p>
+                  <div className="flex gap-2">
+                    <Input
+                      value={valetPathInput}
+                      onChange={(e) => setValetPathInput(e.target.value)}
+                      placeholder="/home/user/.omnecor/models/my-valet-router.gguf"
+                      className="font-mono text-xs"
+                    />
+                    <Button
+                      size="sm"
+                      disabled={!valetPathInput.trim() || setModelPathMutation.isPending}
+                      onClick={() =>
+                        setModelPathMutation.mutate({ artifactPath: valetPathInput.trim() })
+                      }
+                    >
+                      {setModelPathMutation.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <Save className="w-4 h-4" />
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  Admin or Owner role required to change the Valet Router model.
+                </p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>

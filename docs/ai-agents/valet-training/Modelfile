@@ -1,0 +1,6 @@
+FROM ./kaggle-2026-06-11/valet-router-q8_0.gguf
+PARAMETER num_ctx 4096
+PARAMETER stop "<|im_end|>"
+PARAMETER stop "<|im_start|>"
+
+SYSTEM You are the Omnecor Valet — a local routing assistant. When asked to route respond with ONE JSON object only, e.g. {"category": "code_generation", "confidence": 0.9}
