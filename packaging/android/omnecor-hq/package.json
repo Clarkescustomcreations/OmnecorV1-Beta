@@ -13,9 +13,9 @@
     "ios": "expo run:ios",
     "qr": "node scripts/generate_qr.mjs",
     "prebuild:android": "expo prebuild --platform android --clean",
-    "apk:debug": "cd android && ./gradlew clean assembleDebug",
-    "apk:release": "cd android && ./gradlew clean assembleRelease",
-    "apk:install": "cd android && ./gradlew clean installDebug"
+    "apk:debug": "cd android && rm -rf app/.cxx app/build/generated/autolinking && ./gradlew assembleDebug",
+    "apk:release": "cd android && rm -rf app/.cxx app/build/generated/autolinking && ./gradlew assembleRelease",
+    "apk:install": "cd android && rm -rf app/.cxx app/build/generated/autolinking && ./gradlew installDebug"
   },
   "dependencies": {
     "@expo/vector-icons": "^15.0.3",

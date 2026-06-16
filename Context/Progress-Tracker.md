@@ -5,9 +5,15 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 ---
 
 ## 🚦 Current Status
-*   **Active Phase:** Phase 5: Mobile App Realization & Verification (F23–F26 code-complete; F27 Windows installer built ✅, on-device verification remaining)
-*   **Next Task:** Install `Omnecor-Setup-2.3.0-beta.1.exe` on a real Windows machine, confirm app launches; then F23b on-device wake-word test, Android APK sideload
-*   **Gates (2026-06-16):** root `tsc` 0 · APK `tsc` 0 · `vitest` 338/338 passing
+*   **Active Phase:** Phase 5 — F23–F27 code-complete. **All 3 OMMESH node artifacts built** for cross-platform mesh testing.
+*   **OMMESH 3-way test readiness (2026-06-16, Linux):**
+    *   **Linux node:** `packaging/electron-app/dist/Omnecor-2.3.0-beta.1-x86_64.AppImage` (373 MB) + `Omnecor_2.3.0-beta.1_amd64.deb` (220 MB) — built (electron-builder 25, Electron 39.8.10, better-sqlite3 rebuilt).
+    *   **Android node:** `packaging/android/omnecor-hq/android/app/build/outputs/apk/release/app-release.apk` (118 MB, JS-bundled standalone, debug-signed → sideloadable).
+    *   **Windows node:** installer built on the Windows box (awaiting install + test there).
+    *   **Shared `OMMESH_SECRET`** generated + written to this Linux node's gitignored `.env`; the **same value must be set** in the Windows node's `.env` and the APK Settings → OMMESH secret. mDNS advertise + fail-closed secret auth verified in code (`MeshDiscoveryService`, `WebSocketServer.mobile_node_register`).
+*   **Build fix:** `apk:debug`/`apk:release`/`apk:install` scripts changed from `gradlew clean …` to `rm -rf app/.cxx app/build/generated/autolinking && gradlew …` — the hardcoded `clean` made `externalNativeBuildClean` re-run CMake against not-yet-generated autolinking codegen JNI dirs (react-native-voice-processor etc.) and fail. Run `prebuild:android` (which is `--clean`) before a release build to keep app icons fresh.
+*   **Next:** install the Windows `.exe`; sideload `app-release.apk`; run the Linux AppImage — set the same `OMMESH_SECRET` on all three + same LAN → verify mesh discovery/routing. Then F23b on-device wake-word test; optional social live-test.
+*   **Gates (2026-06-16):** root `tsc` 0 · APK `tsc` 0 · `vitest` 338/338 · web build ✓ · Linux AppImage/.deb ✓ · release APK ✓
 
 ---
 
