@@ -1,7 +1,7 @@
 import { EventEmitter } from "events";
-import { networkInterfaces } from "os";
 import bonjour from "bonjour";
 import type { Bonjour, Browser, Service, RemoteService } from "bonjour";
+import { primaryIPv4, mdnsBindInterface, pickPeerAddress } from "../../_core/net-utils.js";
 
 export interface MeshNode {
   id: string;
@@ -34,8 +34,12 @@ export class MeshDiscoveryService extends EventEmitter {
   }
 
   private startMdns(): void {
+    // Bind mDNS multicast to the real LAN interface only on hosts with a
+    // WSL/Hyper-V vEthernet adapter (else undefined → bind all, the safe
+    // default that keeps multicast reception working alongside avahi on Linux).
+    const ifaceIp = mdnsBindInterface();
     try {
-      this.bjInstance = bonjour();
+      this.bjInstance = bonjour(ifaceIp ? { interface: ifaceIp } : undefined);
     } catch (err) {
       console.warn("[MeshDiscoveryService] bonjour init failed — mDNS disabled:", (err as Error).message);
       return;
@@ -60,7 +64,7 @@ export class MeshDiscoveryService extends EventEmitter {
       this.browser = bj.find({ type: MDNS_SERVICE_TYPE }, (svc) => {
         if (svc.name === nodeName) return;
 
-        const address = svc.addresses?.[0] ?? svc.host;
+        const address = pickPeerAddress(svc);
         const txt = (svc.txt ?? {}) as Record<string, string>;
         const node: MeshNode = {
           id: `${svc.name}@${address}:${svc.port}`,
@@ -76,7 +80,7 @@ export class MeshDiscoveryService extends EventEmitter {
       });
 
       this.browser.on("down", (svc: RemoteService) => {
-        const address = svc.addresses?.[0] ?? svc.host;
+        const address = pickPeerAddress(svc);
         const id = `${svc.name}@${address}:${svc.port}`;
         const node = this.nodes.get(id);
         if (node) {
@@ -103,14 +107,7 @@ export class MeshDiscoveryService extends EventEmitter {
   }
 
   private localHostname(): string {
-    const nets = networkInterfaces();
-    for (const ifaces of Object.values(nets)) {
-      for (const iface of ifaces ?? []) {
-        if (!iface.internal && iface.family === "IPv4") {
-          return iface.address.replace(/\./g, "-");
-        }
-      }
-    }
-    return "node";
+    const ip = primaryIPv4();
+    return ip ? ip.replace(/\./g, "-") : "node";
   }
 }

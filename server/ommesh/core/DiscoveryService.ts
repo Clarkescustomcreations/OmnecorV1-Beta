@@ -3,6 +3,7 @@ import bonjour from 'bonjour';
 import { NodeIdentity } from '../../../shared/types/ommesh.types.js';
 import { SecurityManager } from './SecurityManager.js';
 import { createLogger } from "../../_core/logger.js";
+import { mdnsBindInterface, pickPeerAddress } from "../../_core/net-utils.js";
 const log = createLogger("OMMESH:Discovery");
 
 export interface PeerInfo {
@@ -20,8 +21,14 @@ export class DiscoveryService {
   private peers = new Map<string, PeerInfo>();
 
   constructor(private identity: NodeIdentity, private security: SecurityManager) {
-    const bonjourFactory = bonjour as unknown as () => any;
-    this.bonjourInstance = bonjourFactory();
+    // On hosts with a WSL/Hyper-V vEthernet adapter, bind mDNS multicast to the
+    // real LAN interface so announcements don't egress the wrong NIC. On clean
+    // single-NIC hosts this returns undefined → bind all interfaces (default),
+    // which avoids breaking multicast reception alongside avahi on Linux.
+    const ifaceIp = mdnsBindInterface();
+    const bonjourFactory = bonjour as unknown as (opts?: any) => any;
+    this.bonjourInstance = bonjourFactory(ifaceIp ? { interface: ifaceIp } : undefined);
+    if (ifaceIp) log.info("mDNS bound to LAN interface", { interface: ifaceIp });
   }
 
   async startMdnsBeacon() {
@@ -56,7 +63,7 @@ export class DiscoveryService {
 
     const peerInfo: PeerInfo = {
       name: service.name,
-      address: service.addresses?.[0] ?? service.host ?? "unknown",
+      address: pickPeerAddress(service),
       port: service.port,
       fingerprint: service.txt?.fingerprint ?? "",
       capabilities: (() => {
