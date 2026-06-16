@@ -199,3 +199,36 @@ All code changes are complete and reviewed (5 review issues fixed). Changes are 
 - Python runtime bundling for the packaged Electron installer is not yet resolved — the inference server script is bundled but `llama-cpp-python` must be installed on the build machine and the packaged app needs Python available at runtime
 - Whether to enable the condenser LLM-summary by default (currently off for Sovereign safety)
 - Whether auto-re-prompt-on-job-completion is the desired UX vs. inject-only
+
+---
+
+# Session — Phase 5 close-out (F24–F27) + OMMESH 3-way build readiness (2026-06-16, Linux)
+
+## What was built
+- **F26** Unwired elements: APK dark-mode toggle wired to the real `ThemeProvider` (`setColorScheme`) in `app/(tabs)/settings.tsx`; removed a stray `console.log` in `lib/theme-provider.tsx`. Desktop `client/src/components/SettingsPanel.tsx`: bound 16 previously write-only controls (13 switches + per-folder enable + Log Level + Theme/Language/Startup/CloudProvider selects) via the real `system.saveSettings` mutation. Real podcast **episode history** dialog (localStorage, play/download/remove) in `client/src/pages/PodcastStudio.tsx`, replacing a toast that pointed at a non-existent route — also fixed a latent bug where the desktop master-mix `<audio>` was never wired to the generated audio.
+- **F25** Mobile podcast: server now returns `audioUrl` + a range-capable `/media/podcast/:jobId` route (`server/_core/static.ts`, `LocalPodcastService.ts`); APK `app/(tabs)/podcast.tsx` got a real `expo-audio` player + `expo-file-system` device download. **Add Sources** panel (text / website-URL fetched+stripped / file via `expo-document-picker`) feeding the AI script generator as context.
+- **F24** Mobile 3D real meshes: `server/routers/blenderRouter.ts` gained `listModels` + `export` `toLibrary`; new `/media/model/:file` serve route (basename-only + `.glb/.gltf` allowlist + `model/gltf-binary`) from `PATHS.models`. APK `app/(tabs)/viewer.tsx`: added `GLTFLoader` to the WebView three.js importmap + `window.loadModel/clearModel`, a Model picker, raycast rebuilt on loaded meshes, camera framing; demo primitives are the no-model fallback.
+- **F23b** Native mic Foreground Service: new local Expo module `packaging/android/omnecor-hq/modules/mic-foreground-service/` (Kotlin `MicForegroundService` with `FOREGROUND_SERVICE_TYPE_MICROPHONE` + persistent notification + `START_STICKY`; `MicForegroundServiceModule` bridge; `<service foregroundServiceType="microphone">` in its own manifest). Autolinked (under `modules/`, survives `prebuild --clean`). Wired into `always-listen.ts` start/stop via `requireOptionalNativeModule`.
+- **OMMESH 3-way artifacts (all built on Linux):** Linux `Omnecor-2.3.0-beta.1-x86_64.AppImage` + `.deb` (`packaging/electron-app/dist/`); Android `app-release.apk` 118 MB standalone (`…/apk/release/`). Windows installer already built on the Windows box.
+
+## Decisions made
+- APK `release` is signed with the **debug keystore** (`signingConfig signingConfigs.debug`) — fine for LAN sideload/testing; a real keystore is only needed for Play Store.
+- OMMESH uses one **shared `OMMESH_SECRET`** across all 3 nodes; written to this Linux node's gitignored `.env`. (Secret value lives in `.env` only — never commit it / never put it in memory.)
+- Native FGS delivered as a **local Expo module** (not raw `android/` edits or a config-plugin dangerous-mod) so `prebuild --clean` can't wipe it. The "background capture provider" is satisfied by the FGS keeping the app-wide `useAlwaysListenCapture` (mounted in `app/_layout.tsx`) alive.
+
+## Problems solved
+- **`apk:release`/`apk:debug` build failure:** the scripts hardcoded `gradlew clean`, whose `externalNativeBuildClean` re-runs CMake against autolinking codegen JNI dirs (react-native-voice-processor etc.) that aren't generated yet → `build.ninja` regenerate failure. Fixed: scripts now `rm -rf app/.cxx app/build/generated/autolinking && gradlew …` (no `clean`). Run `prebuild:android` (`--clean`) before release builds to keep app icons fresh (sharp is the real icon fix).
+- **Expo Kotlin `Function {}` gotcha:** `val x = appContext.reactContext ?: return@Function` fails to compile ("expected Any?, actual Unit") — use a plain `if (x != null) {}` null-check.
+- **Android SDK location:** `prebuild --clean` wipes `android/local.properties`; recreate with `sdk.dir=/home/linux/Android/Sdk` (or set `ANDROID_HOME`) before gradle.
+
+## Current state
+- Gates green: root `tsc` 0 · APK `tsc` 0 · `vitest` 338/338 · web build ✓ · Linux AppImage/.deb ✓ · release APK ✓ · Android debug build ✓ (FGS service confirmed merged into the manifest).
+- Commits on `main` (local, may need push): `62a1875` (F24–F27 + prior workflow/Valet/demo work), `ea992f2` (apk scripts + tracker). Repo was synced to `origin/main` with the Windows work stacked on top.
+
+## Next session starts with
+1. **3-way OMMESH on-device test:** set the same `OMMESH_SECRET` (in `.env`) on the Windows node + APK Settings; install Windows `.exe`, sideload `app-release.apk`, run the Linux AppImage; same LAN → verify mDNS discovery + authenticated mesh routing across all 3.
+2. **F23b on-device:** train "Hey Omnecor" `.ppn` (Picovoice console) + `setKeywordPath` (fallback `BuiltInKeywords.COMPUTER`); confirm wake word fires with the app backgrounded.
+3. **Optional:** social pipeline live-test (needs real OAuth creds + go-ahead; YouTube via Google login is lowest-friction). `git push` when ready so other machines pull.
+
+## Open questions
+- Same as the Valet section above (AVX2 / Python bundling), plus: does the 3-way mesh route inference correctly once all nodes share the secret on one LAN? (code-verified, not yet runtime-verified across 3 physical nodes).
