@@ -300,6 +300,16 @@ export class SecurityManager extends EventEmitter {
   getCaCert(): string {
     return this.caCert;
   }
+
+  /**
+   * True once the mTLS key + certificate pair has been loaded. The constructor
+   * defers cert loading (a fresh install has no certs yet), so callers that
+   * open a TLS listener/socket must gate on this — `getServerTlsOptions()`
+   * returns undefined key/cert before the identity is provisioned.
+   */
+  isReady(): boolean {
+    return !!this.privateKey && !!this.cert && !!this.caCert;
+  }
 }
 
 // Singleton

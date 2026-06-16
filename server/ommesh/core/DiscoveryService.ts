@@ -4,6 +4,7 @@ import { NodeIdentity } from '../../../shared/types/ommesh.types.js';
 import { SecurityManager } from './SecurityManager.js';
 import { createLogger } from "../../_core/logger.js";
 import { mdnsBindInterface, pickPeerAddress } from "../../_core/net-utils.js";
+import { MESH_PORT } from "./MeshServer.js";
 const log = createLogger("OMMESH:Discovery");
 
 export interface PeerInfo {
@@ -38,7 +39,7 @@ export class DiscoveryService {
       this.bonjourInstance.publish({
         name: this.identity.id,
         type: 'omnecor',
-        port: 3001, // Dedicated mesh port
+        port: MESH_PORT, // Dedicated mesh port (mTLS inference server)
         txt: {
           fingerprint: this.identity.fingerprint,
           capabilities: JSON.stringify(this.identity.capabilities)
