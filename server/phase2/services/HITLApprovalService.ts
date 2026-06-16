@@ -32,8 +32,10 @@ export function isHitlGateEnabled(category: HitlCategory): boolean {
 export class HITLApprovalService extends EventEmitter {
   private static instance: HITLApprovalService | null = null;
   private pendingActions: Map<string, CriticalAction> = new Map();
-  private approvalResolvers: Map<string, (approved: boolean) => void> =
-    new Map();
+  private approvalResolvers: Map<
+    string,
+    (approved: boolean, reason?: string) => void
+  > = new Map();
 
   private constructor() {
     super();
@@ -47,14 +49,17 @@ export class HITLApprovalService extends EventEmitter {
   }
 
   /**
-   * Request approval for a critical action.
-   * Suspends execution until approval is received.
+   * Request approval for a critical action and receive the reviewer's decision
+   * *and* their optional reason. The reason is most useful on a denial — it is
+   * surfaced back to the agent so it can adjust its approach instead of retrying
+   * blind (mirrors Anthropic's `tool_confirmation` deny_message pattern).
+   * Suspends execution until a decision is received.
    */
-  async requestApproval(
+  async requestApprovalDetailed(
     toolName: string,
     args: any,
     category?: HitlCategory,
-  ): Promise<boolean> {
+  ): Promise<{ approved: boolean; reason?: string }> {
     // If this action's HITL gate has been disabled in Settings → Security,
     // auto-approve without suspending execution (but still record it).
     if (category && !isHitlGateEnabled(category)) {
@@ -68,7 +73,7 @@ export class HITLApprovalService extends EventEmitter {
         ipAddress: null,
         sessionId: null,
       }).catch((err) => console.warn("[AuditLog] write failed:", err));
-      return true;
+      return { approved: true };
     }
 
     const id = uuidv4();
@@ -96,29 +101,44 @@ export class HITLApprovalService extends EventEmitter {
 
     // Wait for manual approval/rejection
     return new Promise(resolve => {
-      this.approvalResolvers.set(id, (approved: boolean) => {
+      this.approvalResolvers.set(id, (approved: boolean, reason?: string) => {
         action.status = approved ? "approved" : "rejected";
+        if (!approved && reason) action.denyReason = reason;
         this.pendingActions.delete(id);
         this.approvalResolvers.delete(id);
-        resolve(approved);
+        resolve({ approved, reason });
       });
     });
   }
 
   /**
-   * Handle user approval/rejection.
+   * Request approval for a critical action. Backward-compatible boolean form —
+   * callers that don't need the deny reason use this. Suspends execution until
+   * approval is received.
    */
-  approveAction(id: string, approved: boolean) {
+  async requestApproval(
+    toolName: string,
+    args: any,
+    category?: HitlCategory,
+  ): Promise<boolean> {
+    return (await this.requestApprovalDetailed(toolName, args, category)).approved;
+  }
+
+  /**
+   * Handle user approval/rejection. An optional `reason` is recorded and, on a
+   * denial, delivered back to the suspended caller so the agent learns why.
+   */
+  approveAction(id: string, approved: boolean, reason?: string) {
     const resolver = this.approvalResolvers.get(id);
     if (resolver) {
-      resolver(approved);
+      resolver(approved, reason);
       AuditLogService.getInstance().log({
         eventType: approved ? "hitl_approved" : "hitl_rejected",
         actorId: null,
         actorType: "system",
         procedure: id,
         args: null,
-        result: { approved },
+        result: { approved, reason: reason ?? null },
         ipAddress: null,
         sessionId: null,
       }).catch((err) => console.warn("[AuditLog] write failed:", err));

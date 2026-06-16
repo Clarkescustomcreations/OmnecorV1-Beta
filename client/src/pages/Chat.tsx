@@ -41,6 +41,8 @@ import {
 import type { SlashCommand } from "@/components/chat/ChatInput";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
+import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
+import { SKILL_WORKFLOWS } from "@/lib/skillWorkflows";
 import {
   Dialog,
   DialogContent,
@@ -621,7 +623,24 @@ export default function Chat() {
 
   // ── Slash commands ───────────────────────────────────────────────────────
   const handleCommand = useCallback(
-    async (cmd: SlashCommand) => {
+    async (cmd: SlashCommand, arg?: string) => {
+      // Inject a steering/system message (workflow preamble or server result)
+      // into the conversation so Valet runs the workflow with it in context.
+      const injectSystem = (text: string) =>
+        setConversation(prev => ({
+          ...prev,
+          messages: [
+            ...prev.messages,
+            {
+              id: crypto.randomUUID(),
+              role: "system" as const,
+              content: text,
+              timestamp: new Date(),
+              tokens: Math.ceil(text.length / 4),
+            },
+          ],
+          updatedAt: new Date(),
+        }));
       switch (cmd) {
         case "clear":
           handleClearHistory();
@@ -722,10 +741,124 @@ export default function Chat() {
           );
           break;
 
+        case "architect":
+        case "recover": {
+          injectSystem(SKILL_WORKFLOWS[cmd].preamble);
+          toast.info(
+            cmd === "architect"
+              ? "Architect mode — describe what you want to build."
+              : "Recover mode — describe what went wrong and how many fixes you've tried.",
+            { duration: 6000 }
+          );
+          break;
+        }
+
+        case "review": {
+          toast.info("Gathering changes for review…", { duration: 8000 });
+          try {
+            const reviewCtx = await vanillaTrpc.workflow.reviewContext.query({});
+            const diffBlock = reviewCtx.hasChanges
+              ? `Working-tree changes:\n\n${reviewCtx.diffStat}\n\n\`\`\`diff\n${reviewCtx.diff}\n\`\`\`${reviewCtx.truncated ? "\n(diff truncated)" : ""}`
+              : "No uncommitted changes detected in the working tree.";
+            const planBlock = Object.entries(reviewCtx.planExcerpts)
+              .map(([f, t]) => `--- ${f} ---\n${t}`)
+              .join("\n\n");
+            injectSystem(
+              `${SKILL_WORKFLOWS.review.preamble}\n\n[Review context]\n${diffBlock}${planBlock ? `\n\n[Plan]\n${planBlock}` : ""}`
+            );
+            toast.success(
+              reviewCtx.hasChanges
+                ? "Review context loaded — ask Valet to run the review."
+                : "No changes to review."
+            );
+          } catch (err) {
+            toast.error(`Review failed: ${(err as Error).message}`);
+          }
+          break;
+        }
+
+        case "remember": {
+          const mode = (arg || "").trim().toLowerCase();
+          if (mode === "restore") {
+            try {
+              const res = await vanillaTrpc.workflow.rememberRestore.query({
+                projectId: "default",
+              });
+              if (!res.hasMemory || !res.memory) {
+                toast.info("No saved memory found for this project.");
+                break;
+              }
+              injectSystem(
+                `${SKILL_WORKFLOWS.remember.preamble}\n\n[Restored memory]\n${res.memory}`
+              );
+              toast.success("Memory restored — confirm with Valet before continuing.");
+            } catch (err) {
+              toast.error(`Restore failed: ${(err as Error).message}`);
+            }
+            break;
+          }
+          if (mode === "save") {
+            if (!selectedModel) {
+              toast.error("Select a model first to summarize the session.");
+              break;
+            }
+            if (conversation.messages.length === 0) {
+              toast.info("Nothing to save yet.");
+              break;
+            }
+            toast.info("Saving session memory…", { duration: 10_000 });
+            try {
+              const res = await vanillaTrpc.workflow.rememberSave.mutate({
+                projectId: "default",
+                providerId: selectedModel.providerId,
+                modelId: selectedModel.modelId,
+                apiKey: selectedModel.apiKey,
+                baseUrl: selectedModel.baseUrl,
+                messages: conversation.messages.map(m => ({
+                  role: m.role,
+                  content: m.content,
+                })),
+              });
+              injectSystem(`[Memory saved → memory.md]\n\n${res.content}`);
+              toast.success("Session memory saved.");
+            } catch (err) {
+              toast.error(`Save failed: ${(err as Error).message}`);
+            }
+            break;
+          }
+          toast.info("Use /remember save or /remember restore.", {
+            duration: 5000,
+          });
+          break;
+        }
+
+        case "imprint": {
+          const filePath = (arg || "").trim();
+          if (!filePath) {
+            toast.info(
+              "Usage: /imprint <path to a component file in your project>",
+              { duration: 6000 }
+            );
+            break;
+          }
+          toast.info("Imprinting UI patterns…", { duration: 8000 });
+          try {
+            const res = await vanillaTrpc.workflow.imprint.mutate({
+              projectId: "default",
+              filePath,
+            });
+            injectSystem(`[Imprinted → ui-registry.md]\n\n${res.entry}`);
+            toast.success("UI patterns captured to ui-registry.md");
+          } catch (err) {
+            toast.error(`Imprint failed: ${(err as Error).message}`);
+          }
+          break;
+        }
+
         case "help":
           toast.info(
-            "Slash commands: /new · /clear · /compress · /btw <note> · /plan · /skill · /system · /export · /help",
-            { duration: 8000 }
+            "Slash commands: /new · /clear · /compress · /btw <note> · /plan · /skill · /system · /export · /help\nWorkflows: /architect · /remember [save|restore] · /review · /recover · /imprint <file>",
+            { duration: 10000 }
           );
           break;
 
@@ -735,6 +868,18 @@ export default function Chat() {
     },
     [handleClearHistory, handleNewConversation, conversation, setConversation, selectedModel]
   );
+
+  // ── Command Palette → workflow bridge ────────────────────────────────────
+  // The global Command Palette's Workflows group navigates here and dispatches
+  // this event; run the matching slash workflow.
+  useEffect(() => {
+    const handler = (e: Event) => {
+      const id = (e as CustomEvent<{ id?: string }>).detail?.id;
+      if (id) void handleCommand(id as SlashCommand);
+    };
+    window.addEventListener("omnecor:run_workflow", handler);
+    return () => window.removeEventListener("omnecor:run_workflow", handler);
+  }, [handleCommand]);
 
   // ── Context panel collapse ──────────────────────────────────────────────
   const contextCollapsed = useAppStore((s) => s.chatContextCollapsed);
@@ -780,6 +925,83 @@ export default function Chat() {
     window.addEventListener("omnecor:terminal_output", handler);
     return () => window.removeEventListener("omnecor:terminal_output", handler);
   }, []);
+
+  // ── Async background-job results → conversation continuation ──────────────
+  // When a long agent-launched job (build/download/train) finishes, the server
+  // condenses its output and pushes an `asyncJobResult` over the socket. We
+  // inject the compact result as a system message and, if Valet is idle, auto
+  // re-prompt it to continue based on the result — the token-saving async-job
+  // flow, without ever loading the raw multi-thousand-line log.
+  //
+  // Refs keep the socket handler stable (so the WS doesn't reconnect every
+  // render) while still reading the latest conversation / streaming / sender.
+  const conversationRef = useRef(conversation);
+  useEffect(() => {
+    conversationRef.current = conversation;
+  }, [conversation]);
+  const isStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+  const handleSendMessageRef = useRef(handleSendMessage);
+  useEffect(() => {
+    handleSendMessageRef.current = handleSendMessage;
+  }, [handleSendMessage]);
+
+  const handleAsyncJobResult = useCallback((data: Record<string, unknown>) => {
+    const formatted = typeof data?.formatted === "string" ? data.formatted : "";
+    if (!formatted) return;
+    const label =
+      (data?.result as { label?: string } | undefined)?.label ?? "background job";
+    const resultMsg: ChatMessage = {
+      id: crypto.randomUUID(),
+      role: "system",
+      content: formatted,
+      timestamp: new Date(),
+      tokens: Math.ceil(formatted.length / 4),
+    };
+    toast.success(`Background job finished: ${label}`);
+
+    // A stream is in flight — just inject so the result isn't lost; Valet will
+    // pick it up on the next turn rather than racing the active stream.
+    if (isStreamingRef.current) {
+      setConversation(prev => ({
+        ...prev,
+        messages: [...prev.messages, resultMsg],
+        updatedAt: new Date(),
+      }));
+      return;
+    }
+
+    // Idle — inject the result and auto re-prompt Valet to act on it. Passing
+    // priorMessages makes handleSendMessage append the result + user nudge and
+    // stream with the result in context.
+    const priors = [...conversationRef.current.messages, resultMsg];
+    handleSendMessageRef.current(
+      "A background job just finished — its condensed result is in the system message above. Continue based on it.",
+      priors
+    );
+  }, []);
+
+  const handleSocketEvent = useCallback(
+    (type: string, data: Record<string, unknown>) => {
+      if (type === "asyncJobResult") handleAsyncJobResult(data);
+    },
+    [handleAsyncJobResult]
+  );
+
+  const { subscribe: subscribeSocket, unsubscribe: unsubscribeSocket } =
+    useOmnecorSocket({ onEvent: handleSocketEvent });
+
+  // Scope the result channel to this user so one user's job results never leak
+  // to another in networked/multi-node mode. The server also mirrors to
+  // asyncjob:all, but we deliberately do not subscribe to that here.
+  useEffect(() => {
+    if (me?.id == null) return;
+    const channel = `asyncjob:${me.id}`;
+    subscribeSocket(channel);
+    return () => unsubscribeSocket(channel);
+  }, [me?.id, subscribeSocket, unsubscribeSocket]);
 
   const handleOpenPreview = useCallback((mode: "3d" | "pcb" | "web", code: string) => {
     setPreviewMode(mode);

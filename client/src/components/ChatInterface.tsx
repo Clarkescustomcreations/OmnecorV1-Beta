@@ -511,7 +511,7 @@ export interface ChatInterfaceProps {
   onToggleSystemPrompt?: () => void;
   onExport?: () => void;
   onStop?: () => void;
-  onCommand?: (cmd: SlashCommand) => void | Promise<void>;
+  onCommand?: (cmd: SlashCommand, arg?: string) => void | Promise<void>;
   onBtw?: (note: string) => void;
   onToggleMemory?: () => void;
   onToggleTerminal?: () => void;
@@ -637,15 +637,15 @@ export default function ChatInterface({
   };
 
   const handleCommand = useCallback(
-    (cmd: SlashCommand) => {
+    (cmd: SlashCommand, arg?: string) => {
       if (cmd === "help") {
         toast.info(
-          "Commands: /clear · /new · /system · /export · /compress · /btw [note] · /skill · /plan\nShortcuts: Enter → send · Shift+Enter → new line",
-          { duration: 6000 }
+          "Commands: /clear · /new · /system · /export · /compress · /btw [note] · /skill · /plan\nWorkflows: /architect · /remember [save|restore] · /review · /recover · /imprint [file]\nShortcuts: Enter → send · Shift+Enter → new line",
+          { duration: 8000 }
         );
         return;
       }
-      onCommand?.(cmd);
+      onCommand?.(cmd, arg);
     },
     [onCommand]
   );
@@ -967,7 +967,7 @@ export default function ChatInterface({
       </ScrollArea>
 
       {/* ── Input area ──────────────────────────────────────────────── */}
-      <div className="border-t border-border px-4 py-3 flex-shrink-0">
+      <div className="border-t border-border px-4 pt-3 pb-1 flex-shrink-0">
         <ChatInput
           onSend={content => onSendMessage?.(content)}
           onAddFile={file => onAddFile?.(file)}

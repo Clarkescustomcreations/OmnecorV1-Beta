@@ -150,6 +150,19 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
     handleSettingChange();
   };
 
+  const handleToggleFolder = (id: string, enabled: boolean) => {
+    setSettings({
+      ...settings,
+      knowledge: {
+        ...settings.knowledge,
+        folders: settings.knowledge.folders.map(f =>
+          f.id === id ? { ...f, enabled } : f
+        )
+      }
+    });
+    handleSettingChange();
+  };
+
   return (
     <div className={cn("space-y-4", className)}>
       <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -188,7 +201,13 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
             <CardContent className="space-y-4">
               <div className="space-y-2">
                 <label className="text-sm font-semibold">Theme</label>
-                <Select value={settings.general.theme}>
+                <Select
+                  value={settings.general.theme}
+                  onValueChange={value => {
+                    setSettings({ ...settings, general: { ...settings.general, theme: value as AppSettings["general"]["theme"] } });
+                    handleSettingChange();
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -225,7 +244,13 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold">Language</label>
-                <Select value={settings.general.language}>
+                <Select
+                  value={settings.general.language}
+                  onValueChange={value => {
+                    setSettings({ ...settings, general: { ...settings.general, language: value as AppSettings["general"]["language"] } });
+                    handleSettingChange();
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -293,7 +318,13 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                 <label className="text-sm font-semibold">
                   Startup Behavior
                 </label>
-                <Select value={settings.general.startupBehavior}>
+                <Select
+                  value={settings.general.startupBehavior}
+                  onValueChange={value => {
+                    setSettings({ ...settings, general: { ...settings.general, startupBehavior: value as AppSettings["general"]["startupBehavior"] } });
+                    handleSettingChange();
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>
@@ -348,7 +379,7 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                         </p>
                       </div>
                       <div className="flex items-center gap-2">
-                        <Switch checked={folder.enabled} />
+                        <Switch checked={folder.enabled} onCheckedChange={checked => handleToggleFolder(folder.id, checked)} />
                         <Button size="sm" variant="ghost" onClick={() => handleRemoveFolder(folder.id)}>
                           <Trash2 className="w-4 h-4" />
                         </Button>
@@ -370,7 +401,13 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Auto-Index</label>
-                <Switch checked={settings.knowledge.autoIndex} />
+                <Switch
+                  checked={settings.knowledge.autoIndex}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, knowledge: { ...settings.knowledge, autoIndex: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="space-y-2">
@@ -426,12 +463,24 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                 <label className="text-sm font-semibold">
                   Malicious File Scan
                 </label>
-                <Switch checked={settings.security.maliciousFileScan} />
+                <Switch
+                  checked={settings.security.maliciousFileScan}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, security: { ...settings.security, maliciousFileScan: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Scan on Upload</label>
-                <Switch checked={settings.security.scanOnUpload} />
+                <Switch
+                  checked={settings.security.scanOnUpload}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, security: { ...settings.security, scanOnUpload: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="space-y-2">
@@ -471,14 +520,26 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Encryption</label>
-                <Switch checked={settings.security.encryptionEnabled} />
+                <Switch
+                  checked={settings.security.encryptionEnabled}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, security: { ...settings.security, encryptionEnabled: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">
                   Encrypt API Keys
                 </label>
-                <Switch checked={settings.security.apiKeyEncryption} />
+                <Switch
+                  checked={settings.security.apiKeyEncryption}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, security: { ...settings.security, apiKeyEncryption: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="space-y-2">
@@ -522,22 +583,46 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                     All data stays local
                   </p>
                 </div>
-                <Switch checked={settings.privacy.zeroLoginMode} />
+                <Switch
+                  checked={settings.privacy.zeroLoginMode}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, privacy: { ...settings.privacy, zeroLoginMode: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Telemetry</label>
-                <Switch checked={settings.privacy.telemetryEnabled} />
+                <Switch
+                  checked={settings.privacy.telemetryEnabled}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, privacy: { ...settings.privacy, telemetryEnabled: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Crash Reports</label>
-                <Switch checked={settings.privacy.crashReportsEnabled} />
+                <Switch
+                  checked={settings.privacy.crashReportsEnabled}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, privacy: { ...settings.privacy, crashReportsEnabled: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Analytics</label>
-                <Switch checked={settings.privacy.analyticsEnabled} />
+                <Switch
+                  checked={settings.privacy.analyticsEnabled}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, privacy: { ...settings.privacy, analyticsEnabled: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
             </CardContent>
           </Card>
@@ -552,14 +637,26 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
                 <label className="text-sm font-semibold">
                   Enable Cloud Sync
                 </label>
-                <Switch checked={settings.privacy.cloudSyncEnabled} />
+                <Switch
+                  checked={settings.privacy.cloudSyncEnabled}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, privacy: { ...settings.privacy, cloudSyncEnabled: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               {settings.privacy.cloudSyncEnabled && (
                 <>
                   <div className="space-y-2">
                     <label className="text-sm font-semibold">Provider</label>
-                    <Select value={settings.privacy.cloudSyncProvider || ""}>
+                    <Select
+                      value={settings.privacy.cloudSyncProvider || ""}
+                      onValueChange={value => {
+                        setSettings({ ...settings, privacy: { ...settings.privacy, cloudSyncProvider: value } });
+                        handleSettingChange();
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
@@ -678,24 +775,48 @@ export default function SettingsPanel({ className }: SettingsPanelProps) {
             <CardContent className="space-y-4">
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Debug Mode</label>
-                <Switch checked={settings.advanced.debugMode} />
+                <Switch
+                  checked={settings.advanced.debugMode}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, advanced: { ...settings.advanced, debugMode: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">
                   Enable Dev Tools
                 </label>
-                <Switch checked={settings.advanced.enableDevTools} />
+                <Switch
+                  checked={settings.advanced.enableDevTools}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, advanced: { ...settings.advanced, enableDevTools: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="flex items-center justify-between">
                 <label className="text-sm font-semibold">Enable Cache</label>
-                <Switch checked={settings.advanced.cacheEnabled} />
+                <Switch
+                  checked={settings.advanced.cacheEnabled}
+                  onCheckedChange={checked => {
+                    setSettings({ ...settings, advanced: { ...settings.advanced, cacheEnabled: checked } });
+                    handleSettingChange();
+                  }}
+                />
               </div>
 
               <div className="space-y-2">
                 <label className="text-sm font-semibold">Log Level</label>
-                <Select value={settings.advanced.logLevel}>
+                <Select
+                  value={settings.advanced.logLevel}
+                  onValueChange={value => {
+                    setSettings({ ...settings, advanced: { ...settings.advanced, logLevel: value as AppSettings["advanced"]["logLevel"] } });
+                    handleSettingChange();
+                  }}
+                >
                   <SelectTrigger>
                     <SelectValue />
                   </SelectTrigger>

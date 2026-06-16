@@ -161,6 +161,7 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
         onConnect={onConnect}
         nodeTypes={nodeTypes}
         fitView
+        proOptions={{ hideAttribution: true }}
       >
         <Background variant={BackgroundVariant.Dots} gap={20} size={1} />
         <Controls />

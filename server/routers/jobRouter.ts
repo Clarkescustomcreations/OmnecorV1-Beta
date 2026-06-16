@@ -9,6 +9,8 @@
 import { z } from "zod";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
+import { validatePath } from "../_core/security.js";
+import { AsyncJobService } from "../phase2/services/AsyncJobService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -53,6 +55,72 @@ export const jobRouter = router({
       }
 
       return status;
+    }),
+
+  /**
+   * Start a long-running background command on behalf of the AI agent.
+   *
+   * The agent calls this, gets a jobId back immediately, and ends its turn — no
+   * token-burning poll loop. When the job finishes, AsyncJobService condenses
+   * the output and the result is pushed back into the conversation as a new turn.
+   *
+   * Host command execution is gated behind the HITL "command" approval. A denial
+   * carries the reviewer's reason straight back to the agent so it can adjust.
+   * Arguments are passed as a discrete array — never a shell string — so there
+   * is no interpolation/injection surface.
+   */
+  startAsync: protectedProcedure
+    .input(
+      z.object({
+        command: z.string().min(1, "command is required"),
+        args: z.array(z.string()).default([]),
+        cwd: z.string().optional(),
+        label: z.string().max(120).optional(),
+        conversationId: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const decision = await ctx.services.hitl.requestApprovalDetailed(
+        "asyncJob.start",
+        { command: input.command, args: input.args, cwd: input.cwd ?? null },
+        "command"
+      );
+      if (!decision.approved) {
+        throw new TRPCError({
+          code: "FORBIDDEN",
+          message: decision.reason
+            ? `Async job denied: ${decision.reason}`
+            : "Async job denied by reviewer.",
+        });
+      }
+
+      // Validate any caller-supplied working directory against the allow-list.
+      let cwd: string | undefined;
+      if (input.cwd) {
+        cwd = await validatePath(input.cwd);
+      }
+
+      const label =
+        input.label ||
+        `${input.command} ${input.args.join(" ")}`.trim().slice(0, 80);
+
+      const jobId = await ctx.services.processManager.spawn({
+        type: "custom",
+        command: input.command,
+        args: input.args,
+        cwd,
+        label,
+        captureMode: "raw",
+        timeoutMs: 0, // long build/download jobs: no auto-kill
+      });
+
+      AsyncJobService.getInstance().track(jobId, {
+        userId: ctx.user?.id ?? null,
+        conversationId: input.conversationId ?? null,
+        label,
+      });
+
+      return { jobId, status: "started" as const, label };
     }),
 
   /**

@@ -1,8 +1,64 @@
 import express, { type Express } from "express";
 import fs from "fs";
+import os from "os";
 import path from "path";
+import { PATHS } from "./paths.js";
 
 export function serveStatic(app: Express) {
+  // Serve 3D models (.glb/.gltf) from the model library with HTTP range support
+  // so the desktop and mobile three.js viewers can stream them. Only a bare
+  // basename with an allowed extension is accepted (no traversal, no other types).
+  const MODEL_EXT: Record<string, string> = {
+    ".glb": "model/gltf-binary",
+    ".gltf": "model/gltf+json",
+  };
+  app.get("/media/model/:file", (req, res) => {
+    const file = req.params.file;
+    // Reject anything that isn't a plain filename (path separators / traversal).
+    if (file !== path.basename(file)) {
+      res.status(400).end();
+      return;
+    }
+    const ext = path.extname(file).toLowerCase();
+    const contentType = MODEL_EXT[ext];
+    if (!contentType) {
+      res.status(400).end();
+      return;
+    }
+    const full = path.join(PATHS.models, file);
+    if (!fs.existsSync(full)) {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader("Content-Type", contentType);
+    res.setHeader("Accept-Ranges", "bytes");
+    res.sendFile(full);
+  });
+  // Serve generated podcast audio by jobId with HTTP range support (so the
+  // browser/native <audio> can stream + seek). Files live where the podcast
+  // engine writes them: ~/.omnecor/podcasts/<jobId>/. The jobId is a UUID, so a
+  // strict UUID match both authorizes (unguessable) and prevents path traversal.
+  const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  const podcastsRoot = path.join(os.homedir(), ".omnecor", "podcasts");
+  app.get("/media/podcast/:jobId", (req, res) => {
+    const { jobId } = req.params;
+    if (!UUID_RE.test(jobId)) {
+      res.status(400).end();
+      return;
+    }
+    const dir = path.join(podcastsRoot, jobId);
+    const candidate = ["podcast_master.wav", "podcast.wav"]
+      .map((name) => path.join(dir, name))
+      .find((p) => fs.existsSync(p));
+    if (!candidate) {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Accept-Ranges", "bytes");
+    // sendFile honours Range requests and sets the appropriate 206 headers.
+    res.sendFile(candidate);
+  });
   // Serve user-uploaded attachments from the on-disk uploads directory.
   // Harden the response: prevent MIME sniffing (so an attacker-controlled file
   // can't be re-interpreted as HTML/JS) and force downloads as attachments so

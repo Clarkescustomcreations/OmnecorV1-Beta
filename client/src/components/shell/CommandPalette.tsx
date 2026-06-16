@@ -44,7 +44,7 @@ import { trpc } from "@/lib/trpc";
 import { useCommandRegistry, type CommandEntry } from "@/hooks/useCommandRegistry";
 
 // Map group names to section icons (fallback only — individual commands provide their own)
-const GROUP_ORDER = ["Navigation", "Actions", "AI", "Security", "Hardware", "Admin"] as const;
+const GROUP_ORDER = ["Navigation", "Actions", "Workflows", "AI", "Security", "Hardware", "Admin"] as const;
 
 /** Pick an icon for a command based on its id. Falls back to a generic one. */
 function iconForCommand(cmd: CommandEntry): React.ReactNode {

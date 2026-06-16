@@ -9,8 +9,11 @@ import { z } from "zod";
 import { protectedProcedure, publicProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
+import { PATHS } from "../_core/paths.js";
 import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
 import { spawn } from "child_process";
+import fs from "fs/promises";
+import path from "path";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -32,6 +35,8 @@ const blenderRenderSchema = z.object({
 const blenderExportSchema = z.object({
   blendFile: z.string().min(1),
   outputPath: z.string().min(1),
+  /** When true, write the export into the shared model library so the 3D viewers can load it. */
+  toLibrary: z.boolean().optional(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -122,11 +127,16 @@ export const blenderRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const validatedBlend = await validatePath(input.blendFile);
+        // When toLibrary is set, force the output into the shared model library
+        // (basename only) so it's immediately listable + servable to the viewers.
+        const outputPath = input.toLibrary
+          ? path.join(PATHS.models, path.basename(input.outputPath))
+          : input.outputPath;
         const jobId = await ctx.services.blender.exportFile(
           validatedBlend,
-          input.outputPath
+          outputPath
         );
-        return { success: true, jobId };
+        return { success: true, jobId, outputPath };
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -134,4 +144,29 @@ export const blenderRouter = router({
         });
       }
     }),
+
+  /**
+   * List 3D models (.glb/.gltf) in the shared model library. Each entry includes
+   * a range-capable HTTP URL the three.js viewers (desktop + mobile) can load.
+   */
+  listModels: protectedProcedure.query(async () => {
+    let entries: string[] = [];
+    try {
+      entries = await fs.readdir(PATHS.models);
+    } catch {
+      return []; // library dir not created yet — no models
+    }
+    const models = await Promise.all(
+      entries
+        .filter((f) => /\.(glb|gltf)$/i.test(f))
+        .map(async (name) => {
+          let size = 0;
+          try {
+            size = (await fs.stat(path.join(PATHS.models, name))).size;
+          } catch { /* ignore stat failure */ }
+          return { name, url: `/media/model/${encodeURIComponent(name)}`, size };
+        })
+    );
+    return models.sort((a, b) => a.name.localeCompare(b.name));
+  }),
 });

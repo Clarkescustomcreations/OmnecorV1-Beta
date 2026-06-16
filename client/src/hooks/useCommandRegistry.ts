@@ -11,12 +11,20 @@ import { useLocation } from "wouter";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
 import { trpc } from "@/lib/trpc";
+import { SKILL_WORKFLOW_LIST } from "@/lib/skillWorkflows";
 
 export interface CommandEntry {
   id: string;
   label: string;
   description: string;
-  group: "Navigation" | "Actions" | "AI" | "Security" | "Hardware" | "Admin";
+  group:
+    | "Navigation"
+    | "Actions"
+    | "Workflows"
+    | "AI"
+    | "Security"
+    | "Hardware"
+    | "Admin";
   /** action is called with the palette already closed */
   action: () => void;
 }
@@ -197,6 +205,25 @@ export function useCommandRegistry(): CommandEntry[] {
       group: "Actions",
       action: handleClearContext,
     },
+
+    // Workflows — the built-in skill commands (architect / remember / review /
+    // recover / imprint). The palette entry opens Chat and dispatches the
+    // workflow, which Chat's handleCommand runs.
+    ...SKILL_WORKFLOW_LIST.map((wf) => ({
+      id: `workflow-${wf.id}`,
+      label: wf.command,
+      description: wf.description,
+      group: "Workflows" as const,
+      action: () => {
+        navigate("/chat");
+        // Defer so the Chat page is mounted and its listener is registered.
+        setTimeout(() => {
+          window.dispatchEvent(
+            new CustomEvent("omnecor:run_workflow", { detail: { id: wf.id } })
+          );
+        }, 120);
+      },
+    })),
 
     // AI — execution mode switching
     {

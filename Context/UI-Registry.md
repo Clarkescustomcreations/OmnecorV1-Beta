@@ -14,7 +14,23 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 
 ---
 
-## Global Summary (Updated 2026-06-13 Session 15 - Visual Spacing, Scrollbars & Overlap Enforcement)
+## Global Summary (Updated 2026-06-15 Session 16 - Chat Input Layout Redesign)
+
+### Session 16 (2026-06-15) — Chat Input Layout Redesign & UI Cleanup
+- **ChatInput.tsx & ChatInterface.tsx Layout & Styling**:
+  - Repositioned the action toolbar elements: placed `Terminal/CLI` and `Sandboxed` triggers on the left, and attachment controls (`Attach File`, `Attach Image`, `Voice/Mic`, `Send/Stop`) on the right to prevent text entry box squishing/wrapping bugs on small viewports.
+  - Aligned styling with design tokens: replaced raw Tailwind color classes (`bg-blue-600`, `hover:bg-blue-700`, `text-white`, `text-red-500`, `text-yellow-500`) with semantic token classes (`variant="default"` for primary brand blue, `text-destructive` for critical token usage, and `text-accent-cyan` for warning states).
+  - Increased textarea minHeight to 36px and vertical padding to py-3. Reduced the parent container's bottom padding (`pb-1`) to align the bottom hint text snugly with the card border.
+- **Dashboard.tsx Hero Logo**:
+  - Imported `logo_mark_256.png` directly via Vite ESM from the root `assets/` directory (ensuring zero file moves/copies).
+  - Restructured the dashboard hero section to a responsive flex container constrained to `max-w-5xl` to bring the text and the logo closer together towards the center. Placed the logo as a floating, select-free icon on the right side of the hero header, hid it on mobile (`hidden md:block`), and added a subtle hover scale effect.
+- **ReactFlow Attribution Removal**:
+  - Added `proOptions={{ hideAttribution: true }}` to all ReactFlow canvases to hide the attribution watermark from the bottom-right corner of the canvas viewports:
+    - [NeuralGraphView.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/neural/NeuralGraphView.tsx) (Neural Brain Map)
+    - [PCBSchematicEditor.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/pcb/PCBSchematicEditor.tsx) (PCB Schematic Editor)
+    - [EnhancedPCBEditor.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/pcb/EnhancedPCBEditor.tsx) (Enhanced PCB Editor)
+    - [SchematicEditor.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/designer/SchematicEditor.tsx) (3D Designer Schematic/PCB View)
+    - [NeuralWorkspaceCanvas.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/workspace/NeuralWorkspaceCanvas.tsx) (Neural Workspace Canvas)
 
 ### Session 15 (2026-06-13) — Visual Spacing, Scrollbars & Overlap Enforcement
 Layout, spacing, scrollbar, and visual boundary fixes:

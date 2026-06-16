@@ -30,6 +30,11 @@ import {
   hasPicovoiceAccessKey,
 } from "./always-listen-config";
 import { encryptString, decryptString } from "./secure-crypto";
+import {
+  startMicForegroundService,
+  stopMicForegroundService,
+  isMicForegroundServiceAvailable,
+} from "../../modules/mic-foreground-service";
 
 // ── Status ───────────────────────────────────────────────────────────────────
 
@@ -349,6 +354,17 @@ export async function startListening(): Promise<void> {
   }
 
   await _porcupine.start();
+
+  // Hold the mic alive when backgrounded/closed via a microphone-typed Android
+  // foreground service (no-op until the native module is prebuilt into the APK).
+  if (isMicForegroundServiceAvailable()) {
+    try {
+      startMicForegroundService("Omnecor is listening", 'Say "Hey Omnecor" to talk.');
+    } catch (e) {
+      console.warn("[AlwaysListen] failed to start foreground service:", e);
+    }
+  }
+
   _running = true;
   setState("listening");
 }
@@ -360,6 +376,9 @@ export async function stopListening(): Promise<void> {
     try { await _porcupine.stop(); } catch { /* ignore */ }
     try { _porcupine.delete(); } catch { /* ignore */ }
     _porcupine = null;
+  }
+  if (isMicForegroundServiceAvailable()) {
+    try { stopMicForegroundService(); } catch (e) { console.warn("[AlwaysListen] failed to stop foreground service:", e); }
   }
   Speech.stop();
   setState("off");

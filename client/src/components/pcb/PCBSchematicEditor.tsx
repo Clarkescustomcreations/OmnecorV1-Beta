@@ -295,6 +295,7 @@ export const PCBSchematicEditorInner: React.FC<PCBSchematicEditorProps> = ({
             fitView
             snapToGrid={snapToGrid}
             snapGrid={[gridSize, gridSize]}
+            proOptions={{ hideAttribution: true }}
           >
             {gridVisible && (
               <Background

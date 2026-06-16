@@ -43,6 +43,13 @@ import {
 } from "lucide-react";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -400,6 +407,28 @@ function loadPodcastSession(): Partial<PodcastSessionState> | null {
   }
 }
 
+// Persistent episode history — every successfully generated episode is recorded
+// so the History button can replay/download past episodes (capped at 50).
+const HISTORY_KEY = "omnecor:podcast_history";
+
+interface PodcastEpisode {
+  id: string;
+  title: string;
+  date: string;
+  audioUrl: string;
+  segmentCount: number;
+  duration: number;
+}
+
+function loadPodcastHistory(): PodcastEpisode[] {
+  try {
+    const raw = localStorage.getItem(HISTORY_KEY);
+    return raw ? (JSON.parse(raw) as PodcastEpisode[]) : [];
+  } catch {
+    return [];
+  }
+}
+
 export default function PodcastStudio() {
   const [turns, setTurns] = useState<DialogueTurn[]>(() => loadPodcastSession()?.turns ?? DEFAULT_TURNS);
   const [sources, setSources] = useState<PodcastSource[]>(() => loadPodcastSession()?.sources ?? []);
@@ -408,6 +437,24 @@ export default function PodcastStudio() {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [podcastLength, setPodcastLength] = useState<PodcastLength>(() => loadPodcastSession()?.podcastLength ?? "medium");
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
+  const [history, setHistory] = useState<PodcastEpisode[]>(() => loadPodcastHistory());
+  const [showHistory, setShowHistory] = useState(false);
+
+  const addEpisodeToHistory = useCallback((episode: PodcastEpisode) => {
+    setHistory((prev) => {
+      const next = [episode, ...prev].slice(0, 50);
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch { /* quota — non-fatal */ }
+      return next;
+    });
+  }, []);
+
+  const removeEpisodeFromHistory = useCallback((id: string) => {
+    setHistory((prev) => {
+      const next = prev.filter((e) => e.id !== id);
+      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
+      return next;
+    });
+  }, []);
 
   // Persist the editable session whenever it changes.
   useEffect(() => {
@@ -518,7 +565,25 @@ export default function PodcastStudio() {
   const generateMutation = trpc.podcast.generate.useMutation({
     onSuccess: (data) => {
       setIsGenerating(false);
-      setResult(data as { segments: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] });
+      const d = data as {
+        jobId?: string;
+        audioUrl?: string | null;
+        duration?: number;
+        segments: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[];
+      };
+      setResult(d);
+      // Wire the master-mix player to the range-capable server URL (same-origin).
+      setAudioUrl(d.audioUrl ?? null);
+      if (d.audioUrl) {
+        addEpisodeToHistory({
+          id: d.jobId ?? Math.random().toString(36).slice(2),
+          title: turns[0]?.text?.slice(0, 60) || "Podcast Episode",
+          date: new Date().toISOString(),
+          audioUrl: d.audioUrl,
+          segmentCount: d.segments?.length ?? 0,
+          duration: d.duration ?? 0,
+        });
+      }
       toast.success("Podcast generated successfully using local mesh!");
     },
     onError: (e) => {
@@ -639,8 +704,8 @@ export default function PodcastStudio() {
               {generateScriptMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               AI Script Gen
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => toast.info("Podcast history: browse completed episodes in the podcast list page or check your /podcast-studio/history.")}>
-              <History className="w-4 h-4" /> History
+            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowHistory(true)}>
+              <History className="w-4 h-4" /> History{history.length > 0 ? ` (${history.length})` : ""}
             </Button>
             <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={clearSession} title="Clear saved session and reset to defaults">
               <Trash2 className="w-4 h-4" /> Clear session
@@ -906,6 +971,63 @@ export default function PodcastStudio() {
           </div>
         </div>
       </div>
+
+      {/* Episode History */}
+      <Dialog open={showHistory} onOpenChange={setShowHistory}>
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <History className="w-4 h-4" /> Episode History
+            </DialogTitle>
+            <DialogDescription>
+              {history.length === 0
+                ? "No episodes yet — generate a podcast to start your history."
+                : `${history.length} saved episode${history.length === 1 ? "" : "s"}. Click play to load one into the studio.`}
+            </DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-[60vh] pr-3">
+            <div className="space-y-2">
+              {history.map((ep) => (
+                <div key={ep.id} className="flex items-center gap-2 p-2 rounded-lg border bg-background">
+                  <div className="flex-1 min-w-0">
+                    <p className="text-xs font-semibold truncate">{ep.title}</p>
+                    <p className="text-[10px] text-muted-foreground">
+                      {new Date(ep.date).toLocaleString()} · {ep.segmentCount} segment{ep.segmentCount === 1 ? "" : "s"}
+                    </p>
+                  </div>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    title="Load this episode into the player"
+                    onClick={() => { setAudioUrl(ep.audioUrl); setShowHistory(false); toast.success("Episode loaded"); }}
+                  >
+                    <Play className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7"
+                    title="Download episode"
+                    onClick={() => { const a = document.createElement("a"); a.href = ep.audioUrl; a.download = `${ep.title || "podcast-episode"}.wav`; a.click(); }}
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-7 w-7 text-muted-foreground"
+                    title="Remove from history"
+                    onClick={() => removeEpisodeFromHistory(ep.id)}
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              ))}
+            </div>
+          </ScrollArea>
+        </DialogContent>
+      </Dialog>
     </OmnecorDashboardLayout>
   );
 }

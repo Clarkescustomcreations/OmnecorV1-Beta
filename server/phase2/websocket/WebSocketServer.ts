@@ -55,6 +55,8 @@ import { HashTrackerService } from "../services/HashTrackerService.js";
 import { VoiceService, VoiceEventData } from "../services/VoiceService.js";
 import { HITLApprovalService } from "../services/HITLApprovalService.js";
 import { AgentService } from "../services/AgentService.js";
+import { AsyncJobService } from "../services/AsyncJobService.js";
+import type { AsyncJobResultEvent } from "../services/AsyncJobService.js";
 import { NotificationService } from "../../_core/NotificationService.js";
 import type { OmnecorNotification } from "../../../shared/notifications.js";
 
@@ -129,7 +131,8 @@ interface ServerMessage {
     | "pty:ready"
     | "pty:exit"
     | "terminal:toChatOutput"
-    | "systemMetrics";
+    | "systemMetrics"
+    | "asyncJobResult";
   channel?: string;
   data?: any;
   timestamp?: string;
@@ -716,6 +719,33 @@ export class OmnecorWebSocketServer {
           channel: "hardware:all",
           data: event,
           timestamp: event.timestamp,
+        });
+      }
+    });
+
+    // --- Async Job Results → agent continuation ---
+    // When an agent-launched long job finishes, AsyncJobService condenses the
+    // output; we push the compact result to the originating user's channel so
+    // the client can inject it as a new conversation turn.
+    AsyncJobService.getInstance().on("result", (event: AsyncJobResultEvent) => {
+      const ts = new Date().toISOString();
+      const userChannel =
+        event.context.userId != null
+          ? `asyncjob:${event.context.userId}`
+          : "asyncjob:all";
+      this.broadcastToChannel(userChannel, {
+        type: "asyncJobResult",
+        channel: userChannel,
+        data: event,
+        timestamp: ts,
+      });
+      // Mirror to a global channel for dashboards / multi-tab clients.
+      if (userChannel !== "asyncjob:all") {
+        this.broadcastToChannel("asyncjob:all", {
+          type: "asyncJobResult",
+          channel: "asyncjob:all",
+          data: event,
+          timestamp: ts,
         });
       }
     });

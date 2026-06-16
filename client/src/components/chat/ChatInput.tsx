@@ -8,7 +8,21 @@ import { cn } from "@/lib/utils";
 import type { ContextFile, SelectedModel } from "@/lib/chatContext";
 import { trpc } from "@/lib/trpc";
 
-export type SlashCommand = "clear" | "new" | "system" | "export" | "help" | "compress" | "btw" | "skill" | "plan";
+export type SlashCommand =
+  | "clear"
+  | "new"
+  | "system"
+  | "export"
+  | "help"
+  | "compress"
+  | "btw"
+  | "skill"
+  | "plan"
+  | "architect"
+  | "remember"
+  | "review"
+  | "recover"
+  | "imprint";
 
 interface Attachment {
   name: string;
@@ -32,7 +46,7 @@ interface ChatInputProps {
   onAddFile: (file: File) => void;
   onAddImage: (file: File) => void;
   onStop: () => void;
-  onCommand: (cmd: SlashCommand) => void | Promise<void>;
+  onCommand: (cmd: SlashCommand, arg?: string) => void | Promise<void>;
   onBtw?: (note: string) => void;
   onToggleCliTerminal?: () => void;
   onToggleSandbox?: () => void;
@@ -55,6 +69,11 @@ const COMMANDS: { cmd: SlashCommand; label: string; description: string }[] = [
   { cmd: "btw", label: "/btw", description: "Add a persistent background context note" },
   { cmd: "skill", label: "/skill", description: "Save this workflow as a reusable skill" },
   { cmd: "plan", label: "/plan", description: "Start guided project planning with Valet" },
+  { cmd: "architect", label: "/architect", description: "Think through a build like a senior engineer before coding" },
+  { cmd: "remember", label: "/remember", description: "Save or restore session memory (save | restore)" },
+  { cmd: "review", label: "/review", description: "Three-layer review of the current changes" },
+  { cmd: "recover", label: "/recover", description: "Diagnose a failure before deciding how to respond" },
+  { cmd: "imprint", label: "/imprint", description: "Capture a component's UI patterns to the registry" },
 ];
 
 export default function ChatInput({
@@ -174,9 +193,15 @@ export default function ChatInput({
   };
 
   const execCommand = (cmd: SlashCommand) => {
-    // /btw keeps the input open so the user can type the note inline
-    if (cmd === "btw") {
-      setValue("/btw ");
+    // These keep the input open so the user can type an inline argument
+    // (/btw <note>, /remember save|restore, /imprint <file>).
+    const inlineArgPrefix: Partial<Record<SlashCommand, string>> = {
+      btw: "/btw ",
+      remember: "/remember ",
+      imprint: "/imprint ",
+    };
+    if (inlineArgPrefix[cmd]) {
+      setValue(inlineArgPrefix[cmd]!);
       setSlashOpen(false);
       if (textareaRef.current) textareaRef.current.style.height = "auto";
       textareaRef.current?.focus();
@@ -210,6 +235,17 @@ export default function ChatInput({
         setAttachments([]);
         if (textareaRef.current) textareaRef.current.style.height = "auto";
       }
+      return;
+    }
+
+    // Intercept workflow commands that carry an inline argument so they run the
+    // workflow instead of being sent as a chat message.
+    const argCmd = /^\/(remember|imprint)\b\s*(.*)$/.exec(trimmed);
+    if (argCmd) {
+      onCommand(argCmd[1] as SlashCommand, argCmd[2].trim() || undefined);
+      setValue("");
+      setAttachments([]);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
       return;
     }
 
@@ -363,7 +399,7 @@ export default function ChatInput({
       )}
 
       {/* Input container */}
-      <div className="flex items-end gap-2 border border-border rounded-xl bg-card px-3 py-2 focus-within:ring-1 focus-within:ring-ring/50 transition-shadow">
+      <div className="flex items-end gap-2 border border-border rounded-xl bg-card px-3 py-3 focus-within:ring-1 focus-within:ring-ring/50 transition-shadow">
         <Textarea
           ref={textareaRef}
           placeholder="Message Omnecor… (/ commands · @ files · Shift+Enter new line)"
@@ -375,11 +411,40 @@ export default function ChatInput({
           rows={1}
           aria-label="Message input"
           className="flex-1 resize-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0 shadow-none leading-relaxed"
-          style={{ minHeight: "24px", maxHeight: "200px" }}
+          style={{ minHeight: "36px", maxHeight: "200px" }}
         />
+      </div>
 
-        {/* Toolbar */}
-        <div className="flex items-center gap-0.5 flex-shrink-0 pb-0.5">
+      {/* Action Toolbar Row (Terminal + Add/Send) */}
+      <div className="flex items-center justify-between mt-3.5 px-1">
+        {/* Left: Terminal buttons */}
+        <div className="flex items-center gap-2">
+          {onToggleCliTerminal && (
+            <Button
+              onClick={onToggleCliTerminal}
+              variant="default"
+              className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+              type="button"
+            >
+              <Terminal className="w-3 h-3" />
+              Terminal/CLI
+            </Button>
+          )}
+          {onToggleSandbox && (
+            <Button
+              onClick={onToggleSandbox}
+              variant="default"
+              className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+              type="button"
+            >
+              <Terminal className="w-3 h-3" />
+              Sandboxed
+            </Button>
+          )}
+        </div>
+
+        {/* Right: Add & Send Toolbar */}
+        <div className="flex items-center gap-1">
           <input
             ref={fileInputRef}
             type="file"
@@ -400,7 +465,7 @@ export default function ChatInput({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-7 w-7 cursor-pointer"
               onClick={() => fileInputRef.current?.click()}
               type="button"
               disabled={isLoading}
@@ -413,7 +478,7 @@ export default function ChatInput({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7"
+              className="h-7 w-7 cursor-pointer"
               onClick={() => imageInputRef.current?.click()}
               type="button"
               disabled={isLoading}
@@ -438,18 +503,18 @@ export default function ChatInput({
               <Button
                 size="icon"
                 variant="destructive"
-                className="h-7 w-7"
+                className="h-7 w-7 cursor-pointer"
                 onClick={onStop}
                 type="button"
               >
-                <Square className="w-3 h-3 fill-current" />
+                <Square className="w-3.5 h-3.5 fill-current" />
               </Button>
             </HowToTooltip>
           ) : (
             <HowToTooltip title="Send Message" description="Send your message to the AI. You can also press Enter to send." side="top">
               <Button
                 size="icon"
-                className="h-7 w-7"
+                className="h-7 w-7 cursor-pointer"
                 onClick={handleSend}
                 disabled={!value.trim() || disabled || isUploading}
                 aria-label={isUploading ? "Uploading attachments" : "Send message"}
@@ -467,51 +532,27 @@ export default function ChatInput({
       </div>
 
       {/* Hint line */}
-      <div className="flex items-center justify-between mt-1 pl-1">
+      <div className="flex items-center justify-between mt-2.5 px-1">
         <p className="text-[10px] text-muted-foreground">
           {isUploading
             ? "Uploading attachments…"
             : isLoading
             ? "Generating response…"
-            : "Enter ↵ send · Shift+Enter new line · / commands · @ mention files · paste image"}
+            : "Enter ↵ send · Shift+Enter new line · /commands/skills · @ mention files · paste image"}
         </p>
         {tokenCount !== undefined && maxTokens !== undefined && (
           <span
             className={cn(
               "text-[10px] tabular-nums ml-2 flex-shrink-0",
               tokenCount / maxTokens >= 0.9
-                ? "text-red-500"
+                ? "text-destructive"
                 : tokenCount / maxTokens >= 0.7
-                ? "text-yellow-500"
+                ? "text-accent-cyan"
                 : "text-muted-foreground"
             )}
           >
             {tokenCount.toLocaleString()} / {maxTokens.toLocaleString()} tokens
           </span>
-        )}
-      </div>
-
-      {/* Terminal buttons */}
-      <div className="flex items-center gap-2 pl-1 mt-1">
-        {onToggleCliTerminal && (
-          <Button
-            onClick={onToggleCliTerminal}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] h-5 px-2 py-0 rounded transition-all flex items-center gap-1 shadow-sm"
-            type="button"
-          >
-            <Terminal className="w-2.5 h-2.5" />
-            Terminal/CLI
-          </Button>
-        )}
-        {onToggleSandbox && (
-          <Button
-            onClick={onToggleSandbox}
-            className="bg-blue-600 hover:bg-blue-700 text-white font-semibold text-[10px] h-5 px-2 py-0 rounded transition-all flex items-center gap-1 shadow-sm"
-            type="button"
-          >
-            <Terminal className="w-2.5 h-2.5" />
-            Sandboxed
-          </Button>
         )}
       </div>
     </div>

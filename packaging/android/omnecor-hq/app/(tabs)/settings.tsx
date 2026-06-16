@@ -5,7 +5,7 @@ import { Pressable } from "@/components/pressable";
 import { useState, useEffect, useCallback } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { useColorScheme } from "@/hooks/use-color-scheme";
+import { useThemeContext } from "@/lib/theme-provider";
 import {
   loadServerConfig, saveServerConfig, getServerIp,
   getOmmeshSecret, getNodeName, isServerConfigured,
@@ -32,8 +32,8 @@ import { AlwaysListenSettings } from "@/components/always-listen-settings";
 
 export default function SettingsScreen() {
   const colors      = useColors();
-  const colorScheme = useColorScheme();
-  const [isDarkMode, setIsDarkMode] = useState(colorScheme === "dark");
+  const { colorScheme, setColorScheme } = useThemeContext();
+  const isDarkMode = colorScheme === "dark";
 
   // ── Connection ──────────────────────────────────────────────────────────
   const [serverIp,   setServerIp]   = useState("");
@@ -764,7 +764,7 @@ export default function SettingsScreen() {
             <Text className="text-lg font-bold text-foreground mb-4">Appearance</Text>
             <View className="bg-surface border border-border rounded-lg p-4 flex-row justify-between items-center">
               <Text className="text-sm font-semibold text-foreground">Dark Mode</Text>
-              <Switch value={isDarkMode} onValueChange={setIsDarkMode}
+              <Switch value={isDarkMode} onValueChange={(v) => setColorScheme(v ? "dark" : "light")}
                 trackColor={{ false: colors.border, true: colors.primary }}
                 thumbColor={isDarkMode ? colors.background : colors.foreground} />
             </View>

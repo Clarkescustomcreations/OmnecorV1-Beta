@@ -66,6 +66,7 @@ export default function SchematicEditor() {
           nodeTypes={nodeTypes}
           fitView
           className="pcb-flow"
+          proOptions={{ hideAttribution: true }}
         >
           <Background color="#334155" gap={20} />
           <Controls className="bg-slate-800 border-slate-700 fill-slate-300" />

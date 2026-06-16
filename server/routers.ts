@@ -82,6 +82,7 @@ import { mobileSyncRouter } from "./routers/mobileSyncRouter.js";
 import { personaRouter } from "./routers/personaRouter.js";
 import { integrationManagementRouter } from "./routers/integrationManagementRouter.js";
 import { hitlRouter } from "./routers/hitlRouter.js";
+import { workflowRouter } from "./routers/workflowRouter.js";
 import { notificationRouter } from "./routers/notificationRouter.js";
 import { agentMessengerRouter } from "./routers/agentMessengerRouter.js";
 
@@ -212,6 +213,9 @@ export const appRouter = router({
 
   // ─── Human-in-the-Loop (HITL) Approval ───────────────────────────────────
   hitl: hitlRouter,
+
+  // ─── Skill Workflows (architect / remember / review / recover / imprint) ──
+  workflow: workflowRouter,
 
   // ─── Unified Notifications (chat / task / HITL / wallet / agent alerts) ───
   notifications: notificationRouter,

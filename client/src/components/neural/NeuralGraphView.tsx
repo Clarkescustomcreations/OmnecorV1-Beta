@@ -834,6 +834,7 @@ function BrainMapViewportInner({
         maxZoom={20}
         onlyRenderVisibleElements={!gpuEnabled}
         className="bg-background/50"
+        proOptions={{ hideAttribution: true }}
       >
         <Background color="#333" gap={20} />
         <Controls>

@@ -57,6 +57,16 @@ export class ValetServerService {
       return;
     }
 
+    // Seed the centralized app-data registry from the bundled/repo current.json
+    // when it's missing (fresh machine / fresh install) so the trained model is
+    // actually registered instead of silently falling back to keyword routing.
+    if (await ValetArtifactRegistry.seedFromRepoIfMissing()) {
+      log.info(
+        "[ValetServer] Seeded artifact registry from bundled current.json " +
+          `→ ${ValetArtifactRegistry.currentJsonPath}`
+      );
+    }
+
     const artifact = await ValetArtifactRegistry.read();
     if (artifact.status !== "ready" || !artifact.artifact_path) {
       log.info(

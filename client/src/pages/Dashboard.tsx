@@ -1,5 +1,6 @@
 import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
 import BudgetPanel from "@/components/wallet/BudgetPanel";
+import logoMark from "../../../assets/logo_mark_256.png";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import {
   Card,
@@ -163,23 +164,33 @@ export default function Dashboard() {
       <div className="min-h-screen bg-background">
         {/* Hero Section */}
         <div className="border-b border-border bg-gradient-to-br from-card to-background">
-          <div className="max-w-7xl mx-auto px-4 sm:px-6 py-10 md:py-20">
-            <div className="flex items-center gap-2 mb-4">
-              <Sparkles className="w-5 h-5 text-accent" />
-              <span className="text-sm font-medium text-accent">
-                Welcome to Omnecor
-              </span>
+          <div className="max-w-5xl mx-auto px-6 sm:px-12 py-10 md:py-20 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
+            <div className="max-w-2xl">
+              <div className="flex items-center gap-2 mb-4">
+                <Sparkles className="w-5 h-5 text-accent" />
+                <span className="text-sm font-medium text-accent">
+                  Welcome to Omnecor
+                </span>
+              </div>
+              <h1 className="text-4xl md:text-5xl font-bold mb-4">
+                The Ultimate All-in-One AI Workbench
+              </h1>
+              <p className="text-lg text-muted-foreground whitespace-pre-line">
+                A powerful, local-first AI workstation designed for Creativity
+                <br />
+                <span className="text-sm font-medium text-accent/80 tracking-tight">
+                  Operational Memory Never Escapes Context Overview Remains
+                </span>
+              </p>
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
-              The Ultimate All-in-One AI Workbench
-            </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl whitespace-pre-line">
-              A powerful, local-first AI workstation designed for Creativity
-              <br />
-              <span className="text-sm font-medium text-accent/80 tracking-tight">
-                Operational Memory Never Escapes Context Overview Remains
-              </span>
-            </p>
+            <div className="hidden md:block flex-shrink-0">
+              <img
+                id="img-dashboard-hero-logo"
+                src={logoMark}
+                alt="Omnecor Logo"
+                className="w-40 h-40 object-contain opacity-85 hover:opacity-100 hover:scale-105 transition-all duration-300 select-none"
+              />
+            </div>
           </div>
         </div>
 

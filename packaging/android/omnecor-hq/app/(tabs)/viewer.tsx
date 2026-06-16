@@ -20,7 +20,7 @@
  */
 import { ScrollView, Text, View, TextInput, ActivityIndicator } from "react-native";
 import { Pressable } from "@/components/pressable";
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { WebView } from "react-native-webview";
 import Svg, { Rect, Line, Text as SvgText, G } from "react-native-svg";
 import { ScreenContainer } from "@/components/screen-container";
@@ -40,7 +40,7 @@ const THREE_HTML = `<!doctype html><html><head><meta charset="utf-8"/>
 <style>html,body{margin:0;height:100%;background:#0b1220;overflow:hidden;touch-action:none}
 #hint{position:fixed;bottom:8px;left:0;right:0;text-align:center;color:#94a3b8;font:11px sans-serif;pointer-events:none}
 #err{position:fixed;inset:0;display:none;align-items:center;justify-content:center;color:#f87171;font:13px sans-serif;padding:16px;text-align:center}</style>
-<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js"}}</script>
+<script type="importmap">{"imports":{"three":"https://unpkg.com/three@0.160.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.160.0/examples/jsm/"}}</script>
 </head><body>
 <div id="hint">Drag to orbit · pinch to zoom · tap an object</div>
 <div id="err">Could not load the 3D engine.<br/>Check the phone's internet connection.</div>
@@ -48,11 +48,12 @@ const THREE_HTML = `<!doctype html><html><head><meta charset="utf-8"/>
 let post = (m)=>{ try{ window.ReactNativeWebView && window.ReactNativeWebView.postMessage(JSON.stringify(m)); }catch(e){} };
 try {
   const THREE = await import('three');
+  const { GLTFLoader } = await import('three/addons/loaders/GLTFLoader.js');
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0x0b1220);
   const camera = new THREE.PerspectiveCamera(50, innerWidth/innerHeight, 0.1, 1000);
-  let radius=9, theta=0.9, phi=1.0;
-  function applyCam(){ camera.position.set(radius*Math.sin(phi)*Math.cos(theta), radius*Math.cos(phi), radius*Math.sin(phi)*Math.sin(theta)); camera.lookAt(0,0,0); }
+  let radius=9, theta=0.9, phi=1.0, target=new THREE.Vector3(0,0,0);
+  function applyCam(){ camera.position.set(target.x+radius*Math.sin(phi)*Math.cos(theta), target.y+radius*Math.cos(phi), target.z+radius*Math.sin(phi)*Math.sin(theta)); camera.lookAt(target); }
   applyCam();
   const renderer = new THREE.WebGLRenderer({antialias:true});
   renderer.setPixelRatio(devicePixelRatio); renderer.setSize(innerWidth, innerHeight);
@@ -66,18 +67,48 @@ try {
     Sphere:'A sphere, radius 0.9, 32×32 segments. Placed at X+2.5.',
     Cylinder:'A cylinder, radius 0.6, height 2.2, 32 radial segments. Placed at X-2.5.'
   };
-  const meshes = [];
-  function add(geo, color, name, x){ const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color})); m.position.x=x; m.name=name; scene.add(m); meshes.push(m); }
+  let meshes = [];
+  const demoGroup = new THREE.Group(); scene.add(demoGroup);
+  let modelGroup = null;
+  function add(geo, color, name, x){ const m=new THREE.Mesh(geo, new THREE.MeshStandardMaterial({color})); m.position.x=x; m.name=name; demoGroup.add(m); meshes.push(m); }
   add(new THREE.BoxGeometry(2,2,2), 0xe24b6e, 'Cube', 0);
   add(new THREE.SphereGeometry(0.9,32,32), 0x4e8ef7, 'Sphere', 2.5);
   add(new THREE.CylinderGeometry(0.6,0.6,2.2,32), 0x4ecb71, 'Cylinder', -2.5);
 
   let selected=null;
-  function highlight(){ meshes.forEach(m=>{ m.material.emissive = new THREE.Color(m===selected?0xff6600:0x000000); m.material.emissiveIntensity = m===selected?0.6:0; }); }
+  function highlight(){ meshes.forEach(m=>{ if(!m.material) return; m.material.emissive = new THREE.Color(m===selected?0xff6600:0x000000); m.material.emissiveIntensity = m===selected?0.6:0; }); }
+
+  // ── Load a real GLB/GLTF mesh, replacing the demo primitives ──
+  const gltfLoader = new GLTFLoader();
+  window.loadModel = function(url){
+    gltfLoader.load(url, (gltf)=>{
+      if(modelGroup){ scene.remove(modelGroup); }
+      demoGroup.visible = false;
+      modelGroup = gltf.scene;
+      scene.add(modelGroup);
+      // Rebuild the pickable mesh list from the loaded model.
+      meshes = []; selected = null;
+      modelGroup.traverse((o)=>{ if(o.isMesh){ meshes.push(o); if(!o.name) o.name='Mesh'; } });
+      // Frame the camera to the model's bounding box.
+      const box = new THREE.Box3().setFromObject(modelGroup);
+      const size = box.getSize(new THREE.Vector3());
+      target = box.getCenter(new THREE.Vector3());
+      radius = Math.max(size.x,size.y,size.z) * 1.8 || 9;
+      applyCam();
+      post({type:'modelLoaded', meshCount: meshes.length});
+    }, undefined, (err)=>{ post({type:'modelError', message:String(err && err.message || err)}); });
+  };
+  window.clearModel = function(){
+    if(modelGroup){ scene.remove(modelGroup); modelGroup=null; }
+    demoGroup.visible = true;
+    meshes = []; demoGroup.children.forEach((m)=>meshes.push(m)); selected=null;
+    target.set(0,0,0); radius=9; applyCam();
+    post({type:'modelCleared'});
+  };
 
   const ray=new THREE.Raycaster(), ndc=new THREE.Vector2();
   let downX=0,downY=0,moved=false;
-  function pick(x,y){ ndc.x=(x/innerWidth)*2-1; ndc.y=-(y/innerHeight)*2+1; ray.setFromCamera(ndc,camera); const hit=ray.intersectObjects(meshes)[0];
+  function pick(x,y){ ndc.x=(x/innerWidth)*2-1; ndc.y=-(y/innerHeight)*2+1; ray.setFromCamera(ndc,camera); const hit=ray.intersectObjects(meshes,true)[0];
     if(hit){ selected=hit.object; highlight(); post({type:'select',name:selected.name,description:DESC[selected.name]||('3D object: '+selected.name)}); }
     else { selected=null; highlight(); post({type:'deselect'}); } }
 
@@ -116,8 +147,15 @@ export default function Viewer3DScreen() {
   const [aiBusy, setAiBusy] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
-  // ── 3D selection ──
+  // ── 3D selection + model library ──
   const [selected3d, setSelected3d] = useState<{ name: string; description: string } | null>(null);
+  const webRef = useRef<WebView>(null);
+  const [models, setModels] = useState<{ name: string; url: string; size: number }[]>([]);
+  const [activeModel, setActiveModel] = useState<string | null>(null); // model name, or null = demo scene
+  const [modelStatus, setModelStatus] = useState<string | null>(null);
+  // Full URL of the currently-loaded model, kept so we can re-inject if the
+  // WebView remounts (e.g. after switching modes and back).
+  const activeModelUrlRef = useRef<string | null>(null);
 
   // ── PCB state ──
   const [pcbProjects, setPcbProjects] = useState<PcbProject[]>([]);
@@ -136,16 +174,36 @@ export default function Viewer3DScreen() {
 
   const configured = isServerConfigured();
 
-  // Load project lists when entering pcb / code modes
+  // Load project / model lists when entering the relevant mode
   useEffect(() => {
     if (!configured) return;
+    if (viewMode === "3d" && models.length === 0) {
+      trpcQuery<{ name: string; url: string; size: number }[]>("blender.listModels").then((m) => m && setModels(m)).catch(() => {});
+    }
     if (viewMode === "pcb" && pcbProjects.length === 0) {
       trpcQuery<PcbProject[]>("pcbEditor.getProjects").then((p) => p && setPcbProjects(p)).catch(() => {});
     }
     if (viewMode === "code" && codeProjects.length === 0) {
       trpcQuery<ProjectItem[]>("project.list").then((p) => p && setCodeProjects(p)).catch(() => {});
     }
-  }, [viewMode, configured, pcbProjects.length, codeProjects.length]);
+  }, [viewMode, configured, models.length, pcbProjects.length, codeProjects.length]);
+
+  // ── 3D model picker: inject loadModel/clearModel into the WebView scene ──
+  const selectModel = useCallback((model: { name: string; url: string } | null) => {
+    setSelected3d(null);
+    setModelStatus(null);
+    if (!model) {
+      setActiveModel(null);
+      activeModelUrlRef.current = null;
+      webRef.current?.injectJavaScript("window.clearModel && window.clearModel(); true;");
+      return;
+    }
+    const fullUrl = getServerBaseUrl() + model.url;
+    setActiveModel(model.name);
+    activeModelUrlRef.current = fullUrl;
+    setModelStatus(`Loading ${model.name}…`);
+    webRef.current?.injectJavaScript(`window.loadModel && window.loadModel(${JSON.stringify(fullUrl)}); true;`);
+  }, []);
 
   // ── PCB loaders ──
   const loadPcbProject = useCallback(async (proj: PcbProject) => {
@@ -202,21 +260,31 @@ export default function Viewer3DScreen() {
     }
   }, []);
 
-  // ── WebView message bridge (3D selection) ──
+  // ── WebView message bridge (3D selection + model load status) ──
   const onWebMessage = useCallback((raw: string) => {
     try {
       const msg = JSON.parse(raw);
       if (msg.type === "select") setSelected3d({ name: msg.name, description: msg.description });
       else if (msg.type === "deselect") setSelected3d(null);
+      else if (msg.type === "modelLoaded") setModelStatus(`Loaded · ${msg.meshCount} mesh${msg.meshCount === 1 ? "" : "es"}`);
+      else if (msg.type === "modelError") setModelStatus("⚠ Failed to load model: " + (msg.message ?? "unknown error"));
+      else if (msg.type === "modelCleared") setModelStatus(null);
+      else if (msg.type === "ready" && activeModelUrlRef.current) {
+        // WebView (re)mounted with a model previously selected — re-inject it.
+        webRef.current?.injectJavaScript(`window.loadModel && window.loadModel(${JSON.stringify(activeModelUrlRef.current)}); true;`);
+      }
     } catch {}
   }, []);
 
   // ── Build the context string fed to the AI for the current view ──
   const buildContext = useCallback((): string => {
     if (viewMode === "3d") {
+      const sceneDesc = activeModel
+        ? `Viewing the loaded 3D model "${activeModel}".`
+        : "Viewing a demo 3D scene containing a Cube, Sphere and Cylinder primitive.";
       return selected3d
-        ? `Viewing a 3D scene. Selected object: ${selected3d.name}. ${selected3d.description}`
-        : "Viewing a 3D scene containing a Cube, Sphere and Cylinder primitive.";
+        ? `${sceneDesc} Selected object: ${selected3d.name}. ${selected3d.description}`
+        : sceneDesc;
     }
     if (viewMode === "pcb") {
       if (!pcbDesign) return "Viewing the Schematic/PCB editor (no design loaded).";
@@ -386,8 +454,28 @@ export default function Viewer3DScreen() {
       {/* ── 3D MODE ── */}
       {viewMode === "3d" && (
         <View className="flex-1">
+          {/* Model library picker */}
+          <View className="bg-surface border-b border-border p-2">
+            <Text className="text-xs text-muted mb-1">Model</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
+              <Pressable onPress={() => selectModel(null)}
+                className={`mr-2 px-3 py-1.5 rounded-lg ${activeModel === null ? "bg-primary" : "bg-background border border-border"}`}>
+                <Text className={`text-xs ${activeModel === null ? "text-background" : "text-foreground"}`}>Demo scene</Text>
+              </Pressable>
+              {models.map((m) => (
+                <Pressable key={m.name} onPress={() => selectModel(m)}
+                  className={`mr-2 px-3 py-1.5 rounded-lg ${activeModel === m.name ? "bg-primary" : "bg-background border border-border"}`}>
+                  <Text className={`text-xs ${activeModel === m.name ? "text-background" : "text-foreground"}`}>{m.name}</Text>
+                </Pressable>
+              ))}
+              {models.length === 0 && (
+                <Text className="text-xs text-muted p-2">No models in the library — export one from the desktop Blender bridge.</Text>
+              )}
+            </ScrollView>
+          </View>
           <View className="flex-1 bg-background">
             <WebView
+              ref={webRef}
               originWhitelist={["*"]}
               source={{ html: THREE_HTML }}
               onMessage={(e) => onWebMessage(e.nativeEvent.data)}
@@ -397,6 +485,11 @@ export default function Viewer3DScreen() {
               mixedContentMode="always"
             />
           </View>
+          {modelStatus && (
+            <View className="bg-background border-t border-border px-3 py-1.5">
+              <Text className="text-xs text-muted" numberOfLines={1}>{modelStatus}</Text>
+            </View>
+          )}
           {selected3d && (
             <View className="bg-surface border-t border-border p-3">
               <Text className="text-sm font-semibold text-primary">Selected: {selected3d.name}</Text>

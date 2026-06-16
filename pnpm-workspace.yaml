@@ -26,14 +26,27 @@ onlyBuiltDependencies:
 overrides:
   # Build/tooling pins
   "@builder.io/vite-plugin-jsx-loc": "0.1.1"
-  "@esbuild-kit/core-utils>esbuild": ">=0.25.0"
-  # esbuild RCE via NPM_CONFIG_REGISTRY (GHSA-gv7w-rqvm-qjhr, high) + arbitrary
-  # file read on Windows dev server (GHSA-g7r4-m6w7-qqqr, low). Only reaches us
-  # through the mobile chain nativewind>tailwindcss>postcss-load-config>tsx>esbuild.
-  # Scoped to tsx so the legacy @esbuild-kit chain above keeps its old esbuild.
-  "tsx>esbuild": ">=0.28.1"
+  # esbuild RCE via NPM_CONFIG_REGISTRY (GHSA-gv7w-rqvm-qjhr, high — fixed in
+  # 0.28.1) + arbitrary file read on Windows dev server (GHSA-g7r4-m6w7-qqqr,
+  # low — fixed in 0.25.0). A GLOBAL floor is required: vite's bundled esbuild
+  # (0.27.7), the legacy @esbuild-kit/core-utils chain (0.25.x), our own build
+  # esbuild, and the tsx chain all sit below 0.28.1 otherwise. A single global
+  # pin forces every esbuild copy past the RCE fix.
+  "esbuild": ">=0.28.1"
+  # ws memory-exhaustion DoS from tiny fragments / data chunks (GHSA — fixed in
+  # 8.21.0; backported to 7.5.11 / 6.2.4). Our direct dep resolved to 8.20.1
+  # (pre-fix); pin the 8.x line forward to the patched release.
+  "ws": ">=8.21.0"
   "@expo/ngrok>uuid": ">=11.1.1"
   # Security pins (CVE / GHSA remediation — keep floors, allow forward patches)
+  # form-data CRLF injection (GHSA-fjxv-7rqg-78g4) — only 4.0.x in tree, safe global floor.
+  "form-data": ">=4.0.6"
+  # @babel/core arbitrary file read via sourceMappingURL (GHSA-4x5r-pxfx-6jf8) — all 7.x.
+  "@babel/core": ">=7.29.6"
+  # js-yaml merge-key quadratic DoS (GHSA-h67p-54hq-rp68) — fix only ships in 4.2.0.
+  # SCOPED to the one legacy 3.x consumer; a global floor would force js-yaml v4
+  # (no safeLoad) onto @istanbuljs/load-nyc-config and break it.
+  "@istanbuljs/load-nyc-config>js-yaml": ">=4.2.0"
   "@trpc/server": ">=11.8.0"
   "dompurify": ">=3.4.0"
   "drizzle-orm": ">=0.45.2"

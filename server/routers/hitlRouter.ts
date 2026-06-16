@@ -39,10 +39,16 @@ export const hitlRouter = router({
       z.object({
         id: z.string(),
         approved: z.boolean(),
+        /** Optional reason, surfaced back to the agent when denying. */
+        reason: z.string().max(2000).optional(),
       })
     )
     .mutation(({ input }) => {
-      HITLApprovalService.getInstance().approveAction(input.id, input.approved);
+      HITLApprovalService.getInstance().approveAction(
+        input.id,
+        input.approved,
+        input.reason
+      );
       return { success: true } as const;
     }),
 });

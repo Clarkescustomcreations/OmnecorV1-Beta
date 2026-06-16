@@ -519,6 +519,7 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
             fitView
             snapToGrid={snapToGrid}
             snapGrid={[gridSize, gridSize]}
+            proOptions={{ hideAttribution: true }}
           >
             {gridVisible && (
               <Background

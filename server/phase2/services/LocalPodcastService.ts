@@ -34,6 +34,8 @@ export interface PodcastConfig {
 export interface PodcastResult {
   jobId: string;
   audioPath: string;
+  /** HTTP URL the client can stream/download the master mix from (range-capable). */
+  audioUrl: string;
   duration: number;
   segments: { speaker: string; text: string; path?: string; audioUrl?: string | null }[];
 }
@@ -44,6 +46,7 @@ function _stubResult(jobId: string, tempDir: string, config: PodcastConfig): Pod
   return {
     jobId,
     audioPath: path.join(tempDir, "podcast.wav"),
+    audioUrl: `/media/podcast/${jobId}`,
     duration: config.turns.length * 15,
     segments: config.turns.map(turn => ({
       speaker: turn.speakerId,
@@ -127,7 +130,9 @@ export class LocalPodcastService {
     try {
       const result = await callPodcastEngine(jobId, tempDir, config);
       log.info("Podcast generated", { jobId, audioPath: result.audioPath, duration: result.duration });
-      return result;
+      // Always expose the range-capable HTTP URL keyed by jobId, regardless of
+      // the absolute path the engine reported.
+      return { ...result, audioUrl: `/media/podcast/${jobId}` };
     } catch (err) {
       log.warn("podcast_engine.py unavailable, returning stub", { err: (err as Error).message });
       return _stubResult(jobId, tempDir, config);

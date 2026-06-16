@@ -364,7 +364,11 @@ async def _route_via_ollama(task: str, rag_context: str) -> Optional[dict]:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        with urllib.request.urlopen(req, timeout=10) as resp:
+        # First route after the model goes cold has to pay the Ollama load cost
+        # (a 1.5B Q8 GGUF can take 20-40s to page in on modest/LAN nodes). A 10s
+        # timeout guaranteed a rule-based fallback on the very first request; warm
+        # routing is ~2-3s, so a longer ceiling only bites on cold start.
+        with urllib.request.urlopen(req, timeout=45) as resp:
             return json.loads(resp.read())
 
     try:

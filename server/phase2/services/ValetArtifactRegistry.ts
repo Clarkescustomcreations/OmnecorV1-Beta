@@ -47,6 +47,50 @@ export class ValetArtifactRegistry {
     }
   }
 
+  /**
+   * Seed the centralized app-data registry from the bundled/repo `current.json`
+   * when the app-data copy is missing or still `pending`.
+   *
+   * The registry that the running server reads lives under the OS app-data dir
+   * (`PATHS.valetRouter`), but the committed/bundled `current.json` ships inside
+   * the repo (dev) or `resources/models/valet-router` (packaged installer).
+   * Without this copy, a fresh machine never registers the trained model and the
+   * router silently falls back to keyword routing. Returns true when it seeded.
+   */
+  static async seedFromRepoIfMissing(): Promise<boolean> {
+    const existing = await this.read();
+    if (existing.status === "ready" && existing.artifact_path) return false;
+
+    // process.resourcesPath is Electron-only (absent from base Node types)
+    const resourcesPath = (process as NodeJS.Process & { resourcesPath?: string })
+      .resourcesPath;
+
+    const candidates = [
+      // dev: launched from repo root
+      path.join(process.cwd(), "models", "valet-router", "current.json"),
+      // packaged electron: extraResources → <resources>/models/valet-router
+      resourcesPath
+        ? path.join(resourcesPath, "models", "valet-router", "current.json")
+        : "",
+      // fallback relative to the compiled backend bundle
+      path.resolve(__dirname, "../../../models/valet-router/current.json"),
+    ].filter(Boolean);
+
+    for (const src of candidates) {
+      try {
+        const raw = await fs.readFile(src, "utf-8");
+        const record = JSON.parse(raw) as ArtifactRecord;
+        if (record.status !== "ready") continue;
+        if (path.resolve(src) === path.resolve(CURRENT_JSON)) return false;
+        await this.write(record);
+        return true;
+      } catch {
+        /* try next candidate */
+      }
+    }
+    return false;
+  }
+
   static async write(record: ArtifactRecord): Promise<void> {
     await fs.mkdir(REGISTRY_ROOT, { recursive: true });
     await fs.writeFile(CURRENT_JSON, JSON.stringify(record, null, 2) + "\n", "utf-8");

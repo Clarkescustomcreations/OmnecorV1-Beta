@@ -66,6 +66,16 @@ export interface SpawnConfig {
   label?: string;
   /** Maximum runtime in milliseconds before auto-kill (0 = no limit) */
   timeoutMs?: number;
+  /**
+   * Output capture mode. "json" (default) parses stdout lines as JSON progress
+   * events only. "raw" additionally retains the last `maxCaptureLines` stdout
+   * lines in a ring buffer so the full tail of a long build/download log is
+   * available at completion (for the async-job result condenser) without
+   * unbounded memory growth.
+   */
+  captureMode?: "json" | "raw";
+  /** Max stdout lines retained in raw capture mode (default 100). */
+  maxCaptureLines?: number;
 }
 
 /** Progress event emitted when a JSON line is parsed from stdout */
@@ -118,6 +128,10 @@ interface ManagedProcess {
   completedAt: string | null;
   lastProgress: Record<string, any> | null;
   stderrBuffer: string;
+  /** Raw stdout tail ring buffer — only populated when captureMode === "raw". */
+  stdoutTail: string[];
+  /** Max stdout lines retained in stdoutTail. */
+  maxCaptureLines: number;
   timeoutHandle: ReturnType<typeof setTimeout> | null;
 }
 
@@ -337,6 +351,8 @@ export class ProcessManagerService extends EventEmitter {
       completedAt: null,
       lastProgress: null,
       stderrBuffer: "",
+      stdoutTail: [],
+      maxCaptureLines: config.maxCaptureLines ?? 100,
       timeoutHandle: null,
     };
 
@@ -376,6 +392,15 @@ export class ProcessManagerService extends EventEmitter {
       for (const line of lines) {
         const trimmed = line.trim();
         if (!trimmed) continue;
+
+        // Raw capture: retain every non-empty stdout line in a bounded ring
+        // buffer so the async-job condenser can read the log tail at completion.
+        if (config.captureMode === "raw") {
+          managed.stdoutTail.push(trimmed);
+          if (managed.stdoutTail.length > managed.maxCaptureLines) {
+            managed.stdoutTail.shift();
+          }
+        }
 
         try {
           const parsed = JSON.parse(trimmed);
@@ -520,6 +545,23 @@ export class ProcessManagerService extends EventEmitter {
       completedAt: managed.completedAt,
       lastProgress: managed.lastProgress,
       stderrBuffer: managed.stderrBuffer,
+    };
+  }
+
+  /**
+   * Get the raw captured output for a job. Only populated when the job was
+   * spawned with `captureMode: "raw"`. Returns the retained stdout tail (last N
+   * lines) and the captured stderr buffer — the inputs the async-job result
+   * condenser needs. Returns null if the job is unknown.
+   */
+  getCapturedOutput(
+    jobId: string
+  ): { stdoutTail: string[]; stderr: string } | null {
+    const managed = this.processes.get(jobId);
+    if (!managed) return null;
+    return {
+      stdoutTail: [...managed.stdoutTail],
+      stderr: managed.stderrBuffer,
     };
   }
 

@@ -1,11 +1,26 @@
 import { ScrollView, Text, View, TextInput, Alert } from "react-native";
 import { Pressable } from "@/components/pressable";
 import { useState } from "react";
+import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
+import * as FileSystem from "expo-file-system/legacy";
+import * as DocumentPicker from "expo-document-picker";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { trpcMutate } from "@/lib/_core/trpc-fetch";
-import { isServerConfigured } from "@/lib/_core/server-config";
+import { isServerConfigured, getServerBaseUrl } from "@/lib/_core/server-config";
 import { askAi } from "@/lib/_core/ai-chat";
+
+// ── Podcast sources (mirror the desktop SourcesSidebar) ───────────────────────
+// Each selected source's content is fed into the AI script generator as context.
+type SourceKind = "text" | "file" | "website";
+interface PodcastSource {
+  id: string;
+  kind: SourceKind;
+  label: string;
+  content: string;
+  selected: boolean;
+}
+const KIND_LABEL: Record<SourceKind, string> = { text: "Text", file: "File", website: "Website" };
 
 const LENGTH_OPTIONS: { value: string; label: string; desc: string; turnCount: number }[] = [
   { value: "short",     label: "Short",     desc: "~5 min · 4–6 turns",   turnCount: 6  },
@@ -23,11 +38,87 @@ export default function PodcastScreen() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [audioPath, setAudioPath] = useState<string | null>(null);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [showVoiceSelector, setShowVoiceSelector] = useState(false);
   const [podcastLength, setPodcastLength] = useState("medium");
   const [isScripting, setIsScripting] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
+
+  // ── Sources ──
+  const [sources, setSources] = useState<PodcastSource[]>([]);
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [textDraft, setTextDraft] = useState("");
+  const [urlDraft, setUrlDraft] = useState("");
+
+  // ── Audio player (streams the master mix from the PC over HTTP, range-capable) ──
+  const player = useAudioPlayer(audioUrl ?? undefined);
+  const playerStatus = useAudioPlayerStatus(player);
 
   const voices = ["Default", "Male", "Female", "Narrator", "Casual"];
+
+  const addSource = (kind: SourceKind, label: string, content: string) => {
+    if (!content.trim()) return;
+    setSources((prev) => [
+      ...prev,
+      { id: Math.random().toString(36).slice(2), kind, label: label || KIND_LABEL[kind], content: content.trim(), selected: true },
+    ]);
+  };
+  const toggleSource = (id: string) =>
+    setSources((prev) => prev.map((s) => (s.id === id ? { ...s, selected: !s.selected } : s)));
+  const removeSource = (id: string) => setSources((prev) => prev.filter((s) => s.id !== id));
+
+  const addTextSource = () => {
+    if (!textDraft.trim()) { Alert.alert("Empty", "Type or paste some text first."); return; }
+    addSource("text", "Pasted text", textDraft);
+    setTextDraft("");
+    setShowAddSource(false);
+  };
+
+  const addWebsiteSource = async () => {
+    const url = urlDraft.trim();
+    if (!url) { Alert.alert("Empty", "Enter a website URL first."); return; }
+    try {
+      const res = await fetch(url);
+      const html = await res.text();
+      // Strip tags to plain text and cap length so the prompt stays reasonable.
+      const text = html.replace(/<script[\s\S]*?<\/script>/gi, "")
+        .replace(/<style[\s\S]*?<\/style>/gi, "")
+        .replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 4000);
+      if (!text) { Alert.alert("No content", "Could not extract readable text from that page."); return; }
+      addSource("website", url.replace(/^https?:\/\//, "").slice(0, 40), text);
+      setUrlDraft("");
+      setShowAddSource(false);
+    } catch (err) {
+      Alert.alert("Fetch failed", err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const addFileSource = async () => {
+    try {
+      const picked = await DocumentPicker.getDocumentAsync({ type: ["text/*", "application/json"], copyToCacheDirectory: true });
+      if (picked.canceled || !picked.assets?.[0]) return;
+      const asset = picked.assets[0];
+      const content = await FileSystem.readAsStringAsync(asset.uri);
+      addSource("file", asset.name || "File", content.slice(0, 8000));
+      setShowAddSource(false);
+    } catch (err) {
+      Alert.alert("File read failed", err instanceof Error ? err.message : String(err));
+    }
+  };
+
+  const handleDownload = async () => {
+    if (!audioUrl) return;
+    setIsDownloading(true);
+    try {
+      const dest = FileSystem.documentDirectory + `podcast-${Date.now()}.wav`;
+      const { uri } = await FileSystem.downloadAsync(audioUrl, dest);
+      Alert.alert("Saved", `Episode saved to:\n${uri}`);
+    } catch (err) {
+      Alert.alert("Download failed", err instanceof Error ? err.message : String(err));
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleGenerate = async () => {
     if (!title.trim() || !script.trim()) {
@@ -43,6 +134,7 @@ export default function PodcastScreen() {
     setIsGenerating(true);
     setGenerationProgress(0);
     setAudioPath(null);
+    setAudioUrl(null);
 
     try {
       // Build turns from script: split on double-newlines or --- separators
@@ -70,11 +162,14 @@ export default function PodcastScreen() {
       const result = await trpcMutate<{
         jobId: string;
         audioPath: string;
+        audioUrl: string;
         duration: number;
         segments: unknown[];
       }>("podcast.generate", { title, turns, useRVC });
 
       setAudioPath(result.audioPath);
+      // Full HTTP URL the on-device player streams from (PC base + server route).
+      setAudioUrl(result.audioUrl ? getServerBaseUrl() + result.audioUrl : null);
       setGenerationProgress(100);
       setIsGenerating(false);
     } catch (err) {
@@ -95,9 +190,17 @@ export default function PodcastScreen() {
     const turnCount = LENGTH_OPTIONS.find((l) => l.value === podcastLength)!.turnCount;
     setIsScripting(true);
     try {
+      // Fold any selected sources into the generation context so the script is
+      // grounded in the provided material (same idea as the desktop sidebar).
+      const selectedSources = sources.filter((s) => s.selected);
+      const sourceContext = selectedSources.length
+        ? "Base the episode on these sources:\n\n" +
+          selectedSources.map((s) => `[${KIND_LABEL[s.kind]}: ${s.label}]\n${s.content}`).join("\n\n")
+        : undefined;
       const text = await askAi({
         prompt: `Generate a ${turnCount}-turn podcast script between two hosts named Host and Guest about: "${title.trim()}".${description.trim() ? " Context: " + description.trim() + "." : ""} Put each turn on its own line, alternating Host: and Guest:, no extra commentary.`,
         systemPrompt: "You are a podcast scriptwriter. Output only the dialogue lines.",
+        context: sourceContext,
       });
       setScript(text);
     } catch (err) {
@@ -142,6 +245,81 @@ export default function PodcastScreen() {
               className="bg-surface border border-border rounded-lg px-3 py-2 text-foreground"
               multiline
             />
+          </View>
+
+          {/* Sources */}
+          <View>
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-sm font-semibold text-foreground">
+                Sources{sources.length > 0 ? ` (${sources.filter((s) => s.selected).length}/${sources.length})` : ""}
+              </Text>
+              <Pressable
+                onPress={() => setShowAddSource(!showAddSource)}
+                className="rounded-lg px-3 py-1.5 bg-surface border border-primary active:opacity-80"
+              >
+                <Text className="text-xs font-semibold text-primary">{showAddSource ? "Close" : "+ Add Source"}</Text>
+              </Pressable>
+            </View>
+            <Text className="text-xs text-muted mb-2">
+              Selected sources are fed to the AI script generator as context.
+            </Text>
+
+            {showAddSource && (
+              <View className="bg-surface border border-border rounded-lg p-3 gap-3 mb-2">
+                {/* Text source */}
+                <View className="gap-2">
+                  <TextInput
+                    value={textDraft}
+                    onChangeText={setTextDraft}
+                    placeholder="Paste text to use as a source…"
+                    placeholderTextColor={colors.muted}
+                    className="bg-background border border-border rounded-lg px-3 py-2 text-foreground min-h-16"
+                    multiline
+                  />
+                  <Pressable onPress={addTextSource} className="rounded-lg p-2 items-center bg-background border border-border active:opacity-70">
+                    <Text className="text-xs font-semibold text-foreground">+ Add Text</Text>
+                  </Pressable>
+                </View>
+                {/* Website source */}
+                <View className="flex-row gap-2">
+                  <TextInput
+                    value={urlDraft}
+                    onChangeText={setUrlDraft}
+                    placeholder="https://example.com/article"
+                    placeholderTextColor={colors.muted}
+                    autoCapitalize="none"
+                    keyboardType="url"
+                    className="flex-1 bg-background border border-border rounded-lg px-3 py-2 text-foreground"
+                  />
+                  <Pressable onPress={addWebsiteSource} className="rounded-lg px-3 items-center justify-center bg-background border border-border active:opacity-70">
+                    <Text className="text-xs font-semibold text-foreground">+ Web</Text>
+                  </Pressable>
+                </View>
+                {/* File source */}
+                <Pressable onPress={addFileSource} className="rounded-lg p-2 items-center bg-background border border-border active:opacity-70">
+                  <Text className="text-xs font-semibold text-foreground">📄 Add File (text)</Text>
+                </Pressable>
+              </View>
+            )}
+
+            {sources.length > 0 && (
+              <View className="gap-2">
+                {sources.map((s) => (
+                  <View key={s.id} className="flex-row items-center bg-surface border border-border rounded-lg p-2 gap-2">
+                    <Pressable onPress={() => toggleSource(s.id)} className="flex-1 flex-row items-center gap-2">
+                      <View className={`w-4 h-4 rounded border ${s.selected ? "bg-primary border-primary" : "border-border"}`} />
+                      <View className="flex-1">
+                        <Text className="text-xs font-semibold text-foreground" numberOfLines={1}>{KIND_LABEL[s.kind]}: {s.label}</Text>
+                        <Text className="text-xs text-muted" numberOfLines={1}>{s.content.slice(0, 60)}</Text>
+                      </View>
+                    </Pressable>
+                    <Pressable onPress={() => removeSource(s.id)} className="px-2 active:opacity-70">
+                      <Text className="text-xs text-error">✕</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
           </View>
 
           {/* Episode Length */}
@@ -290,13 +468,41 @@ export default function PodcastScreen() {
             </Text>
           </Pressable>
 
-          {/* Download Button (shown after generation) */}
-          {generationProgress === 100 && !isGenerating && audioPath && (
-            <Pressable className="rounded-lg p-4 items-center bg-success active:opacity-80">
-              <Text className="text-background font-semibold text-base">
-                {`⬇️ Audio ready: ${audioPath}`}
-              </Text>
-            </Pressable>
+          {/* Player + Download (shown after generation) */}
+          {audioUrl && !isGenerating && (
+            <View className="bg-surface border border-border rounded-lg p-4 gap-3">
+              <Text className="text-sm font-semibold text-foreground">Master Mix</Text>
+              <View className="flex-row items-center gap-3">
+                <Pressable
+                  onPress={() => (playerStatus.playing ? player.pause() : player.play())}
+                  className="rounded-full w-12 h-12 items-center justify-center bg-primary active:opacity-80"
+                >
+                  <Text className="text-background text-lg">{playerStatus.playing ? "⏸" : "▶"}</Text>
+                </Pressable>
+                <View className="flex-1">
+                  <View className="bg-background rounded-full h-2 overflow-hidden">
+                    <View
+                      className="bg-primary h-full"
+                      style={{ width: `${playerStatus.duration ? Math.min(100, (playerStatus.currentTime / playerStatus.duration) * 100) : 0}%` }}
+                    />
+                  </View>
+                  <Text className="text-xs text-muted mt-1">
+                    {Math.floor(playerStatus.currentTime)}s
+                    {playerStatus.duration ? ` / ${Math.floor(playerStatus.duration)}s` : ""}
+                    {playerStatus.isBuffering ? " · buffering…" : ""}
+                  </Text>
+                </View>
+              </View>
+              <Pressable
+                onPress={handleDownload}
+                disabled={isDownloading}
+                className={`rounded-lg p-3 items-center ${isDownloading ? "bg-muted opacity-50" : "bg-background border border-border active:opacity-70"}`}
+              >
+                <Text className="text-sm font-semibold text-foreground">
+                  {isDownloading ? "Downloading…" : "⬇️ Download to device (.wav)"}
+                </Text>
+              </Pressable>
+            </View>
           )}
         </View>
       </ScrollView>

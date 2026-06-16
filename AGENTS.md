@@ -98,7 +98,7 @@ These are absolute. No exceptions, no "just this once."
 - **Update `Context/UI-Registry.md` after every UI component built or modified.**
   Use `/imprint` to do this automatically.
 - **Run `pnpm check` and `pnpm test` after every change.** Target: 0 TypeScript
-  errors, 323/323 tests passing. Do not commit work that breaks either gate.
+  errors, all tests passing. Do not commit work that breaks either gate.
 - **Before any third-party library:** load its installed skill first, then read
   `Context/Library-Docs.md` for project-specific usage rules.
 - **When unsure:** ask questions rather than guessing. One clarifying question is
@@ -253,7 +253,7 @@ broken gates — fix them first or document exactly why they cannot be fixed now
 
 ```bash
 pnpm check          # 0 TypeScript errors (root workspace)
-pnpm test           # 323/323 passing, 2 skipped (expected)
+pnpm test           # all passing (count grows as features land)
 pnpm build          # Clean production build
 pnpm audit --prod   # 0 known vulnerabilities
 ```
