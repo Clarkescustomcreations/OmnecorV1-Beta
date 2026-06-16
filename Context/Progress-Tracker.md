@@ -5,9 +5,9 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 ---
 
 ## 🚦 Current Status
-*   **Active Phase:** Phase 5: Mobile App Realization & Verification (F23–F26 code-complete; F27 on-device/build verification remaining)
-*   **Next Task:** F23b native Foreground Service (Linux stage), then F27 build smoke; Windows/Electron stage last
-*   **Gates (2026-06-15):** root `tsc` 0 · APK `tsc` 0 · `vitest` 325 passing
+*   **Active Phase:** Phase 5: Mobile App Realization & Verification (F23–F26 code-complete; F27 Windows installer built ✅, on-device verification remaining)
+*   **Next Task:** Install `Omnecor-Setup-2.3.0-beta.1.exe` on a real Windows machine, confirm app launches; then F23b on-device wake-word test, Android APK sideload
+*   **Gates (2026-06-16):** root `tsc` 0 · APK `tsc` 0 · `vitest` 338/338 passing
 
 ---
 
@@ -183,8 +183,20 @@ models\valet-router\kaggle-2026-06-11\valet-router-q8_0.gguf
 - [x] **Feature 26: Unwired Frontend Elements**
   *   *Files:* [SettingsPanel.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/SettingsPanel.tsx), [settings.tsx (APK)](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/app/(tabs)/settings.tsx), [theme-provider.tsx](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/lib/theme-provider.tsx), [PodcastStudio.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/PodcastStudio.tsx), [ChatInput.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/chat/ChatInput.tsx), [ChatInterface.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/ChatInterface.tsx), [NeuralGraphView.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/neural/NeuralGraphView.tsx), [PCBSchematicEditor.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/pcb/PCBSchematicEditor.tsx), [EnhancedPCBEditor.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/pcb/EnhancedPCBEditor.tsx), [SchematicEditor.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/designer/SchematicEditor.tsx), [NeuralWorkspaceCanvas.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/workspace/NeuralWorkspaceCanvas.tsx), [Dashboard.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/pages/Dashboard.tsx)
   *   *Done (2026-06-15):* **Mobile dark mode** now wired to the live `ThemeProvider` (`setColorScheme`) — toggling re-themes the app; removed a stray debug `console.log` in the provider. **Desktop SettingsPanel:** bound 16 previously write-only controls (13 switches: knowledge.autoIndex, security.maliciousFileScan/scanOnUpload/encryptionEnabled/apiKeyEncryption, privacy.zeroLoginMode/telemetry/crashReports/analytics/cloudSync, advanced.debugMode/enableDevTools/cacheEnabled + per-folder enable toggle + Log Level select + Theme/Language/Startup/CloudProvider selects) — all persist via the real `system.saveSettings` mutation. **Podcast history:** the misleading toast (pointed at a non-existent route) replaced with a real localStorage-backed episode-history dialog (play/download/remove); this also fixed a latent desktop bug where the master-mix `<audio>` was never wired to the generated audio (now uses the new `audioUrl`). AgentNetworking checkboxes/persona select were already wired (verified). **Desktop ChatInput & ChatInterface:** Refactored action toolbar layouts (left-aligned terminal buttons, right-aligned attachments/send) to prevent textbox squishing. Increased text entry box height to 36px (with py-3 padding) for a roomier feel, updated the bottom hint line to refer to `/commands/skills`, and reduced the parent container's bottom padding (`pb-1`) to align the bottom hint text snugly with the card border. **ReactFlow Canvas attribution removal**: Hid the ReactFlow bottom-right attribution watermark on the Neural Brain Map, PCB Schematic Editors (standard & enhanced), 3D Designer schematic flow editor, and Neural Workspace canvas viewports via the `proOptions={{ hideAttribution: true }}` prop. **Desktop Dashboard Hero Logo**: Imported `logo_mark_256.png` directly via Vite ESM from the root assets directory and aligned it in a responsive flex layout next to the hero text, hidden on small screens (`hidden md:block`) with a transition-scale hover effect. Gates: APK `tsc` 0 · root `tsc` 0 · `vitest` 325.
-- [ ] **Feature 27: End-to-End Build Smoke Tests**
-  *   *File:* [package.json](file:///home/linux/Documents/OmnecorV1-Beta/package.json)
+- [~] **Feature 27: End-to-End Build Smoke Tests**
+  *   *Files:* [packaging/windows/installer.smoke.test.ts](file:///mnt/c/OmnecorV1-Beta/packaging/windows/installer.smoke.test.ts), [packaging/electron-app/electron-builder.yml](file:///mnt/c/OmnecorV1-Beta/packaging/electron-app/electron-builder.yml)
+  *   *Windows installer — BUILT (2026-06-16):*
+    - `Omnecor-Setup-2.3.0-beta.1.exe` — 1.69 GB NSIS installer (in `packaging/electron-app/dist/`, gitignored)
+    - `Omnecor-2.3.0-beta.1-portable.exe` — 1.69 GB portable (same dir)
+    - `Omnecor-Setup-2.3.0-beta.1.exe.blockmap` + `latest.yml` generated
+    - Installer smoke suite: **338/338 tests passing** (22 test files — NSIS script content, electron-builder.yml config, bash syntax, version consistency)
+    - **NSIS bugs fixed this session:** `${GetDriveSpace}` → `${DriveSpace} "$INSTDIR" "/D=F /S=M" $R0` (electron-builder ships NSIS 3.0.4.1 which lacks the old macro); CRLF stripped from `install.sh`, `build-deb.sh`, `postinst`, `build-appimage.sh`
+    - **WSL2/NTFS workarounds:** `.npmrc` `node-linker=hoisted` (pnpm doesn't create `.bin` symlinks on NTFS); test script changed to `node node_modules/vitest/vitest.mjs run`; native modules (`axios`, `@libsql/linux-x64-gnu`, `@esbuild/linux-x64`, `@rollup/rollup-linux-x64-gnu`) must be copied from `.pnpm` store if crash wipes them
+    - **Actual Windows installation: NOT YET DONE** — smoke tests are static analysis only; no one has run the installer on a real Windows machine
+  *   *Remaining:*
+    - [ ] Install `Omnecor-Setup-2.3.0-beta.1.exe` on a clean Windows machine, confirm app launches and connects to backend
+    - [ ] Android APK sideload + on-device test (F27 Android leg)
+    - [ ] Web smoke (server start → `/health` → chat round-trip)
 
 ---
 

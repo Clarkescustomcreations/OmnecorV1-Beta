@@ -151,6 +151,7 @@ models/valet-router/*/outputs*/
 models/valet-router/*/ckpts*/
 _refs/
 .claude/worktrees/
+.claude/skills/
 
 # AppImage build artifacts (large binaries — never commit)
 packaging/appimage-build/

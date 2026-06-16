@@ -9,7 +9,7 @@
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
-    "test": "vitest run",
+    "test": "node node_modules/vitest/vitest.mjs run",
     "build:push": "drizzle-kit generate && drizzle-kit migrate",
     "db:migrate": "tsx server/scripts/migrate.ts",
     "build:demo": "vite build --config vite.demo.config.ts",

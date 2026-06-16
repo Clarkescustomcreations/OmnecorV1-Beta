@@ -2,11 +2,12 @@
 ; Omnecor HMCI — NSIS Custom Installer Header
 ; ==============================================================================
 
-; LogicLib provides ${If}/${EndIf}; FileFunc provides ${GetDriveSpace}.
+; LogicLib provides ${If}/${EndIf}; FileFunc provides ${DriveSpace}.
 ; electron-builder normally includes these, but guard them so this header is
 ; self-contained and safe if included standalone.
 !include LogicLib.nsh
 !include FileFunc.nsh
+!insertmacro DriveSpace
 
 ; --- Security: require administrator privileges -------------------------------
 ; Native modules and the Visual C++ runtime check below need elevated access.
@@ -62,8 +63,8 @@ Section "-Dependency Check" SecDepCheck
   ${EndIf}
 
   ; Disk space check (2GB minimum)
-  ${GetDriveSpace} "$INSTDIR" $R0
-  ${If} $R0 < 2048000  ; 2GB in KB
+  ${DriveSpace} "$INSTDIR" "/D=F /S=M" $R0
+  ${If} $R0 < 2048  ; 2GB in MB
     MessageBox MB_ICONEXCLAMATION|MB_YESNO "Less than 2GB of disk space available at the installation path.$\n$\nOmnecor requires at least 2GB for installation. AI model files will require additional space.$\n$\nContinue anyway?" IDYES continue_install
     Abort
     continue_install:

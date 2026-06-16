@@ -8,6 +8,67 @@ Last updated: 2026-06-16
 
 ---
 
+## Windows Installer Build — 2026-06-16
+
+### Build artifacts (gitignored — not in repo)
+Located in `packaging/electron-app/dist/`:
+- `Omnecor-Setup-2.3.0-beta.1.exe` — 1.69 GB NSIS installer
+- `Omnecor-2.3.0-beta.1-portable.exe` — 1.69 GB portable
+- `Omnecor-Setup-2.3.0-beta.1.exe.blockmap` + `latest.yml`
+
+All four generated 2026-06-16 ~06:48. Both exe files are excluded by `packaging/electron-app/.gitignore` (`dist` rule).
+
+### Tests
+`pnpm test` → **338/338 passing** (22 test files). The installer smoke suite is at `packaging/windows/installer.smoke.test.ts` — 39 tests covering NSIS script content, electron-builder.yml config, bash syntax of bundled scripts, and version consistency.
+
+**IMPORTANT:** These are static analysis tests. They validate config files and script content. Nobody has actually run the installer on a Windows machine yet. That step is still pending.
+
+### NSIS bugs fixed
+1. **`${GetDriveSpace}` → `${DriveSpace}`** — electron-builder bundles NSIS 3.0.4.1 which does not include `GetDriveSpace`. The correct macro from `FileFunc.nsh` is: `${DriveSpace} "$INSTDIR" "/D=F /S=M" $R0`. Fixed in `packaging/windows/omnecor.nsh` (lines 5–10 header, line 66 call). Also added `!include FileFunc.nsh` and `!insertmacro DriveSpace`.
+2. **CRLF line endings** — Windows-style CRLF in shell scripts caused `bash -n` syntax check failures. Stripped from: `packaging/scripts/install.sh`, `packaging/build-deb.sh`, `packaging/deb/debian/postinst`, `packaging/build-appimage.sh`. Use `tr -d '\r' < file > /tmp/f && cp /tmp/f file` on NTFS (sed -i doesn't work on NTFS mounts).
+
+### Files modified (uncommitted as of 2026-06-16, need to commit before next Windows build)
+- `.npmrc` — added `node-linker=hoisted`
+- `package.json` — test script: `vitest run` → `node node_modules/vitest/vitest.mjs run`
+- `packaging/windows/omnecor.nsh` — NSIS macro fix + FileFunc includes
+- `packaging/scripts/install.sh`, `packaging/build-deb.sh`, `packaging/deb/debian/postinst`, `packaging/build-appimage.sh` — CRLF stripped
+
+### WSL2 / NTFS workarounds (important for next build)
+pnpm running on NTFS (`/mnt/c/`) does not create real `.bin` symlinks, so symlink-based binary resolution fails. Two permanent workarounds are in place:
+- `node-linker=hoisted` in `.npmrc` — tells pnpm to create real directories instead of virtual store only (makes `node_modules` more like npm)
+- Test invocation uses `node node_modules/vitest/vitest.mjs run` not `vitest run` — bypasses `.bin` symlink entirely
+
+**Native module crash recovery pattern** — if a PC crash or WSL2 restart wipes the hoisted copies of Linux native modules, restore them from the pnpm store:
+```bash
+# Pattern: find in .pnpm store, copy to hoisted node_modules
+find node_modules/.pnpm -path "*/@esbuild/linux-x64" -type d | head -1
+# Then: cp -r <found-path> node_modules/@esbuild/linux-x64
+
+# Modules that have been needed (copy this list for next crash):
+# @esbuild/linux-x64       (esbuild native for WSL2)
+# @rollup/rollup-linux-x64-gnu   (rollup native for WSL2)
+# @libsql/linux-x64-gnu    (libsql/turso native for WSL2)
+# axios                    (was not hoisted by pnpm on NTFS — copy from .pnpm store)
+```
+
+### How the build was done (steps for next Windows build)
+The build used existing compiled artifacts rather than rebuilding from scratch (WSL2 cross-compile limitations):
+1. `dist/` — web build from June 2 (backend esbuild output), already present — not rebuilt
+2. `packaging/electron-app/out/` — electron-vite output from June 2, already present — not rebuilt
+3. **New step:** `npm install --ignore-scripts --legacy-peer-deps` inside `packaging/electron-app/` from **Windows PowerShell** (not WSL2) — needed because electron-builder can't read electron version from symlinked node_modules
+4. **New step (validation):** Tested NSIS macro with a minimal script via `makensis.exe /V4 test.nsi` before triggering the full build, to catch syntax errors early
+5. electron-builder run from Windows PowerShell: `cd C:\OmnecorV1-Beta\packaging\electron-app && npx electron-builder --win`
+
+### Beta readiness assessment (2026-06-16)
+- ✅ Build artifacts exist and are correctly sized
+- ✅ 338/338 static tests passing
+- ✅ NSIS installer script is syntactically valid (makensis compiled it)
+- ❌ Installer has NOT been run on a real Windows machine
+- ❌ No `.gitattributes` CRLF guard — CRLF will return if files are edited on Windows
+- ❌ Modified files (fixes above) are NOT yet committed — commit them before next build or release tag
+
+---
+
 ## What was built
 
 ### This session — Valet Router GGUF Windows prep (NOT YET COMMITTED)

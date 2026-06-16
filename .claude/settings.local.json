@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell.exe *)",
+      "Bash(tr -d '\\\\r')",
+      "Bash(cp /tmp/omnecor_fixed.nsh /mnt/c/OmnecorV1-Beta/packaging/windows/omnecor.nsh)",
+      "Bash(awk NR==65 *)"
+    ]
+  }
+}
