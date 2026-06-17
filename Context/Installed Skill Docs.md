@@ -243,3 +243,33 @@ calls an external provider API must use `cloudProcedure`, not `protectedProcedur
 | `init` | Initialize a CLAUDE.md for a new codebase |
 | `find-skills` | Find relevant skills for a task |
 
+
+Universal /home/linux/.agents/skills
+  + electron
+  + electron-api
+  + electron-pro
+  + xtream-electron
+  + electron-development
+  + electron-builder
+  + desktop
+  + electronics-sourcing
+Claude Code /home/linux/.claude/skills
+  + electron
+  + electron-api
+  + electron-pro
+  + xtream-electron
+  + electron-development
+  + electron-builder
+  + desktop
+  + electronics-sourcing
+Universal /home/linux/.agents/skills
+  + install
+  + windows-builder
+  + install-duckdb
+  + installing-skills
+Claude Code /home/linux/.claude/skills
+  + install
+  + windows-builder
+  + install-duckdb
+  + installing-skills
+
