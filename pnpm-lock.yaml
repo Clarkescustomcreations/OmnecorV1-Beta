@@ -670,8 +670,8 @@ importers:
         specifier: ^2.1.0
         version: 2.1.1
       lucide-react:
-        specifier: ^0.363.0
-        version: 0.363.0(react@19.2.1)
+        specifier: ^0.453.0
+        version: 0.453.0(react@19.2.1)
       mysql2:
         specifier: ^3.15.0
         version: 3.15.1
@@ -710,7 +710,7 @@ importers:
         specifier: ^4.3.1
         version: 4.7.0(vite@7.3.5(@types/node@20.19.41)(jiti@2.6.1)(lightningcss@1.32.0)(terser@5.48.0)(tsx@4.22.3)(yaml@2.9.0))
       electron:
-        specifier: ^39.8.5
+        specifier: 39.8.10
         version: 39.8.10
       electron-builder:
         specifier: ^25.1.8
@@ -7468,11 +7468,6 @@ packages:
   lru.min@1.1.2:
     resolution: {integrity: sha512-Nv9KddBcQSlQopmBHXSsZVY5xsdlZkdH/Iey0BlcBYggMd4two7cZnKOK9vmy3nY0O5RGH99z1PCeTpPqszUYg==}
     engines: {bun: '>=1.0.0', deno: '>=1.30.0', node: '>=8.0.0'}
-
-  lucide-react@0.363.0:
-    resolution: {integrity: sha512-AlsfPCsXQyQx7wwsIgzcKOL9LwC498LIMAo+c0Es5PkHJa33xwmYAkkSoKoJWWWSYQEStqu58/jT4tL2gi32uQ==}
-    peerDependencies:
-      react: ^16.5.1 || ^17.0.0 || ^18.0.0
 
   lucide-react@0.453.0:
     resolution: {integrity: sha512-kL+RGZCcJi9BvJtzg2kshO192Ddy9hv3ij+cPrVPWSRzgCWCVazoQJxOjAwgK53NomL07HB7GPHW120FimjNhQ==}
@@ -18620,10 +18615,6 @@ snapshots:
   lru-cache@7.18.3: {}
 
   lru.min@1.1.2: {}
-
-  lucide-react@0.363.0(react@19.2.1):
-    dependencies:
-      react: 19.2.1
 
   lucide-react@0.453.0(react@19.2.1):
     dependencies:
