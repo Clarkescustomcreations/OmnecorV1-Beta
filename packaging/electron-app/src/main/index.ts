@@ -3,9 +3,7 @@ import { join, extname } from 'path'
 import { randomBytes } from 'crypto'
 import { appendFile, readFileSync, writeFileSync, existsSync } from 'fs'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { spawn, ChildProcess, exec } from 'child_process'
-import os from 'os'
-import util from 'util'
+import { spawn, ChildProcess } from 'child_process'
 import icon from '../../resources/icon.png?asset'
 
 const LOG_FILE = join(
@@ -28,8 +26,6 @@ process.on('uncaughtException', (err: Error) => {
 process.on('unhandledRejection', (reason: unknown) => {
   log(`UNHANDLED REJECTION: ${String(reason)}`)
 })
-
-const execAsync = util.promisify(exec)
 
 let backendProcess: ChildProcess | null = null
 let isQuitting = false
@@ -148,19 +144,6 @@ function startBackend(): void {
   })
 }
 
-async function waitForBackend(url: string, timeout = 30000): Promise<boolean> {
-  const start = Date.now()
-  while (Date.now() - start < timeout) {
-    try {
-      const response = await fetch(url)
-      if (response.ok) return true
-    } catch {
-      await new Promise((resolve) => setTimeout(resolve, 1000))
-    }
-  }
-  return false
-}
-
 function createWindow(): void {
   const mainWindow = new BrowserWindow({
     width: 1400,
@@ -245,85 +228,6 @@ app.whenReady().then(async () => {
       }
       menu.popup({ window })
     })
-  })
-
-  // --- IPC: system hardware info for the Setup Wizard ---
-  ipcMain.handle('get-system-info', async () => {
-    const info = {
-      cpu: os.cpus()[0].model,
-      cores: os.cpus().length,
-      ram: Math.round(os.totalmem() / (1024 * 1024 * 1024)),
-      gpu: 'Unknown',
-      vram: 0,
-      isLegacy: false,
-      zramEnabled: false,
-      zramSize: 0
-    }
-
-    try {
-      if (process.platform === 'win32') {
-        try {
-          const { stdout } = await execAsync(
-            'powershell -Command "Get-WmiObject Win32_VideoController | Select-Object Name,AdapterRAM | Format-List"'
-          )
-          const nameMatch = stdout.match(/Name\s*:\s*(.*)/)
-          const ramMatch = stdout.match(/AdapterRAM\s*:\s*(.*)/)
-          if (nameMatch) info.gpu = nameMatch[1].trim()
-          if (ramMatch) info.vram = Math.round(parseInt(ramMatch[1]) / (1024 * 1024))
-        } catch {
-          // Fall back to wmic if PowerShell unavailable
-          try {
-            const { stdout } = await execAsync(
-              'wmic path win32_VideoController get name,AdapterRAM /format:list'
-            )
-            const nameMatch = stdout.match(/Name=(.*)/)
-            const ramMatch = stdout.match(/AdapterRAM=(.*)/)
-            if (nameMatch) info.gpu = nameMatch[1].trim()
-            if (ramMatch) info.vram = Math.round(parseInt(ramMatch[1]) / (1024 * 1024))
-          } catch {
-            info.gpu = 'GPU detection unavailable on Windows'
-          }
-        }
-      } else if (process.platform === 'darwin') {
-        try {
-          const { stdout } = await execAsync('system_profiler SPDisplaysDataType | grep -E "Chipset|VRAM"')
-          info.gpu = stdout.trim() || 'Apple GPU'
-        } catch {
-          info.gpu = 'GPU detection unavailable on macOS'
-        }
-      } else if (process.platform === 'linux') {
-        const { stdout } = await execAsync('lspci | grep -i vga')
-        info.gpu = stdout.split(':').pop()?.trim() || 'Unknown'
-        try {
-          const { stdout: nv } = await execAsync(
-            'nvidia-smi --query-gpu=memory.total --format=csv,noheader,nounits'
-          )
-          info.vram = parseInt(nv.trim())
-        } catch { /* no NVIDIA GPU */ }
-        try {
-          const { stdout: zr } = await execAsync(
-            'zramctl --bytes --noheadings --output SIZE | head -n 1'
-          )
-          if (zr.trim()) {
-            info.zramEnabled = true
-            info.zramSize = Math.round(parseInt(zr.trim()) / (1024 * 1024 * 1024))
-          }
-        } catch { /* no ZRAM */ }
-      }
-    } catch (e) {
-      console.error('GPU/ZRAM detection failed', e)
-    }
-
-    // Legacy: < 8 GB RAM, < 4 cores, or integrated Intel GPU with < 12 GB RAM
-    if (
-      info.ram < 8 ||
-      info.cores < 4 ||
-      (info.gpu.toLowerCase().includes('intel') && info.ram < 12)
-    ) {
-      info.isLegacy = true
-    }
-
-    return info
   })
 
   // Serve the built frontend via app://omnecor/ using net.createURLLoader.

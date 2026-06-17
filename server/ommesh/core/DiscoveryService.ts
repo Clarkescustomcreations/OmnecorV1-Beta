@@ -36,7 +36,7 @@ export class DiscoveryService {
     log.info("Starting mDNS beacon", { nodeId: this.identity.id });
 
     try {
-      this.bonjourInstance.publish({
+      const service = this.bonjourInstance.publish({
         name: this.identity.id,
         type: 'omnecor',
         port: MESH_PORT, // Dedicated mesh port (mTLS inference server)
@@ -44,6 +44,19 @@ export class DiscoveryService {
           fingerprint: this.identity.fingerprint,
           capabilities: JSON.stringify(this.identity.capabilities)
         }
+      });
+
+      // bonjour emits 'error' asynchronously on the Service EventEmitter (e.g.
+      // "Service name is already in use on the network" when a stale instance of
+      // this same node is still advertising). With no listener attached Node
+      // rethrows it as an unhandled 'error' event, which crashes the whole
+      // process on boot. Swallow it so OMMESH degrades gracefully — the node
+      // keeps serving even if its mDNS announcement can't be registered.
+      service?.on?.('error', (err: any) => {
+        log.warn("mDNS service registration failed — discovery degraded", {
+          nodeId: this.identity.id,
+          error: err?.message ?? String(err),
+        });
       });
 
       // Browse for peers using event-based browser for up/down tracking

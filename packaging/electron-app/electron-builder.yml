@@ -39,10 +39,16 @@ extraResources:
     to: app.asar.unpacked/backend/public
     filter:
       - "**/*"
-  # Native modules required by backend (better-sqlite3, bindings, etc.)
+  # Native modules required by backend (libSQL DB driver, onnxruntime, etc.)
+  # libSQL is the unified DB engine: its JS is esbuild-bundled, but the native
+  # binding (@libsql/<platform> → index.node) loads via a runtime require() that
+  # the bundler can't follow, so the @libsql + libsql packages MUST ship on disk
+  # or the backend crashes on boot with "Cannot find module '@libsql/<platform>'".
   - from: ../../node_modules
     to: app.asar.unpacked/node_modules
     filter:
+      - "@libsql/**/*"
+      - "libsql/**/*"
       - "better-sqlite3/**/*"
       - "bindings/**/*"
       - "file-uri-to-path/**/*"

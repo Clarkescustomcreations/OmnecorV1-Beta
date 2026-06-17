@@ -19,6 +19,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
+import { setSessionToken } from "@/lib/desktopAuth";
 import { useTheme } from "@/contexts/ThemeContext";
 import { cn } from "@/lib/utils";
 import { useRef } from "react";
@@ -150,8 +151,11 @@ export default function SetupWizard() {
         credentials: "include",
         body: JSON.stringify({ name: localName.trim(), password: localPassword }),
       });
-      const data = await res.json() as { ok?: boolean; error?: string };
+      const data = await res.json() as { ok?: boolean; error?: string; sessionToken?: string };
       if (!res.ok) { toast.error(data.error ?? "Registration failed"); return; }
+      // Desktop app is cross-origin and can't use the SameSite cookie — persist
+      // the returned token so subsequent tRPC calls authenticate via Bearer.
+      if (data.sessionToken) setSessionToken(data.sessionToken);
       toast.success("Account created!");
       setCurrentStep(s => s + 1);
     } catch { toast.error("Registration failed — is the backend running?"); }
@@ -167,8 +171,9 @@ export default function SetupWizard() {
         credentials: "include",
         body: JSON.stringify({ password: localPassword }),
       });
-      const data = await res.json() as { ok?: boolean; error?: string };
+      const data = await res.json() as { ok?: boolean; error?: string; sessionToken?: string };
       if (!res.ok) { toast.error(data.error ?? "Login failed"); return; }
+      if (data.sessionToken) setSessionToken(data.sessionToken);
       toast.success("Signed in!");
       setCurrentStep(s => s + 1);
     } catch { toast.error("Login failed — is the backend running?"); }

@@ -262,13 +262,23 @@ class SDKServer {
   }
 
   async authenticateRequest(req: Request): Promise<AuthenticatedUser> {
-    // Regular authentication flow
+    // The session token normally arrives in the SameSite=Strict cookie, but
+    // cross-origin callers that can't send that cookie — the Electron desktop
+    // app (frontend on app://omnecor, backend on http://localhost) and the
+    // mobile app — pass it as `Authorization: Bearer <token>` instead. Accept
+    // either; the login routes already return the token in the response body
+    // for exactly these non-cookie clients.
     const cookies = this.parseCookies(req.headers.cookie);
-    const sessionCookie = cookies.get(COOKIE_NAME);
+    const authHeader = req.headers.authorization;
+    const bearerToken =
+      authHeader && authHeader.toLowerCase().startsWith("bearer ")
+        ? authHeader.slice(7).trim()
+        : undefined;
+    const sessionCookie = cookies.get(COOKIE_NAME) ?? bearerToken;
     const session = await this.verifySession(sessionCookie);
 
     if (!session) {
-      throw ForbiddenError("Invalid session cookie");
+      throw ForbiddenError("Invalid session");
     }
 
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {

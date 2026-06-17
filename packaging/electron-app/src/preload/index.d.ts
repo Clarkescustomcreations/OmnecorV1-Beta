@@ -1,19 +1,8 @@
 import { ElectronAPI } from '@electron-toolkit/preload'
 
-export interface SystemInfo {
-  cpu: string
-  cores: number
-  ram: number
-  gpu: string
-  vram: number
-  isLegacy: boolean
-  zramEnabled: boolean
-  zramSize: number
-}
-
 export interface OmnecorAPI {
-  getSystemInfo: () => Promise<SystemInfo>
-  setupComplete: () => void
+  /** Absolute base URL for the embedded backend (http://localhost:PORT). */
+  backendBase: string
   openExternal: (url: string) => void
 }
 

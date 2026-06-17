@@ -152,6 +152,36 @@ async function startServer() {
     },
   }));
 
+  // ─── CORS for the Electron desktop app ──────────────────────────────────
+  // The desktop frontend is served from the privileged custom scheme
+  // app://omnecor and talks to this backend cross-origin at http://localhost.
+  // Chromium blocks those responses unless we echo the Origin and allow
+  // credentials/headers. We only ever reflect the desktop app's own origin or a
+  // loopback dev origin — never a wildcard — so this cannot widen exposure to
+  // arbitrary web pages. Pairs with the Bearer-token auth fallback in
+  // sdk.authenticateRequest (the desktop app can't rely on the SameSite=Strict
+  // session cookie across origins, so it sends Authorization: Bearer instead).
+  const isAllowedAppOrigin = (origin: string): boolean =>
+    origin.startsWith("app://omnecor") ||
+    /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
+
+  app.use((req, res, next) => {
+    const origin = req.get("origin");
+    if (origin && isAllowedAppOrigin(origin)) {
+      res.setHeader("Access-Control-Allow-Origin", origin);
+      res.setHeader("Vary", "Origin");
+      res.setHeader("Access-Control-Allow-Credentials", "true");
+      res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,PATCH,DELETE,OPTIONS");
+      res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    }
+    // Short-circuit CORS preflight before rate limiting / routing.
+    if (req.method === "OPTIONS") {
+      res.sendStatus(204);
+      return;
+    }
+    next();
+  });
+
   const limiter = rateLimit({
     windowMs: 60 * 1000,
     max: 100,

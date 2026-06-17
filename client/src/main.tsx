@@ -15,6 +15,7 @@ import App from "./App";
 import { getLoginUrl } from "./const";
 import { FictionModeProvider } from "./contexts/FictionModeContext";
 import { IS_DEMO } from "@/lib/demo";
+import { authHeaders } from "@/lib/desktopAuth";
 import { applyFontSize, getStoredFontSize } from "@/lib/fontSize";
 import "./Globals.css";
 
@@ -124,6 +125,7 @@ const trpcClient = trpc.createClient({
               return "/api/trpc";
             })(),
             transformer: superjson,
+            headers: () => authHeaders(),
             fetch(input, init) {
               return globalThis.fetch(input, {
                 ...(init ?? {}),

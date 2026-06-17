@@ -9,6 +9,7 @@ import {
 import type { AppRouter } from "../../../server/routers";
 import superjson from "superjson";
 import { IS_DEMO } from "./demo";
+import { authHeaders } from "./desktopAuth";
 
 export const trpc = createTRPCReact<AppRouter>();
 
@@ -60,6 +61,7 @@ export const vanillaTrpc = createTRPCProxyClient<AppRouter>({
           false: httpBatchLink({
             url: `${apiBase}/api/trpc`,
             transformer: superjson,
+            headers: () => authHeaders(),
           }),
         }),
       ],
