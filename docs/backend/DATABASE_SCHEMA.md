@@ -1,6 +1,6 @@
 # Omnecor Database Schema
 
-Omnecor utilizes Drizzle ORM for its database interactions, providing a type-safe and robust way to manage application data. The schema is defined in `drizzle/schema.ts` and supports MySQL/TiDB. This document outlines the key tables and their relationships within the Omnecor database.
+Omnecor utilizes Drizzle ORM for its database interactions, providing a type-safe and robust way to manage application data. The schema is defined in `drizzle/schema.ts` using the **libSQL / SQLite** dialect. This document outlines the key tables and their relationships within the Omnecor database.
 
 ## 1. Overview
 
@@ -20,7 +20,7 @@ This table stores core user information, backing the authentication flow. It is 
 | `email` | `varchar(320)` | User's email address. | |
 | `loginMethod` | `varchar(64)` | Method used for user login. Supports `'google'`, `'microsoft'`, `'local'`. | |
 | `role` | `enum('viewer', 'user', 'admin', 'owner')` | User's role within the system. | `NOT NULL`, `DEFAULT 'user'` |
-| `executionMode` | `mysqlEnum('executionMode', ['sovereign', 'scrapper', 'big_spender'])` | Controls which execution mode this user prefers. | `NOT NULL`, `DEFAULT 'scrapper'` |
+| `executionMode` | `text({ enum: ['sovereign', 'scrapper', 'big_spender'] })` | Controls which execution mode this user prefers. | `NOT NULL`, `DEFAULT 'scrapper'` |
 | `createdAt` | `timestamp` | Timestamp of user creation. | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
 | `updatedAt` | `timestamp` | Timestamp of last update to user record. | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP` |
 | `lastSignedIn` | `timestamp` | Timestamp of the user's last sign-in. | `NOT NULL`, `DEFAULT CURRENT_TIMESTAMP` |
@@ -102,7 +102,7 @@ Defines per-project spending limits and alerting behaviour. The `mode` column co
 
 ### 2.7. `audit_log` Table
 
-> **APPEND-ONLY.** No `UPDATE` is ever performed and application code cannot delete entries. The only deletion path is the time-based retention purge in `AuditLogService` (default 14 days; configurable to 28 days or permanent in Settings → Security). Sensitive data is redacted before insertion via `redactSensitiveData()`. The table exists in BOTH backends — MySQL (`drizzle/schema.ts`) and SQLite (`server/db.sqlite.ts`) — with the identical retention schedule, routed through the `audit*` functions in `db.factory.ts`.
+> **APPEND-ONLY.** No `UPDATE` is ever performed and application code cannot delete entries. The only deletion path is the time-based retention purge in `AuditLogService` (default 14 days; configurable to 28 days or permanent in Settings → Security). Sensitive data is redacted before insertion via `redactSensitiveData()`. The table is defined in the unified schema (`drizzle/schema.ts`) with the identical retention schedule, written through the `audit*` functions in `db.factory.ts`.
 
 | Column Name | Type | Description | Constraints |
 |---|---|---|---|
@@ -483,7 +483,7 @@ AI personas created by users for multi-agent systems and social media integratio
 
 ### Intentionally Non-Persisted State (in-memory)
 
-Some features are deliberately **not** backed by a table — they are ephemeral, process-local state that resets on server restart. This keeps them migration-free and identical across the MySQL and SQLite backends:
+Some features are deliberately **not** backed by a table — they are ephemeral, process-local state that resets on server restart. This keeps them migration-free:
 
 -   **Unified Notifications** — held in `NotificationService` (`server/_core/NotificationService.ts`), a capped in-memory ring buffer; the immutable history lives in the `auditLog` table instead.
 -   **Agent Messenger threads** — held in `AgentMessengerStore` (`server/_core/AgentMessengerStore.ts`), keyed by `personas.id`. The conversation participants are persisted (the `personas` table); the message history is not.

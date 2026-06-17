@@ -26,6 +26,7 @@ Operational Memory Never Escapes. Context Overview Remains.
     -   11b. [Kaggle GPU Training](#11b-kaggle-gpu-training)
     -   11a. [Agent Networking & Social Media Automation](#11a-agent-networking--social-media-automation)
 12. [Persona & Agent Creation](#12-persona--agent-creation)
+12b. [Podcast Studio](#12b-podcast-studio)
 13. [Networking & Multi-System Operation](#13-networking--multi-system-operation)
 14. [Security & Permissions](#14-security--permissions)
 15. [Backup, Recovery, and Migration](#15-backup-recovery-and-migration)
@@ -672,7 +673,7 @@ Omnecor's Agent Networking system automates your social media presence across 6 
 
 ### Quick Start
 
-1. Set OAuth credentials for your platforms in `.env` (see [OAUTH_SETUP.md](../OAUTH_SETUP.md)).
+1. Set OAuth credentials for your platforms in `.env` (see [OAUTH_SETUP.md](../setup/OAUTH_SETUP.md)).
 2. Go to **Agent Networking → Platforms** → click a platform button → complete OAuth.
 3. Go to **Agent Networking → Personas** → create a persona with your brand voice and tone.
 4. Go to **Agent Networking → Discovery** → configure content sources (RSS feeds or keywords).
@@ -715,6 +716,52 @@ The **Character Persona Studio** lets you build a digital clone, a social media 
 Personas are stored locally in `localStorage` — no data leaves your machine.
 
 Full reference: [docs/user-guides/PERSONA_AGENT_GUIDE.md](PERSONA_AGENT_GUIDE.md)
+
+---
+
+## 12b. Podcast Studio
+
+The **Podcast Studio** lets you turn any source material into a fully produced, multi-speaker audio podcast using local or cloud TTS voices — no external DAW required.
+
+**Access:** Sidebar → Podcast Studio icon.
+
+### Source Ingestion
+
+Provide content in any of three forms:
+
+| Source Type | How to Add |
+|---|---|
+| **Website URL** | Paste a URL into the URL field; the studio fetches and strips the article body automatically. |
+| **Text file** | Drag-and-drop a `.txt`, `.md`, or `.pdf` onto the drop zone, or click **Import File**. |
+| **Text draft** | Type or paste raw text directly into the **Script Draft** editor. |
+
+Multiple sources can be combined in a single episode — the studio merges and de-duplicates content before passing it to the script generator.
+
+### Script Generation
+
+1. Choose the number of speakers (1–4) and their role labels (e.g., *Host*, *Guest*, *Narrator*).
+2. Set tone and target duration, then click **Generate Script**.
+3. The AI produces a turn-by-turn script with speaker tags. Edit any line inline before rendering audio.
+
+### Voice Selection
+
+Each speaker slot has an independent voice selector:
+
+| Backend | Selection |
+|---|---|
+| **Local TTS (Kokoro / XTTS-v2)** | Dropdown of installed voice models on port 8002. No internet required. |
+| **ElevenLabs** | Enter your ElevenLabs API key in Settings → Voice → ElevenLabs Key, then choose a voice ID from the dropdown. |
+| **RVC clone** | Select an uploaded `.pth` model file for voice-cloned narration (port 8003). |
+
+### Rendering & Playback
+
+Click **Render Episode** to synthesize all lines in sequence. Progress is shown per-line. When complete:
+
+-   **Play** — streams the finished audio directly in the browser player.
+-   **Download** — exports the merged `.wav` (or `.mp3` if FFmpeg is present).
+-   **History** — all rendered episodes are listed under the **History** tab, sorted by date. Click any entry to replay or re-download it. Delete individual entries with the trash icon.
+
+> **Tip:** For the best local quality, ensure the Kokoro TTS microservice is running (`python services/tts/kokoro_server.py`). If the TTS service is offline, the studio falls back to ElevenLabs (requires an API key).
 
 ---
 
