@@ -76,6 +76,7 @@ import { platformsRouter } from "./routers/platformsRouter.js";
 import { analyticsRouter } from "./routers/analyticsRouter.js";
 import { agentSettingsRouter } from "./routers/agentSettingsRouter.js";
 import { oauthRouter } from "./routers/oauthRouter.js";
+import { gmailRouter } from "./routers/gmailRouter.js";
 import { attachmentsRouter } from "./routers/attachmentsRouter.js";
 import { neuralMapsRouter } from "./routers/neuralMapsRouter.js";
 import { mobileSyncRouter } from "./routers/mobileSyncRouter.js";
@@ -85,6 +86,7 @@ import { hitlRouter } from "./routers/hitlRouter.js";
 import { workflowRouter } from "./routers/workflowRouter.js";
 import { notificationRouter } from "./routers/notificationRouter.js";
 import { agentMessengerRouter } from "./routers/agentMessengerRouter.js";
+import { scriptsRouter } from "./routers/scriptsRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -201,6 +203,7 @@ export const appRouter = router({
   analytics: analyticsRouter,
   settings: agentSettingsRouter,
   oauth: oauthRouter,
+  gmail: gmailRouter,
 
   // ─── File Attachments (pre-upload before chat send) ───────────────────────
   attachments: attachmentsRouter,
@@ -225,6 +228,7 @@ export const appRouter = router({
 
   // ─── Mobile chat sync (Omnecor HQ app → Notifications + Add-to-project) ───
   mobileSync: mobileSyncRouter,
+  scripts: scriptsRouter,
 });
 
 export type AppRouter = typeof appRouter;

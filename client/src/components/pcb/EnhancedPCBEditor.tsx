@@ -1,12 +1,15 @@
 /**
  * Enhanced PCB/Schematic Editor
- * 
- * Complete implementation with:
- * - Proper undo/redo with keyboard shortcuts
- * - Multi-select support
- * - Save/load integration
- * - Real AI assistant
- * - Custom edges
+ *
+ * Features:
+ * - Server-backed project persistence (auto-create + auto-save + load)
+ * - Project selector in toolbar (switch/create projects)
+ * - Drag-and-drop components from library panel onto canvas
+ * - Click-to-add components from library panel
+ * - Undo/redo with keyboard shortcuts (Ctrl+Z / Ctrl+Shift+Z)
+ * - Multi-select with Ctrl+click
+ * - Delete key removes selected nodes
+ * - Ctrl+S saves immediately
  */
 
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
@@ -28,8 +31,8 @@ import ReactFlow, {
   ControlButton,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
-import { RotateCw } from 'lucide-react';
-
+import { RotateCw, FolderOpen, Plus, ChevronDown, Save, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 import { SchematicNode } from './SchematicNode';
 import { PCBNode } from './PCBNode';
@@ -42,18 +45,16 @@ import { NetlistPanel } from './NetlistPanel';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 
-export interface EnhancedPCBEditorProps {
-  projectId?: number;
-}
+// ─── Types ───────────────────────────────────────────────────────────────────
 
 interface HistoryState {
   nodes: Node[];
   edges: Edge[];
 }
 
-export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
-  projectId,
-}) => {
+// ─── Inner component (requires ReactFlowProvider above) ───────────────────────
+
+const EnhancedPCBEditorInner: React.FC = () => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
 
@@ -61,7 +62,7 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState([]);
   const [selectedNodeIds, setSelectedNodeIds] = useState<string[]>([]);
-  const { getNodes, getEdges, fitView } = useReactFlow();
+  const { getNodes, getEdges, fitView, project } = useReactFlow();
 
   // Editor settings
   const [mode, setMode] = useState<'schematic' | 'pcb'>('schematic');
@@ -70,7 +71,6 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
   const [gridSize] = useState(20);
   const [showMiniMap, setShowMiniMap] = useState(true);
 
-
   // UI panels
   const [showLibrary, setShowLibrary] = useState(true);
   const [showProperties, setShowProperties] = useState(true);
@@ -78,99 +78,175 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
   const [showNetlist, setShowNetlist] = useState(false);
 
   // Undo/redo
-  const [history, setHistory] = useState<HistoryState[]>([]);
   const [historyIndex, setHistoryIndex] = useState(-1);
   const historyRef = useRef<HistoryState[]>([]);
 
-  // Save/load
+  // Save state
   const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
+  const [isDirty, setIsDirty] = useState(false);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  // Suppresses the redundant auto-save that fires immediately after loading a design
+  const suppressAutoSaveRef = useRef(false);
+  // Always-current refs so the auto-save timeout never captures a stale project/mode
+  const pcbProjectIdRef = useRef<number | null>(null);
+  const modeRef = useRef<'schematic' | 'pcb'>('schematic');
 
+  // ── Project management ────────────────────────────────────────────────────
 
-  // tRPC mutations + queries
-  const saveDesignMutation = trpc.pcbEditor.saveDesign.useMutation({
-    onError: (err) => toast.error("Failed to save design: " + err.message),
+  const [pcbProjectId, setPcbProjectId] = useState<number | null>(null);
+  const [showProjectDropdown, setShowProjectDropdown] = useState(false);
+  const [newProjectName, setNewProjectName] = useState('');
+  const [showNewProjectInput, setShowNewProjectInput] = useState(false);
+  const autoCreatedRef = useRef(false);
+  const loadedProjectRef = useRef<number | null>(null);
+  const projectDropdownRef = useRef<HTMLDivElement>(null);
+
+  const trpcUtils = trpc.useUtils();
+
+  const { data: pcbProjects = [] } = trpc.pcbEditor.getProjects.useQuery(undefined, {
+    staleTime: 30_000,
   });
 
-  // Auto-load latest design when projectId is known
+  const createProjectMutation = trpc.pcbEditor.createProject.useMutation({
+    onSuccess: (proj) => {
+      trpcUtils.pcbEditor.getProjects.invalidate();
+      setPcbProjectId(proj.id);
+      toast.success(`Project "${proj.name}" created`);
+    },
+    onError: (err) => toast.error('Failed to create project: ' + err.message),
+  });
+
+  // Auto-select first project when projects load
+  useEffect(() => {
+    if (pcbProjectId !== null) return;
+    if (pcbProjects.length > 0) {
+      setPcbProjectId(pcbProjects[0].id);
+    }
+  }, [pcbProjects, pcbProjectId]);
+
+  // Auto-create "Default Design" if user has no projects yet
+  useEffect(() => {
+    if (autoCreatedRef.current) return;
+    if (pcbProjects.length === 0 && pcbProjectId === null) {
+      autoCreatedRef.current = true;
+      createProjectMutation.mutate({ name: 'Default Design', mode: 'schematic' });
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pcbProjects]);
+
+  // Close project dropdown on outside click
+  useEffect(() => {
+    const handle = (e: MouseEvent) => {
+      if (projectDropdownRef.current && !projectDropdownRef.current.contains(e.target as Element)) {
+        setShowProjectDropdown(false);
+        setShowNewProjectInput(false);
+        setNewProjectName('');
+      }
+    };
+    document.addEventListener('mousedown', handle);
+    return () => document.removeEventListener('mousedown', handle);
+  }, []);
+
+  // ── Design load / auto-save ───────────────────────────────────────────────
+
+  const saveDesignMutation = trpc.pcbEditor.saveDesign.useMutation({
+    onSuccess: () => { setIsDirty(false); setLastSavedAt(new Date()); },
+    onError: (err) => toast.error('Failed to save: ' + err.message),
+  });
+
   const latestDesignQuery = trpc.pcbEditor.getLatestDesign.useQuery(
-    { projectId: projectId! },
+    { projectId: pcbProjectId! },
     {
-      enabled: !!projectId,
+      enabled: !!pcbProjectId,
       staleTime: Infinity,
       refetchOnWindowFocus: false,
     }
   );
 
-  // Load into canvas on first fetch
-  const hasLoadedRef = useRef(false);
+  // Keep refs current so the auto-save timeout never reads a stale project/mode
+  useEffect(() => { pcbProjectIdRef.current = pcbProjectId; }, [pcbProjectId]);
+  useEffect(() => { modeRef.current = mode; }, [mode]);
+
+  // Reset canvas when active project switches
   useEffect(() => {
-    if (hasLoadedRef.current || !latestDesignQuery.data) return;
-    hasLoadedRef.current = true;
+    if (pcbProjectId !== null && loadedProjectRef.current !== pcbProjectId) {
+      setNodes([]);
+      setEdges([]);
+      historyRef.current = [];
+      setHistoryIndex(-1);
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pcbProjectId]);
+
+  // Load design into canvas once per project
+  useEffect(() => {
+    if (!latestDesignQuery.data || loadedProjectRef.current === pcbProjectId) return;
+    loadedProjectRef.current = pcbProjectId;
     const design = latestDesignQuery.data;
-    if (!design) return;
     try {
-      const canvasData = typeof design.canvasData === "string"
-        ? JSON.parse(design.canvasData)
-        : (design.canvasData as { nodes: Node[]; edges: Edge[]; metadata?: { mode?: string } });
+      const canvasData =
+        typeof design.canvasData === 'string'
+          ? JSON.parse(design.canvasData as string)
+          : (design.canvasData as { nodes: Node[]; edges: Edge[]; metadata?: { mode?: string } });
+      suppressAutoSaveRef.current = true;
       if (canvasData?.nodes) setNodes(canvasData.nodes);
       if (canvasData?.edges) setEdges(canvasData.edges);
-      if (canvasData?.metadata?.mode) setMode(canvasData.metadata.mode as "schematic" | "pcb");
+      if (canvasData?.metadata?.mode) setMode(canvasData.metadata.mode as 'schematic' | 'pcb');
     } catch {
       // malformed saved data — start fresh
     }
-  }, [latestDesignQuery.data, setNodes, setEdges]);
+  }, [latestDesignQuery.data, pcbProjectId, setNodes, setEdges]);
 
-  // Auto-save debounced after node/edge changes
+  // Auto-save 1.5s after any node/edge change.
+  // suppressAutoSaveRef prevents a redundant write immediately after loading a design.
+  // Reads pcbProjectIdRef/modeRef (not closed-over state) so a mid-debounce project
+  // switch never saves canvas data to the wrong project.
   const autoSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Node types
-  const nodeTypes: NodeTypes = useMemo(
-    () => ({
-      schematic: SchematicNode,
-      pcb: PCBNode,
-    }),
-    []
-  );
-
-  // Edge types
-  const edgeTypes: EdgeTypes = useMemo(
-    () => ({
-      custom: CustomEdge,
-    }),
-    []
-  );
-
-  // Auto-save node positions when they change (debounced, only when projectId is set)
   useEffect(() => {
-    if (!projectId || !nodes.length) return;
+    if (!pcbProjectId) return;
+    if (suppressAutoSaveRef.current) {
+      suppressAutoSaveRef.current = false;
+      return;
+    }
+    setIsDirty(true);
     if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
+      const projectId = pcbProjectIdRef.current;
+      if (!projectId) return;
       saveDesignMutation.mutate({
         projectId,
         name: `Autosave ${new Date().toLocaleString()}`,
-        canvasData: { nodes, edges, metadata: { mode } },
+        canvasData: { nodes, edges, metadata: { mode: modeRef.current } },
       });
     }, 1500);
-    return () => { if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current); };
+    return () => {
+      if (autoSaveTimerRef.current) clearTimeout(autoSaveTimerRef.current);
+    };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges]);
 
-  // Add to history
-  const addToHistory = useCallback(() => {
-    const currentState: HistoryState = {
-      nodes: getNodes(),
-      edges: getEdges(),
-    };
+  // ── Node types / edge types ───────────────────────────────────────────────
 
+  const nodeTypes: NodeTypes = useMemo(
+    () => ({ schematic: SchematicNode, pcb: PCBNode }),
+    []
+  );
+
+  const edgeTypes: EdgeTypes = useMemo(
+    () => ({ custom: CustomEdge }),
+    []
+  );
+
+  // ── History ───────────────────────────────────────────────────────────────
+
+  const addToHistory = useCallback(() => {
+    const currentState: HistoryState = { nodes: getNodes(), edges: getEdges() };
     const newHistory = historyRef.current.slice(0, historyIndex + 1);
     newHistory.push(currentState);
     historyRef.current = newHistory;
-    setHistory(newHistory);
     setHistoryIndex(newHistory.length - 1);
   }, [historyIndex, getNodes, getEdges]);
 
-  // Undo
   const handleUndo = useCallback(() => {
     if (historyIndex > 0) {
       const newIndex = historyIndex - 1;
@@ -183,7 +259,6 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
     }
   }, [historyIndex, setNodes, setEdges]);
 
-  // Redo
   const handleRedo = useCallback(() => {
     if (historyIndex < historyRef.current.length - 1) {
       const newIndex = historyIndex + 1;
@@ -196,53 +271,183 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
     }
   }, [historyIndex, setNodes, setEdges]);
 
-  // Keyboard shortcuts
+  // ── Canvas operations ─────────────────────────────────────────────────────
+
+  const handleAddComponent = useCallback(
+    (componentId: string, position: { x: number; y: number }) => {
+      const newNode: Node = {
+        id: `node-${Date.now()}`,
+        type: mode === 'schematic' ? 'schematic' : 'pcb',
+        position,
+        data: {
+          component: componentId,
+          reference: `U${nodes.length + 1}`,
+          value: '',
+          rotation: 0,
+          layer: 'top',
+          isSelected: false,
+        },
+      };
+      setNodes((nds) => [...nds, newNode]);
+      addToHistory();
+    },
+    [mode, nodes.length, setNodes, addToHistory]
+  );
+
+  const handleDeleteNodes = useCallback(() => {
+    if (selectedNodeIds.length === 0) return;
+    setNodes((nds) => nds.filter((n) => !selectedNodeIds.includes(n.id)));
+    setEdges((eds) =>
+      eds.filter(
+        (e) =>
+          !selectedNodeIds.includes(e.source) && !selectedNodeIds.includes(e.target)
+      )
+    );
+    setSelectedNodeIds([]);
+    addToHistory();
+  }, [selectedNodeIds, setNodes, setEdges, addToHistory]);
+
+  const handleRotateNode = useCallback(
+    (angle: number) => {
+      if (selectedNodeIds.length === 0) return;
+      setNodes((nds) =>
+        nds.map((n) =>
+          selectedNodeIds.includes(n.id)
+            ? { ...n, data: { ...n.data, rotation: ((n.data.rotation || 0) + angle) % 360 } }
+            : n
+        )
+      );
+      addToHistory();
+    },
+    [selectedNodeIds, setNodes, addToHistory]
+  );
+
+  const handleFlipNode = useCallback(
+    (direction: 'horizontal' | 'vertical') => {
+      if (selectedNodeIds.length === 0) return;
+      setNodes((nds) =>
+        nds.map((n) =>
+          selectedNodeIds.includes(n.id)
+            ? {
+                ...n,
+                data: {
+                  ...n.data,
+                  flipped: { ...n.data.flipped, [direction]: !n.data.flipped?.[direction] },
+                },
+              }
+            : n
+        )
+      );
+      addToHistory();
+    },
+    [selectedNodeIds, setNodes, addToHistory]
+  );
+
+  const handleRotateCanvas = useCallback(() => {
+    if (!nodes.length) return;
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    nodes.forEach((n) => {
+      if (n.position.x < minX) minX = n.position.x;
+      if (n.position.x > maxX) maxX = n.position.x;
+      if (n.position.y < minY) minY = n.position.y;
+      if (n.position.y > maxY) maxY = n.position.y;
+    });
+    const cx = (minX + maxX) / 2;
+    const cy = (minY + maxY) / 2;
+    setNodes(
+      nodes.map((n) => ({
+        ...n,
+        position: { x: cx - (n.position.y - cy), y: cy + (n.position.x - cx) },
+      }))
+    );
+    addToHistory();
+    requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
+    toast.success('Rotated layout 90°');
+  }, [nodes, setNodes, fitView, addToHistory]);
+
+  const handleSaveDesign = useCallback(async () => {
+    if (!pcbProjectId) {
+      toast.error('No project selected');
+      return;
+    }
+    setIsSaving(true);
+    try {
+      await saveDesignMutation.mutateAsync({
+        projectId: pcbProjectId,
+        name: `Design ${new Date().toLocaleString()}`,
+        canvasData: { nodes: getNodes(), edges: getEdges(), metadata: { mode } },
+      });
+      toast.success('Design saved');
+      addToHistory();
+    } finally {
+      setIsSaving(false);
+    }
+  }, [pcbProjectId, saveDesignMutation, getNodes, getEdges, mode, addToHistory]);
+
+  // ── Drag-and-drop onto canvas ─────────────────────────────────────────────
+
+  const reactFlowWrapperRef = useRef<HTMLDivElement>(null);
+
+  const handleDragOver = useCallback((e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+
+  const handleDrop = useCallback(
+    (e: React.DragEvent<HTMLDivElement>) => {
+      e.preventDefault();
+      const componentId = e.dataTransfer.getData('componentId');
+      if (!componentId || !reactFlowWrapperRef.current) return;
+
+      const bounds = reactFlowWrapperRef.current.getBoundingClientRect();
+      const position = project({
+        x: e.clientX - bounds.left,
+        y: e.clientY - bounds.top,
+      });
+
+      handleAddComponent(componentId, position);
+    },
+    [project, handleAddComponent]
+  );
+
+  // ── Keyboard shortcuts ────────────────────────────────────────────────────
+
   useEffect(() => {
-    const handleKeyDown = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+    const onKeyDown = (e: KeyboardEvent) => {
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (ctrl && e.key === 'z') {
         e.preventDefault();
-        if (e.shiftKey) {
-          handleRedo();
-        } else {
-          handleUndo();
-        }
-      } else if (e.key === 'Delete') {
+        e.shiftKey ? handleRedo() : handleUndo();
+      } else if (e.key === 'Delete' || e.key === 'Backspace') {
+        // Only delete if canvas is focused (not inside an input)
+        if (document.activeElement?.tagName === 'INPUT' || document.activeElement?.tagName === 'TEXTAREA') return;
         e.preventDefault();
         handleDeleteNodes();
-      } else if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+      } else if (ctrl && e.key === 's') {
         e.preventDefault();
         handleSaveDesign();
       }
     };
+    window.addEventListener('keydown', onKeyDown);
+    return () => window.removeEventListener('keydown', onKeyDown);
+  }, [handleUndo, handleRedo, handleDeleteNodes, handleSaveDesign]);
 
-    window.addEventListener('keydown', handleKeyDown);
-    return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [handleUndo, handleRedo]);
+  // ── Selection ─────────────────────────────────────────────────────────────
 
-  // Handle node selection
-  const handleNodeClick = useCallback(
-    (event: React.MouseEvent, node: Node) => {
-      if (event.ctrlKey || event.metaKey) {
-        // Multi-select
-        setSelectedNodeIds((prev) =>
-          prev.includes(node.id)
-            ? prev.filter((id) => id !== node.id)
-            : [...prev, node.id]
-        );
-      } else {
-        // Single select
-        setSelectedNodeIds([node.id]);
-      }
-    },
-    []
-  );
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
+    if (event.ctrlKey || event.metaKey) {
+      setSelectedNodeIds((prev) =>
+        prev.includes(node.id) ? prev.filter((id) => id !== node.id) : [...prev, node.id]
+      );
+    } else {
+      setSelectedNodeIds([node.id]);
+    }
+  }, []);
 
-  // Handle canvas click
   const handleCanvasClick = useCallback(() => {
     setSelectedNodeIds([]);
   }, []);
 
-  // Handle edge connection
   const handleConnect = useCallback(
     (connection: Connection) => {
       setEdges((eds) =>
@@ -262,186 +467,26 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
     [setEdges, addToHistory]
   );
 
-  // Handle add component
-  const handleAddComponent = useCallback(
-    (componentId: string, position: { x: number; y: number }) => {
-      const newNode: Node = {
-        id: `node-${Date.now()}`,
-        type: mode === 'schematic' ? 'schematic' : 'pcb',
-        position,
-        data: {
-          component: componentId,
-          reference: `R${nodes.length + 1}`,
-          value: '10k',
-          rotation: 0,
-          layer: 'top',
-          isSelected: false,
-        },
-      };
-      setNodes((nds) => [...nds, newNode]);
-      addToHistory();
-    },
-    [mode, nodes.length, setNodes, addToHistory]
-  );
+  // ── Project selector helpers ──────────────────────────────────────────────
 
-  // Handle delete
-  const handleDeleteNodes = useCallback(() => {
-    if (selectedNodeIds.length === 0) return;
+  const activeProject = pcbProjects.find((p) => p.id === pcbProjectId);
 
-    setNodes((nds) => nds.filter((n) => !selectedNodeIds.includes(n.id)));
-    setEdges((eds) =>
-      eds.filter(
-        (e) =>
-          !selectedNodeIds.includes(e.source) &&
-          !selectedNodeIds.includes(e.target)
-      )
-    );
-    setSelectedNodeIds([]);
-    addToHistory();
-  }, [selectedNodeIds, setNodes, setEdges, addToHistory]);
+  const handleCreateProject = () => {
+    const name = newProjectName.trim();
+    if (!name) return;
+    createProjectMutation.mutate({ name, mode: 'schematic' });
+    setNewProjectName('');
+    setShowNewProjectInput(false);
+    setShowProjectDropdown(false);
+  };
 
-  // Handle rotate
-  const handleRotateNode = useCallback(
-    (angle: number) => {
-      if (selectedNodeIds.length === 0) return;
-
-      setNodes((nds) =>
-        nds.map((n) =>
-          selectedNodeIds.includes(n.id)
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  rotation: ((n.data.rotation || 0) + angle) % 360,
-                },
-              }
-            : n
-        )
-      );
-      addToHistory();
-    },
-    [selectedNodeIds, setNodes, addToHistory]
-  );
-
-  // Handle flip
-  const handleFlipNode = useCallback(
-    (direction: 'horizontal' | 'vertical') => {
-      if (selectedNodeIds.length === 0) return;
-
-      setNodes((nds) =>
-        nds.map((n) =>
-          selectedNodeIds.includes(n.id)
-            ? {
-                ...n,
-                data: {
-                  ...n.data,
-                  flipped: {
-                    ...n.data.flipped,
-                    [direction]: !n.data.flipped?.[direction],
-                  },
-                },
-              }
-            : n
-        )
-      );
-      addToHistory();
-    },
-    [selectedNodeIds, setNodes, addToHistory]
-  );
-
-  // Handle rotate canvas layout by 90 degrees
-  const handleRotateCanvas = useCallback(() => {
-    if (!nodes || nodes.length === 0) return;
-    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-    nodes.forEach((n) => {
-      const x = n.position.x;
-      const y = n.position.y;
-      if (x < minX) minX = x;
-      if (x > maxX) maxX = x;
-      if (y < minY) minY = y;
-      if (y > maxY) maxY = y;
-    });
-    const cx = (minX + maxX) / 2;
-    const cy = (minY + maxY) / 2;
-
-    const rotated = nodes.map((n) => {
-      const rx = n.position.x - cx;
-      const ry = n.position.y - cy;
-      return {
-        ...n,
-        position: {
-          x: cx - ry,
-          y: cy + rx,
-        },
-      };
-    });
-    setNodes(rotated);
-    addToHistory();
-    requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
-    toast.success("Rotated schematic/PCB layout 90°");
-  }, [nodes, setNodes, fitView, addToHistory]);
-
-  // Save design
-  const handleSaveDesign = useCallback(async () => {
-    if (!projectId) {
-      toast.error('No project selected');
-      return;
-    }
-
-    setIsSaving(true);
-    try {
-      await saveDesignMutation.mutateAsync({
-        projectId,
-        name: `Design ${new Date().toLocaleString()}`,
-        canvasData: {
-          nodes: getNodes(),
-          edges: getEdges(),
-          metadata: { mode },
-        },
-      });
-      toast.success('Design saved successfully');
-      addToHistory();
-    } catch (error) {
-      toast.error('Failed to save design');
-      console.error(error);
-    } finally {
-      setIsSaving(false);
-    }
-  }, [projectId, saveDesignMutation, getNodes, getEdges, mode, addToHistory]);
-
-  // Load design
-  const handleLoadDesign = useCallback(async (designId: number) => {
-    setIsLoading(true);
-    try {
-      // Fetch design data directly via tRPC
-      const response = await fetch(
-        `/api/trpc/editor.loadDesign?input=${encodeURIComponent(JSON.stringify({ designSaveId: designId }))}`
-      );
-      const data = await response.json();
-      if (data.result?.data) {
-        const design = data.result.data;
-        const canvasData = typeof design.canvasData === 'string'
-          ? JSON.parse(design.canvasData)
-          : design.canvasData;
-        setNodes(canvasData.nodes);
-        setEdges(canvasData.edges);
-        setMode(canvasData.metadata?.mode || 'schematic');
-        toast.success('Design loaded');
-        addToHistory();
-      }
-    } catch (error) {
-      toast.error('Failed to load design');
-      console.error(error);
-    } finally {
-      setIsLoading(false);
-    }
-  }, [setNodes, setEdges, addToHistory]);
+  // ── Render ────────────────────────────────────────────────────────────────
 
   return (
     <div className="w-full h-full flex flex-col bg-background">
       <style dangerouslySetInnerHTML={{ __html: `
         .react-flow__controls {
-          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1) !important;
+          box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1) !important;
           border: 1px solid var(--border) !important;
           border-radius: 0.375rem !important;
           overflow: hidden !important;
@@ -464,18 +509,107 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
           justify-content: center !important;
           transition: background-color 0.2s ease !important;
         }
-        .react-flow__controls-button:last-child {
-          border-bottom: none !important;
-        }
-        .react-flow__controls-button:hover {
-          background: var(--bg-secondary) !important;
-        }
-        .react-flow__controls-button svg {
-          fill: currentColor !important;
-        }
+        .react-flow__controls-button:last-child { border-bottom: none !important; }
+        .react-flow__controls-button:hover { background: var(--bg-secondary) !important; }
+        .react-flow__controls-button svg { fill: currentColor !important; }
       `}} />
 
-      {/* Toolbar */}
+      {/* ── Project Bar ──────────────────────────────────────────────────── */}
+      <div className="flex items-center gap-2 px-3 py-1.5 border-b border-border bg-card flex-shrink-0">
+        <FolderOpen className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
+
+        <div className="relative" ref={projectDropdownRef}>
+          <button
+            className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-accent transition-colors"
+            onClick={() => setShowProjectDropdown((v) => !v)}
+          >
+            <span className="max-w-[180px] truncate">
+              {activeProject?.name ?? (createProjectMutation.isPending ? 'Creating…' : 'No project')}
+            </span>
+            <ChevronDown className="w-3 h-3 opacity-60" />
+          </button>
+
+          {showProjectDropdown && (
+            <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-md shadow-lg z-50 py-1">
+              {pcbProjects.map((proj) => (
+                <button
+                  key={proj.id}
+                  className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
+                    proj.id === pcbProjectId
+                      ? 'bg-accent/10 text-accent font-semibold'
+                      : 'text-foreground hover:bg-muted'
+                  }`}
+                  onClick={() => {
+                    setPcbProjectId(proj.id);
+                    setShowProjectDropdown(false);
+                  }}
+                >
+                  {proj.name}
+                </button>
+              ))}
+
+              <div className="border-t border-border mt-1 pt-1">
+                {showNewProjectInput ? (
+                  <div className="px-2 py-1 flex items-center gap-1">
+                    <input
+                      autoFocus
+                      className="flex-1 bg-background border border-border rounded px-2 py-0.5 text-xs text-foreground outline-none focus:border-accent"
+                      placeholder="Project name…"
+                      value={newProjectName}
+                      onChange={(e) => setNewProjectName(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter') handleCreateProject();
+                        if (e.key === 'Escape') {
+                          setShowNewProjectInput(false);
+                          setNewProjectName('');
+                        }
+                      }}
+                    />
+                    <Button
+                      size="sm"
+                      variant="default"
+                      className="h-5 px-2 text-[10px]"
+                      onClick={handleCreateProject}
+                      disabled={!newProjectName.trim() || createProjectMutation.isPending}
+                    >
+                      {createProjectMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : 'Add'}
+                    </Button>
+                  </div>
+                ) : (
+                  <button
+                    className="w-full text-left px-3 py-1.5 text-xs text-muted-foreground hover:bg-muted flex items-center gap-1.5"
+                    onClick={() => setShowNewProjectInput(true)}
+                  >
+                    <Plus className="w-3 h-3" /> New project…
+                  </button>
+                )}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* Save indicator */}
+        <div className="ml-auto flex items-center gap-2">
+          {isSaving ? (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Loader2 className="w-3 h-3 animate-spin" /> Saving…
+            </span>
+          ) : isDirty ? (
+            <span className="text-[10px] text-muted-foreground italic">Unsaved changes…</span>
+          ) : lastSavedAt ? (
+            <span className="text-[10px] text-muted-foreground flex items-center gap-1">
+              <Save className="w-3 h-3" /> Saved
+            </span>
+          ) : null}
+          {!pcbProjectId && (
+            <span className="text-[10px] text-muted-foreground italic">
+              {createProjectMutation.isPending ? 'Setting up workspace…' : 'No project — create one to save'}
+            </span>
+          )}
+        </div>
+      </div>
+
+      {/* ── Editor Toolbar ───────────────────────────────────────────────── */}
       <EditorToolbar
         mode={mode}
         onModeChange={setMode}
@@ -489,23 +623,31 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
         onShowLibrary={() => setShowLibrary(!showLibrary)}
         onShowProperties={() => setShowProperties(!showProperties)}
         onShowAI={() => setShowAI(!showAI)}
-        onShowNetlist={() => setShowNetlist(!showNetlist)}
+        onShowNetlist={() => {
+          if (mode === 'pcb') {
+            toast.info('Netlist is only available in Schematic mode');
+            return;
+          }
+          setShowNetlist((v) => !v);
+        }}
         showMiniMap={showMiniMap}
         onMiniMapToggle={() => setShowMiniMap(!showMiniMap)}
       />
 
-      {/* Main Editor Area */}
+      {/* ── Main Editor Area ─────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
         {/* Component Library */}
         {showLibrary && (
-          <ComponentLibraryPanel
-            onAddComponent={handleAddComponent}
-            mode={mode}
-          />
+          <ComponentLibraryPanel onAddComponent={handleAddComponent} mode={mode} />
         )}
 
         {/* React Flow Canvas */}
-        <div className="flex-1 relative">
+        <div
+          ref={reactFlowWrapperRef}
+          className="flex-1 relative"
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        >
           <ReactFlow
             nodes={nodes}
             edges={edges}
@@ -536,7 +678,7 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
             {showMiniMap && (
               <MiniMap
                 nodeColor="#f59e0b"
-                maskColor={isDark ? 'rgba(0, 0, 0, 0.4)' : 'rgba(0, 0, 0, 0.1)'}
+                maskColor={isDark ? 'rgba(0,0,0,0.4)' : 'rgba(0,0,0,0.1)'}
                 style={{
                   backgroundColor: isDark ? '#0f172a' : '#f3f4f6',
                   border: `1px solid ${isDark ? '#334155' : '#d1d5db'}`,
@@ -554,9 +696,7 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
             selectedNodeId={selectedNodeIds[0]}
             nodes={nodes}
             onUpdateNode={(node: Node) => {
-              setNodes((nds) =>
-                nds.map((n) => (n.id === node.id ? node : n))
-              );
+              setNodes((nds) => nds.map((n) => (n.id === node.id ? node : n)));
               addToHistory();
             }}
           />
@@ -572,23 +712,21 @@ export const EnhancedPCBEditor: React.FC<EnhancedPCBEditorProps> = ({
 
         {/* Netlist */}
         {showNetlist && mode === 'schematic' && (
-          <NetlistPanel
-            nodes={nodes}
-            edges={edges}
-            onClose={() => setShowNetlist(false)}
-          />
+          <NetlistPanel nodes={nodes} edges={edges} onClose={() => setShowNetlist(false)} />
         )}
       </div>
     </div>
   );
 };
 
-function EnhancedPCBEditorWithProvider(props: EnhancedPCBEditorProps) {
+// ─── Public export (wraps with ReactFlowProvider) ─────────────────────────────
+
+function EnhancedPCBEditor() {
   return (
     <ReactFlowProvider>
-      <EnhancedPCBEditor {...props} />
+      <EnhancedPCBEditorInner />
     </ReactFlowProvider>
   );
 }
 
-export default EnhancedPCBEditorWithProvider;
+export { EnhancedPCBEditor };

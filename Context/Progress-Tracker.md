@@ -5,7 +5,7 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 ---
 
 ## 🚦 Current Status
-*   **Active Phase:** Phase 5 — F23–F27 code-complete. **All 3 OMMESH node artifacts built** for cross-platform mesh testing.
+*   **Active Phase:** Phase 5 — F23–F27 code-complete. **All 3 OMMESH node artifacts built** for cross-platform mesh testing. Documentation audit and professional update complete (2026-06-17).
 *   **OMMESH 3-way test readiness (2026-06-16, Linux):**
     *   **Linux node:** `packaging/electron-app/dist/Omnecor-2.3.0-beta.1-x86_64.AppImage` (373 MB) + `Omnecor_2.3.0-beta.1_amd64.deb` (220 MB) — built (electron-builder 25, Electron 39.8.10, better-sqlite3 rebuilt).
     *   **Android node:** `packaging/android/omnecor-hq/android/app/build/outputs/apk/release/app-release.apk` (118 MB, JS-bundled standalone, debug-signed → sideloadable).
@@ -23,6 +23,36 @@ This living document tracks the execution progress of the 5-phase build roadmap.
     *   **Environment gotchas hit & resolved (not code bugs):** Windows LAN must be **Private** + inbound firewall allow for TCP 3000/3001; **the Linux box clock was ~61 min fast (NTP off)** → certs had to be generated on the correct-clock machine and back-dated (also affects OMMESH's 5-min `verifyMessage` replay window — Linux clock still needs an NTP fix). Linux Ollama backend separately returning 500s on all models (local issue, not mesh).
 *   **Next:** fix the V-I-S clock (`sudo timedatectl set-ntp true`); bring the **Android node** in as the 3rd peer (connects by explicit IP + `OMMESH_SECRET`); then F23b on-device wake-word test; optional social live-test.
 *   **Gates (2026-06-16):** root `tsc` 0 · APK `tsc` 0 · `vitest` 338/338 · web build ✓ · Linux AppImage/.deb ✓ · release APK ✓
+
+### Server-Backed Scripts Library — made real (2026-06-17, Linux)
+Scripts the AI generates in chat were previously trapped in `localStorage` (browser-only). Replaced with a full server-backed store:
+*   **New `saved_scripts` table** — `drizzle/schema.ts` (`savedScripts`); integer PK, `userId`, `name`, `code`, `language`, `project`, timestamps. Two indexes. Migration `0001_equal_shiva.sql` generated + applied (`pnpm build:push`).
+*   **New `scripts` tRPC router** — `server/routers/scriptsRouter.ts`: `list`, `listProjects`, `create`, `update`, `delete` (all `protectedProcedure`, always user-scoped; no IDOR). Registered in `server/routers.ts`.
+*   **`scriptStorage.ts`** — gutted localStorage CRUD; now only exports `SavedScript` type (inferred from router output) + `getLegacyLocalScripts`/`clearLegacyLocalScripts` migration helpers.
+*   **`Chat.tsx`** — scripts via `trpc.scripts.list.useQuery()`; delete/rename mutations with cache invalidation + `onError` toasts; one-time `useEffect` migrates any existing localStorage scripts to the server (per-script, so partial network failure never creates duplicates).
+*   **`ChatInterface.tsx`** — "Save Script" dialog calls `trpc.scripts.create.useMutation()` with pending state on button; `trpc.useUtils()` invalidates the list on success.
+*   **`ConversationList.tsx`** — script callback IDs changed `string → number`; `timeAgo()` accepts `string | Date`.
+*   **Dead code verdict:** `getProjects()` (old `scriptStorage.ts`) was unfinished — promoted to `scripts.listProjects` on the server rather than deleted.
+*   `/review` run → 3 findings fixed (Drizzle type-safety in `update`, migration deduplication, `onError` toasts).
+*   **Gates (2026-06-17):** root `tsc` **0** · `vitest` **350/350** · `pnpm build` ✓ · changes uncommitted.
+
+### PCB / Schematic Editor — made real (2026-06-17, Linux)
+The PCB/Schematic tab in the 3D Designer page had three fundamental gaps: no persistence (canvas lost on refresh), broken drag-and-drop (canvas had no `onDrop`/`onDragOver`), and only 4 static components in the library. All three fixed:
+*   **`client/src/lib/componentLibrary.ts`** — Expanded 4 → 49 components across 9 categories (Passive, Discrete, Power, Logic, Analog, Comms, MCU, Sensor, Connector). Changed `properties: any` → `Record<string, unknown>`. Added `IC_BODY`, `IC_8PIN`, `IC_4PIN` SVG helpers. `searchComponents()` now also searches `properties` values.
+*   **`client/src/components/pcb/ComponentLibraryPanel.tsx`** — Added click-to-add (places near canvas centre with a small random offset so stacked clicks don't overlap). Added drag start via `dataTransfer.setData('componentId', ...)`. Flat search results mode (no tabs when query is active). Footer shows component + category count.
+*   **`client/src/components/pcb/EnhancedPCBEditor.tsx`** — Complete rewrite of persistence and project management: component is fully self-contained (no external `projectId` prop). Auto-selects first project; auto-creates "Default Design" on first load (`autoCreatedRef` prevents double-fire). Load effect fires once per project (`loadedProjectRef`); resets canvas on project switch. Auto-save debounced 1.5 s after canvas change; `suppressAutoSaveRef` skips the first effect after a load to avoid a redundant write. Save status driven by `isDirty`/`lastSavedAt` state (not stale `mutation.isSuccess`). Added `handleDrop`/`handleDragOver` on the canvas wrapper div with `project()` coordinate conversion (ReactFlow v11 API).
+*   **`/review` run** → 4 findings fixed: removed `!nodes.length` guard (prevented persisting canvas clear), replaced `isSuccess` indicator, removed redundant `pcbProjects !== undefined` guard, removed empty `export type { }`.
+*   **Post-review fixes (2026-06-17):** `ComponentLibraryPanel.tsx` — removed stray `export default` (named-export-only rule). `AGENTS.md` — added `EnhancedPCBEditor` and `PCBSchematicEditor` to the ReactFlow hex-literal exception list (same justification as `SchematicEditor`: no amber/wire-color token in the design system; ReactFlow canvas rendering requires direct color values).
+*   **Gates (2026-06-17):** root `tsc` **0** ✓ · changes uncommitted.
+
+### System B OAuth (service connections / integrations) — made real (2026-06-17, Linux)
+The integrations OAuth (Drive/OneDrive/Dropbox, YouTube, social publishing — **separate from login OAuth**) couldn't actually be configured. Two wiring bugs + a UI gap fixed, and Gmail send added:
+*   **Credentials were read from `process.env.*` once at module load** → the Settings wizard was ignored. `server/oauth/oauthClients.ts` now resolves client id/secret **per-call** via `SettingsService.getSecret(settingsKey, envVar)` (env→settings-file precedence, same as AI keys; mtime-cached/live). New `PROVIDER_CREDENTIALS` map + `isPlatformConfigured()`/`listOAuthPlatforms()`.
+*   **Desktop redirect-URI mismatch** (hardcoded `localhost:5173`; backend runs on 37291). New `getRedirectUri()` = `PUBLIC_URL` or `http://localhost:${PORT}` — desktop (`PORT=37291`) now lines up with no Electron change.
+*   **New Settings → Accounts → "Service Connections" card** (`ServiceConnectionsCard` in `client/src/pages/Settings.tsx`): 10 providers × client id/secret, copyable callback URI, configured badges, `isAdmin`-gated, saves via `system.saveKeys` (admin). New `system.integrationsStatus` (protected) feeds it.
+*   **Gmail send is now a real integration:** new `server/routers/gmailRouter.ts` (`gmail` namespace) — `sendEmail` (**cloudProcedure**, refresh-on-401-and-persist, CR/LF header-injection guard + RFC-2047 subject encoding) + `status`. `gmail` provider added to `oauthClients.ts` + `oauthRouter` enum (reuses Google endpoints, `gmail.send` scope).
+*   `/review` run → all 4 findings fixed. **Still dark until operators register OAuth apps + enter creds + register the exact callback URI.** Kaggle stays `kaggle.json`-based (unchanged).
+*   **Gates (2026-06-17):** root `tsc` **0** · `vitest` **350/350** (+12: `oauthClients.test.ts`, `gmailMessage.test.ts`) · `pnpm build` not run (WSL native-module fragility) · changes uncommitted.
 
 ---
 

@@ -109,6 +109,25 @@ export const systemRouter = router({
     };
   }),
 
+  /**
+   * Report which service-connection (System B) integrations have OAuth client
+   * credentials configured — booleans only, never the secrets. Also returns the
+   * exact callback base URL the operator must register with each provider. This
+   * is server-computed because in the packaged desktop app the renderer origin
+   * is `app://omnecor` (not a valid http redirect target).
+   */
+  integrationsStatus: protectedProcedure.query(async () => {
+    const { listOAuthPlatforms, isPlatformConfigured, getRedirectUri } = await import(
+      "../oauth/oauthClients.js"
+    );
+    const platforms = listOAuthPlatforms();
+    const configured: Record<string, boolean> = {};
+    for (const p of platforms) configured[p] = isPlatformConfigured(p);
+    // Strip the trailing "/<platform>" to expose just the callback base.
+    const callbackBase = getRedirectUri("").replace(/\/$/, "");
+    return { platforms, configured, callbackBase };
+  }),
+
   saveSettings: publicProcedure
     .input(z.object({ settings: z.record(z.string(), z.unknown()) }))
     .mutation(({ input }) => {

@@ -115,7 +115,7 @@ These are absolute. No exceptions, no "just this once."
 - **Never use raw Tailwind color classes** (e.g. `text-blue-500`, `bg-gray-900`).
   Use semantic token classes only (e.g. `text-foreground`, `bg-card`, `text-accent`).
   The only legitimate exceptions are: `EmbeddedTerminal` (xterm theme), `ThreeViewer`
-  and `SchematicEditor` (Three.js/ReactFlow require direct values), `WebPreview`
+  and `SchematicEditor`, `EnhancedPCBEditor`, `PCBSchematicEditor` (Three.js/ReactFlow require direct values), `WebPreview`
   (sandboxed iframe). All other hex literals are violations.
 - **Named exports only** for React components. Never `export default function`.
 - **Explicit prop interfaces** on every component. Never `any` or implicit typing.
@@ -243,6 +243,9 @@ Every entry here is a real problem that was hit and solved in this codebase.
 | Phase2 router duplicates confusing security assessment | `server/phase2/routers/` had stale copies of live routers | Deleted 6 dead files — always check `routers.ts` registration first |
 | `pnpm/action-setup@v4` CI fail | Both `version:` in workflow and `packageManager` in package.json were set | Remove `version:` from workflow — let action read `packageManager` field |
 | Node 18 tests failing in CI | `globalThis.crypto.getRandomValues` undefined in Node 18 Vitest | Dropped Node 18 from matrix; use Node 22+ and 24+ only |
+| Integration OAuth creds ignored / "Missing OAuth credentials" despite Settings wizard | `oauthClients.ts` captured `process.env.*` once at module load | Resolve per-call via `SettingsService.getSecret(settingsKey, envVar)` — env→settings-file precedence, like AI keys. Never re-capture env at module load |
+| OAuth callback never lands in packaged desktop app | Redirect URI hardcoded `localhost:5173`; backend listens on `:37291` | Build it from one source: `getRedirectUri()` = `PUBLIC_URL` or `http://localhost:${OMNECOR_PORT\|\|PORT\|\|3000}`. Desktop is spawned with `PORT=37291` |
+| Gmail/email header injection via subject | Free-text header interpolated raw into RFC-2822 | Strip `[\r\n]` from header values (see `gmailRouter.encodeHeaderValue`); RFC-2047 base64 encoded-word for non-ASCII |
 
 ---
 

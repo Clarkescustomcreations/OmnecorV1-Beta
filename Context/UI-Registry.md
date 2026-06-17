@@ -14,7 +14,32 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 
 ---
 
-## Global Summary (Updated 2026-06-15 Session 16 - Chat Input Layout Redesign)
+## Global Summary (Updated 2026-06-17 Session 18 - Server-Backed Scripts Library)
+
+### Session 18 (2026-06-17) — Server-Backed Scripts Library
+Scripts are now persisted server-side in a new `saved_scripts` DB table (per-user, integer PK, `project` field). Replaced the old localStorage-only store. One-time migration lifts legacy localStorage scripts to the server on first load. All script CRUD (save from chat, list, rename, delete, select-to-inject) is now **CONNECTED** via `trpc.scripts.*`.
+
+- **New router:** `server/routers/scriptsRouter.ts` — `list`, `listProjects`, `create`, `update`, `delete` (all `protectedProcedure`, user-scoped).
+- **New table:** `saved_scripts` — integer PK, `userId`, `name`, `code`, `language`, `project`, timestamps. Two indexes (`userId`, `userId+project`). Migration `0001_equal_shiva.sql` applied.
+- **`scriptStorage.ts`** — gutted localStorage CRUD; now only exports `SavedScript` type (inferred from router) + `getLegacyLocalScripts` / `clearLegacyLocalScripts` migration helpers.
+- **`ConversationList.tsx`** — script id callbacks changed `string → number`; `timeAgo()` now accepts `string | Date` (superjson deserialises DB timestamps as `Date`).
+- **`Chat.tsx`** — scripts loaded via `trpc.scripts.list.useQuery()`; delete/rename are mutations with cache invalidation + `onError` toasts; migration `useEffect` runs on mount.
+- **`ChatInterface.tsx`** — "Save Script" dialog now calls `trpc.scripts.create.useMutation()` with pending state on the button; no more `omnecor:scripts_updated` window event.
+- **Design:** no visual changes — all existing script-panel styles preserved.
+
+---
+
+## Global Summary (Updated 2026-06-17 Session 17 - Service Connections OAuth Card)
+
+### Session 17 (2026-06-17) — Service Connections (System B OAuth) card
+New UI in **`client/src/pages/Settings.tsx`**, Accounts tab, rendered after `SocialLoginCard`:
+- **`ServiceConnectionsCard`** — operator enters OAuth client id/secret for the 10 service-connection providers (YouTube, Gmail, Google Drive, OneDrive, Dropbox, X/Twitter, LinkedIn, Facebook, Instagram, TikTok). Status: **CONNECTED**.
+  - Status badges (Configured / Not configured) ← `trpc.system.integrationsStatus.useQuery()` (per-platform booleans + server-computed callback base; server-side because desktop `window.location.origin` is `app://omnecor`).
+  - Per-provider Client ID + Client Secret inputs (**LOCAL** controlled state) → saved via `trpc.system.saveKeys.useMutation()` (admin) on "Save Connections". **CONNECTED**.
+  - Copyable redirect-URI block (`navigator.clipboard`). **LOCAL**.
+  - `isAdmin`-gated (via `trpc.auth.me`): non-admins get disabled inputs + "Admin or Owner role required" note (mirrors the ValetRouterPanel pattern), since `saveKeys` is `adminProcedure`.
+- **Design tokens:** semantic only (`text-accent`, `text-muted-foreground`, `bg-muted/40`, `border`) — no raw color classes. `Share2` icon for the card title.
+- **Source-of-truth pair:** client `INTEGRATION_PROVIDERS` list ↔ server `PROVIDER_CREDENTIALS` (`server/oauth/oauthClients.ts`) — keep platform keys + settings-key names in sync (comment marks it).
 
 ### Session 16 (2026-06-15) — Chat Input Layout Redesign & UI Cleanup
 - **ChatInput.tsx & ChatInterface.tsx Layout & Styling**:
@@ -1046,7 +1071,7 @@ Read-only display component. No interactive elements.
 | Sandboxed Toggle Button | Sandboxed | onToggleSandbox callback | None | LOCAL |
 
 ### COMPONENT: ConversationList.tsx
-**Notes:** All rename/delete callbacks are passed from parent — ConversationList has no direct API calls.
+**Notes:** All rename/delete callbacks are passed from parent — ConversationList has no direct API calls. Script callbacks use `number` IDs (integer DB PK, Session 18). `timeAgo()` accepts `string | Date`.
 
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
@@ -1064,11 +1089,11 @@ Read-only display component. No interactive elements.
 | Inline edit (conversation) | rename | onChange → confirmEdit → onRename callback | None | LOCAL |
 | Edit hover button | edit | startEdit | None | LOCAL |
 | Delete hover button | delete | onDelete callback | None | LOCAL |
-| Script list item | click | onSelectScript callback | None | LOCAL |
-| Inline edit (script) | rename | onChange → confirmEdit → onRenameScript callback | None | LOCAL |
+| Script list item | click | onSelectScript callback (injects into ChatInput via omnecor:inject_chat) | None | LOCAL |
+| Inline edit (script) | rename | onChange → confirmEdit → onRenameScript(number, string) callback | trpc.scripts.update.useMutation (via Chat.tsx) | CONNECTED |
 | More menu trigger | dropdown | DropdownMenuTrigger | None | LOCAL |
-| Dropdown — Rename | menu item | startEdit | onRenameScript callback | LOCAL |
-| Dropdown — Delete | menu item | onDeleteScript callback | None | LOCAL |
+| Dropdown — Rename | menu item | startEdit | trpc.scripts.update.useMutation (via Chat.tsx) | CONNECTED |
+| Dropdown — Delete | menu item | onDeleteScript(number) callback | trpc.scripts.delete.useMutation (via Chat.tsx) | CONNECTED |
 
 ### COMPONENT: ModelSelector.tsx
 **Notes:** Two background queries polling model discovery.
@@ -1134,7 +1159,7 @@ Read-only display component. No interactive elements.
 | Kill Process Button (per job) | kill | killMutation.mutate({jobId}) | trpc.jobs.cancel.useMutation | CONNECTED |
 
 ### COMPONENT: ChatInterface.tsx
-**Notes:** Script saving goes to localStorage only. Display settings (timestamps/tokens/memory) go to localStorage only. Message copy/edit/delete are state-only callbacks. Fiction mode shows persistent purple banner with persona selector; terminal toggle hidden when fiction active.
+**Notes:** Script saving now goes to server via `trpc.scripts.create` (Session 18 — previously localStorage). Display settings (timestamps/tokens/memory) go to localStorage only. Message copy/edit/delete are state-only callbacks. Fiction mode shows persistent purple banner with persona selector; terminal toggle hidden when fiction active.
 
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
@@ -1164,7 +1189,7 @@ Read-only display component. No interactive elements.
 | Save Script Dialog — Script Name Input | name | setScriptName | None | LOCAL |
 | Save Script Dialog — Project Folder Input | folder | setScriptProject | None | LOCAL |
 | Save Script Dialog — Cancel Button | cancel | setShowSaveDialog(false) | None | LOCAL |
-| Save Script Dialog — Save to Library Button | save | confirmSave | localStorage | LOCAL |
+| Save Script Dialog — Save to Library Button | save | confirmSave → saveScriptMutation.mutate | trpc.scripts.create.useMutation | CONNECTED |
 | Copy (user message) | copy | onCopy | None | LOCAL |
 | Edit (user message) | edit | setEditing(true) | None | LOCAL |
 | Delete (user message) | delete | onDelete | onDeleteMessage callback | LOCAL |
@@ -1358,19 +1383,24 @@ Read-only 3D canvas. OrbitControls only (pan/zoom/rotate). No interactive form e
 | Tab triggers (Installed / Pull / Delete / Modelfile) | tabs | tab state | None | LOCAL |
 
 ### COMPONENT: EnhancedPCBEditor.tsx
-**Notes:** Keyboard shortcuts: Ctrl+Z (undo), Ctrl+Shift+Z (redo), Delete, Ctrl+S (save). Save and load are the only server calls.
+**Notes:** Keyboard shortcuts: Ctrl+Z (undo), Ctrl+Shift+Z (redo), Delete, Ctrl+S (save). Component fully self-contained — no external projectId prop. Auto-creates "Default Design" project on first load; auto-selects first project thereafter. Auto-save fires 1.5 s after any canvas change. Load suppresses the first auto-save via `suppressAutoSaveRef` to avoid a redundant write.
 
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
+| Project dropdown (bar above toolbar) | select | setPcbProjectId | trpc.pcbEditor.getProjects.useQuery | CONNECTED |
+| Auto-create project | programmatic | createProjectMutation (fires once if no projects) | trpc.pcbEditor.createProject.useMutation | CONNECTED |
+| Project dropdown — create new | input + button | createProjectMutation.mutate | trpc.pcbEditor.createProject.useMutation | CONNECTED |
+| Auto-save (1.5 s debounce) | programmatic | saveDesignMutation.mutate | trpc.pcbEditor.saveDesign.useMutation | CONNECTED |
+| Ctrl+S | keyboard | handleSaveDesign → saveDesignMutation.mutate | trpc.pcbEditor.saveDesign.useMutation | CONNECTED |
+| Load Design (on project select) | programmatic | latestDesignQuery data effect → setNodes/setEdges | trpc.pcbEditor.getLatestDesign.useQuery | CONNECTED |
+| ReactFlow Canvas — onDrop | drag | handleDrop → project() coords → handleAddComponent | None | LOCAL |
+| ReactFlow Canvas — onDragOver | drag | handleDragOver (preventDefault + dropEffect='copy') | None | LOCAL |
 | ReactFlow Canvas — node click | onNodeClick | handleNodeClick | None | LOCAL |
 | ReactFlow Canvas — pane click | onClick | handleCanvasClick (deselect) | None | LOCAL |
 | ReactFlow Canvas — edge connect | onConnect | handleConnect → addEdge | None | LOCAL |
 | Ctrl+Z | keyboard | handleUndo | None | LOCAL |
 | Ctrl+Shift+Z | keyboard | handleRedo | None | LOCAL |
 | Delete key | keyboard | handleDeleteNodes | None | LOCAL |
-| Ctrl+S | keyboard | handleSaveDesign | trpc.pcbEditor.saveDesign.mutate | CONNECTED |
-| Load Design | programmatic | handleLoadDesign(designId) | fetch /api/trpc/editor.loadDesign | CONNECTED |
-| Component Drag-Drop (from library panel) | drag | handleAddComponent | None | LOCAL |
 | Rotate (from toolbar callback) | callback | handleRotateNode | None | LOCAL |
 | Flip (from toolbar callback) | callback | handleFlipNode | None | LOCAL |
 | Rotate Canvas Button | click | handleRotateCanvas (rotates all nodes 90°) | None | LOCAL |
@@ -1420,11 +1450,14 @@ Read-only display. Single close button (callback).
 | Rotation Buttons (0°/90°/180°/270°) | 4 buttons | handlePropertyChange → onUpdateNode callback | None | LOCAL |
 
 ### COMPONENT: ComponentLibraryPanel.tsx
+**Notes:** 49 components across 9 categories. Supports click-to-add (random offset near canvas centre) and drag-and-drop (canvas `onDrop` receives `componentId` via `dataTransfer`). Search shows flat results with no category tabs. Footer shows component + category count.
+
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
 | Search Input | search | setSearchQuery | None | LOCAL |
 | Category TabsTrigger (dynamic) | tabs | tab state | None | LOCAL |
-| Component Item (draggable) | drag | handleDragStart / handleDragEnd | onAddComponent callback | LOCAL |
+| Component Card — click | click | handleClick → onAddComponent(id, {x: 200±rand, y: 160±rand}) | onAddComponent callback | LOCAL |
+| Component Card — drag | drag | handleDragStart (sets dataTransfer 'componentId') / handleDragEnd | onAddComponent via canvas drop | LOCAL |
 
 ### COMPONENT: SchematicEditor.tsx
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
@@ -2449,3 +2482,135 @@ Unified alert feed + Agent Messenger. Hooks: `use-notifications.ts`, `use-agent-
 ### Deferred (next pass)
 - LiteRT/MediaPipe `.task` engine so Google AI Edge Gallery models run (custom native module + share-in).
 - Desktop auto-linking of synced chats to projects/neural maps on content detection.
+
+---
+
+## SECTION — VISUAL PATTERNS (Component Design Tokens)
+
+These tables record the exact Tailwind classes used for each established component pattern.
+Any future component of the same type must match these patterns.
+
+### Script List Row (ConversationList.tsx — Scripts panel)
+
+File: `client/src/components/chat/ConversationList.tsx`
+Last updated: 2026-06-17 (Session 18)
+
+| Property | Class |
+|---|---|
+| Row background (idle) | transparent (no bg class) |
+| Row background (hover) | `hover:bg-muted/50` |
+| Row border (idle) | `border border-transparent` |
+| Row border (hover) | `hover:border-border/50` |
+| Row border radius | `rounded-lg` |
+| Row padding | `px-2.5 py-2` |
+| Row gap (icon → content) | `gap-2` |
+| Icon container | `w-5 h-5 rounded bg-blue-500/10` |
+| Icon colour | `text-blue-500` (Terminal icon, `w-3 h-3`) |
+| Name text | `text-xs font-semibold text-foreground truncate` |
+| Project badge | `Badge variant="secondary"` + `text-[9px] px-1 h-3.5 bg-blue-500/5 text-blue-500/80 border-blue-500/20` |
+| Timestamp text | `text-[10px] text-muted-foreground opacity-60` |
+| Hover actions container | `absolute right-1.5 top-2 hidden group-hover:flex gap-0.5` |
+| Hover action button | `h-5 w-5 ghost bg-background/80 backdrop-blur-sm border border-border/50` |
+| Delete menu item | `text-destructive` |
+| Inline edit input | `h-5 text-xs py-0 px-1` |
+| Empty state | `px-2 py-8 text-xs text-muted-foreground text-center italic` |
+
+**Pattern notes:**
+- The `blue-500` family is the intentional accent for the scripts feature (terminal/code association). This is a pre-existing exception to the "semantic tokens only" rule — acceptable because `text-blue-500` has no semantic equivalent in the current token set and the design was reviewed and kept.
+- Row uses `group` class on the container to drive `hidden group-hover:flex` on action buttons — the standard hover-reveal pattern for all list rows in the sidebar.
+- `border border-transparent` + `hover:border-border/50` is the sidebar row hover pattern; match it in any new sidebar list item.
+- Script name inline edit: `Input` component with `h-5 text-xs py-0 px-1`, `autoFocus`, `onBlur=confirmEdit`, `stopPropagation` on click to prevent row selection.
+
+### Save Script Dialog (ChatInterface.tsx)
+
+File: `client/src/components/ChatInterface.tsx`
+Last updated: 2026-06-17 (Session 18)
+
+| Property | Class |
+|---|---|
+| Dialog width | `sm:max-w-md` |
+| Title icon | `Terminal w-5 h-5 text-blue-500` |
+| Form field spacing | `space-y-4 py-2` |
+| Field group | `space-y-1.5` |
+| Field label | `text-xs font-semibold uppercase tracking-wider text-muted-foreground` |
+| Input | standard `Input` component (no extra classes) |
+| Footer button — cancel | `Button variant="outline" size="sm"` |
+| Footer button — confirm | `Button size="sm"` with `disabled={mutation.isPending}` |
+
+**Pattern notes:**
+- Form field label style (`text-xs font-semibold uppercase tracking-wider text-muted-foreground`) is used across Settings panels. Match it in any dialog that collects user-named items.
+- Confirm button must reflect mutation pending state with `disabled` + label change (`"Saving…"`). Do not use a spinner here — label change is the established pattern in this dialog.
+
+### PCB Project Bar (EnhancedPCBEditor.tsx)
+
+File: `client/src/components/pcb/EnhancedPCBEditor.tsx`
+Last updated: 2026-06-17 (Session 19)
+
+| Property | Class |
+|---|---|
+| Bar container | `flex items-center gap-2 px-3 py-1.5 border-b border-border bg-card` |
+| Label text | `text-xs font-medium text-foreground` |
+| Project name (current) | `text-xs font-semibold text-foreground` |
+| Dropdown trigger button | `text-xs hover:text-accent transition-colors` |
+| Dropdown panel | `bg-card border border-border rounded-md shadow-lg` |
+| Dropdown item (inactive) | `text-xs text-foreground hover:bg-muted px-3 py-1.5` |
+| Dropdown item (active) | `text-xs font-semibold text-accent bg-accent/10 px-3 py-1.5` |
+| Create project input | `bg-background border border-border rounded px-2 py-0.5 text-xs text-foreground focus:border-accent` |
+| Save status — saving | `text-xs text-muted-foreground italic` + `Loader2` icon |
+| Save status — unsaved | `text-xs text-muted-foreground italic` (text: "Unsaved changes…") |
+| Save status — saved | `text-xs text-muted-foreground` + `Save` icon (text: "Saved") |
+| Divider | `ml-auto flex items-center gap-1.5` (right-aligned save status) |
+
+**Pattern notes:**
+- Bar sits between the page header and the EditorToolbar; `border-b border-border` is the separator. Never use a shadow here — one `border-b` is enough.
+- Save status uses `isDirty`/`lastSavedAt` state flags (not `mutation.isSuccess`, which stays `true` permanently). Stale "Saved" indicators are a known pitfall — always use a `lastSavedAt` date state updated in `mutation.onSuccess`.
+- Project dropdown is a manually positioned `absolute` panel (not a shadcn `Select`), controlled by a `showProjectDropdown` boolean — keeps it inline with the toolbar aesthetic.
+
+### Component Library Panel (ComponentLibraryPanel.tsx)
+
+File: `client/src/components/pcb/ComponentLibraryPanel.tsx`
+Last updated: 2026-06-17 (Session 19)
+
+| Property | Class |
+|---|---|
+| Panel container | `w-64 border-r border-border bg-card flex flex-col min-h-0 shadow-sm` |
+| Header section | `p-3 border-b border-border` |
+| Panel title | `text-sm font-semibold text-foreground mb-1` |
+| Hint text | `text-[10px] text-muted-foreground mb-2` |
+| Search icon | `absolute left-2 top-2.5 h-4 w-4 text-muted-foreground` |
+| Search input | `pl-8 h-8 text-sm` (standard `Input` component) |
+| Tab list | `w-full justify-start rounded-none border-b border-border bg-muted/50 p-0 overflow-x-auto` |
+| Tab trigger | `rounded-none border-b-2 border-transparent data-[state=active]:border-accent text-[10px] shrink-0` |
+| Tab content padding | `p-2` |
+| Content spacing | `space-y-2` |
+| Empty state | `text-xs text-muted-foreground text-center py-4` |
+| Footer | `p-2 border-t border-border bg-muted/40 text-[10px] text-muted-foreground` |
+
+**Pattern notes:**
+- `min-h-0 flex-1` on the ScrollArea is required for flex children to scroll correctly; without `min-h-0` the scroll area expands to its content height and overflows the panel.
+- Category tabs use `text-[10px]` and only show the first word of the category name (`category.split(' ')[0]`) to fit in the narrow panel width.
+- When `searchQuery` is non-empty, the Tabs component is replaced by a flat list — no category context needed during search.
+
+### Component Card (ComponentLibraryPanel.tsx — ComponentCard sub-component)
+
+File: `client/src/components/pcb/ComponentLibraryPanel.tsx`
+Last updated: 2026-06-17 (Session 19)
+
+| Property | Class |
+|---|---|
+| Card container (idle) | `p-2 rounded border bg-muted/40 border-border cursor-pointer transition-all select-none` |
+| Card container (hover) | `hover:bg-accent/10 hover:border-accent/50` |
+| Card container (active/press) | `active:bg-accent/30` |
+| Card container (dragging) | `bg-accent/20 border-accent opacity-50` |
+| Symbol icon container | `w-8 h-8 bg-background border border-border rounded flex items-center justify-center text-xs text-muted-foreground flex-shrink-0` |
+| Symbol SVG wrapper | `w-6 h-6` (rendered via `dangerouslySetInnerHTML`) |
+| Component name | `text-xs font-semibold text-foreground truncate` |
+| Component description | `text-[10px] text-muted-foreground truncate` |
+| Tag pill | `inline-block text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded` |
+| Tag container | `flex flex-wrap gap-1` (shows first 2 tags only) |
+
+**Pattern notes:**
+- Card is both draggable and clickable. `select-none` prevents text highlighting during drag. `transition-all` covers the border + background colour transition.
+- Dragging state (`isDragging`) replaces the hover classes — do not nest dragging styles inside hover pseudoclasses or they will conflict.
+- Symbol SVGs are inline strings from `componentLibrary.ts` — use `dangerouslySetInnerHTML` with known-safe static library content only. Never pass user-supplied SVG here.
+- Tag display is capped at 2 (`tags.slice(0, 2)`) to keep card height consistent. Full tag list lives in the component's `properties` or `tags` array for AI reference use.

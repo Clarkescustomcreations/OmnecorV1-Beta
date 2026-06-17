@@ -69,7 +69,7 @@ Omnecor offers a wide array of capabilities, including:
 
 ### 1.4. Supported Platforms
 
-Omnecor is primarily developed for Linux-based operating systems, with official support for Debian 12 and Ubuntu 20.04+ (LTS recommended). While it may run on other platforms (e.g., Windows via WSL2, macOS), full compatibility is not guaranteed.
+Omnecor is fully cross-platform with official support for Windows 10/11 (native installer), Linux (Debian 12, Ubuntu 20.04+ recommended via .deb, AppImage, and Flatpak), and has a companion app for Android 9+ (Mobile thin client).
 
 ### 1.5. Intended Users
 
@@ -200,7 +200,7 @@ To ensure optimal performance and compatibility, please ensure your system meets
 
 | Component | Minimum Requirement | Recommended for Local LLM Inference |
 |---|---|---|
-| **Operating System** | Debian 12, Ubuntu 20.04+ (LTS recommended) | Debian 12, Ubuntu 22.04+ |
+| **Operating System** | Windows 10/11 (x64), Debian 12, Ubuntu 20.04+ (LTS), Android 9+ (mobile thin client) | Windows 11, Debian 12, Ubuntu 22.04+ |
 | **CPU** | 4+ physical cores | 8+ physical cores |
 | **RAM** | 8GB | 16GB+ |
 | **Disk Space** | 20GB free space on NVMe SSD | 50GB+ free space on NVMe SSD |
@@ -216,7 +216,7 @@ To ensure optimal performance and compatibility, please ensure your system meets
 
 ### 3.2. Windows and macOS Specifics
 
-While Omnecor is primarily developed for Linux, it may be possible to run it on Windows (via WSL2) or macOS. However, specific instructions and full compatibility are not guaranteed. Users attempting to install on these platforms should be familiar with Node.js development and troubleshooting in their respective environments.
+Omnecor runs natively on Windows 10/11 and Linux, and provides developer support for macOS. The client interface communicates locally or federates over LAN/Tailscale with the Android companion app.
 
 ---
 

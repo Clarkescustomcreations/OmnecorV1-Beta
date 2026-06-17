@@ -33,7 +33,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 ### Core Infrastructure
 - **Unified Backend** — Centralized Express.js/tRPC engine with real-time UI/data state synchronization via WebSockets.
 - **End-to-End Type Safety** — tRPC + Drizzle ORM + Zod across the full stack. No runtime type surprises.
-- **Flexible Persistence** — Support for **SQLite** (zero-infra default) and **MySQL/TiDB** (multi-user / production). Chat history, session state, budgets, and logs are stored reliably.
+- **Flexible Persistence** — Unified **SQLite/libSQL** database engine. Chat history, session state, budgets, and logs are stored reliably local-first or synced to a Turso database cloud.
 - **Real-Time WebSocket Layer** — Live event streaming for AI responses, training progress, hardware jobs, budget alerts, and mesh topology.
 
 ### AI & Model Hub
@@ -214,7 +214,7 @@ graph TD
     SVC --> AN[AgentNetworkingService\nSocial Media OAuth]
     SVC --> CC[CloudComputeService\nVast.ai / RunPod / Lambda]
     SVC --> MCP[MCPService\nExternal Tool Providers]
-    BE --> DB[(SQLite / MySQL)]
+    BE --> DB[(SQLite / libSQL)]
     BE --> OM[OMMESH Mesh\nmTLS Federation]
     3D[3D Designer\nBlender / KiCad GUI] -.->|Bridge| PM
     Podcast[Podcast Studio] --> SVC

@@ -11,7 +11,7 @@ Before starting any development, ensure your local environment is set up correct
 To run Omnecor in development mode, which includes live reloading for both frontend and backend changes:
 
 ```bash
-npm run dev
+pnpm dev
 ```
 
 This command will:
@@ -29,7 +29,7 @@ If you make changes to the Drizzle ORM schema (`drizzle/schema.ts`), you need to
     ```
 2.  **Apply Migration**: This command applies the pending migrations to your local database.
     ```bash
-    pnpm run db:push
+    pnpm db:migrate
     ```
 
 ## 2. Git Branching Strategy

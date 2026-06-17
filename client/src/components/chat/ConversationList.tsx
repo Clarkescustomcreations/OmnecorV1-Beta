@@ -41,11 +41,11 @@ interface ConversationListProps {
   // Script management
   scripts?: SavedScript[];
   onSelectScript?: (script: SavedScript) => void;
-  onDeleteScript?: (id: string) => void;
-  onRenameScript?: (id: string, name: string) => void;
+  onDeleteScript?: (id: number) => void;
+  onRenameScript?: (id: number, name: string) => void;
 }
 
-function timeAgo(iso: string): string {
+function timeAgo(iso: string | Date): string {
   const diff = Date.now() - new Date(iso).getTime();
   if (diff < 60_000) return "just now";
   if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`;
@@ -95,9 +95,9 @@ export default function ConversationList({
     return filtered;
   }, [scripts, search, sortByProject]);
 
-  const startEdit = (id: string, title: string, e: React.MouseEvent) => {
+  const startEdit = (id: string | number, title: string, e: React.MouseEvent) => {
     e.stopPropagation();
-    setEditingId(id);
+    setEditingId(String(id));
     setEditValue(title);
   };
 
@@ -106,7 +106,7 @@ export default function ConversationList({
       if (mode === "chats") {
         onRename(editingId, editValue.trim());
       } else {
-        onRenameScript?.(editingId, editValue.trim());
+        onRenameScript?.(Number(editingId), editValue.trim());
       }
     }
     setEditingId(null);
@@ -351,7 +351,7 @@ export default function ConversationList({
                       <Terminal className="w-3 h-3 text-blue-500" />
                     </div>
                     <div className="flex-1 min-w-0">
-                      {editingId === script.id ? (
+                      {editingId === String(script.id) ? (
                         <Input
                           value={editValue}
                           onChange={e => setEditValue(e.target.value)}

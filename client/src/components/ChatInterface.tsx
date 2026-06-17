@@ -46,7 +46,7 @@ import { toast } from "sonner";
 import type { ChatMessage, ContextFile, SelectedModel } from "@/lib/chatContext";
 import ChatInput, { type SlashCommand } from "@/components/chat/ChatInput";
 import ModelSelector from "@/components/chat/ModelSelector";
-import { saveScript } from "@/lib/scriptStorage";
+import { trpc } from "@/lib/trpc";
 import {
   Dialog,
   DialogContent,
@@ -147,6 +147,18 @@ function AssistantBubble({
   const [scriptProject, setScriptProject] = useState("");
   const [extractedCode, setExtractedCode] = useState("");
 
+  const scriptsUtils = trpc.useUtils();
+  const saveScriptMutation = trpc.scripts.create.useMutation({
+    onSuccess: (row) => {
+      scriptsUtils.scripts.list.invalidate();
+      setShowSaveDialog(false);
+      toast.success(`Script "${row.name}" saved to ${row.project}`);
+    },
+    onError: (err) => {
+      toast.error(err.message || "Failed to save script");
+    },
+  });
+
   useCodeBlockCopy(contentRef, message.content);
 
   const handleSaveScriptClick = useCallback(() => {
@@ -166,17 +178,13 @@ function AssistantBubble({
       toast.error("Please provide a name for the script");
       return;
     }
-    saveScript({
+    saveScriptMutation.mutate({
       name: scriptName.trim(),
       project: scriptProject.trim() || "Default",
       code: extractedCode,
       language: "python",
       description: `Saved from chat: ${message.content.slice(0, 100)}...`,
     });
-    setShowSaveDialog(false);
-    toast.success(`Script "${scriptName}" saved to ${scriptProject || "Default"}`);
-    // Trigger sidebar update
-    window.dispatchEvent(new CustomEvent("omnecor:scripts_updated"));
   };
 
   const hasPython = message.content.includes("```python") || message.content.includes("```py");
@@ -336,7 +344,9 @@ function AssistantBubble({
           </div>
           <DialogFooter>
             <Button variant="outline" size="sm" onClick={() => setShowSaveDialog(false)}>Cancel</Button>
-            <Button size="sm" onClick={confirmSave}>Save to Library</Button>
+            <Button size="sm" onClick={confirmSave} disabled={saveScriptMutation.isPending}>
+              {saveScriptMutation.isPending ? "Saving…" : "Save to Library"}
+            </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>

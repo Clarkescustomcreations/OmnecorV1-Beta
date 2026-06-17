@@ -1,10 +1,7 @@
 import { AuthorizationCode } from "simple-oauth2";
+import { SettingsService } from "../phase2/services/SettingsService.js";
 
-interface OAuthConfig {
-  client: {
-    id: string;
-    secret: string;
-  };
+interface OAuthEndpoints {
   auth: {
     tokenHost: string;
     tokenPath: string;
@@ -15,26 +12,20 @@ interface OAuthConfig {
   };
 }
 
-const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
+// Static authorization-server endpoints per provider. Client credentials are
+// resolved separately and lazily (see resolveCredentials) so that both env vars
+// AND the in-app Settings/credentials wizard work — and changes are picked up
+// without a server restart.
+const OAUTH_ENDPOINTS: Record<string, OAuthEndpoints> = {
   twitter: {
-    client: {
-      id: process.env.TWITTER_CLIENT_ID || "",
-      secret: process.env.TWITTER_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://api.twitter.com",
       tokenPath: "/2/oauth2/token",
       authorizePath: "https://twitter.com/i/oauth2/authorize",
     },
-    options: {
-      authorizationMethod: "body",
-    },
+    options: { authorizationMethod: "body" },
   },
   linkedin: {
-    client: {
-      id: process.env.LINKEDIN_CLIENT_ID || "",
-      secret: process.env.LINKEDIN_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://www.linkedin.com",
       tokenPath: "/oauth/v2/accessToken",
@@ -42,10 +33,6 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   instagram: {
-    client: {
-      id: process.env.INSTAGRAM_CLIENT_ID || "",
-      secret: process.env.INSTAGRAM_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://api.instagram.com",
       tokenPath: "/oauth/access_token",
@@ -53,10 +40,6 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   tiktok: {
-    client: {
-      id: process.env.TIKTOK_CLIENT_ID || "",
-      secret: process.env.TIKTOK_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://open.tiktokapis.com",
       tokenPath: "/v1/oauth/token",
@@ -64,10 +47,6 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   facebook: {
-    client: {
-      id: process.env.FACEBOOK_CLIENT_ID || "",
-      secret: process.env.FACEBOOK_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://www.facebook.com",
       tokenPath: "/v18.0/oauth/access_token",
@@ -75,10 +54,17 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   youtube: {
-    client: {
-      id: process.env.YOUTUBE_CLIENT_ID || "",
-      secret: process.env.YOUTUBE_CLIENT_SECRET || "",
+    auth: {
+      tokenHost: "https://oauth2.googleapis.com",
+      tokenPath: "/token",
+      authorizePath: "https://accounts.google.com/o/oauth2/v2/auth",
     },
+  },
+  // ---- Google Gmail (send) ----
+  // Uses the same Google OAuth endpoints as Drive/YouTube; a single Google Cloud
+  // OAuth client can serve all three (just add the gmail.send scope + this
+  // redirect URI in the console). Powers gmailRouter.sendEmail.
+  gmail: {
     auth: {
       tokenHost: "https://oauth2.googleapis.com",
       tokenPath: "/token",
@@ -86,14 +72,7 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   // ---- Cloud storage providers ----
-  // Post-auth file browser: GitHub directory listing after OAuth.
-  // Implementation deferred — see integrationsRouter.ts listRepositories procedure.
-  // The OAuth token exchange is complete; file browsing uses the stored token.
   google_drive: {
-    client: {
-      id: process.env.GOOGLE_DRIVE_CLIENT_ID || "",
-      secret: process.env.GOOGLE_DRIVE_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://oauth2.googleapis.com",
       tokenPath: "/token",
@@ -101,10 +80,6 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   dropbox: {
-    client: {
-      id: process.env.DROPBOX_CLIENT_ID || "",
-      secret: process.env.DROPBOX_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://api.dropboxapi.com",
       tokenPath: "/oauth2/token",
@@ -112,10 +87,6 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
     },
   },
   onedrive: {
-    client: {
-      id: process.env.ONEDRIVE_CLIENT_ID || "",
-      secret: process.env.ONEDRIVE_CLIENT_SECRET || "",
-    },
     auth: {
       tokenHost: "https://login.microsoftonline.com",
       tokenPath: "/common/oauth2/v2.0/token",
@@ -124,14 +95,78 @@ const OAUTH_CONFIGS: Record<string, OAuthConfig> = {
   },
 };
 
+// Maps each provider to its SettingsService key + env-var fallback for the
+// client id/secret. getSecret() reads ~/.omnecor/settings.json first (the
+// in-app Settings wizard, mtime-cached so edits are live) and falls back to the
+// env var — the same precedence AiProviderService uses for AI keys.
+const PROVIDER_CREDENTIALS: Record<
+  string,
+  { idKey: string; secretKey: string; idEnv: string; secretEnv: string }
+> = {
+  twitter: { idKey: "twitterClientId", secretKey: "twitterClientSecret", idEnv: "TWITTER_CLIENT_ID", secretEnv: "TWITTER_CLIENT_SECRET" },
+  linkedin: { idKey: "linkedinClientId", secretKey: "linkedinClientSecret", idEnv: "LINKEDIN_CLIENT_ID", secretEnv: "LINKEDIN_CLIENT_SECRET" },
+  instagram: { idKey: "instagramClientId", secretKey: "instagramClientSecret", idEnv: "INSTAGRAM_CLIENT_ID", secretEnv: "INSTAGRAM_CLIENT_SECRET" },
+  tiktok: { idKey: "tiktokClientId", secretKey: "tiktokClientSecret", idEnv: "TIKTOK_CLIENT_ID", secretEnv: "TIKTOK_CLIENT_SECRET" },
+  facebook: { idKey: "facebookClientId", secretKey: "facebookClientSecret", idEnv: "FACEBOOK_CLIENT_ID", secretEnv: "FACEBOOK_CLIENT_SECRET" },
+  youtube: { idKey: "youtubeClientId", secretKey: "youtubeClientSecret", idEnv: "YOUTUBE_CLIENT_ID", secretEnv: "YOUTUBE_CLIENT_SECRET" },
+  gmail: { idKey: "gmailClientId", secretKey: "gmailClientSecret", idEnv: "GMAIL_CLIENT_ID", secretEnv: "GMAIL_CLIENT_SECRET" },
+  google_drive: { idKey: "googleDriveClientId", secretKey: "googleDriveClientSecret", idEnv: "GOOGLE_DRIVE_CLIENT_ID", secretEnv: "GOOGLE_DRIVE_CLIENT_SECRET" },
+  dropbox: { idKey: "dropboxClientId", secretKey: "dropboxClientSecret", idEnv: "DROPBOX_CLIENT_ID", secretEnv: "DROPBOX_CLIENT_SECRET" },
+  onedrive: { idKey: "oneDriveClientId", secretKey: "oneDriveClientSecret", idEnv: "ONEDRIVE_CLIENT_ID", secretEnv: "ONEDRIVE_CLIENT_SECRET" },
+};
+
+/** Resolve a provider's client id/secret from the Settings file, then env. */
+function resolveCredentials(platform: string): { id: string; secret: string } {
+  const map = PROVIDER_CREDENTIALS[platform.toLowerCase()];
+  if (!map) throw new Error(`Unsupported platform: ${platform}`);
+  const settings = SettingsService.getInstance();
+  return {
+    id: settings.getSecret(map.idKey, process.env[map.idEnv]),
+    secret: settings.getSecret(map.secretKey, process.env[map.secretEnv]),
+  };
+}
+
+/** True when both client id and secret are configured (env or Settings). */
+export function isPlatformConfigured(platform: string): boolean {
+  try {
+    const { id, secret } = resolveCredentials(platform);
+    return Boolean(id && secret);
+  } catch {
+    return false;
+  }
+}
+
+/** All providers that support the authorization-code flow. */
+export function listOAuthPlatforms(): string[] {
+  return Object.keys(PROVIDER_CREDENTIALS);
+}
+
 export function getOAuthClient(platform: string) {
-  const config = OAUTH_CONFIGS[platform.toLowerCase()];
-  if (!config) throw new Error(`Unsupported platform: ${platform}`);
-  if (!config.client.id || !config.client.secret) {
+  const endpoints = OAUTH_ENDPOINTS[platform.toLowerCase()];
+  if (!endpoints) throw new Error(`Unsupported platform: ${platform}`);
+  const { id, secret } = resolveCredentials(platform);
+  if (!id || !secret) {
     throw new Error(`Missing OAuth credentials for ${platform}`);
   }
 
-  return new AuthorizationCode(config);
+  return new AuthorizationCode({
+    client: { id, secret },
+    auth: endpoints.auth,
+    ...(endpoints.options ? { options: endpoints.options } : {}),
+  });
+}
+
+/**
+ * Single source of truth for the OAuth callback URL the provider redirects the
+ * browser back to. `PUBLIC_URL` wins when set (web deployments behind a domain);
+ * otherwise it derives from the actual listen port so the packaged desktop app —
+ * whose backend listens on :37291, never localhost:5173 — lines up correctly.
+ * The operator must register this exact URI with each provider.
+ */
+export function getRedirectUri(platform: string): string {
+  const port = process.env.OMNECOR_PORT || process.env.PORT || "3000";
+  const base = process.env.PUBLIC_URL || `http://localhost:${port}`;
+  return `${base}/api/oauth/callback/${platform.toLowerCase()}`;
 }
 
 export interface OAuthTokenResponse {
@@ -148,7 +183,7 @@ export async function getOAuthAuthorizationUrl(
   codeChallenge?: string
 ): Promise<string> {
   const client = getOAuthClient(platform);
-  const redirectUri = `${process.env.PUBLIC_URL || "http://localhost:5173"}/api/oauth/callback/${platform}`;
+  const redirectUri = getRedirectUri(platform);
 
   const scopes = getPlatformScopes(platform);
 
@@ -183,7 +218,7 @@ export async function exchangeCodeForToken(
   codeVerifier?: string
 ): Promise<OAuthTokenResponse> {
   const client = getOAuthClient(platform);
-  const redirectUri = `${process.env.PUBLIC_URL || "http://localhost:5173"}/api/oauth/callback/${platform}`;
+  const redirectUri = getRedirectUri(platform);
 
   const tokenParams: Parameters<AuthorizationCode["getToken"]>[0] & Record<string, unknown> = {
     code,
@@ -233,7 +268,11 @@ export async function refreshOAuthToken(
  */
 function getProviderExtraAuthParams(platform: string): Record<string, string> {
   switch (platform.toLowerCase()) {
+    // All Google flows need offline access + a forced consent to receive a
+    // refresh token for long-lived API access.
     case "google_drive":
+    case "youtube":
+    case "gmail":
       return { access_type: "offline", prompt: "consent" };
     default:
       return {};
@@ -265,6 +304,13 @@ function getPlatformScopes(platform: string): string[] {
       "https://www.googleapis.com/auth/youtube.force-ssl",
       "https://www.googleapis.com/auth/youtube.upload",
     ],
+    // Gmail send only — least-privilege scope for outbound mail + userinfo for
+    // the connected account's display name/email.
+    gmail: [
+      "https://www.googleapis.com/auth/gmail.send",
+      "https://www.googleapis.com/auth/userinfo.email",
+      "https://www.googleapis.com/auth/userinfo.profile",
+    ],
     // ---- Cloud storage providers ----
     google_drive: ["https://www.googleapis.com/auth/drive.file"],
     dropbox: ["files.content.read"],
@@ -280,8 +326,7 @@ export async function fetchUserProfile(
   accessToken: string
 ): Promise<Record<string, unknown>> {
   const key = platform.toLowerCase();
-  const config = OAUTH_CONFIGS[key];
-  if (!config) throw new Error(`Unsupported platform: ${platform}`);
+  if (!OAUTH_ENDPOINTS[key]) throw new Error(`Unsupported platform: ${platform}`);
 
   // Dropbox's account endpoint is POST-only and returns a different shape; map
   // it into the common { name } shape the callback handler expects.
@@ -311,6 +356,7 @@ export async function fetchUserProfile(
     tiktok: "https://open.tiktokapis.com/v1/user/info/",
     facebook: "https://graph.facebook.com/me",
     youtube: "https://www.googleapis.com/youtube/v3/channels?part=snippet",
+    gmail: "https://www.googleapis.com/oauth2/v2/userinfo",
     // ---- Cloud storage providers ----
     google_drive:
       "https://www.googleapis.com/drive/v3/about?fields=user(displayName,emailAddress)",

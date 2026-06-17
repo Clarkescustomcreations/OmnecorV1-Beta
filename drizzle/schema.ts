@@ -529,6 +529,37 @@ export const personas = sqliteTable(
 export type PersonaRow = typeof personas.$inferSelect;
 export type InsertPersona = typeof personas.$inferInsert;
 
+/**
+ * Saved Scripts library.
+ *
+ * Python tools/scripts the AI generates in chat, saved per-user so they are
+ * reusable across sessions, devices and projects (replaces the old
+ * localStorage-only store which was trapped on a single browser). The `project`
+ * field is a free-text folder/tag; an empty/"Default" project means the script
+ * is global and selectable from any project.
+ */
+export const savedScripts = sqliteTable(
+  "saved_scripts",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId").notNull(),
+    name: text("name").notNull(),
+    description: text("description").notNull().default(""),
+    code: text("code").notNull(),
+    language: text("language").notNull().default("python"),
+    project: text("project").notNull().default("Default"),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+    updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+  },
+  (t) => [
+    index("saved_scripts_user_id_idx").on(t.userId),
+    index("saved_scripts_user_project_idx").on(t.userId, t.project),
+  ]
+);
+
+export type SavedScriptRow = typeof savedScripts.$inferSelect;
+export type InsertSavedScript = typeof savedScripts.$inferInsert;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Relational definitions (Drizzle relational query API)
 // ─────────────────────────────────────────────────────────────────────────────

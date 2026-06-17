@@ -736,6 +736,7 @@ export const Settings: React.FC = () => {
                 <TabsContent value="accounts">
                   <div className="space-y-6">
                     <SocialLoginCard />
+                    <ServiceConnectionsCard />
                     <ConnectedAccounts loginMethod={me?.loginMethod ?? null} />
                   </div>
                 </TabsContent>
@@ -1527,6 +1528,168 @@ const HardwarePanel: React.FC = () => {
     </div>
   );
 };
+// ---------------------------------------------------------------------------
+// Service Connections (System B) — OAuth client credentials for the
+// integrations that power Drive/OneDrive, YouTube, Gmail send and social
+// publishing. Independent of the Google/Microsoft *login* clients above.
+// ---------------------------------------------------------------------------
+
+interface IntegrationProvider {
+  /** Provider key as used by oauthClients.ts / integrationsStatus.configured. */
+  platform: string;
+  label: string;
+  /** Settings keys the credentials are persisted under (must match server). */
+  idKey: string;
+  secretKey: string;
+}
+
+// Source-of-truth pair: keep this list in sync with PROVIDER_CREDENTIALS in
+// server/oauth/oauthClients.ts (same platform keys + settings-key names).
+const INTEGRATION_PROVIDERS: IntegrationProvider[] = [
+  { platform: "youtube", label: "YouTube", idKey: "youtubeClientId", secretKey: "youtubeClientSecret" },
+  { platform: "gmail", label: "Gmail (send)", idKey: "gmailClientId", secretKey: "gmailClientSecret" },
+  { platform: "google_drive", label: "Google Drive", idKey: "googleDriveClientId", secretKey: "googleDriveClientSecret" },
+  { platform: "onedrive", label: "OneDrive", idKey: "oneDriveClientId", secretKey: "oneDriveClientSecret" },
+  { platform: "dropbox", label: "Dropbox", idKey: "dropboxClientId", secretKey: "dropboxClientSecret" },
+  { platform: "twitter", label: "X / Twitter", idKey: "twitterClientId", secretKey: "twitterClientSecret" },
+  { platform: "linkedin", label: "LinkedIn", idKey: "linkedinClientId", secretKey: "linkedinClientSecret" },
+  { platform: "facebook", label: "Facebook", idKey: "facebookClientId", secretKey: "facebookClientSecret" },
+  { platform: "instagram", label: "Instagram", idKey: "instagramClientId", secretKey: "instagramClientSecret" },
+  { platform: "tiktok", label: "TikTok", idKey: "tiktokClientId", secretKey: "tiktokClientSecret" },
+];
+
+const ServiceConnectionsCard: React.FC = () => {
+  const { data: me } = trpc.auth.me.useQuery();
+  const isAdmin = me?.role === "admin" || me?.role === "owner";
+  const { data: status, refetch } = trpc.system.integrationsStatus.useQuery();
+  const [inputs, setInputs] = useState<Record<string, string>>({});
+  const saveKeysMut = trpc.system.saveKeys.useMutation({
+    onSuccess: () => {
+      toast.success("Service connection credentials saved");
+      setInputs({});
+      refetch();
+    },
+    onError: (e) => toast.error("Failed to save: " + e.message),
+  });
+
+  const callbackBase = status?.callbackBase ?? "";
+
+  const handleCopy = (text: string) =>
+    navigator.clipboard.writeText(text).then(() => toast.success("Redirect URI copied"));
+
+  const handleSave = () => {
+    const keys: Record<string, string> = {};
+    for (const [k, v] of Object.entries(inputs)) {
+      if (v.trim()) keys[k] = v.trim();
+    }
+    if (Object.keys(keys).length === 0) {
+      toast.error("Nothing to save — enter at least one credential");
+      return;
+    }
+    saveKeysMut.mutate({ keys });
+  };
+
+  const hasInput = Object.values(inputs).some((v) => v.trim().length > 0);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2 text-base">
+          <Share2 className="w-4 h-4 text-accent" /> Service Connections
+        </CardTitle>
+        <CardDescription>
+          Optional. To connect Drive / OneDrive / Dropbox, post to social platforms, upload to YouTube,
+          or send mail via Gmail, register an OAuth app for each provider and paste its client ID and
+          secret below. Stored locally in <span className="font-mono">~/.omnecor/settings.json</span>,
+          never committed. Then connect an account from the Integrations page.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-6">
+        {callbackBase && (
+          <div className="space-y-2">
+            <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">
+              Register this redirect URI with every provider (append the provider key)
+            </p>
+            <div className="flex items-center gap-2 rounded-md border bg-muted/40 px-3 py-2">
+              <span className="text-[11px] font-mono flex-1 break-all text-foreground/80">
+                {callbackBase}/&lt;provider&gt;
+              </span>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-6 w-6 flex-shrink-0"
+                onClick={() => handleCopy(callbackBase)}
+              >
+                <Copy className="w-3 h-3" />
+              </Button>
+            </div>
+            <p className="text-[11px] text-muted-foreground">
+              e.g. <span className="font-mono">{callbackBase}/youtube</span>,{" "}
+              <span className="font-mono">{callbackBase}/gmail</span>
+            </p>
+          </div>
+        )}
+
+        <div className="border-t" />
+
+        <div className="space-y-5">
+          {INTEGRATION_PROVIDERS.map((p) => {
+            const configured = status?.configured?.[p.platform];
+            return (
+              <div key={p.platform} className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <p className="text-sm font-semibold">{p.label}</p>
+                  {configured ? (
+                    <Badge variant="secondary" className="gap-1.5 py-0.5 px-2 text-accent">
+                      <CheckCircle className="w-3 h-3" /> Configured
+                    </Badge>
+                  ) : (
+                    <Badge variant="outline" className="gap-1.5 py-0.5 px-2 text-muted-foreground">
+                      <Circle className="w-3 h-3" /> Not configured
+                    </Badge>
+                  )}
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <Input
+                    aria-label={`${p.label} client ID`}
+                    placeholder={configured ? "•••••••• (set)" : "Client ID"}
+                    value={inputs[p.idKey] ?? ""}
+                    onChange={(e) => setInputs({ ...inputs, [p.idKey]: e.target.value })}
+                    disabled={!isAdmin}
+                    autoComplete="off"
+                  />
+                  <Input
+                    aria-label={`${p.label} client secret`}
+                    type="password"
+                    placeholder={configured ? "•••••••• (set)" : "Client secret"}
+                    value={inputs[p.secretKey] ?? ""}
+                    onChange={(e) => setInputs({ ...inputs, [p.secretKey]: e.target.value })}
+                    disabled={!isAdmin}
+                    autoComplete="off"
+                  />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {isAdmin ? (
+          <div className="flex justify-end">
+            <Button onClick={handleSave} disabled={!hasInput || saveKeysMut.isPending} className="gap-2">
+              <Save className="w-4 h-4" />
+              {saveKeysMut.isPending ? "Saving..." : "Save Connections"}
+            </Button>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground text-right">
+            Admin or Owner role required to change service-connection credentials.
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+};
+
 // ---------------------------------------------------------------------------
 // Social Login (OAuth) card — operator pastes their own OAuth credentials
 // ---------------------------------------------------------------------------

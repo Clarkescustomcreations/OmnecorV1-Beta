@@ -11,7 +11,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 import ThreeViewer from "@/components/designer/ThreeViewer";
-import EnhancedPCBEditor from "@/components/pcb/EnhancedPCBEditor";
+import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
 import WebPreview from "@/components/designer/WebPreview";
 import ManufacturingPanel from "@/components/designer/ManufacturingPanel";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";

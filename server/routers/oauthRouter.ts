@@ -29,6 +29,8 @@ const SUPPORTED_OAUTH_PROVIDERS = [
   "tiktok",
   "facebook",
   "youtube",
+  // Google Gmail (send)
+  "gmail",
   // Cloud storage
   "google_drive",
   "dropbox",

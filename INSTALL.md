@@ -25,7 +25,7 @@ This guide provides comprehensive instructions for installing and setting up Omn
 
 | Component | Minimum Requirement | Recommended for Local LLM Inference |
 |---|---|---|
-| **Operating System** | Debian 12, Ubuntu 20.04+ (LTS recommended) | Debian 12, Ubuntu 22.04+ |
+| **Operating System** | Windows 10/11, Debian 12, Ubuntu 20.04+ (LTS recommended), Android 9+ (Mobile) | Windows 10/11, Debian 12, Ubuntu 22.04+, Android 11+ |
 | **CPU** | 4+ physical cores | 8+ physical cores |
 | **RAM** | 8 GB | 16 GB+ |
 | **Disk Space** | 20 GB free (NVMe SSD) | 50 GB+ (NVMe SSD) |
@@ -89,21 +89,10 @@ Refer to `server/_core/env.ts` for the complete list of supported environment va
 
 ### Step 4: Database Setup
 
-Omnecor supports two database backends via the `OMNECOR_DB` environment variable (default: `auto`):
+Omnecor uses a unified **SQLite / libSQL** database engine. Relational persistence (chat histories, workspace canvases, budgets, logs) requires zero database infrastructure:
 
-- **SQLite (default, zero-infra)** — No setup required. A local SQLite file is created automatically at `./data/omnecor.db` on first launch. Recommended for single-user / offline use.
-
-- **MySQL / MariaDB (multi-user / production)** — Requires a running MySQL/MariaDB instance:
-
-  ```bash
-  # Option A: system MariaDB
-  sudo apt install mariadb-server
-  # then set DATABASE_URL in .env, then:
-  pnpm run db:push
-
-  # Option B: Docker
-  docker compose up -d db
-  ```
+- **Local SQLite (default)** — No configuration required. A local database file is created automatically at `./data/omnecor.db` on first boot.
+- **Remote libSQL / Turso (optional)** — For cloud sync or multi-user federation, set `LIBSQL_URL` and `LIBSQL_AUTH_TOKEN` in your `.env` file to connect to a Turso database.
 
 ### Step 5: Build the Application
 

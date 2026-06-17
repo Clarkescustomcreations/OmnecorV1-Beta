@@ -13,6 +13,7 @@ import CliTerminalWindow from "@/components/chat/CliTerminalWindow";
 import EmbeddedTerminal from "@/components/terminal/EmbeddedTerminal";
 import HITLCommandApproval from "@/components/terminal/HITLCommandApproval";
 import { vanillaTrpc, trpc } from "@/lib/trpc";
+import { IS_DEMO } from "@/lib/demo";
 import {
   ChatMessage,
   ContextFile,
@@ -33,9 +34,8 @@ import {
   renameConversationInStorage,
 } from "@/lib/chatContext";
 import {
-  getSavedScripts,
-  deleteScript,
-  updateScript,
+  getLegacyLocalScripts,
+  clearLegacyLocalScripts,
   type SavedScript,
 } from "@/lib/scriptStorage";
 import type { SlashCommand } from "@/components/chat/ChatInput";
@@ -60,7 +60,7 @@ import { useFictionMode } from "@/contexts/FictionModeContext";
 import { ChevronLeft, ChevronRight, Coins, FolderOpen, Box, Cpu, Globe, Maximize2, X, UserCircle2 } from "lucide-react";
 
 import ThreeViewer from "@/components/designer/ThreeViewer";
-import EnhancedPCBEditor from "@/components/pcb/EnhancedPCBEditor";
+import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
 import WebPreview from "@/components/designer/WebPreview";
 
 // ---------------------------------------------------------------------------
@@ -273,8 +273,24 @@ export default function Chat() {
     };
   }, [conversation]);
 
-  // ── Saved Scripts ───────────────────────────────────────────────────────
-  const [scripts, setScripts] = useState<SavedScript[]>(() => getSavedScripts());
+  // ── Saved Scripts (server-backed, syncs across devices/projects) ──────────
+  const scriptsUtils = trpc.useUtils();
+  const { data: scripts = [] } = trpc.scripts.list.useQuery(undefined, {
+    enabled: !IS_DEMO,
+  });
+
+  const deleteScriptMutation = trpc.scripts.delete.useMutation({
+    onSuccess: () => {
+      scriptsUtils.scripts.list.invalidate();
+      toast.success("Script deleted");
+    },
+    onError: (err) => toast.error(err.message || "Failed to delete script"),
+  });
+  const updateScriptMutation = trpc.scripts.update.useMutation({
+    onSuccess: () => scriptsUtils.scripts.list.invalidate(),
+    onError: (err) => toast.error(err.message || "Failed to rename script"),
+  });
+  const createScriptMutation = trpc.scripts.create.useMutation();
 
   const handleSelectScript = useCallback((script: SavedScript) => {
     // Inject script into chat with a request to reuse it
@@ -284,23 +300,46 @@ export default function Chat() {
     toast.success(`Injected script "${script.name}" into input`);
   }, []);
 
-  const handleDeleteScript = useCallback((id: string) => {
-    if (!confirm("Are you sure you want to delete this saved script?")) return;
-    deleteScript(id);
-    setScripts(getSavedScripts());
-    toast.success("Script deleted");
-  }, []);
+  const handleDeleteScript = useCallback(
+    (id: number) => {
+      if (!confirm("Are you sure you want to delete this saved script?")) return;
+      deleteScriptMutation.mutate({ id });
+    },
+    [deleteScriptMutation]
+  );
 
-  const handleRenameScript = useCallback((id: string, name: string) => {
-    updateScript(id, { name });
-    setScripts(getSavedScripts());
-  }, []);
+  const handleRenameScript = useCallback(
+    (id: number, name: string) => {
+      updateScriptMutation.mutate({ id, name });
+    },
+    [updateScriptMutation]
+  );
 
-  // Listen for "script saved" events from message bubbles
+  // One-time migration: lift any scripts left in the old localStorage store up
+  // to the server so they are no longer trapped on this browser.
+  // Each script is removed from localStorage as soon as it uploads successfully,
+  // so a mid-run network failure never causes duplicates on retry.
   useEffect(() => {
-    const handler = () => setScripts(getSavedScripts());
-    window.addEventListener("omnecor:scripts_updated", handler);
-    return () => window.removeEventListener("omnecor:scripts_updated", handler);
+    if (IS_DEMO) return;
+    const legacy = getLegacyLocalScripts();
+    if (legacy.length === 0) return;
+    (async () => {
+      let migrated = 0;
+      for (const s of legacy) {
+        try {
+          await createScriptMutation.mutateAsync(s);
+          migrated++;
+        } catch (e) {
+          console.warn("Saved-script migration failed for script", s.name, e);
+        }
+      }
+      clearLegacyLocalScripts();
+      scriptsUtils.scripts.list.invalidate();
+      if (migrated > 0) {
+        toast.success(`Migrated ${migrated} saved script(s) to your account`);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // ── Conversation actions ─────────────────────────────────────────────────

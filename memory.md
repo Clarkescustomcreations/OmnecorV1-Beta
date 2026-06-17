@@ -1,10 +1,48 @@
 # Memory — Valet Router GGUF Integration + Prior Session Work
 
-Last updated: 2026-06-16
+Last updated: 2026-06-17
 
 ---
 
 ## DO NOT REMOVE THIS NOTE **Important: Read AGENTS.md Before Beginning The Next Session**
+
+---
+
+## Session — System B OAuth (service connections) made real (2026-06-17, Linux)
+
+> Prior sessions' pending handoffs (Valet GGUF commit on Windows, OMMESH 3-way live test) are **still open** — see sections below; this session is independent.
+
+### What was built
+Fixed the "service connections / integrations" OAuth (System B — Drive/OneDrive/Dropbox, YouTube, social publishing) so it can actually be configured and used, and added Gmail send. **Login OAuth (System A) was already separate and not touched.**
+
+- **`server/oauth/oauthClients.ts`** — was the core bug: `OAUTH_CONFIGS` read `process.env.*` **once at module load**, so the in-app Settings wizard was ignored and only pre-boot env vars worked. Refactored to:
+  - Split static endpoints (`OAUTH_ENDPOINTS`) from credentials. New `PROVIDER_CREDENTIALS` map (platform → settings-key + env-var) and `resolveCredentials()` resolve **per-call** via `SettingsService.getInstance().getSecret(key, process.env[env])` — same env→settings-file precedence `AiProviderService` uses for AI keys; mtime-cached so edits are live.
+  - New exports: `isPlatformConfigured()`, `listOAuthPlatforms()`, and **`getRedirectUri(platform)`** — single source of truth: `PUBLIC_URL` when set, else `http://localhost:${OMNECOR_PORT||PORT||3000}`. This fixes the **desktop redirect bug** (was hardcoded `localhost:5173`; packaged backend listens on 37291, spawned with `PORT=37291`, so it now lines up with no Electron change).
+  - Added `gmail` provider (Google endpoints, `gmail.send`+userinfo scopes, offline/consent extra params, userinfo profile endpoint).
+- **`server/routers/gmailRouter.ts`** (NEW, registered as `gmail`) — `status` (protected) + `sendEmail` (**cloudProcedure** → Sovereign-blocked). Looks up the user's active `gmail` `platformAccounts` row, refresh-on-401-and-persist, real Gmail API call. `buildRawMessage()` (exported for tests) hardened: `encodeHeaderValue()` strips CR/LF (header-injection guard, like `auditRouter.ts:44`) and RFC-2047-encodes non-ASCII subjects.
+- **`server/_core/systemRouter.ts`** — new `integrationsStatus` (**protectedProcedure**) returns per-platform configured booleans + server-computed `callbackBase` (because in desktop `window.location.origin` is `app://omnecor`, unusable as a redirect base).
+- **`server/phase2/services/SettingsService.ts`** — `OmnecorSettings` typed with the 10 integration client-id/secret keys.
+- **`server/routers/oauthRouter.ts`** — `gmail` added to `SUPPORTED_OAUTH_PROVIDERS` enum.
+- **`client/src/pages/Settings.tsx`** — new `ServiceConnectionsCard` in Settings → Accounts tab (after `SocialLoginCard`): 10 providers × (client id + secret), copyable redirect URI, configured badges, `isAdmin`-gated (non-admins see read-only note), saves via admin `system.saveKeys`.
+- **`.env.example`** — Gmail vars + corrected redirect-URI guidance (one `/api/oauth/callback/<provider>` path, base = PUBLIC_URL or localhost:PORT).
+- **Tests:** `server/__tests__/oauthClients.test.ts` (8) + `server/__tests__/gmailMessage.test.ts` (4).
+
+### Decisions made
+- Credential precedence is **env var first, then Settings file** via `getSecret(settingsKey, envVar)` — matches AI-key handling; do not revert to module-load env capture.
+- Settings keys are camelCase per provider: `twitterClientId`, `googleDriveClientId`, `oneDriveClientId`, `gmailClientId`, etc. **Client `INTEGRATION_PROVIDERS` (Settings.tsx) and server `PROVIDER_CREDENTIALS` are a source-of-truth pair — keep in sync** (a comment marks this).
+- `saveKeys` is `adminProcedure` (credential write); it passes unknown keys straight through (`keyMap[k] || k`), so new keys need no keyMap entry.
+- Gmail reuses Google OAuth endpoints — one Google Cloud OAuth client can serve Drive+YouTube+Gmail (just add `gmail.send` scope + the callback URI).
+- `/review` was run and **all 4 findings fixed** (header injection = the important one; + non-ASCII subject, provider-list dup comment, admin gate + `integrationsStatus` made protected).
+
+### Current state
+- Gates: `pnpm check` **0 errors**; `pnpm test` **350/350** (24 files; +12 this session). `pnpm build` NOT run (WSL native-module fragility per notes below; tsc is the real correctness gate).
+- All changes are on disk, **not committed**.
+- Integrations remain dark until an operator registers an OAuth app per provider and enters client id/secret (Settings → Accounts → Service Connections, or env) **and** registers the exact callback URI shown there. Kaggle stays `kaggle.json`-based (separate, unchanged).
+
+### Next session / follow-ups
+- Optional: tighten desktop UX so the OAuth success page returns focus to the app window instead of landing in the system browser (token already persists to shared SQLite, so the connect works regardless).
+- Live-test one provider end-to-end once real creds exist (YouTube via Google is lowest-friction).
+- Commit when ready.
 
 ---
 

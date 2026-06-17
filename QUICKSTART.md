@@ -45,7 +45,7 @@ Follow these steps to launch Omnecor and access its user interface:
     Synchronize the database schema:
 
     ```bash
-    pnpm run db:push
+    pnpm db:migrate
     ```
 
 5.  **Start the Application**
@@ -53,10 +53,10 @@ Follow these steps to launch Omnecor and access its user interface:
     Launch Omnecor. This will build the application and start the server:
 
     ```bash
-    npm run dev
+    pnpm dev
     ```
 
-    *(Note: `npm run dev` starts the application in development mode, which includes live reloading. For production, use `npm run build` followed by `npm run start` as described in [INSTALL.md](INSTALL.md).)*
+    *(Note: `pnpm dev` starts the application in development mode, which includes live reloading. For production, use `pnpm build` followed by `pnpm start` as described in [INSTALL.md](INSTALL.md).)*
 
 ## Accessing the User Interface
 

@@ -13,6 +13,30 @@ export interface OmnecorSettings {
   googleClientSecret?: string;
   microsoftClientId?: string;
   microsoftClientSecret?: string;
+  // ---- Service-connection (System B) OAuth client credentials ----
+  // These power Drive/OneDrive/social publishing/YouTube/Gmail — independent of
+  // the Google/Microsoft *login* clients above. Resolved by oauthClients.ts via
+  // getSecret(<key>, <ENV fallback>).
+  twitterClientId?: string;
+  twitterClientSecret?: string;
+  linkedinClientId?: string;
+  linkedinClientSecret?: string;
+  instagramClientId?: string;
+  instagramClientSecret?: string;
+  tiktokClientId?: string;
+  tiktokClientSecret?: string;
+  facebookClientId?: string;
+  facebookClientSecret?: string;
+  youtubeClientId?: string;
+  youtubeClientSecret?: string;
+  gmailClientId?: string;
+  gmailClientSecret?: string;
+  googleDriveClientId?: string;
+  googleDriveClientSecret?: string;
+  dropboxClientId?: string;
+  dropboxClientSecret?: string;
+  oneDriveClientId?: string;
+  oneDriveClientSecret?: string;
   [key: string]: any;
 }
 

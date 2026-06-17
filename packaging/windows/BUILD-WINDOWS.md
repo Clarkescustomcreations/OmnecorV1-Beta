@@ -18,11 +18,15 @@ Cross-compiling from Linux using Wine is possible for the UI but often fails to 
 
 ```powershell
 # 1. Clone/open the project
-cd Omnecor-HMCI-ai-workstation-AltV1
+cd OmnecorV1-Beta
 
 # 2. Build the backend
 pnpm install
 pnpm build
+
+# 2b. Pull the Valet Router GGUF model (via Git LFS)
+git lfs pull
+# (Or run: bash scripts/fetch-valet-model.sh if inside Git Bash/WSL)
 
 # 3. Build the Windows installer
 cd packaging\electron-app
@@ -31,8 +35,8 @@ pnpm build:win
 ```
 
 Output: `packaging\electron-app\dist\`
-- `Omnecor-Setup-2.3.0.exe` — NSIS installer (recommended)
-- `Omnecor-2.3.0-portable.exe` — Portable (no install needed)
+- `Omnecor-Setup-2.3.0-beta.1.exe` — NSIS installer (recommended)
+- `Omnecor-2.3.0-beta.1-portable.exe` — Portable (no install needed)
 
 ---
 
@@ -62,7 +66,7 @@ The file `packaging/windows/omnecor.nsh` is included by `electron-builder.yml`
 and adds:
 - **Ollama silent install** — downloads and installs Ollama during setup
 - **Node.js check** — warns if Node.js 20+ is missing
-- **Registry entries** — writes version/install path to `HKCU\Software\Omnecor\HMCI`
+- **Registry entries** — writes version/install path to `HKCU\Software\Omnecor`
 
 ---
 
@@ -72,7 +76,7 @@ and adds:
 |--------|-----------|
 | Install | Per-user (no UAC needed by default) |
 | Desktop shortcut | Created automatically |
-| Start Menu | `Omnecor HMCI` entry |
+| Start Menu | `Omnecor` entry |
 | Ollama | Downloaded + installed silently if absent |
 | Uninstall | Available from Settings → Apps; removes registry entries |
 

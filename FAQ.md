@@ -24,11 +24,11 @@ A: Omnecor aims for zero mandatory monthly bills, promoting a model of no lock-i
 
 ### Q: What are the minimum system requirements for Omnecor?
 
-A: Omnecor requires a Linux-based operating system (Debian 12, Ubuntu 20.04+ recommended), a CPU with 4+ physical cores, 8GB of RAM (16GB+ recommended for local LLM inference), and 20GB of free space on an NVMe SSD. For more details, see the [Installation Guide](INSTALL.md).
+A: Omnecor supports Windows 10/11 natively, Linux (Debian 12, Ubuntu 20.04+ recommended), and has a companion app for Android 9+. It requires a CPU with 4+ physical cores, 8GB of RAM (16GB+ recommended for local LLM inference), and 20GB of free space on an NVMe SSD. For more details, see the [Installation Guide](INSTALL.md).
 
 ### Q: How do I install Omnecor?
 
-A: You can install Omnecor by cloning the GitHub repository, installing dependencies with `pnpm install`, configuring environment variables in a `.env` file, pushing the database schema with `pnpm run db:push`, building the application with `npm run build`, and starting it with `npm run start`. A quick start guide is available in [QUICKSTART.md](QUICKSTART.md).
+A: You can install Omnecor by cloning the GitHub repository, installing dependencies with `pnpm install`, configuring environment variables in a `.env` file, running database migrations with `pnpm db:migrate`, building the application with `pnpm build`, and starting it with `pnpm start` (or `pnpm dev` for local development). A quick start guide is available in [QUICKSTART.md](QUICKSTART.md).
 
 ### Q: Can I use my own local AI models with Omnecor?
 
