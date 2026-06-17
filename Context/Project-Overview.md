@@ -268,7 +268,7 @@ The companion Android APK utilizes a portrait-locked view model optimized for to
     *   *KiCad:* ERC/DRC verification and Bill-of-Materials compilation.
     *   *ESPTool:* Serial IoT device detection and firmware flashing.
 5.  **Multi-tier Memory Architecture:**
-    *   *Working Memory:* Persisted MySQL active chat contexts.
+    *   *Working Memory:* Persisted libSQL/SQLite active chat contexts.
     *   *Long-Term Memory:* Semantic vector store powered by ChromaDB.
     *   *Episodic Memory:* Summarized interaction logs stored for semantic context query indexing.
 

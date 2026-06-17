@@ -106,14 +106,14 @@ The table below outlines package versions across the project's sub-environments:
 
 | Library / Tool | Web Client & Server (Root) | Desktop Shell (Electron App) | Mobile App (Android Client) | Audit Status & Conflicts |
 | :--- | :--- | :--- | :--- | :--- |
-| **React** | `^19.2.1` | `^18.2.0` | `19.1.0` | 🔴 **React Version Mismatch.** Electron uses React 18; root and mobile use React 19. |
-| **Tailwind CSS** | `^4.1.14` | `^4.1.14` | `^3.4.17` | 🟡 **Styling Drift.** Web & Electron utilize Tailwind CSS v4. Mobile utilizes Tailwind CSS v3 + NativeWind v4 (which does not support OKLCH variables). |
-| **tRPC Client** | `^11.8.0` | *N/A* | `11.17.0` | 🔴 **Version Drift.** Mobile uses tRPC v11.17.0 while backend is on v11.8.0. |
+| **React** | `^19.2.1` | `^19.2.1` | `19.1.0` | ✅ **Aligned.** Electron upgraded to React 19. Minor patch drift on mobile (`19.1.0` vs `19.2.1`) is non-breaking. |
+| **Tailwind CSS** | `^4.1.14` | `^4.1.14` | `^3.4.17` | 🟡 **Styling Drift.** Web & Electron utilize Tailwind CSS v4. Mobile utilizes Tailwind CSS v3 + NativeWind v4 (which does not support OKLCH variables). Static hex fallbacks applied in `theme.config.js` (Feature 18). |
+| **tRPC Client** | `^11.8.0` | *N/A* | `^11.8.0` | ✅ **Aligned.** Mobile tRPC downgraded to match backend `^11.8.0`. |
 
-### 4.1 Dependency Action Plan
-*   **Align Electron React:** Upgrade [package.json (Electron)](file:///home/linux/Documents/OmnecorV1-Beta/packaging/electron-app/package.json) to React `^19.2.1` to match the root project.
-*   **Align tRPC Client:** Downgrade the Android app tRPC dependencies to `11.8.0` to eliminate schema-definition mismatch logs.
-*   **Color Token Fallbacks:** While mobile is on Tailwind v3, ensure colors mapped in [theme.config.js](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/theme.config.js) use solid hex colors that mimic the OKLCH values defined in [Globals.css](file:///home/linux/Documents/OmnecorV1-Beta/client/src/Globals.css).
+### 4.1 Dependency Status
+*   ✅ **Electron React:** Upgraded to `^19.2.1` — aligned with root project.
+*   ✅ **tRPC Client:** Android app downgraded to `^11.8.0` — aligned with backend.
+*   🟡 **Color Token Fallbacks (ongoing):** Mobile is on Tailwind v3 + NativeWind v4. Static hex fallbacks in [theme.config.js](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/theme.config.js) approximate the OKLCH values in [Globals.css](file:///home/linux/Documents/OmnecorV1-Beta/client/src/Globals.css). Full Tailwind v4 / NativeWind v5 upgrade is a future improvement.
 
 ---
 
