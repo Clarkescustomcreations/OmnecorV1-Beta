@@ -8,6 +8,11 @@ on:
     tags:
       - 'v*.*.*'
 
+# Force actions still bundling the Node.js 20 runtime to use Node.js 24 instead.
+# GitHub deprecated the Node 20 runtime for actions on June 16, 2026.
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: true
+
 jobs:
   build-shared:
     name: Build Backend & Web Assets
