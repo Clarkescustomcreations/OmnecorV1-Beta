@@ -50,7 +50,7 @@
     "@electron/rebuild": "^3.6.0",
     "electron": "^39.8.5",
     "electron-builder": "^25.1.8",
-    "electron-vite": "^3.0.0",
+    "electron-vite": "^5.0.0",
     "typescript": "^5.3.3",
     "@tailwindcss/postcss": "^4.1.14"
   }
