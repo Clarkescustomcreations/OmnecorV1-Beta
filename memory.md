@@ -8,6 +8,32 @@ Last updated: 2026-06-17
 
 ---
 
+## Session — Chat Action Buttons Responsive Stacking (2026-06-17, Linux)
+
+### What was built
+Configured a responsive layout for the ChatInput component to stack action toolbar buttons and hide helper texts on smaller screens/mobile viewports to prevent collisions:
+- Modified the parent flex container of the buttons to support vertical stacking on smaller viewports (`flex-col sm:flex-row gap-2.5 sm:gap-0`).
+- Rearranged vertical order using flexbox `order-2 sm:order-1` for Terminal/CLI + Sandboxed group and `order-1 sm:order-2` for Attachments + Voice + Send group.
+- Adjusted widths (`w-full sm:w-auto`) and side alignment (`justify-start` and `justify-end`) so stacked toolbar elements fill the mobile card cleanly.
+- Added `hidden sm:block` to the composition hint text (`<p>`) underneath to hide the long instruction lines on smaller screens.
+- Aligned token count `span` to float to the right using `sm:ml-2 ml-auto` when the instruction paragraph is hidden.
+
+### Decisions made
+- Handled mobile stacking order via standard Tailwind layout utilities (`order-[n]`) to keep JS layout engines clean.
+- Gated the long instruction lines on small screen viewports to prioritize screen estate and clarity on mobile.
+
+### Problems solved
+- Solved text wrapping, collisions, and overflow issues in the main Chat window action toolbar.
+
+### Current state
+- Gates: `pnpm check` **0 errors**; `pnpm test` **350/350 passed**.
+- Staged layout adjustments are ready on disk.
+
+### Next session starts with
+- Verify the stacked responsive layout on physical mobile viewports.
+
+---
+
 ## Session — System B OAuth (service connections) made real (2026-06-17, Linux)
 
 > Prior sessions' pending handoffs (Valet GGUF commit on Windows, OMMESH 3-way live test) are **still open** — see sections below; this session is independent.

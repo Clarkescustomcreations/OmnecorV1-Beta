@@ -14,7 +14,17 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 
 ---
 
-## Global Summary (Updated 2026-06-17 Session 18 - Server-Backed Scripts Library)
+## Global Summary (Updated 2026-06-17 Session 19 - Chat Action Buttons Responsive Stacking)
+
+### Session 19 (2026-06-17) — Chat Action Buttons Responsive Stacking
+Responsive layout and stacking fixes for ChatInput:
+- **ChatInput.tsx Stacking Toolbar Elements**:
+  - Configured action toolbar row container with `flex-col sm:flex-row gap-2.5 sm:gap-0 sm:items-center sm:justify-between` to support stacking on smaller/mobile viewports.
+  - Rearranged rendering order on mobile using flexbox `order-2 sm:order-1` on the Terminal/CLI + Sandboxed group and `order-1 sm:order-2` on the Attachments + Voice + Send group. This places composer buttons on top and utility buttons on bottom on small viewports.
+  - Added full width sizing `w-full sm:w-auto` and side-justification (`justify-start` for utilities, `justify-end` for composer actions) to fill out stacked blocks cleanly.
+- **Under-toolbar instruction text hidden on small viewports**:
+  - Gated composition instruction `<p>` tag behind `hidden sm:block` class to hide it on small viewports, avoiding collisions and messy wrapping.
+  - Aligned token count label `span` with `sm:ml-2 ml-auto` so it automatically floats to the right side of the empty header layout when the instruction paragraph is hidden.
 
 ### Session 18 (2026-06-17) — Server-Backed Scripts Library
 Scripts are now persisted server-side in a new `saved_scripts` DB table (per-user, integer PK, `project` field). Replaced the old localStorage-only store. One-time migration lifts legacy localStorage scripts to the server on first load. All script CRUD (save from chat, list, rename, delete, select-to-inject) is now **CONNECTED** via `trpc.scripts.*`.

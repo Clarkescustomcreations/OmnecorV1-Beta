@@ -24,6 +24,14 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 *   **Next:** fix the V-I-S clock (`sudo timedatectl set-ntp true`); bring the **Android node** in as the 3rd peer (connects by explicit IP + `OMMESH_SECRET`); then F23b on-device wake-word test; optional social live-test.
 *   **Gates (2026-06-16):** root `tsc` 0 · APK `tsc` 0 · `vitest` 338/338 · web build ✓ · Linux AppImage/.deb ✓ · release APK ✓
 
+### Chat Action Buttons Responsive Stacking — resolved (2026-06-17, Linux)
+The Terminal/CLI, Sandboxed, and Attachments/Voice/Send buttons in ChatInput were colliding on smaller/mobile viewports. Resolved via responsive flex configurations:
+*   Added `flex-col sm:flex-row gap-2.5 sm:gap-0` to the action row container to stack buttons vertically on smaller viewports.
+*   Arranged render order on mobile via flexbox ordering: Terminal buttons (`order-2 sm:order-1`) sit on the bottom row, and compose controls (`order-1 sm:order-2`) sit on the top row directly under the message textarea.
+*   Hid composition instruction text on smaller viewports (`hidden sm:block`) to avoid squishing and wrapping.
+*   Floating token count label aligned with `sm:ml-2 ml-auto` to float to the right side of the layout when instruction text is hidden.
+*   **Gates (2026-06-17):** root `tsc` 0 · `vitest` 350/350 passed · changes uncommitted.
+
 ### Server-Backed Scripts Library — made real (2026-06-17, Linux)
 Scripts the AI generates in chat were previously trapped in `localStorage` (browser-only). Replaced with a full server-backed store:
 *   **New `saved_scripts` table** — `drizzle/schema.ts` (`savedScripts`); integer PK, `userId`, `name`, `code`, `language`, `project`, timestamps. Two indexes. Migration `0001_equal_shiva.sql` generated + applied (`pnpm build:push`).

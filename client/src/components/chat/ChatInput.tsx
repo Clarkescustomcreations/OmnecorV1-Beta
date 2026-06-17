@@ -416,9 +416,9 @@ export default function ChatInput({
       </div>
 
       {/* Action Toolbar Row (Terminal + Add/Send) */}
-      <div className="flex items-center justify-between mt-3.5 px-1">
+      <div className="flex flex-col sm:flex-row gap-2.5 sm:gap-0 sm:items-center sm:justify-between mt-3.5 px-1">
         {/* Left: Terminal buttons */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 order-2 sm:order-1 justify-start w-full sm:w-auto">
           {onToggleCliTerminal && (
             <Button
               onClick={onToggleCliTerminal}
@@ -444,7 +444,7 @@ export default function ChatInput({
         </div>
 
         {/* Right: Add & Send Toolbar */}
-        <div className="flex items-center gap-1">
+        <div className="flex items-center gap-1 order-1 sm:order-2 justify-end w-full sm:w-auto">
           <input
             ref={fileInputRef}
             type="file"
@@ -533,7 +533,7 @@ export default function ChatInput({
 
       {/* Hint line */}
       <div className="flex items-center justify-between mt-2.5 px-1">
-        <p className="text-[10px] text-muted-foreground">
+        <p className="text-[10px] text-muted-foreground hidden sm:block">
           {isUploading
             ? "Uploading attachments…"
             : isLoading
@@ -543,7 +543,7 @@ export default function ChatInput({
         {tokenCount !== undefined && maxTokens !== undefined && (
           <span
             className={cn(
-              "text-[10px] tabular-nums ml-2 flex-shrink-0",
+              "text-[10px] tabular-nums sm:ml-2 ml-auto flex-shrink-0",
               tokenCount / maxTokens >= 0.9
                 ? "text-destructive"
                 : tokenCount / maxTokens >= 0.7
