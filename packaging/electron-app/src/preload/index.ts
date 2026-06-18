@@ -25,7 +25,7 @@ const api = {
   // BrowserWindow, completes the OAuth flow, extracts the session token from
   // the backend cookie, and resolves with { token } so the wizard can store
   // it as a Bearer token in localStorage.
-  openOAuthPopup: (url: string): Promise<{ token?: string }> =>
+  openOAuthPopup: (url: string): Promise<{ token?: string; error?: string }> =>
     ipcRenderer.invoke('oauth-start', url),
 }
 

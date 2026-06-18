@@ -39,7 +39,10 @@ let _client: Client | null = null;
 let _db: Db | null = null;
 let _initPromise: Promise<Db> | null = null;
 
-const MIGRATIONS_DIR = path.join(process.cwd(), "drizzle", "migrations");
+// MIGRATIONS_DIR is set by the Electron main process as an env var so the
+// absolute path is known before the backend bundle executes. Falls back to
+// process.cwd()-relative path for dev mode and non-Electron deployments.
+const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR ?? path.join(process.cwd(), "drizzle", "migrations");
 
 /** Resolve the libSQL connection URL (remote when configured, else local file). */
 function resolveUrl(): { url: string; authToken?: string } {

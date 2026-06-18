@@ -47,11 +47,25 @@ function freePortIfBusy(port: number): void {
       const pid = out.split(/\s+/).pop()
       if (pid && pid !== '0') {
         execSync(`taskkill /F /PID ${pid}`, { timeout: 5000 })
-        log(`Freed port ${port}: killed stale PID ${pid}`)
+        log(`Freed port ${port}: killed stale PID ${pid} (Windows)`)
       }
     } else {
-      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`, { timeout: 5000 })
-      log(`Freed port ${port} (killed any stale holder)`)
+      // Try three methods in order: fuser → lsof → ss (one will be available on any Linux distro)
+      let freed = false
+      const methods = [
+        `fuser -k ${port}/tcp 2>/dev/null`,
+        `lsof -ti :${port} 2>/dev/null | xargs -r kill -9`,
+        `ss -lptn 'sport = :${port}' 2>/dev/null | grep -oP 'pid=\\K[0-9]+' | xargs -r kill -9`,
+      ]
+      for (const cmd of methods) {
+        try {
+          execSync(cmd, { timeout: 5000 })
+          log(`Freed port ${port} via: ${cmd.split(' ')[0]}`)
+          freed = true
+          break
+        } catch { /* try next method */ }
+      }
+      if (!freed) log(`freePortIfBusy: no method could kill pid on port ${port} — continuing anyway`)
     }
   } catch {
     // Port was already free or the kill raced — proceed
@@ -115,17 +129,30 @@ function getPersistentJwtSecret(): string {
   return secret
 }
 
-// Poll the backend /health endpoint until it responds OK (or we time out).
-// The backend spawns as a child process and warms up its services before
-// Express starts accepting connections. We show a splash screen until ready.
+// A random nonce generated once per launch. The backend echoes it back in
+// /health so we can verify we're talking to OUR instance, not a stale process
+// left over from a crashed previous session that still occupies the port.
+const BACKEND_NONCE = randomBytes(8).toString('hex')
+
+// Poll the backend /health endpoint until it responds OK and echoes the
+// correct nonce (or we time out). The nonce check prevents a false-positive
+// where a stale previous instance is still alive on port 37291 — its /health
+// returns 200 but its nonce won't match, so we keep waiting.
 async function waitForBackend(port: number, timeoutMs = 40_000): Promise<boolean> {
   const deadline = Date.now() + timeoutMs
   const healthUrl = `http://localhost:${port}/health`
-  log(`Waiting for backend at ${healthUrl}…`)
+  log(`Waiting for backend at ${healthUrl} (nonce: ${BACKEND_NONCE})…`)
   while (Date.now() < deadline) {
     try {
       const r = await net.fetch(healthUrl)
-      if (r.ok) { log('Backend health check passed'); return true }
+      if (r.ok) {
+        const body = await r.json() as { nonce?: string }
+        if (body.nonce === BACKEND_NONCE) {
+          log('Backend health check passed (nonce verified)')
+          return true
+        }
+        log(`Health OK but wrong nonce (got ${body.nonce ?? 'none'}) — stale process on port, retrying…`)
+      }
     } catch { /* not ready yet */ }
     await new Promise(res => setTimeout(res, 600))
   }
@@ -157,6 +184,13 @@ function startBackend(): void {
   log(`backend args: ${JSON.stringify(args)}`)
   log(`backend cwd: ${cwd}`)
   log(`node exec: ${nodeExec}`)
+  // Compute the migrations path here in the main process where we know
+  // process.resourcesPath reliably, then pass it as an env var so the backend
+  // bundle never has to guess via process.cwd() (which can differ on Windows).
+  const migrationsDir = is.dev
+    ? join(__dirname, '../../../../drizzle/migrations')
+    : join(process.resourcesPath, 'app.asar.unpacked', 'backend', 'drizzle', 'migrations')
+
   backendProcess = spawn(nodeExec, args, {
     cwd,
     env: {
@@ -165,6 +199,8 @@ function startBackend(): void {
       PORT: String(BACKEND_PORT),
       JWT_SECRET: getPersistentJwtSecret(),
       OAUTH_SERVER_URL: `http://localhost:${BACKEND_PORT}`,
+      MIGRATIONS_DIR: migrationsDir,
+      BACKEND_NONCE: BACKEND_NONCE,
       // NOTE: ZERO_LOGIN_MODE must NOT be set here. The desktop app uses real
       // authentication (Google / Microsoft OAuth or a local account) via the
       // setup wizard. In production, env.ts throws if ZERO_LOGIN_MODE=true.
@@ -384,23 +420,33 @@ app.whenReady().then(async () => {
   // redirects to localhost:PORT/setup (or /dashboard), we read the session
   // cookie from the backend's session and return it to the renderer which
   // stores it as a Bearer token in localStorage.
-  ipcMain.handle('oauth-start', async (_event, oauthUrl: string): Promise<{ token?: string }> => {
+  ipcMain.handle('oauth-start', async (_event, oauthUrl: string): Promise<{ token?: string; error?: string }> => {
+    log(`oauth-start IPC called: ${oauthUrl}`)
     return new Promise((resolve) => {
-      const popup = new BrowserWindow({
-        width: 900,
-        height: 700,
-        title: 'Sign in to Omnecor',
-        autoHideMenuBar: true,
-        parent: BrowserWindow.getAllWindows()[0],
-        modal: false,
-        webPreferences: {
-          nodeIntegration: false,
-          contextIsolation: true,
-          sandbox: true,
-        }
-      })
+      let popup: BrowserWindow
+      try {
+        popup = new BrowserWindow({
+          width: 900,
+          height: 700,
+          title: 'Sign in to Omnecor',
+          autoHideMenuBar: true,
+          parent: BrowserWindow.getAllWindows()[0],
+          modal: false,
+          webPreferences: {
+            nodeIntegration: false,
+            contextIsolation: true,
+            sandbox: true,
+          }
+        })
+      } catch (err) {
+        log(`Failed to create OAuth popup BrowserWindow: ${String(err)}`)
+        resolve({ error: String(err) })
+        return
+      }
 
-      popup.loadURL(oauthUrl)
+      popup.loadURL(oauthUrl).catch(err => {
+        log(`popup.loadURL failed: ${String(err)}`)
+      })
       log(`OAuth popup opened: ${oauthUrl}`)
 
       const onNavigate = async (_ev: Electron.Event, url: string) => {

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { trpc } from "@/lib/trpc";
+import logoMark from "../../../assets/logo_mark_256.png";
 import { useLocation } from "wouter";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription, CardFooter } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -111,7 +112,8 @@ export default function SetupWizard() {
     onError: (err) => toast.error("Failed to save keys: " + err.message),
   });
 
-  const kaggleStatusQuery = trpc.training.kaggleStatus.useQuery();
+  // Gated on `me` so this doesn't fire an unauthenticated 401 at step 0.
+  const kaggleStatusQuery = trpc.training.kaggleStatus.useQuery(undefined, { enabled: !!me });
   const saveKaggleMutation = trpc.training.saveKaggleKey.useMutation({
     onSuccess: () => { toast.success("Kaggle credentials saved"); kaggleStatusQuery.refetch(); },
     onError: (e) => toast.error("Kaggle save failed: " + e.message),
@@ -137,11 +139,15 @@ export default function SetupWizard() {
   const [localPassword2, setLocalPassword2] = useState("");
   const [authBusy, setAuthBusy] = useState(false);
 
-  const windowApi = (window as Window & { api?: { backendBase?: string; openOAuthPopup?: (url: string) => Promise<{ token?: string }> } }).api;
+  const windowApi = (window as Window & { api?: { backendBase?: string; openOAuthPopup?: (url: string) => Promise<{ token?: string; error?: string }> } }).api;
   const apiBase = windowApi?.backendBase ?? "";
 
   const handleOAuth = async (provider: 'google' | 'microsoft') => {
     if (authBusy) return;
+    if (!apiBase) {
+      toast.error("Desktop bridge not ready. If this persists, restart Omnecor.");
+      return;
+    }
     setAuthBusy(true);
     try {
       // Pre-check whether this provider is configured on the backend before
@@ -153,8 +159,8 @@ export default function SetupWizard() {
         if (!status[provider]) {
           toast.error(
             provider === 'google'
-              ? "Google OAuth isn't configured on this server. Add GOOGLE_CLIENT_ID and restart, or use a local account."
-              : "Microsoft OAuth isn't configured on this server. Add MICROSOFT_CLIENT_ID and restart, or use a local account."
+              ? "Google OAuth isn't configured. Add GOOGLE_CLIENT_ID and restart, or use a local account."
+              : "Microsoft OAuth isn't configured. Add MICROSOFT_CLIENT_ID and restart, or use a local account."
           );
           return;
         }
@@ -168,15 +174,18 @@ export default function SetupWizard() {
           setSessionToken(result.token);
           toast.success("Signed in!");
           setCurrentStep(s => s + 1);
+        } else if (result?.error) {
+          toast.error(`Sign-in window failed to open: ${result.error}`);
         } else {
-          toast.error("Sign-in was cancelled or failed. Try again.");
+          toast.error("Sign-in was cancelled. Try again or use a local account.");
         }
         return;
       }
       // Web browser fallback: navigate to backend OAuth initiation URL.
       window.open(url, '_self');
-    } catch {
-      toast.error("OAuth sign-in failed — check your connection.");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      toast.error(`OAuth error: ${msg}`);
     } finally {
       setAuthBusy(false);
     }
@@ -186,6 +195,7 @@ export default function SetupWizard() {
     if (localPassword !== localPassword2) { toast.error("Passwords do not match"); return; }
     if (localPassword.length < 8) { toast.error("Password must be at least 8 characters"); return; }
     if (!localName.trim()) { toast.error("Name is required"); return; }
+    if (!apiBase) { toast.error("Desktop bridge not ready. Restart Omnecor and try again."); return; }
     setAuthBusy(true);
     try {
       const res = await fetch(`${apiBase}/api/auth/local/register`, {
@@ -195,17 +205,21 @@ export default function SetupWizard() {
         body: JSON.stringify({ name: localName.trim(), password: localPassword }),
       });
       const data = await res.json() as { ok?: boolean; error?: string; sessionToken?: string };
-      if (!res.ok) { toast.error(data.error ?? "Registration failed"); return; }
+      if (!res.ok) { toast.error(data.error ?? `Registration failed (${res.status})`); return; }
       // Desktop app is cross-origin and can't use the SameSite cookie — persist
       // the returned token so subsequent tRPC calls authenticate via Bearer.
       if (data.sessionToken) setSessionToken(data.sessionToken);
       toast.success("Account created!");
       setCurrentStep(s => s + 1);
-    } catch { toast.error("Registration failed — is the backend running?"); }
+    } catch (err) {
+      const msg = err instanceof TypeError ? "Cannot connect to backend — check ~/omnecor-debug.log (Linux) or %APPDATA%\\omnecor-debug.log (Windows)" : String(err);
+      toast.error(msg);
+    }
     finally { setAuthBusy(false); }
   };
 
   const handleLocalLogin = async () => {
+    if (!apiBase) { toast.error("Desktop bridge not ready. Restart Omnecor and try again."); return; }
     setAuthBusy(true);
     try {
       const res = await fetch(`${apiBase}/api/auth/local/login`, {
@@ -215,11 +229,14 @@ export default function SetupWizard() {
         body: JSON.stringify({ password: localPassword }),
       });
       const data = await res.json() as { ok?: boolean; error?: string; sessionToken?: string };
-      if (!res.ok) { toast.error(data.error ?? "Login failed"); return; }
+      if (!res.ok) { toast.error(data.error ?? `Login failed (${res.status})`); return; }
       if (data.sessionToken) setSessionToken(data.sessionToken);
       toast.success("Signed in!");
       setCurrentStep(s => s + 1);
-    } catch { toast.error("Login failed — is the backend running?"); }
+    } catch (err) {
+      const msg = err instanceof TypeError ? "Cannot connect to backend — check ~/omnecor-debug.log (Linux) or %APPDATA%\\omnecor-debug.log (Windows)" : String(err);
+      toast.error(msg);
+    }
     finally { setAuthBusy(false); }
   };
 
@@ -311,7 +328,7 @@ export default function SetupWizard() {
           <div className="flex flex-col items-center justify-center space-y-8 py-10 animate-in fade-in zoom-in duration-500">
             <div className="relative">
               <div className="absolute -inset-4 bg-accent/20 rounded-full blur-2xl animate-pulse" />
-              <img src={`${import.meta.env.BASE_URL}assets/logo_mark_256.png`} alt="Omnecor Logo" className="w-32 h-32 relative drop-shadow-2xl object-contain" />
+              <img src={logoMark} alt="Omnecor Logo" className="w-32 h-32 relative drop-shadow-2xl object-contain" />
             </div>
             <div className="text-center space-y-4 max-w-lg">
               <h2 className="text-4xl font-black tracking-tighter">OMNECOR HMCI</h2>
@@ -358,13 +375,24 @@ export default function SetupWizard() {
                     variant="outline"
                     className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-accent hover:bg-accent/5"
                     onClick={async () => {
+                      if (!apiBase) {
+                        toast.error("Desktop bridge not ready. If this persists, restart Omnecor.");
+                        return;
+                      }
                       try {
                         const res = await fetch(`${apiBase}/api/auth/local/exists`);
-                        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+                        if (!res.ok) {
+                          const body = await res.json().catch(() => ({})) as { error?: string };
+                          toast.error(`Backend error ${res.status}${body.error ? `: ${body.error}` : " — try restarting Omnecor."}`);
+                          return;
+                        }
                         const { exists } = await res.json() as { exists: boolean };
                         setAuthView(exists ? "local-login" : "local-register");
-                      } catch {
-                        toast.error("Backend not ready — please wait a moment and try again.");
+                      } catch (err) {
+                        const msg = err instanceof TypeError
+                          ? "Cannot connect to backend — check ~/omnecor-debug.log (Linux) or %APPDATA%\\omnecor-debug.log (Windows)"
+                          : String(err);
+                        toast.error(msg);
                       }
                     }}
                   >
@@ -818,7 +846,7 @@ export default function SetupWizard() {
         <div className="w-full md:w-1/3 flex flex-col justify-between py-6">
            <div className="space-y-12">
              <div className="flex items-center gap-3">
-               <img src={`${import.meta.env.BASE_URL}assets/logo_mark_256.png`} alt="Logo" className="w-8 h-8 object-contain" />
+               <img src={logoMark} alt="Logo" className="w-8 h-8 object-contain" />
                <span className="text-xl font-black tracking-tighter">OMNECOR</span>
              </div>
 

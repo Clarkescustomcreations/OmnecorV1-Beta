@@ -173,7 +173,14 @@ async function startServer() {
   // sdk.authenticateRequest (the desktop app can't rely on the SameSite=Strict
   // session cookie across origins, so it sends Authorization: Bearer instead).
   const isAllowedAppOrigin = (origin: string): boolean =>
+    // Electron custom scheme: app://omnecor — sent when the scheme is registered
+    // with corsEnabled: true (see protocol.registerSchemesAsPrivileged in main).
     origin.startsWith("app://omnecor") ||
+    // Some Chromium builds (varies by Electron version) send "null" as the origin
+    // for requests from custom protocol pages. Safe here because the backend only
+    // listens on localhost and is never reachable from the network.
+    origin === "null" ||
+    // localhost origins for the Vite dev server and any local web clients.
     /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin);
 
   app.use((req, res, next) => {
@@ -230,6 +237,9 @@ async function startServer() {
       architecture: "unified",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
+      // Echoed back so the Electron main process can verify it's talking to its
+      // own backend instance and not a stale process left over on the same port.
+      nonce: process.env.BACKEND_NONCE ?? "",
     });
   });
 

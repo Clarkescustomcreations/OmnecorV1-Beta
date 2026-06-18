@@ -14,7 +14,15 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 
 ---
 
-## Global Summary (Updated 2026-06-17 Session 19 - Chat Action Buttons Responsive Stacking)
+## Global Summary (Updated 2026-06-18 Session 20 - Setup Wizard Logo & Windows Installer Wordmark)
+
+### Session 20 (2026-06-18) — Setup Wizard Logo & Windows Installer Wordmark
+- **SetupWizard.tsx Logo Resolution**:
+  - Imported `logo_mark_256.png` directly via Vite ESM from the root `assets/` directory (ensuring zero file moves/copies).
+  - Replaced unbundled string-interpolated base path `src={`${import.meta.env.BASE_URL}assets/logo_mark_256.png`}` with the imported `logoMark` variable for the welcome step and sidebar branding logo images.
+  - Wiped output demo directories (`docs/demo`) no longer cause broken logo asset links.
+- **Windows Installer Header Image**:
+  - Generated a clean, white-background, 150x57 BMP header image from `assets/wordmark.png` and replaced the old dark and misaligned logo at `packaging/electron-app/build/installer_header.bmp`. This ensures it centers/right-aligns properly in the top-right of the installer window without overlapping native NSIS titles.
 
 ### Session 19 (2026-06-17) — Chat Action Buttons Responsive Stacking
 Responsive layout and stacking fixes for ChatInput:

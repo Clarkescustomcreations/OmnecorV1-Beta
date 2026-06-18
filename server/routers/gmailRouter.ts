@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { cloudProcedure, protectedProcedure, router } from "../_core/trpc.js";
+import { protectedProcedure, router } from "../_core/trpc.js";
 import { getDb } from "../db.factory.js";
 import { platformAccounts } from "../../drizzle/schema.js";
 import {
@@ -79,12 +79,11 @@ export const gmailRouter = router({
   }),
 
   /**
-   * Send an email through the connected Gmail account. cloudProcedure: this is
-   * an external API call, so it is blocked in Sovereign mode. On a 401 the
-   * access token is refreshed once (if a refresh token exists) and the new token
-   * is persisted back to the account row.
+   * Send an email through the connected Gmail account. Uses protectedProcedure
+   * so email works even in sovereign mode — sovereign mode only blocks AI model
+   * inference calls (OpenAI, Anthropic, etc.), not OAuth-dependent services.
    */
-  sendEmail: cloudProcedure
+  sendEmail: protectedProcedure
     .input(
       z.object({
         to: z.string().email(),

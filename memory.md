@@ -1,10 +1,35 @@
 # Memory — Valet Router GGUF Integration + Prior Session Work
 
-Last updated: 2026-06-17
+Last updated: 2026-06-18
 
 ---
 
 ## DO NOT REMOVE THIS NOTE **Important: Read AGENTS.md Before Beginning The Next Session**
+
+---
+
+## Session — Setup Wizard Logo & Windows Installer Wordmark (2026-06-18, Linux)
+
+### What was built
+- Imported `logo_mark_256.png` directly via Vite ESM from the root `assets/` directory in `client/src/pages/SetupWizard.tsx`.
+- Replaced unbundled string-interpolated base path `src={`${import.meta.env.BASE_URL}assets/logo_mark_256.png`}` with the imported `logoMark` variable in both the welcome step and the sidebar branding logo images in `SetupWizard.tsx`.
+- Generated a clean, white-background, 150x57 BMP header image from `assets/wordmark.png` and placed it at `packaging/electron-app/build/installer_header.bmp` to replace the old dark and misaligned installer header.
+
+### Decisions made
+- Used Vite ESM import rather than relying on manual file copies or hardcoded/unbundled URL paths. This guarantees Vite tracks the logo as a compilation dependency, compiles/hashes it automatically, and places it into the output folder on every build.
+- Placed the resized "OMNECOR" text logo from `assets/wordmark.png` onto the right side of a solid white `150x57` pixel canvas. This aligns with NSIS Modern UI's header layout rules where native page text is printed on the left, preventing collisions/overlaps and ensuring the logo is correctly right-aligned.
+
+### Problems solved
+- Solved a `404 Not Found` (broken image) error in the onboarding setup wizard that occurred when the demo or production directories were wiped by the `emptyOutDir: true` setting in Vite build configurations.
+- Solved a rendering collision/unreadability issue in the Windows custom NSIS installer window where the header logo was dark, positioned on the left, and overlapped with the installer's native title text.
+
+### Current state
+- Validation Gates: `pnpm check` passes with **0 TypeScript errors** and all **350/350 vitest tests passed** (including all 39 `packaging/windows/installer.smoke.test.ts` tests).
+- Changes are verified and ready on disk.
+
+### Next session starts with
+- Verify logo rendering inside the setup wizard page across the desktop, mobile, and web versions.
+- Test the generated installer executable on a Windows test box to ensure the header logo displays correctly in the top-right of the installer window.
 
 ---
 
