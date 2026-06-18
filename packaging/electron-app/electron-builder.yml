@@ -34,6 +34,11 @@ extraResources:
     to: app.asar.unpacked/backend
     filter:
       - "index.js"
+  # Drizzle migration files — required for DB schema setup on fresh installs
+  - from: ../../drizzle/migrations
+    to: app.asar.unpacked/backend/drizzle/migrations
+    filter:
+      - "**/*"
   # Frontend static assets (Vite build output)
   - from: ../../dist/public
     to: app.asar.unpacked/backend/public

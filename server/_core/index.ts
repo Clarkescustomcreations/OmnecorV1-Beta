@@ -26,6 +26,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes, registerSocialMediaOAuthRoutes, registerLocalAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
+import { getDb } from "../db.factory.js";
 import { appRouter } from "../routers";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
@@ -80,6 +81,18 @@ async function startServer() {
   // Ensures user-writable data directories exist before services start.
   initPaths();
 
+  // ─── Initialize Database (eager) ─────────────────────────────────────────
+  // getDb() is lazy by default but we force it here so migrations run
+  // before Express accepts connections. This means /health only responds
+  // OK after the schema is ready — preventing the race where the frontend
+  // polls healthy and immediately hits auth routes before tables exist.
+  try {
+    await getDb();
+    log.info("[Omnecor] Database initialized and migrations applied");
+  } catch (error) {
+    log.warn("[Omnecor] Database init warning:", (error as Error).message);
+  }
+
   // ─── Initialize Phase 2 Services ────────────────────────────────────────
   // These services are singletons. Calling getInstance() here ensures they
   // are ready before any tRPC request arrives.
@@ -120,13 +133,11 @@ async function startServer() {
   }
 
   // ─── Auto-start Valet Router Inference Server ───────────────────────────
-  // Spawns valet_router_inference.py when models/valet-router/current.json
-  // reports status="ready". No-op when no artifact is registered.
-  try {
-    await ValetServerService.getInstance().start();
-  } catch (error) {
+  // Fire-and-forget: Valet is optional. Awaiting it would delay Express startup
+  // by 30+ seconds when Python deps are missing (5 retries × increasing backoff).
+  ValetServerService.getInstance().start().catch(error => {
     log.warn("[Omnecor] Valet Router Server init warning:", (error as Error).message);
-  }
+  });
 
   // ─── Create Express App ─────────────────────────────────────────────────
   const app = express();
@@ -219,6 +230,17 @@ async function startServer() {
       architecture: "unified",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
+    });
+  });
+
+  // ─── OAuth provider availability check ─────────────────────────────────
+  // Lets the frontend know which providers are actually configured before
+  // attempting OAuth navigation (avoids the "navigate away, get 404 JSON,
+  // press Back, wizard resets to step 0" flow in the Electron desktop app).
+  app.get("/api/oauth/status", (_req, res) => {
+    res.json({
+      google: !!ENV.googleClientId,
+      microsoft: !!ENV.microsoftClientId,
     });
   });
 

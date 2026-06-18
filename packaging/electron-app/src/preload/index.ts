@@ -18,7 +18,15 @@ const api = {
     } catch {
       /* invalid URL — ignore */
     }
-  }
+  },
+  // OAuth in Electron requires a dedicated popup window — navigating the main
+  // window away from app://omnecor/ loses the React state and the session
+  // cookie can't cross origins back to the frontend. This IPC call opens a
+  // BrowserWindow, completes the OAuth flow, extracts the session token from
+  // the backend cookie, and resolves with { token } so the wizard can store
+  // it as a Bearer token in localStorage.
+  openOAuthPopup: (url: string): Promise<{ token?: string }> =>
+    ipcRenderer.invoke('oauth-start', url),
 }
 
 if (process.contextIsolated) {

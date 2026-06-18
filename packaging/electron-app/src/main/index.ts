@@ -1,9 +1,9 @@
-import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem, protocol, net } from 'electron'
+import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem, protocol, net, session } from 'electron'
 import { join, extname } from 'path'
 import { randomBytes } from 'crypto'
 import { appendFile, readFileSync, writeFileSync, existsSync } from 'fs'
+import { execSync, spawn, ChildProcess } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
-import { spawn, ChildProcess } from 'child_process'
 import icon from '../../resources/icon.png?asset'
 
 const LOG_FILE = join(
@@ -21,6 +21,9 @@ log(`resourcesPath: ${(process as NodeJS.Process & { resourcesPath?: string }).r
 
 process.on('uncaughtException', (err: Error) => {
   log(`UNCAUGHT EXCEPTION: ${err.message}\n${err.stack}`)
+  // EPIPE is expected when stdout/stderr pipe readers close (e.g. `... | tee log`).
+  // It is not a fatal error — swallow it so the app doesn't crash on pipe close.
+  if ((err as NodeJS.ErrnoException).code === 'EPIPE') return
   process.exit(1)
 })
 process.on('unhandledRejection', (reason: unknown) => {
@@ -31,6 +34,29 @@ let backendProcess: ChildProcess | null = null
 let isQuitting = false
 // Fixed port for the embedded backend. High port avoids conflicts with `pnpm dev` on 3000.
 const BACKEND_PORT = process.env.PORT || 37291
+
+// Kill any stale process occupying our port so we always start on the expected port.
+// A previous crash or unclean shutdown can leave the backend running as an orphan.
+function freePortIfBusy(port: number): void {
+  try {
+    if (process.platform === 'win32') {
+      const out = execSync(
+        `netstat -aon | findstr ":${port} " | findstr LISTENING`,
+        { encoding: 'utf8', timeout: 5000 }
+      ).trim()
+      const pid = out.split(/\s+/).pop()
+      if (pid && pid !== '0') {
+        execSync(`taskkill /F /PID ${pid}`, { timeout: 5000 })
+        log(`Freed port ${port}: killed stale PID ${pid}`)
+      }
+    } else {
+      execSync(`fuser -k ${port}/tcp 2>/dev/null || true`, { timeout: 5000 })
+      log(`Freed port ${port} (killed any stale holder)`)
+    }
+  } catch {
+    // Port was already free or the kill raced — proceed
+  }
+}
 
 // Register the custom protocol before app is ready (required by Electron).
 // app://omnecor/ serves the built frontend from the bundled public directory.
@@ -89,6 +115,24 @@ function getPersistentJwtSecret(): string {
   return secret
 }
 
+// Poll the backend /health endpoint until it responds OK (or we time out).
+// The backend spawns as a child process and warms up its services before
+// Express starts accepting connections. We show a splash screen until ready.
+async function waitForBackend(port: number, timeoutMs = 40_000): Promise<boolean> {
+  const deadline = Date.now() + timeoutMs
+  const healthUrl = `http://localhost:${port}/health`
+  log(`Waiting for backend at ${healthUrl}…`)
+  while (Date.now() < deadline) {
+    try {
+      const r = await net.fetch(healthUrl)
+      if (r.ok) { log('Backend health check passed'); return true }
+    } catch { /* not ready yet */ }
+    await new Promise(res => setTimeout(res, 600))
+  }
+  log('Backend health check timed out')
+  return false
+}
+
 function startBackend(): void {
   log('startBackend called')
   console.log('Starting Omnecor backend...')
@@ -120,6 +164,7 @@ function startBackend(): void {
       NODE_ENV: is.dev ? 'development' : 'production',
       PORT: String(BACKEND_PORT),
       JWT_SECRET: getPersistentJwtSecret(),
+      OAUTH_SERVER_URL: `http://localhost:${BACKEND_PORT}`,
       // NOTE: ZERO_LOGIN_MODE must NOT be set here. The desktop app uses real
       // authentication (Google / Microsoft OAuth or a local account) via the
       // setup wizard. In production, env.ts throws if ZERO_LOGIN_MODE=true.
@@ -144,7 +189,37 @@ function startBackend(): void {
   })
 }
 
-function createWindow(): void {
+// Minimal dark splash screen shown while the backend warms up.
+const SPLASH_HTML = `data:text/html;charset=UTF-8,` + encodeURIComponent(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#09090b;color:#fff;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;height:100vh;
+  font-family:system-ui,-apple-system,sans-serif;user-select:none}
+.ring{width:2.5rem;height:2.5rem;border:3px solid #27272a;
+  border-top:3px solid #6366f1;border-radius:50%;
+  animation:spin .9s linear infinite;margin-bottom:1.5rem}
+@keyframes spin{to{transform:rotate(360deg)}}
+h2{font-size:1.2rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.4rem}
+p{font-size:.78rem;color:#71717a}
+</style></head>
+<body><div class="ring"></div><h2>Starting Omnecor</h2><p>Loading backend services&hellip;</p></body></html>`)
+
+const ERROR_HTML = `data:text/html;charset=UTF-8,` + encodeURIComponent(`<!DOCTYPE html>
+<html><head><meta charset="UTF-8"><style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#09090b;color:#fff;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;height:100vh;padding:2rem;text-align:center;
+  font-family:system-ui,-apple-system,sans-serif}
+h2{color:#f87171;font-size:1.1rem;font-weight:700;margin-bottom:.75rem}
+p{font-size:.8rem;color:#71717a;max-width:400px;line-height:1.5}
+</style></head>
+<body><h2>&#9888; Backend failed to start</h2>
+<p>The Omnecor backend did not respond within 40 seconds.<br>
+Please restart the app. If the problem persists, check<br>
+<code style="color:#a1a1aa">~/.omnecor/</code> for error logs or reinstall.</p></body></html>`)
+
+async function createWindow(): Promise<void> {
   const mainWindow = new BrowserWindow({
     width: 1400,
     height: 900,
@@ -168,6 +243,11 @@ function createWindow(): void {
     mainWindow.show()
   })
 
+  // Show splash immediately so the window appears while backend warms up.
+  // Loading the real app URL before the backend is ready lets users click
+  // auth buttons into a dead backend — the splash prevents that entirely.
+  mainWindow.loadURL(SPLASH_HTML)
+
   // window.open / target=_blank: never open a sub-window; hand safe URLs to the
   // OS browser and drop everything else.
   mainWindow.webContents.setWindowOpenHandler((details) => {
@@ -179,12 +259,20 @@ function createWindow(): void {
     return { action: 'deny' }
   })
 
-  // Block navigation away from the app's own origin. The window only ever
-  // legitimately shows app://omnecor/ (production) or the dev renderer URL.
+  // Navigation policy:
+  //  - app://omnecor/ — our own Electron frontend (always allowed)
+  //  - http://localhost:PORT — backend OAuth initiation and callback endpoints
+  //  - https:// — external OAuth provider pages (Google, Microsoft) shown in-window
+  //  - anything else — blocked; safe https: links open in the system browser
+  const backendOrigin = `http://localhost:${BACKEND_PORT}`
+  const backendOriginAlt = `http://127.0.0.1:${BACKEND_PORT}`
   mainWindow.webContents.on('will-navigate', (event, url) => {
     const devUrl = process.env['ELECTRON_RENDERER_URL']
     const allowed =
       url.startsWith('app://omnecor/') ||
+      url.startsWith(backendOrigin) ||
+      url.startsWith(backendOriginAlt) ||
+      url.startsWith('https://') ||        // OAuth provider pages
       (!!devUrl && url.startsWith(devUrl))
     if (!allowed) {
       event.preventDefault()
@@ -193,13 +281,51 @@ function createWindow(): void {
     }
   })
 
+  // After OAuth completes the backend redirects to http://localhost:PORT/
+  // (or /setup). Snap the window back to app://omnecor/ so the Electron
+  // frontend (with preload / window.api) takes over again.
+  mainWindow.webContents.on('did-navigate', (_event, url) => {
+    try {
+      const { hostname, port, pathname } = new URL(url)
+      if (
+        (hostname === 'localhost' || hostname === '127.0.0.1') &&
+        port === String(BACKEND_PORT) &&
+        (pathname === '/' || pathname === '/setup' || pathname === '/dashboard')
+      ) {
+        log(`OAuth callback complete at ${url} — returning to app://omnecor/`)
+        mainWindow.loadURL('app://omnecor/')
+      }
+    } catch { /* ignore malformed URLs */ }
+  })
+
+  // Recovery: if a navigation to the backend fails (ERR_CONNECTION_REFUSED,
+  // wrong port, backend crashed) the renderer ends up on an error page.
+  // Redirect back to the app so the user isn't stuck on a Chromium error page.
+  mainWindow.webContents.on('did-fail-load', (_event, _code, desc, failedUrl) => {
+    try {
+      const { hostname, port } = new URL(failedUrl)
+      if (
+        (hostname === 'localhost' || hostname === '127.0.0.1') &&
+        port === String(BACKEND_PORT)
+      ) {
+        log(`Navigation to backend failed (${desc}) — returning to app://omnecor/`)
+        mainWindow.loadURL('app://omnecor/')
+      }
+    } catch { /* non-url failures (e.g. data: aborted) — ignore */ }
+  })
+
+  // Backend readiness gate: wait for /health before loading the real app.
+  // The splash is already showing; switch to the app once backend is warm.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
   } else {
-    // Load the production frontend via the custom app:// protocol.
-    // This gives dynamic import() a real origin so relative chunk URLs
-    // resolve correctly without fetching from localhost.
-    mainWindow.loadURL('app://omnecor/')
+    waitForBackend(Number(BACKEND_PORT)).then(ready => {
+      if (ready) {
+        mainWindow.loadURL('app://omnecor/')
+      } else {
+        mainWindow.loadURL(ERROR_HTML)
+      }
+    })
   }
 }
 
@@ -252,11 +378,70 @@ app.whenReady().then(async () => {
     }
   })
 
+  // --- IPC: OAuth popup window ---
+  // Opens a dedicated BrowserWindow for the OAuth flow so the main window
+  // never navigates away from app://omnecor/. When the backend OAuth callback
+  // redirects to localhost:PORT/setup (or /dashboard), we read the session
+  // cookie from the backend's session and return it to the renderer which
+  // stores it as a Bearer token in localStorage.
+  ipcMain.handle('oauth-start', async (_event, oauthUrl: string): Promise<{ token?: string }> => {
+    return new Promise((resolve) => {
+      const popup = new BrowserWindow({
+        width: 900,
+        height: 700,
+        title: 'Sign in to Omnecor',
+        autoHideMenuBar: true,
+        parent: BrowserWindow.getAllWindows()[0],
+        modal: false,
+        webPreferences: {
+          nodeIntegration: false,
+          contextIsolation: true,
+          sandbox: true,
+        }
+      })
+
+      popup.loadURL(oauthUrl)
+      log(`OAuth popup opened: ${oauthUrl}`)
+
+      const onNavigate = async (_ev: Electron.Event, url: string) => {
+        try {
+          const { hostname, port, pathname } = new URL(url)
+          if (
+            (hostname === 'localhost' || hostname === '127.0.0.1') &&
+            port === String(BACKEND_PORT) &&
+            (pathname === '/setup' || pathname === '/dashboard' || pathname === '/')
+          ) {
+            // OAuth succeeded — read the session cookie set by the backend callback
+            const cookies = await session.defaultSession.cookies.get({
+              url: `http://localhost:${BACKEND_PORT}`
+            })
+            const sessionCookie = cookies.find(c => c.name === 'app_session_id')
+            log(`OAuth popup success — session cookie ${sessionCookie ? 'found' : 'NOT found'}`)
+            popup.destroy()
+            resolve({ token: sessionCookie?.value })
+          }
+        } catch {
+          /* URL parse error — ignore */
+        }
+      }
+
+      popup.webContents.on('did-navigate', onNavigate)
+
+      popup.on('closed', () => {
+        log('OAuth popup closed by user')
+        resolve({})
+      })
+    })
+  })
+
+  freePortIfBusy(Number(BACKEND_PORT))
   startBackend()
-  createWindow()
+  createWindow().catch(err => log(`createWindow error: ${String(err)}`))
 
   app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) createWindow()
+    if (BrowserWindow.getAllWindows().length === 0) {
+      createWindow().catch(err => log(`createWindow (activate) error: ${String(err)}`))
+    }
   })
 })
 
