@@ -35,7 +35,7 @@ Already implemented as part of V1-Beta build-out (Phases 2–35). Session 12 clo
 -   ✅ **Model Marketplace Sync** — Dual-source search (Ollama library + HuggingFace), 8 curated featured models, pull-to-install.
 -   ✅ **Integration Lifecycle Management** — Health monitoring, OAuth token refresh, disconnect, 60s cache.
 -   ✅ **crewAI / n8n Connectors** — V1 bridges functional (RecursiveMASPanel + agentSettingsRouter n8n URL).
--   ⚠️ **OMMESH Topology UI** — Visual `react-force-graph` rendering of live mesh peer network. Deferred to v3.x.
+-   ✅ **OMMESH Topology UI** — Visual `react-force-graph` rendering of live mesh peer network. 
 
 ### Phase 3 (v3.x): Community & Ecosystem
 
