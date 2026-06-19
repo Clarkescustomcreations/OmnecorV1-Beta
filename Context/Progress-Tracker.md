@@ -24,6 +24,17 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 *   **Next:** fix the V-I-S clock (`sudo timedatectl set-ntp true`); bring the **Android node** in as the 3rd peer (connects by explicit IP + `OMMESH_SECRET`); then F23b on-device wake-word test; optional social live-test.
 *   **Gates (2026-06-16):** root `tsc` 0 · APK `tsc` 0 · `vitest` 338/338 · web build ✓ · Linux AppImage/.deb ✓ · release APK ✓
 
+### Security, Correctness & Design-Token Sweep — completed (2026-06-19, Linux)
+
+*   **Real BPE tokenizer (`js-tiktoken@1.0.21`):** `client/src/lib/tokenizer.ts` added — model-aware encoding (o200k_base for GPT-4o/Claude 4/Gemini, cl100k_base for legacy). `estimateTokens()` in `chatContext.ts` now delegates to real BPE instead of chars/4 approximation. `Chat.tsx` passes `selectedModel.modelId` for per-model accuracy.
+*   **Dead `!db` branch removed:** `agentMessengerRouter.ts:39` — `if (!db || !userId)` → `if (!userId)`. `getDb()` never returns null; the dead branch was misleading.
+*   **Rate limiter dev-mode fix:** `server/_core/index.ts` — `skip: (req) => !req.path.startsWith("/api")` added to express-rate-limit config. Prevents 429s on cold Vite module fetches (100-request burst) while keeping the API limit intact.
+*   **AGENTS.md exceptions updated:** Added `PCBViewer3D` (Three.js `0xRRGGBB` integer — CSS vars can't inject into hex integers), brand-identity SVG logos in `SetupWizard` (Google/Microsoft palettes legally required), `MeshTopologyGraph` (Canvas API `ctx.fillStyle` can't read CSS vars), and `OAUTH_PLATFORMS` buttons in `AgentNetworking` (Twitter/X black, LinkedIn blue, YouTube red, Instagram pink — brand-required).
+*   **Design-token sweep — hex literals:** `neuralNodeTree.ts` inline styles, `MeshTopologyGraph.tsx` canvas colors, `AgentNetworking.tsx` legend dots — all replaced with CSS variable references (`var(--color-accent-*)`, `var(--color-background)`, etc.).
+*   **Design-token sweep — raw Tailwind classes (14 files):** `AgentNetworking.tsx`, `Pipelines.tsx`, `Dashboard.tsx`, `ChatInterface.tsx`, `OmnecorDashboardLayout.tsx`, `ModelHub.tsx`, `SpecializedModuleLauncher.tsx`, `Notifications.tsx`, `VisualContextMap.tsx`, `Settings.tsx`, `PodcastStudio.tsx`, `ComponentLibrary.tsx`, `3DDesigner.tsx`, `AGENTS.md`. All `green-*`, `blue-*`, `red-*`, `purple-*`, `emerald-*`, `rose-*`, `amber-*`, `gray-*`, `slate-*` classes replaced with `accent-success`, `accent-cyan`, `destructive`, `accent-purple`, `accent-danger`, `muted-foreground`, etc.
+*   **UI Registry — Sessions 21–22:** 537 CONNECTED rows verified, 14 procedures confirmed live-driven, 8 previously-missing rows added, 5 label corrections.
+*   **Gates (2026-06-19):** root `tsc` **0** · `vitest` **353/353** · all changes committed.
+
 ### Chat Action Buttons Responsive Stacking — resolved (2026-06-17, Linux)
 The Terminal/CLI, Sandboxed, and Attachments/Voice/Send buttons in ChatInput were colliding on smaller/mobile viewports. Resolved via responsive flex configurations:
 *   Added `flex-col sm:flex-row gap-2.5 sm:gap-0` to the action row container to stack buttons vertically on smaller viewports.
