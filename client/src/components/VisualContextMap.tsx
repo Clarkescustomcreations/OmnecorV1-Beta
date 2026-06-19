@@ -53,13 +53,13 @@ export default function VisualContextMap({
 
   const getFileTypeColor = (filename: string) => {
     if (filename.endsWith(".ts") || filename.endsWith(".tsx"))
-      return "bg-blue-500/10 border-blue-500/30";
+      return "bg-accent-cyan/10 border-accent-cyan/30";
     if (filename.endsWith(".js") || filename.endsWith(".jsx"))
-      return "bg-yellow-500/10 border-yellow-500/30";
+      return "bg-accent-danger/10 border-accent-danger/30";
     if (filename.endsWith(".json"))
-      return "bg-purple-500/10 border-purple-500/30";
+      return "bg-accent-purple/10 border-accent-purple/30";
     if (filename.endsWith(".md"))
-      return "bg-orange-500/10 border-orange-500/30";
+      return "bg-accent-success/10 border-accent-success/30";
     return "bg-muted border-border";
   };
 
@@ -102,7 +102,7 @@ export default function VisualContextMap({
                 }
               >
                 {file.included ? (
-                  <Eye className="w-4 h-4 text-green-500" />
+                  <Eye className="w-4 h-4 text-accent-success" />
                 ) : (
                   <EyeOff className="w-4 h-4 text-muted-foreground" />
                 )}

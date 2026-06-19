@@ -91,11 +91,11 @@ const KIND_ICON: Record<SourceKind, React.ReactNode> = {
 };
 
 const KIND_COLOR: Record<SourceKind, string> = {
-  audio: "text-purple-400",
-  file: "text-blue-400",
-  text: "text-green-400",
-  website: "text-amber-400",
-  cloud: "text-cyan-400",
+  audio: "text-accent-purple",
+  file: "text-accent-cyan",
+  text: "text-accent-success",
+  website: "text-accent-danger",
+  cloud: "text-accent-cyan",
   discovery: "text-accent",
 };
 
@@ -328,9 +328,9 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
           <div className="space-y-1 animate-in slide-in-from-top-1 duration-150">
             <p className="text-[9px] text-muted-foreground italic">Connect a cloud storage provider:</p>
             {[
-              { label: "Google Drive", icon: "G", color: "text-blue-400", provider: "google_drive" as const },
-              { label: "Dropbox", icon: "⬡", color: "text-blue-500", provider: "dropbox" as const },
-              { label: "OneDrive", icon: "☁", color: "text-cyan-400", provider: "onedrive" as const },
+              { label: "Google Drive", icon: "G", color: "text-accent-cyan", provider: "google_drive" as const },
+              { label: "Dropbox", icon: "⬡", color: "text-accent-cyan", provider: "dropbox" as const },
+              { label: "OneDrive", icon: "☁", color: "text-accent-cyan", provider: "onedrive" as const },
             ].map(p => (
               <button
                 key={p.label}
@@ -818,7 +818,7 @@ export default function PodcastStudio() {
                       <div className="flex items-center gap-3 mb-2">
                         <div className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border shadow-sm",
-                          turn.speakerId === "Alex" ? "bg-blue-500/10 text-blue-500 border-blue-500/20" : "bg-purple-500/10 text-purple-500 border-purple-500/20"
+                          turn.speakerId === "Alex" ? "bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20" : "bg-accent-purple/10 text-accent-purple border-accent-purple/20"
                         )}>
                           {turn.speakerId.charAt(0)}
                         </div>
@@ -963,7 +963,7 @@ export default function PodcastStudio() {
                   <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Parallelism</p>
                   <div className="flex items-center justify-between">
                     <span className="text-xs">Mesh Rendering</span>
-                    <Badge className="bg-green-500/10 text-green-500 border-green-500/20 text-[9px] h-4">Enabled</Badge>
+                    <Badge className="bg-accent-success/10 text-accent-success border-accent-success/20 text-[9px] h-4">Enabled</Badge>
                   </div>
                   <p className="text-[9px] text-muted-foreground italic">Distributing synthesis across 3 local nodes.</p>
                 </div>

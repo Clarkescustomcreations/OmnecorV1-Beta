@@ -277,7 +277,7 @@ export default function Dashboard() {
                         <div className="p-2 rounded-lg bg-accent/10 group-hover:bg-accent/20 transition-colors">
                           <Wallet className="w-6 h-6 text-accent" />
                         </div>
-                        <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Live Monitoring</Badge>
+                        <Badge className="bg-accent-success/10 text-accent-success border-accent-success/20">Live Monitoring</Badge>
                       </div>
                       <CardTitle className="text-xl">Agentic Wallet</CardTitle>
                       <CardDescription className="text-sm max-w-md">

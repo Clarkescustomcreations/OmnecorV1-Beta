@@ -724,7 +724,7 @@ export default function AgentNetworking() {
                       accountsData?.map((account) => (
                         <div key={account.id} className="p-4 border rounded-lg flex items-center justify-between hover:bg-muted/50 transition-colors">
                           <div className="flex items-center gap-4">
-                            <div className={`w-2 h-2 rounded-full ${account.isActive ? 'bg-green-500' : 'bg-destructive'}`} />
+                            <div className={`w-2 h-2 rounded-full ${account.isActive ? 'bg-accent-success' : 'bg-destructive'}`} />
                             <div>
                               <p className="font-medium uppercase">{account.platform}</p>
                               <p className="text-xs text-muted-foreground">{account.accountName || 'Active Account'}</p>
@@ -982,7 +982,7 @@ function MeshFederationPanel() {
                             Authorize
                           </Button>
                         ) : (
-                          <Badge variant="secondary" className="bg-green-500/10 text-green-500 h-5 text-[10px]">Connected</Badge>
+                          <Badge variant="secondary" className="bg-accent-success/10 text-accent-success h-5 text-[10px]">Connected</Badge>
                         )}
                       </div>
                     ))
@@ -1091,7 +1091,7 @@ function PlatformOAuthButtons({
           disabled={getAuthUrlMutation.isPending || connectedPlatforms.has(platform.id)}
           className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
             connectedPlatforms.has(platform.id)
-              ? "border-green-500/30 bg-green-500/5 cursor-not-allowed opacity-60"
+              ? "border-accent-success/30 bg-accent-success/5 cursor-not-allowed opacity-60"
               : `border-border ${platform.color} text-white font-medium`
           }`}
         >
@@ -1217,7 +1217,7 @@ function CurationPanel() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">Raw Discovery</p>
-              <Newspaper className="w-4 h-4 text-blue-500" />
+              <Newspaper className="w-4 h-4 text-accent-cyan" />
             </div>
             <div className="text-2xl font-bold">{articles?.length || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Unprocessed articles in feed</p>
@@ -1227,7 +1227,7 @@ function CurationPanel() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">Awaiting Review</p>
-              <Clock className="w-4 h-4 text-amber-500" />
+              <Clock className="w-4 h-4 text-accent-danger" />
             </div>
             <div className="text-2xl font-bold">{pendingPosts?.length || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">AI-generated drafts to approve</p>
@@ -1237,7 +1237,7 @@ function CurationPanel() {
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
               <p className="text-sm font-medium text-muted-foreground">Queue Depth</p>
-              <TrendingUp className="w-4 h-4 text-green-500" />
+              <TrendingUp className="w-4 h-4 text-accent-success" />
             </div>
             <div className="text-2xl font-bold">{scheduledPosts?.filter(p => p.status === 'scheduled').length || 0}</div>
             <p className="text-xs text-muted-foreground mt-1">Posts ready for publication</p>
@@ -1253,7 +1253,7 @@ function CurationPanel() {
           <TabsTrigger value="approvals" className="gap-2 relative">
             <CheckCircle2 className="w-4 h-4" /> Approvals
             {pendingPosts && pendingPosts.length > 0 && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-[10px] text-white rounded-full flex items-center justify-center font-bold">
+              <div className="absolute -top-1 -right-1 w-4 h-4 bg-destructive text-[10px] text-destructive-foreground rounded-full flex items-center justify-center font-bold">
                 {pendingPosts.length}
               </div>
             )}
@@ -1329,7 +1329,7 @@ function CurationPanel() {
                     <div className="grid grid-cols-2 gap-2">
                       <div className="flex items-center justify-between p-2 rounded border bg-muted/20">
                         <span className="text-xs font-medium">X (Twitter)</span>
-                        <Badge className="bg-green-500/10 text-green-500 text-[10px]">Active</Badge>
+                        <Badge className="bg-accent-success/10 text-accent-success text-[10px]">Active</Badge>
                       </div>
                       <div className="flex items-center justify-between p-2 rounded border bg-muted/20 opacity-50">
                         <span className="text-xs font-medium">LinkedIn</span>
@@ -1386,7 +1386,7 @@ function CurationPanel() {
                     <div className="p-6 flex-1 space-y-4">
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2">
-                          <Badge className="bg-black text-white uppercase text-[10px]">{post.platform}</Badge>
+                          <Badge className="bg-foreground text-background uppercase text-[10px]">{post.platform}</Badge>
                           <span className="text-xs text-muted-foreground font-mono">Draft #{post.id}</span>
                         </div>
                         <Button
@@ -1438,7 +1438,7 @@ function CurationPanel() {
                       )}
                       <div className="flex gap-3 pt-2">
                         <Button
-                          className="flex-1 h-10 gap-2 bg-green-600 hover:bg-green-700"
+                          className="flex-1 h-10 gap-2 bg-accent-success hover:bg-accent-success/90"
                           title={draftOverLimit ? `Exceeds ${post.platform} character limit` : undefined}
                           onClick={() => approveMutation.mutate({ postIds: [post.id] })}
                           disabled={approveMutation.isPending || draftOverLimit}
@@ -1448,7 +1448,7 @@ function CurationPanel() {
                         </Button>
                         <Button
                           variant="outline"
-                          className="flex-1 h-10 gap-2 border-red-500/20 text-red-500 hover:bg-red-500/10"
+                          className="flex-1 h-10 gap-2 border-destructive/20 text-destructive hover:bg-destructive/10"
                           onClick={() => rejectMutation.mutate({ postIds: [post.id], rejectionReason: "Manual rejection" })}
                           disabled={rejectMutation.isPending}
                         >
@@ -1485,8 +1485,8 @@ function CurationPanel() {
                 {scheduledPosts?.filter(p => p.status === 'published').map(post => (
                   <div key={post.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
                     <div className="flex items-center gap-4">
-                      <div className="w-10 h-10 rounded-full bg-green-500/10 flex items-center justify-center">
-                        <Share2 className="w-5 h-5 text-green-500" />
+                      <div className="w-10 h-10 rounded-full bg-accent-success/10 flex items-center justify-center">
+                        <Share2 className="w-5 h-5 text-accent-success" />
                       </div>
                       <div>
                         <p className="text-sm font-bold line-clamp-1">{post.content}</p>

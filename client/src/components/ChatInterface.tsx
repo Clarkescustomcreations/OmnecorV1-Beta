@@ -254,7 +254,7 @@ function AssistantBubble({
             <Button
               size="sm"
               variant="outline"
-              className="h-5 text-[10px] px-1.5 gap-1 border-purple-500/30 text-purple-500 bg-purple-500/5 hover:bg-purple-500/10"
+              className="h-5 text-[10px] px-1.5 gap-1 border-accent-purple/30 text-accent-purple bg-accent-purple/5 hover:bg-accent-purple/10"
               onClick={handleLivePreviewClick}
             >
               <Eye className="w-2.5 h-2.5" />
@@ -267,7 +267,7 @@ function AssistantBubble({
             <Button
               size="sm"
               variant="outline"
-              className="h-5 text-[10px] px-1.5 gap-1 border-blue-500/30 text-blue-500 bg-blue-500/5 hover:bg-blue-500/10"
+              className="h-5 text-[10px] px-1.5 gap-1 border-accent-cyan/30 text-accent-cyan bg-accent-cyan/5 hover:bg-accent-cyan/10"
               onClick={handleSaveScriptClick}
             >
               <Save className="w-2.5 h-2.5" />
@@ -285,7 +285,7 @@ function AssistantBubble({
               title="Copy message"
             >
               {copied ? (
-                <Check className="w-3 h-3 text-green-500" />
+                <Check className="w-3 h-3 text-accent-success" />
               ) : (
                 <Copy className="w-3 h-3" />
               )}
@@ -319,7 +319,7 @@ function AssistantBubble({
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <Terminal className="w-5 h-5 text-blue-500" />
+              <Terminal className="w-5 h-5 text-accent-cyan" />
               Save Python Script
             </DialogTitle>
           </DialogHeader>
@@ -458,7 +458,7 @@ function UserBubble({
               title="Copy message"
             >
               {copied ? (
-                <Check className="w-3 h-3 text-green-500" />
+                <Check className="w-3 h-3 text-accent-success" />
               ) : (
                 <Copy className="w-3 h-3" />
               )}
@@ -663,22 +663,22 @@ export default function ChatInterface({
   return (
     <Card className={cn(
       "flex flex-col h-full overflow-hidden transition-all duration-300",
-      isFictionMode && "border-purple-500/60 shadow-[0_0_18px_-4px_theme(colors.purple.500/0.35)]",
+      isFictionMode && "border-accent-purple/60 shadow-[0_0_18px_-4px_color-mix(in_srgb,var(--color-accent-purple)_35%,transparent)]",
       className
     )}>
       {/* ── Fiction Mode Persistent Banner ─────────────────────────── */}
       {isFictionMode && (
-        <div className="flex items-center gap-2 px-4 py-2 bg-purple-950/60 border-b border-purple-500/40 flex-shrink-0 flex-wrap">
-          <BookOpenText className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
-          <span className="text-xs font-semibold text-purple-300 tracking-wide">FICTION MODE</span>
-          <span className="text-[10px] text-purple-400/70 hidden sm:inline">Creative writing &amp; roleplay only</span>
+        <div className="flex items-center gap-2 px-4 py-2 bg-accent-purple/5 border-b border-accent-purple/40 flex-shrink-0 flex-wrap">
+          <BookOpenText className="w-3.5 h-3.5 text-accent-purple flex-shrink-0" />
+          <span className="text-xs font-semibold text-accent-purple tracking-wide">FICTION MODE</span>
+          <span className="text-[10px] text-accent-purple/70 hidden sm:inline">Creative writing &amp; roleplay only</span>
           {/* Persona selector */}
           <div className="flex items-center gap-1.5 ml-1">
-            <UserCircle2 className="w-3 h-3 text-purple-400/70 flex-shrink-0" />
+            <UserCircle2 className="w-3 h-3 text-accent-purple/70 flex-shrink-0" />
             <select
               value={fictionPersonaId}
               onChange={e => onFictionPersonaChange?.(e.target.value)}
-              className="text-[10px] bg-purple-900/50 border border-purple-500/30 rounded px-1.5 py-0.5 text-purple-300 focus:outline-none focus:ring-1 focus:ring-purple-500/50 max-w-[130px]"
+              className="text-[10px] bg-accent-purple/10 border border-accent-purple/30 rounded px-1.5 py-0.5 text-accent-purple focus:outline-none focus:ring-1 focus:ring-accent-purple/50 max-w-[130px]"
               title="Active fiction persona"
             >
               <option value="">No persona</option>
@@ -688,7 +688,7 @@ export default function ChatInterface({
             </select>
           </div>
           <div className="flex-1" />
-          <div className="flex items-center gap-1 text-[10px] text-purple-400/60">
+          <div className="flex items-center gap-1 text-[10px] text-accent-purple/60">
             <ShieldAlert className="w-3 h-3" />
             <span className="hidden md:inline">Terminal · Agent Net · Wallet · Cloud blocked</span>
             <span className="md:hidden">Restricted</span>

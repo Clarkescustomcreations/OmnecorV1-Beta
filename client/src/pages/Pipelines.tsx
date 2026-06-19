@@ -13,12 +13,12 @@ import { Card, CardHeader, CardTitle, CardContent } from "@/components/ui/card";
 import { toast } from "sonner";
 
 const phaseColor: Record<string, string> = {
-  DEFINE: "bg-slate-700",
-  PLAN: "bg-blue-700",
-  EXECUTE: "bg-amber-700",
-  REVIEW: "bg-purple-700",
-  SHIP: "bg-green-700",
-  DONE: "bg-emerald-700",
+  DEFINE: "bg-muted text-muted-foreground",
+  PLAN: "bg-primary/80 text-primary-foreground",
+  EXECUTE: "bg-accent-cyan/70 text-foreground",
+  REVIEW: "bg-accent-purple/70 text-foreground",
+  SHIP: "bg-accent-success/70 text-foreground",
+  DONE: "bg-accent-success text-foreground",
 };
 
 export default function Pipelines() {
@@ -83,7 +83,7 @@ export default function Pipelines() {
             <div className="lg:col-span-2 space-y-6">
               {showCreateForm && (
                 <div className="rounded-lg border border-border bg-card p-4 space-y-3">
-                  <h2 className="text-sm font-semibold text-white">New Pipeline</h2>
+                  <h2 className="text-sm font-semibold text-foreground">New Pipeline</h2>
                   <Input placeholder="Pipeline name" value={name} onChange={e => setName(e.target.value)} />
                   <Textarea
                     placeholder="Describe the goal (min 10 chars)"
@@ -102,30 +102,30 @@ export default function Pipelines() {
                     <Button size="sm" variant="ghost" onClick={() => setShowCreateForm(false)}>Cancel</Button>
                   </div>
                   {createPipeline.isError && (
-                    <p className="text-red-400 text-xs">{createPipeline.error?.message}</p>
+                    <p className="text-destructive text-xs">{createPipeline.error?.message}</p>
                   )}
                 </div>
               )}
 
               <div className="space-y-3">
                 <h2 className="text-sm font-semibold text-muted-foreground uppercase tracking-wide">Pipelines</h2>
-                {listPipelines.isLoading && <p className="text-gray-400 text-sm">Loading...</p>}
+                {listPipelines.isLoading && <p className="text-muted-foreground text-sm">Loading...</p>}
                 {!listPipelines.isLoading && (!listPipelines.data || listPipelines.data.length === 0) && (
-                  <p className="text-gray-500 text-sm">No pipelines yet. Create one above.</p>
+                  <p className="text-muted-foreground text-sm">No pipelines yet. Create one above.</p>
                 )}
                 {listPipelines.data?.map((p) => (
                   <div key={p.id} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between transition-all hover:border-accent/30 group">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <span className="text-white font-medium text-sm">{p.name}</span>
-                        <Badge className={`text-[10px] h-5 ${phaseColor[p.currentPhase] ?? "bg-gray-700"}`}>
+                        <span className="text-foreground font-medium text-sm">{p.name}</span>
+                        <Badge className={`text-[10px] h-5 ${phaseColor[p.currentPhase] ?? "bg-muted text-muted-foreground"}`}>
                           {p.currentPhase}
                         </Badge>
-                        <Badge variant="outline" className={`text-[10px] h-5 ${p.status === "complete" ? "border-emerald-500 text-emerald-500" : p.status === "aborted" ? "border-red-500 text-red-500" : "border-blue-500 text-blue-500"}`}>
+                        <Badge variant="outline" className={`text-[10px] h-5 ${p.status === "complete" ? "border-accent-success text-accent-success" : p.status === "aborted" ? "border-destructive text-destructive" : "border-accent-cyan text-accent-cyan"}`}>
                           {p.status}
                         </Badge>
                       </div>
-                      <p className="text-gray-400 text-xs truncate">{p.goal}</p>
+                      <p className="text-muted-foreground text-xs truncate">{p.goal}</p>
                     </div>
                     <Button size="sm" variant="outline" className="ml-4 shrink-0 group-hover:bg-accent group-hover:text-accent-foreground" onClick={() => setSelectedPipelineId(p.id)}>
                       View Detail

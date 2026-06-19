@@ -278,7 +278,7 @@ export default function Designer3D() {
               className="flex items-center gap-1.5 px-2 py-1 text-slate-300 text-[11px] hover:bg-slate-800/40 rounded cursor-pointer font-sans"
               style={{ paddingLeft: `${depth * 8 + 8}px` }}
             >
-              <Folder className="w-3.5 h-3.5 text-amber-500 opacity-80" />
+              <Folder className="w-3.5 h-3.5 text-accent-danger opacity-80" />
               <span className="font-medium truncate">{node.name}</span>
             </div>
             {node.children && renderFileTreeItems(node.children, depth + 1)}
@@ -522,13 +522,13 @@ export default function Designer3D() {
             lines.pop();
           }
           return lines.map((line, lineIdx) => {
-            let bgClass = "text-slate-400 border-l-2 border-transparent px-2";
+            let bgClass = "text-muted-foreground border-l-2 border-transparent px-2";
             let prefix = " ";
             if (change.added) {
-              bgClass = "bg-emerald-950/30 text-emerald-400 border-l-2 border-emerald-500 px-2";
+              bgClass = "bg-accent-success/10 text-accent-success border-l-2 border-accent-success px-2";
               prefix = "+";
             } else if (change.removed) {
-              bgClass = "bg-rose-950/20 text-rose-500 border-l-2 border-rose-600 line-through px-2";
+              bgClass = "bg-destructive/10 text-destructive border-l-2 border-destructive line-through px-2";
               prefix = "-";
             }
             return (
@@ -608,10 +608,10 @@ export default function Designer3D() {
                     }}
                     autoFocus
                   />
-                  <button onClick={handleCreateFile} className="text-emerald-500 hover:text-emerald-400">
+                  <button onClick={handleCreateFile} className="text-accent-success hover:text-accent-success/80">
                     <Check className="w-3 h-3" />
                   </button>
-                  <button onClick={() => setIsCreatingFile(false)} className="text-rose-500 hover:text-rose-400">
+                  <button onClick={() => setIsCreatingFile(false)} className="text-destructive hover:text-destructive/80">
                     <X className="w-3 h-3" />
                   </button>
                 </div>
@@ -661,10 +661,10 @@ export default function Designer3D() {
             
             {/* Right: Diff Meter and File Type Badge */}
             <div className="flex items-center gap-3 flex-shrink-0">
-              <div className="flex items-center gap-1.5 font-mono text-[11px] select-none bg-slate-950 px-2 py-1 rounded border border-slate-850">
-                <span className="text-slate-500 text-[10px] mr-1 uppercase font-semibold">Changes</span>
-                <span className="text-emerald-500 font-bold">+{diffStats.additions}</span>
-                <span className="text-rose-500 font-bold">-{diffStats.deletions}</span>
+              <div className="flex items-center gap-1.5 font-mono text-[11px] select-none bg-card px-2 py-1 rounded border border-border">
+                <span className="text-muted-foreground text-[10px] mr-1 uppercase font-semibold">Changes</span>
+                <span className="text-accent-success font-bold">+{diffStats.additions}</span>
+                <span className="text-destructive font-bold">-{diffStats.deletions}</span>
               </div>
 
               <Badge variant="secondary" className="bg-slate-800 text-slate-300 border-none font-mono text-[10px]">
@@ -1037,7 +1037,7 @@ export default function Designer3D() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8 px-3 text-xs mr-2 border-blue-500/40 text-blue-400 hover:bg-blue-500/10 hover:border-blue-400"
+                  className="h-8 px-3 text-xs mr-2 border-accent-cyan/40 text-accent-cyan hover:bg-accent-cyan/10 hover:border-accent-cyan"
                   onClick={handleOpenInKicad}
                   disabled={openInKicadMutation.isPending}
                 >

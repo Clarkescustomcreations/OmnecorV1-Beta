@@ -333,15 +333,15 @@ export default function SpecializedModuleLauncher({
       </div>
 
       {/* Kaggle GPU Training */}
-      <Card className="border-blue-500/20 bg-blue-500/5">
+      <Card className="border-accent-cyan/20 bg-accent-cyan/5">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Cloud className="w-4 h-4 text-blue-400" />
+              <Cloud className="w-4 h-4 text-accent-cyan" />
               Kaggle GPU Training (Free)
             </CardTitle>
             {kaggleStatus.data?.connected
-              ? <Badge className="bg-green-500/10 text-green-400 border-green-500/20 text-[10px] gap-1"><CheckCircle2 className="w-3 h-3" /> {kaggleStatus.data.username}</Badge>
+              ? <Badge className="bg-accent-success/10 text-accent-success border-accent-success/20 text-[10px] gap-1"><CheckCircle2 className="w-3 h-3" /> {kaggleStatus.data.username}</Badge>
               : <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1"><AlertCircle className="w-3 h-3" /> Not connected</Badge>
             }
           </div>
@@ -358,7 +358,7 @@ export default function SpecializedModuleLauncher({
               <p>3. Go to <strong>kaggle.com/settings</strong> → API section → click <strong>"Create New Token"</strong> — this downloads a file called <code className="font-mono bg-muted px-1 rounded">kaggle.json</code></p>
               <p>4. Open that file — it looks like: <code className="font-mono bg-muted px-1 rounded">{`{"username":"you","key":"abc123..."}`}</code></p>
               <p>5. Enter those values in <strong>Settings → AI Providers → Kaggle</strong> or in the <strong>Valet Router tab</strong> to connect.</p>
-              <p className="text-blue-400">Once connected, come back here to launch a training run with one click.</p>
+              <p className="text-accent-cyan">Once connected, come back here to launch a training run with one click.</p>
             </div>
           ) : (
             <Button

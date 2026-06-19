@@ -120,7 +120,9 @@ These are absolute. No exceptions, no "just this once."
   be injected into a `0xRRGGBB` integer), `MeshTopologyGraph` (Canvas API — `ctx.fillStyle`
   cannot read CSS vars; values documented to match UI-Tokens.md equivalents), and brand-identity
   SVG logos in `SetupWizard` (Google/Microsoft official brand palettes are legally required to
-  be exact). All other hex literals are violations.
+  be exact), and social-media OAuth platform buttons (`OAUTH_PLATFORMS` in `AgentNetworking` —
+  Twitter/X black, LinkedIn blue, YouTube red, Instagram pink are brand-required).
+  All other hex literals are violations.
 - **Named exports only** for React components. Never `export default function`.
 - **Explicit prop interfaces** on every component. Never `any` or implicit typing.
 

@@ -265,7 +265,7 @@ export const Settings: React.FC = () => {
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <Server className="w-4 h-4 text-green-500" /> Local AI (No Key Required)
+                          <Server className="w-4 h-4 text-accent-success" /> Local AI (No Key Required)
                         </CardTitle>
                         <CardDescription>
                           Local inference engines running on your machine. Configure the base URL if non-default.
@@ -278,7 +278,7 @@ export const Settings: React.FC = () => {
                             <Label htmlFor="ollama-url" className="font-semibold">
                               Ollama — Base URL
                             </Label>
-                            <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                            <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                               <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Local
                             </Badge>
                           </div>
@@ -300,7 +300,7 @@ export const Settings: React.FC = () => {
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <Brain className="w-4 h-4 text-blue-500" /> Cloud AI Providers
+                          <Brain className="w-4 h-4 text-accent-cyan" /> Cloud AI Providers
                         </CardTitle>
                         <CardDescription>
                           API keys are stored locally in <code className="font-mono text-[11px]">~/.omnecor/settings.json</code> and never sent to our servers.
@@ -313,7 +313,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-openai" className="font-semibold">OpenAI</Label>
                             {aiProviders?.openai ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -337,7 +337,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-anthropic" className="font-semibold">Anthropic (Claude)</Label>
                             {aiProviders?.anthropic ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -361,7 +361,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-gemini" className="font-semibold">Google Gemini</Label>
                             {aiProviders?.gemini ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -385,7 +385,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-grok" className="font-semibold">xAI Grok</Label>
                             {aiProviders?.grok ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -409,7 +409,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-hf" className="font-semibold">Hugging Face</Label>
                             {aiProviders?.huggingface ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -446,7 +446,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-elevenlabs" className="font-semibold">ElevenLabs (TTS)</Label>
                             {aiProviders?.elevenlabs ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -470,7 +470,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-falai" className="font-semibold">fal.ai (Image Gen)</Label>
                             {aiProviders?.falai ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -494,7 +494,7 @@ export const Settings: React.FC = () => {
                           <div className="flex items-center justify-between">
                             <Label htmlFor="key-forge" className="font-semibold">Forge API</Label>
                             {aiProviders?.forge ? (
-                              <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1.5 py-0.5 text-[10px]">
+                              <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
                                 <CheckCircle className="w-3 h-3" /> Configured
                               </Badge>
                             ) : (
@@ -593,7 +593,7 @@ export const Settings: React.FC = () => {
                             <RadioGroupItem value="sovereign" id="mode-sovereign" className="mt-0.5" />
                             <div>
                               <Label htmlFor="mode-sovereign" className="font-medium cursor-pointer flex items-center gap-1.5">
-                                <Lock className="h-3.5 w-3.5 text-red-500" /> Sovereign
+                                <Lock className="h-3.5 w-3.5 text-destructive" /> Sovereign
                               </Label>
                               <p className="text-xs text-muted-foreground">Air-gapped lockdown. All cloud provider calls are blocked server-side.</p>
                             </div>
@@ -602,7 +602,7 @@ export const Settings: React.FC = () => {
                             <RadioGroupItem value="scrapper" id="mode-scrapper" className="mt-0.5" />
                             <div>
                               <Label htmlFor="mode-scrapper" className="font-medium cursor-pointer flex items-center gap-1.5">
-                                <Zap className="h-3.5 w-3.5 text-green-500" /> Scrapper
+                                <Zap className="h-3.5 w-3.5 text-accent-success" /> Scrapper
                               </Label>
                               <p className="text-xs text-muted-foreground">Local-preferred. Ollama runs first; cloud providers available with keys.</p>
                             </div>
@@ -627,7 +627,7 @@ export const Settings: React.FC = () => {
                       </div>
                       <div className="pt-6 border-t space-y-6">
                         <h3 className="text-lg font-semibold flex items-center gap-2">
-                          <ShieldAlert className="w-5 h-5 text-red-500" /> Agent Safety (HITL)
+                          <ShieldAlert className="w-5 h-5 text-destructive" /> Agent Safety (HITL)
                         </h3>
                         <p className="text-xs text-muted-foreground">Require human-in-the-loop approval before agents perform critical actions.</p>
                         
@@ -847,8 +847,8 @@ const OMMESHPanel: React.FC = () => {
             </div>
             <div className="p-3 rounded-lg bg-muted/50 border">
               <p className="text-[10px] uppercase font-bold text-muted-foreground mb-1">Status</p>
-              <Badge variant="outline" className="bg-green-500/10 text-green-500 border-green-500/20 gap-1">
-                <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
+              <Badge variant="outline" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1">
+                <div className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
                 Active
               </Badge>
             </div>
@@ -915,7 +915,7 @@ const OMMESHPanel: React.FC = () => {
                       <div className="flex items-center gap-2">
                         <p className="font-bold text-sm truncate">{peer.name}</p>
                         {peer.isApproved ? (
-                          <Badge variant="secondary" className="bg-blue-500/10 text-blue-500 text-[10px] h-4 px-1.5">Linked</Badge>
+                          <Badge variant="secondary" className="bg-accent-cyan/10 text-accent-cyan text-[10px] h-4 px-1.5">Linked</Badge>
                         ) : (
                           <Badge variant="outline" className="text-[10px] h-4 px-1.5">Pending</Badge>
                         )}
@@ -1216,9 +1216,9 @@ function KaggleKeyCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="rounded-md bg-blue-500/5 border border-blue-500/20 px-4 py-3 text-xs text-blue-700 dark:text-blue-400 space-y-1">
+        <div className="rounded-md bg-accent-cyan/5 border border-accent-cyan/20 px-4 py-3 text-xs text-accent-cyan space-y-1">
           <p className="font-medium">How to get your Kaggle API key (2 min):</p>
-          <ol className="list-decimal list-inside space-y-0.5 text-blue-600 dark:text-blue-400/80">
+          <ol className="list-decimal list-inside space-y-0.5 text-accent-cyan/80">
             <li>Create a free account at <span className="font-mono">kaggle.com</span></li>
             <li>Go to <span className="font-mono">kaggle.com/settings</span> → Phone Verification → verify your phone (required for GPU)</li>
             <li>Still in Settings → API section → click <strong>Create New Token</strong> → <span className="font-mono">kaggle.json</span> downloads</li>
@@ -1513,7 +1513,7 @@ const HardwarePanel: React.FC = () => {
             <div className="p-4 rounded-xl border bg-muted/30">
               <p className="text-[10px] font-bold text-muted-foreground uppercase mb-1">Training Venv</p>
               <div className="flex items-center gap-2">
-                <div className={cn("w-2 h-2 rounded-full", mlVenvQuery.data?.installed ? "bg-green-500" : "bg-red-500")} />
+                <div className={cn("w-2 h-2 rounded-full", mlVenvQuery.data?.installed ? "bg-accent-success" : "bg-destructive")} />
                 <p className="font-bold text-sm">{mlVenvQuery.data?.installed ? "Ready" : "Missing"}</p>
               </div>
               <p className="text-xs text-muted-foreground mt-1 truncate">{mlVenvQuery.data?.path || "Not installed"}</p>
@@ -1556,7 +1556,7 @@ const HardwarePanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Usb className="w-5 h-5 text-blue-500" /> Neural-Link Hardware
+            <Usb className="w-5 h-5 text-accent-cyan" /> Neural-Link Hardware
           </CardTitle>
           <CardDescription>Manage connected ESP32 microcontrollers and sensors.</CardDescription>
         </CardHeader>
@@ -1591,7 +1591,7 @@ const HardwarePanel: React.FC = () => {
           <div className="grid grid-cols-2 gap-4">
             <Button 
               variant="outline" 
-              className="gap-2 border-red-500/30 hover:bg-red-500/10 hover:text-red-500"
+              className="gap-2 border-destructive/30 hover:bg-destructive/10 hover:text-destructive"
               onClick={() => {
                 if (window.confirm("Erase all flash memory? This cannot be undone.")) {
                   eraseMutation.mutate({ port: selectedPort });
@@ -1845,7 +1845,7 @@ const SocialLoginCard: React.FC = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Globe className="w-4 h-4 text-blue-500" /> Social Login (OAuth)
+          <Globe className="w-4 h-4 text-accent-cyan" /> Social Login (OAuth)
         </CardTitle>
         <CardDescription>
           Optional. Local accounts work with no setup. To enable Google / Microsoft sign-in for all your devices
@@ -1858,7 +1858,7 @@ const SocialLoginCard: React.FC = () => {
         {/* Status badges */}
         <div className="flex flex-wrap gap-3">
           {oauthStatus?.google ? (
-            <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1.5 py-1 px-2.5">
+            <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-1 px-2.5">
               <CheckCircle className="w-3 h-3" /> Google: Configured
             </Badge>
           ) : (
@@ -1867,7 +1867,7 @@ const SocialLoginCard: React.FC = () => {
             </Badge>
           )}
           {oauthStatus?.microsoft ? (
-            <Badge variant="secondary" className="bg-green-500/10 text-green-600 border-green-500/20 gap-1.5 py-1 px-2.5">
+            <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-1 px-2.5">
               <CheckCircle className="w-3 h-3" /> Microsoft: Configured
             </Badge>
           ) : (
@@ -1913,7 +1913,7 @@ const SocialLoginCard: React.FC = () => {
         {/* Google credentials */}
         <div className="space-y-3">
           <p className="text-sm font-semibold flex items-center gap-1.5">
-            <span className="inline-block w-4 h-4 rounded-full bg-blue-500/20 text-blue-500 text-[9px] font-bold flex items-center justify-center">G</span>
+            <span className="inline-block w-4 h-4 rounded-full bg-accent-cyan/20 text-accent-cyan text-[9px] font-bold flex items-center justify-center">G</span>
             Google OAuth
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">

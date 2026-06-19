@@ -242,7 +242,7 @@ export default function ModelHub() {
                     <div key={p.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-accent/5 text-[11px] font-mono min-w-0 gap-2">
                       <span className="text-muted-foreground truncate">{p.label}</span>
                       {p.configured ? (
-                        <span className="flex items-center gap-1 text-emerald-500 font-medium flex-shrink-0">
+                        <span className="flex items-center gap-1 text-accent-success font-medium flex-shrink-0">
                           <CheckCircle2 className="w-3.5 h-3.5" /> Configured
                         </span>
                       ) : (
@@ -319,7 +319,7 @@ export default function ModelHub() {
                   </div>
                 </div>
                 {pullMutation.isPending && (
-                  <div className="flex items-center gap-2 text-xs text-blue-400 mt-2 px-1">
+                  <div className="flex items-center gap-2 text-xs text-accent-cyan mt-2 px-1">
                     <Download className="w-3.5 h-3.5 animate-bounce" />
                     Pulling model in background...
                   </div>
