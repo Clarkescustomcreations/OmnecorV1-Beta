@@ -117,9 +117,10 @@ These are absolute. No exceptions, no "just this once."
   The only legitimate exceptions are: `EmbeddedTerminal` (xterm theme), `ThreeViewer`
   and `SchematicEditor`, `EnhancedPCBEditor`, `PCBSchematicEditor` (Three.js/ReactFlow require direct values), `WebPreview`
   (sandboxed iframe), `PCBViewer3D` (Three.js material hex integer — CSS vars cannot
-  be injected into a `0xRRGGBB` integer), and brand-identity SVG logos in `SetupWizard`
-  (Google/Microsoft official brand palettes are legally required to be exact). All other
-  hex literals are violations.
+  be injected into a `0xRRGGBB` integer), `MeshTopologyGraph` (Canvas API — `ctx.fillStyle`
+  cannot read CSS vars; values documented to match UI-Tokens.md equivalents), and brand-identity
+  SVG logos in `SetupWizard` (Google/Microsoft official brand palettes are legally required to
+  be exact). All other hex literals are violations.
 - **Named exports only** for React components. Never `export default function`.
 - **Explicit prop interfaces** on every component. Never `any` or implicit typing.
 

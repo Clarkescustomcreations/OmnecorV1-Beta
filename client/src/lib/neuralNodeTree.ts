@@ -361,16 +361,21 @@ export function generateMockFileSystem(projectName: string): FileSystemNode[] {
 
 import type { NeuralBrainMap } from "@/types/neural";
 
-/** Map-mode colour palette — one accent per map (cycling if > 8 maps) */
+// Map-mode accent palette — one colour per map (cycles if > 8 maps).
+// These hex values intentionally approximate the design token OKLCH equivalents
+// (--accent-purple, --accent-cyan, --accent-success, --accent-danger) so they
+// read consistently in both themes. They must stay as hex because they are
+// also appended with a two-digit alpha suffix (e.g. `${mapColor}55`) in inline
+// border styles where CSS variable strings cannot be extended that way.
 const MAP_COLORS = [
-  "#7c3aed", // violet
-  "#0ea5e9", // sky
-  "#10b981", // emerald
-  "#f59e0b", // amber
-  "#ef4444", // red
-  "#ec4899", // pink
-  "#06b6d4", // cyan
-  "#84cc16", // lime
+  "#7c3aed", // ≈ --color-accent-purple
+  "#0ea5e9", // ≈ --color-accent-cyan
+  "#10b981", // ≈ --color-accent-success
+  "#ef4444", // ≈ --color-accent-danger
+  "#ec4899", // pink (no token — nearest is accent-purple)
+  "#06b6d4", // ≈ --color-accent-cyan (variant)
+  "#84cc16", // lime (no token — nearest is accent-success)
+  "#f59e0b", // amber (no token — nearest is accent-danger)
 ];
 
 function polar(cx: number, cy: number, r: number, angleRad: number) {
@@ -408,7 +413,7 @@ export function buildMasterNetwork(maps: NeuralBrainMap[]): NeuralNetwork {
     type: "project",
     data: { path: "/", depth: 0, metadata: { type: "workspace-hub" } },
     position: { x: 0, y: 0 },
-    style: { background: "#1e1e2e", border: "2px solid #7c3aed", color: "#e2e8f0" },
+    style: { background: "var(--color-background)", border: "2px solid var(--color-accent-purple)", color: "var(--color-foreground)" },
   });
 
   if (maps.length === 0) return { id: "master", name: "Master Network", type: "master", nodes, edges };
@@ -433,7 +438,7 @@ export function buildMasterNetwork(maps: NeuralBrainMap[]): NeuralNetwork {
         metadata: { type: "map-hub", mode: map.mode, color: mapColor },
       },
       position: mapPos,
-      style: { background: "#0f0f1a", border: `2px solid ${mapColor}`, color: "#e2e8f0" },
+      style: { background: "var(--color-card)", border: `2px solid ${mapColor}`, color: "var(--color-foreground)" },
     });
 
     // Workspace → map edge
@@ -467,8 +472,8 @@ export function buildMasterNetwork(maps: NeuralBrainMap[]): NeuralNetwork {
         },
         position: srcPos,
         style: isRemote
-          ? { background: "#0a0a1a", border: "1px dashed #7c3aed", color: "#a78bfa" }
-          : { background: "#0a0f1a", border: `1px solid ${mapColor}55`, color: "#94a3b8" },
+          ? { background: "var(--color-bg-primary)", border: "1px dashed var(--color-accent-purple)", color: "var(--color-accent-purple)" }
+          : { background: "var(--color-bg-primary)", border: `1px solid ${mapColor}55`, color: "var(--color-muted-foreground)" },
       });
 
       edges.push({

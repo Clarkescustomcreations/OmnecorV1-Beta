@@ -996,13 +996,13 @@ function MeshFederationPanel() {
               <MeshTopologyGraph identity={identity} peers={peers ?? []} />
               <div className="flex gap-4 text-[10px]">
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: "#1d4ed8" }} /> Local
+                  <div className="w-2 h-2 rounded-full bg-accent-cyan" /> Local
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: "#16a34a" }} /> Trusted
+                  <div className="w-2 h-2 rounded-full bg-accent-success" /> Trusted
                 </div>
                 <div className="flex items-center gap-1.5">
-                  <div className="w-2 h-2 rounded-full" style={{ background: "#dc2626" }} /> Pending
+                  <div className="w-2 h-2 rounded-full bg-accent-danger" /> Pending
                 </div>
               </div>
             </div>
