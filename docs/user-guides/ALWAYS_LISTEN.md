@@ -8,7 +8,7 @@ Always-Listening Mode allows your Android device to run a persistent microphone 
 
 ## 1. How the Voice Pipeline Works
 
-1. **Wake Word Detection**: The app runs the **Picovoice Porcupine** engine locally on the device to monitor the microphone stream.
+1. **Wake Word Detection**: The app runs the local **whisper.rn** (GGML) engine on the device's NPU/GPU, transcribing short audio segments to detect your configured wake word (`"Hey Omnecor"` / `"Computer"`). No cloud service or third-party wake-word engine is used.
 2. **Foreground Service (Kotlin)**: To prevent Android's system battery optimizer from terminating the mic capture, a custom native Foreground Service (`MicForegroundService`) runs with persistent notifications and microphone priority.
 3. **Local STT (Whisper)**: Once the wake word is triggered, **expo-audio** records the utterance, and the local **whisper.rn** engine transcribes the audio directly on the device.
 4. **Desktop Persona Handoff**: The text output is sent to your desktop's designated Persona Agent via WebSockets.
@@ -16,12 +16,12 @@ Always-Listening Mode allows your Android device to run a persistent microphone 
 
 ---
 
-## 2. Setup Prerequisites
+## 2. Setup 
 
-To utilize Always-Listening Mode, you must obtain a Picovoice API Key:
-1. Go to the [Picovoice Console](https://console.picovoice.ai/) and create a free account.
-2. Copy your **AccessKey** from the dashboard.
-3. (Optional) In the Picovoice console, train a custom wake-word model for the phrase `"Hey Omnecor"` targeting the Android platform, and download the resulting `.ppn` file.
+Always-Listening Mode runs **100% on-device** — there is no account to create, no API key, and no third-party wake-word service. You only need:
+1. An Android device with a working microphone.
+2. A reachable Omnecor desktop workstation (paired over OMMESH / Tailscale) for the AI persona handoff.
+3. A downloaded on-device Whisper STT model (the app downloads this for you in Settings — see below).
 
 ---
 
@@ -29,12 +29,12 @@ To utilize Always-Listening Mode, you must obtain a Picovoice API Key:
 
 1. Open the **Omnecor HQ App** and navigate to the **Settings** tab.
 2. Expand the **Always-Listening** config section.
-3. Enter your **Picovoice AccessKey** and save settings.
-4. Under **Wake Word Configuration**:
-   - By default, the app uses the built-in fallback keyword `COMPUTER`.
-   - To use your custom trained wake word, upload your `.ppn` file to the app's document storage directory, or select it from the file picker.
-5. Under **STT Model Setup**:
+3. Under **Wake Word Configuration**:
+   - Type the wake word you want to listen for (defaults to `omnecor`). It is matched against the on-device Whisper transcription — no custom model file is required.
+   - Adjust the **Sensitivity** slider (0–1; higher is more sensitive / triggers on lower audio energy).
+4. Under **STT Model Setup**:
    - Download the Whisper `base` or `tiny` model (`ggml-model.bin`) using the download progress bar in the settings. (The downloader ignores standard media files to prevent indexing conflicts).
+5. Select the **Persona** that should answer your voice intents.
 6. Tap the **Test Audio Pipeline** button to verify that permissions are granted and the microphone is capturing cleanly.
 
 ---

@@ -5,7 +5,9 @@
  * and Visual Context Map for the AI chat interface.
  */
 
-// We replaced @anthropic-ai/tokenizer to avoid WebAssembly resolution issues in Vite
+// Token counts use js-tiktoken (pure JS, no WASM) — see ./tokenizer.
+// @anthropic-ai/tokenizer was avoided because its WASM broke Vite resolution.
+import { countTokens } from "./tokenizer";
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 
@@ -57,11 +59,12 @@ export interface ConversationContext {
 }
 
 /**
- * Estimate tokens for a given text
- * Rule of thumb: ~1 token per 4 characters for English
+ * Count tokens for a given text using the real BPE tokenizer.
+ * Pass `modelId` for an exact count on OpenAI models (and the closest proxy
+ * for Claude/Gemini/Grok); omit it to use the default modern encoding.
  */
-export function estimateTokens(text: string): number {
-  return Math.ceil((text || "").length / 4);
+export function estimateTokens(text: string, modelId?: string): number {
+  return countTokens(text, modelId);
 }
 
 /**

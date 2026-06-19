@@ -12,6 +12,126 @@ Initial audit: 2026-06-08 | Last updated: 2026-06-10 (Session 11: 9-agent Haiku 
 | **PARTIAL** | Handler exists but API target is fetch instead of tRPC, or is commented out / stubbed |
 | ~~DEAD~~ → **CONNECTED** | Fixed in this session |
 
+### Verified dimension (added Session 21, 2026-06-19)
+The `Status` column above records *what the handler is wired to*. The new **Verified** dimension records *whether that claim was proven this pass*. Because 537 CONNECTED rows resolve to ~135 distinct procedures (many rows share one proc — see the Duplicate API Entry Points appendix), the Verified verdict is recorded **per-procedure** in the Session 21 index below rather than duplicated into every row. To read any CONNECTED row's Verified status, look up its `API/tRPC Call` value in the **Session 21 per-procedure verdict index**.
+
+| Verified | Meaning |
+|---|---|
+| **VERIFIED-REAL ✅** | Traced to a real server impl that does real work **and** (web) observed firing with real 200 data, or (APK) statically proven to real impl + builds. |
+| **UNVERIFIED ⚠️** | Not proven this pass — default until proof. Real impl exists but not live-driven, or depends on an offline optional bridge / unset cloud key. Reason cited. |
+| **STUB/MOCK 🔴** | Traced to a stub / mock / non-existent proc, even if a prior status said CONNECTED. |
+| **DEFERRED 🟦** | Intentionally incomplete per `Context/Progress-Tracker.md` (known shell), not a regression. |
+
+---
+
+## Session 22 (2026-06-19) — LOCAL/DEAD/PARTIAL Verification + Missing-Element Hunt (registry-tracker)
+
+**Scope:** second pass over the same day's run — re-prove every LOCAL, DEAD, and PARTIAL entry (Session 21 only covered CONNECTED) and enumerate every interactive element in both UIs to surface anything absent from the registry entirely. Method: (1) static-trace all active LOCAL/DEAD/PARTIAL rows against current source; (2) exhaustive file-by-file interactive-element inventory across `client/src/` and `packaging/android/omnecor-hq/`; (3) grep-verify every router reference before adding any new row.
+
+### Headline metrics (Session 22)
+- **Active DEAD rows re-verified:** 1 genuine — `LoRA Rank visual slider` (UnslothPanel). Result: **table row was stale** — code shows a real `<input type="range" onChange>` wired to `loraRank` state that feeds `startFineTuning.mutate`. Corrected to **LOCAL** (S22).
+- **LOCAL rows sampled:** settings-tab switches/sliders listing `trpc.system.saveSettings.mutate (on Save)` — classification is **correct**. Individual controls update local state only; the Save button (separately CONNECTED) fires the server call.
+- **PARTIAL rows (web):** 0 active web PARTIAL rows; all APK 🟡 PARTIAL entries are runtime-gated (NDK lib / model file / whisper server), not missing code — unchanged.
+- **Missing web components found:** **4** (AuditRetentionPanel + 3 missing query rows across MCPToolDirectory and ThreatDashboard).
+- **APK Section 4 Settings errors:** 4 label/status errors corrected; section is superseded by the authoritative full tracker, but errors strike-corrected for honesty.
+- **Total new rows added:** 8 web rows (AuditRetentionPanel ×4, MCPToolDirectory queries ×3, ThreatDashboard IoC query ×1) + APK corrections.
+
+### Discrepancy Report (Session 22)
+
+**1. [BUG — stale DEAD row] `UnslothPanel.tsx` — LoRA Rank slider**
+Session 12 corrected this in the session-summary note ("UnslothPanel LoRA Rank slider confirmed as real `<input type="range">`, replaced cosmetic div in Session 12") but **never updated the table row**. Current code: `client/src/components/hardware/UnslothPanel.tsx:130` — `<input type="range" onChange={(e) => setLoraRank(Number(e.target.value))}>`, value passed to `startFineTuning.mutate({ r: loraRank })`. Corrected: ~~DEAD (cosmetic div)~~ → **LOCAL**.
+
+**2. [BUG — missing component] `AuditRetentionPanel.tsx` (Settings → Security tab)**
+Component at `client/src/components/settings/AuditRetentionPanel.tsx`, rendered at `Settings.tsx:678`. Zero registry entries. Has `trpc.audit.getRetention.useQuery` (admin-only, real impl `auditRouter.ts:58`) and `trpc.audit.setRetention.useMutation` (admin-only, real impl `auditRouter.ts:69`). Added below under COMPONENT: AuditRetentionPanel.tsx.
+
+**3. [BUG — missing rows] `MCPToolDirectory.tsx` — 3 query display rows absent**
+Action rows (Connect/Disconnect/Run) were registered but query rows used for data display were missing: `mcp.agenticOsStatus` (mcpRouter.ts:136), `mcp.listConnectedServers` (mcpRouter.ts:8), `mcp.listTools` (mcpRouter.ts:80). All real protectedProcedures. Added below.
+
+**4. [BUG — missing row] `ThreatDashboard.tsx` — IoC feed query absent**
+`security.getIoCFeed.useQuery` used for the IoC tab display (securityRouter.ts:237, real impl). Only the Scan button was registered. Added below.
+
+**5. [BUG — label/status errors] APK Section 4 Settings rows**
+Section 4 is superseded by the authoritative full tracker (§ "MOBILE APK — FULL INPUT/OUTPUT/FUNCTION TRACKER") but its stale rows have 4 errors — corrected with strike-and-correct:
+- "SSH Host" → no SSH in this app; actual element is **Server IP / Hostname** TextInput
+- "SSH Credentials" → this element does not exist; actual second TextInput is **Port**
+- "Test Connection" handler labeled `testSSH / ping socket` → actual: `handleTestConnection → fetch(ip:port/health)` HTTP
+- Dark Mode Toggle → labeled **DEAD** but has real `onValueChange → setColorScheme` → **LOCAL**
+
+---
+
+## Session 21 (2026-06-19) — CONNECTED-Claims Proof Pass (registry-tracker)
+
+**Scope:** re-verify the **537 CONNECTED** claims across both UIs (the entries that can be falsely "connected" to a stub). Method: (1) static-trace every distinct procedure backing a CONNECTED row → its router impl; (2) live-drive the core web flows with chrome-devtools against a running `pnpm dev` (port 3000, `ZERO_LOGIN_MODE`, local admin) and capture the real network response; (3) reconcile against Progress-Tracker deferrals. LOCAL/DEAD/PARTIAL rows were **not** re-audited this pass (per the chosen scope) and keep their existing status.
+
+### Headline metrics
+- **Distinct procedures backing web CONNECTED rows:** ~135 — **all exist, all resolve to real implementations.**
+- **STUB/MOCK found inside server routers:** **0** (router stub-marker scan clean; the only hits are comments noting prior placeholders were *fixed*).
+- **Live-proven VERIFIED-REAL (web, observed 200 + real data):** **14 procedures** (table below).
+- **Corrections:** 5 APK "Section 4" mislabels (2 of them reference **non-existent** procedures) + 1 namespace-label error. 0 router-level stubs masquerading as CONNECTED.
+- **Environment blockers (not app bugs):** local **Ollama llama-runner crashes** (`llama runner process has terminated` — matches Progress-Tracker L23) → blocks end-to-end proof of `ai.chat`/`chatStream`; **ChromaDB / Whisper / TTS / RVC / ComfyUI / RecursiveMAS bridges offline**; no cloud API keys set.
+
+### Local service availability observed this pass
+Ollama daemon UP (5 models listed) **but inference runner crashes**; Valet server (8010) UP in **rule-based fallback** (llama-cpp not installed); ChromaDB (8000), Whisper (8001), TTS (8002), RVC (8003), RecursiveMAS (8011), llama.cpp (8013), ComfyUI (8188) **all offline**; no OpenAI/Anthropic/Gemini/Grok/HF/Fal/OpenArt/Vast/RunPod/Lambda keys set.
+
+### VERIFIED-REAL ✅ — live-driven 2026-06-19 (observed real 200 response)
+| Procedure | Evidence |
+|---|---|
+| `auth.me` | net 200, real user `{id:1, Local Admin, role:admin, executionMode:scrapper}` |
+| `neuralMaps.list` | net 200 `[]` (real query, empty) |
+| `aiProvider.discoverOllamaModels` | net 200; populated model menu with real Ollama models (`qwen2.5:1.5b`, `gemma4`, `qwen2.5-coder:7b`, …) |
+| `aiProvider.getProviders` | net 200 |
+| `system.saveKeys` | **POST 200 `{success:true}`** (drove Settings → "Save API Configuration") |
+| `system.aiProviders` | net 200 (provider status badges) |
+| `system.getSettings` | net 200 |
+| `notifications.unreadCount` | net 200 |
+| `honcho.getFacts` | net 200 (batch) |
+| `chat.listSessions` | net 200 (batch) |
+| `scripts.list` | net 200 (batch) |
+| `integrations.getIntegrations` | net 200 |
+| `ommesh.discover` | net 200; live mesh peer discovered (`omnecor-lin-vis @ 192.168.1.252`) |
+| `training.kaggleStatus` | net 200 (batch) |
+
+> Also observed real: WS `/ws` clients authenticated-connect; Chat send created a 2-message conversation, entered "Generating response…" (chatStream subscription fired), and the new `js-tiktoken` token counter produced real BPE counts ("9 tokens").
+
+### UNVERIFIED ⚠️ — real impl traced, but not proven end-to-end this pass
+| Procedure(s) | Reason |
+|---|---|
+| `ai.chat`, `aiProvider.chatStream` | Subscription fired + UI entered generating state, but **local Ollama llama-runner crashed** (env issue, Progress-Tracker L23) → real completion not observed. Wiring real; end-to-end blocked. |
+| `voice.transcribe` / `voice.synthesize` / `voice.synthesizeElevenLabs` / `voice.healthCheck` | Whisper/TTS/RVC bridges (8001-8003) offline; proc real, throws honest "Whisper server is not running" (`voiceRouter.ts:160+`). |
+| `knowledgeBase.search` / `ingestDirectory` / `ensureProject` / `deleteCollection` | ChromaDB (8000) offline ("Semantic search will be disabled"); proc real. |
+| `comfy.queuePrompt` / `comfy.getSystemStats` | ComfyUI (8188) offline. |
+| `fal.generateImage`, `imageGen.generate` | `FAL_KEY`/`OPENART_API_KEY` not set (provider disabled). |
+| `cloudCompute.*`, `virtualCard.issueCard` | Vast/RunPod/Lambda/Lithic keys not set. |
+| `agent.runRecursiveMAS` / `stopRecursiveMAS` | RecursiveMAS bridge (8011) offline. |
+| `mcp.callTool` / `connectServer` / `disconnectServer` | Needs MCP server config. |
+| `blender.*`, `kicad.*`, `esp.*` | Local CLI/hardware bridges (Blender/KiCad/esptool) not confirmed installed; procs real. |
+| `security.runVulnerabilityScan` | `threat_scanner.py` optional bridge. |
+| `system.saveSettings`/`setExecutionMode`/`detectHardware`/`applyOptimizations`/`checkForUpdates`/`setUserRole`/`openTerminal`/`getPendingCliOutput`, `project.*`, `neuralMaps.create`/`update`/`delete`, `personas.upsert`/`delete`, `pcbEditor.*`, `audit.getAuditLog`, `jobs.*`, `pipeline.*`, `ollama.*`, `platforms.disconnectAccount`, `scripts.create`/`update`/`delete`, `honcho.addFact` | Static-traced to real impls; **not individually live-driven this pass** (most are local-serviceable and would likely pass, but unproven per the assume-broken protocol). |
+
+### DEFERRED 🟦 — per Progress-Tracker (known shells, not regressions)
+| Procedure(s) | Tracker reference |
+|---|---|
+| `scheduling.publishNow`/`schedulePost`/`createDirectPost`/`reschedulePost`/`cancelPost`, `curator.curateArticle`/`approvePosts`/`rejectPosts`/`regenerateDraft`/`updatePost`, `discovery.fetchArticles` | Social pipeline is **real code but "not yet live-tested against real platform APIs"** + needs OAuth creds (Archive A "Social content pipeline"). `publishNow` calls real `publishScheduledPostIds()` (`schedulingRouter.ts:145`). |
+| `oauth.getAuthorizationUrl` | System B OAuth "**still dark until operators register OAuth apps + enter creds**" (Session 17). |
+| `valet.status`, `valet.startLocalTraining`, `training.generateValetDataset`/`startTraining`/`startKaggleTraining`/`kaggleJobStatus`/`pullKaggleArtifact`/`registerArtifact`/`saveLoraConfig`/`saveKaggleKey` | Valet model in **rule-based fallback** (llama-cpp not installed; trained GGUF lives on Windows box — "ACTION REQUIRED ON WINDOWS PC"). `valet.status` returns real (fallback) data. |
+
+### APK CONNECTED claims (static, the APK ceiling)
+The **authoritative APK tracker** (the "MOBILE APK — FULL INPUT/OUTPUT/FUNCTION TRACKER" section, which by its own note supersedes "Section 4") references **only procedures that exist and are real**: `ai.chat`, `ai.getProviders`, `neuralMaps.list`, `personas.list`, `attachments.uploadFile`, `pcbEditor.getProjects`/`getLatestDesign`/`saveDesign`/`exportDesign`/`reviewDesign`, `project.list`/`getFileTree`/`readFile`/`writeFile`, `jobs.list`/`cancel`, `hitl.getPending`/`resolve`, `notifications.markRead`/`markAllRead`/`clear`, `agentMessenger.listConversations`/`getMessages`/`send`, `integrations.getIntegrations`/`connect`/`sync`/`disconnect`, `auth.setExecutionMode`, `mobileSync.push`, `podcast.generateScript`. These are **VERIFIED-REAL (static — traced to real impl)**; the APK **build was not re-run this session** (last green build per Progress-Tracker 2026-06-16: debug 160 MB / release 118 MB). On-device llama.rn / whisper.rn / MediaPipe items remain 🟡 PARTIAL/DEFERRED (need NDK build machine) as already recorded.
+
+### Discrepancy report (what the registry got wrong)
+1. **[BUG — superseded section] APK "Section 4 (Audited Session 16)" has 5 false / mislabeled CONNECTED rows.** Section 4 is explicitly superseded by the authoritative tracker (line ~2148) but still asserts:
+   - `trpc.ai.editMesh` (viewer "Submit Edit") — **proc does not exist** in `aiRouter`; the real viewer uses `ai.chat` (3d/code) or `pcbEditor.reviewDesign` (pcb). → corrected to **STUB/MOCK 🔴 (non-existent proc)**.
+   - `trpc.kicad.getLayout` (viewer "Schematic Mode") — **proc does not exist** in `kicadRouter`; real path is `pcbEditor.getProjects`→`getLatestDesign`. → **STUB/MOCK 🔴**.
+   - `trpc.voice.listProfiles` (podcast "Voice Selector") — **proc does not exist** in `voiceRouter`; real voice selector is LOCAL (maps to `useRVC`). → corrected to **LOCAL**.
+   - `trpc.chat.listSessions` (session selector) — proc exists, **but the APK does not call it**; sessions are LOCAL (AsyncStorage `omnecor_chats`). → corrected to **LOCAL**.
+   - `trpc.persona.list` → wrong namespace; real APK call is **`personas.list`**. → label corrected.
+2. **[BUG — label] `agentSettings` namespace does not exist.** AgentNetworking/CurationStudio "Auto-Pilot Settings" rows label the API `trpc.agentSettings.updateScheduleConfig`; routers.ts registers the namespace as **`settings`** and the client calls **`trpc.settings.updateScheduleConfig`** (`AgentNetworking.tsx:1175`). Element stays CONNECTED to a real proc; only the namespace label was wrong.
+3. **[CONFIRMED self-correction] `trpc.podcast.getHistory` and `trpc.brainmap.saveLayoutPreferences` do not exist** — they appear only in superseded S10/commit-`159ae26` "CONNECTED" notes; the active rows were already correctly reverted to LOCAL in S11. This pass confirms both procs never existed (no router defines them), validating the S11 correction.
+4. **[ENV — not a registry bug] Ollama llama-runner crash** blocks end-to-end chat proof (Progress-Tracker L23 known local issue).
+5. **[OBSERVATION — team note, not a registry row] Global rate limiter** (`server/_core/index.ts:254`, `max:100 / 60s`) is mounted in front of the Vite **dev** asset stream, so a cold dev page-load (100+ module fetches) returns 429 "Too many requests". Harmless in production (bundled static assets = few requests) but it throttles local dev / browser-driving. Suggest skipping the limiter for non-`/api` paths in development.
+
+**Before/after counts:** CONNECTED rows 537 (unchanged — none demoted to stub at the router level); APK Section-4 corrections: 3 CONNECTED→LOCAL/STUB, 2 label fixes. VERIFIED-REAL ✅ proven this pass: 14 procedures (web, live) + the authoritative-APK static set. STUB/MOCK 🔴 newly identified: 2 (`ai.editMesh`, `kicad.getLayout` — non-existent procs in the superseded Section 4).
+
 ---
 
 ## Global Summary (Updated 2026-06-18 Session 20 - Setup Wizard Logo & Windows Installer Wordmark)
@@ -635,6 +755,10 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 | Security Tab — Encrypt API Keys | Switch | setEncryptApiKeys | trpc.system.saveSettings.mutate | CONNECTED |
 | Security Tab — Session Timeout Slider | Slider | setSessionTimeout | trpc.system.saveSettings.mutate | CONNECTED |
 | Security Tab — Save Button | button | saveSettingsMutation.mutate + setModeMutation.mutate | trpc.system.saveSettings + trpc.system.setExecutionMode | CONNECTED |
+| Security Tab — Audit Retention Display (auto, admin only) | output | retentionQuery.data render | trpc.audit.getRetention (auditRouter.ts:58, adminProcedure) | CONNECTED (S22: AuditRetentionPanel.tsx, missing row added) |
+| Security Tab — Audit Retention 2-week Radio | RadioGroupItem | onValueChange → setRetentionMutation.mutate({retentionDays:14}) | trpc.audit.setRetention (auditRouter.ts:69, adminProcedure) | CONNECTED (S22: admin-only, instant commit) |
+| Security Tab — Audit Retention 4-week Radio | RadioGroupItem | onValueChange → setRetentionMutation.mutate({retentionDays:28}) | trpc.audit.setRetention | CONNECTED (S22) |
+| Security Tab — Audit Retention Permanent Radio | RadioGroupItem | onValueChange → setRetentionMutation.mutate({retentionDays:0}) | trpc.audit.setRetention | CONNECTED (S22: shows storage warning badge when selected) |
 | OMMESH Tab — Copy Fingerprint | button | navigator.clipboard.writeText | None | LOCAL |
 | OMMESH Tab — Rotate Mesh Certificates | button | rotateMutation.mutate | trpc.ommesh.rotateCert.mutate | CONNECTED |
 | OMMESH Tab — Authorize Peer | button | approveMutation.mutate | trpc.ommesh.approvePeer.mutate | CONNECTED |
@@ -784,7 +908,7 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 | Federation — Agent Discourse Switch | Switch | defaultChecked | None | LOCAL |
 | Federation — Authorize Peer Button | button | approveMutation.mutate | trpc.ommesh.approvePeer.mutate | CONNECTED |
 | Curation — Sync Feeds Button | button | syncMutation.mutate | trpc.discovery.fetchArticles.mutate | CONNECTED |
-| Curation — Auto-Pilot Settings Button | button | updateScheduleConfig.mutate | trpc.agentSettings.updateScheduleConfig.mutate (:1084, button :1114) | ~~DEAD~~ → **CONNECTED** (S13) |
+| Curation — Auto-Pilot Settings Button | button | updateScheduleConfig.mutate | ~~trpc.agentSettings~~ → **trpc.settings.updateScheduleConfig.mutate** (client :1175) | ~~DEAD~~ → **CONNECTED** (S13; S21 namespace label fixed) |
 | Curation — Process with AI Button | button | curateMutation.mutate | trpc.curator.curateArticle.mutate | CONNECTED |
 | Curation — Approvals: Schedule Button | button | schedulePostMutation.mutate | trpc.scheduling.schedulePost.mutate (:1059, button :1304) | ~~DEAD~~ → **CONNECTED** (S13) |
 | Curation — Approvals: Regenerate Button | button | regenerateDraftMutation.mutate | trpc.curator.regenerateDraft.mutate (:1068, button :1324) | ~~DEAD~~ → **CONNECTED** (S13) |
@@ -846,7 +970,7 @@ Pure wrapper — all interactions delegated to IntegrationsHub and MCPToolDirect
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
 | Sync Feeds Button | button | syncMutation.mutate | trpc.discovery.fetchArticles.mutate | CONNECTED |
-| Auto-Pilot Settings Button | button | updateScheduleConfig.mutate | trpc.agentSettings.updateScheduleConfig.mutate | ~~DEAD~~ → **CONNECTED** (S13) |
+| Auto-Pilot Settings Button | button | updateScheduleConfig.mutate | ~~trpc.agentSettings~~ → **trpc.settings.updateScheduleConfig.mutate** | ~~DEAD~~ → **CONNECTED** (S13; S21 namespace label fixed) |
 | Discovery — Process with AI Button | button | curateMutation.mutate | trpc.curator.curateArticle.mutate | CONNECTED |
 | Discovery — Active Keywords Badge (remove) | badge | setKeywords(kws => kws.filter(k => k !== tag)) | None | ~~DEAD~~ → **CONNECTED** |
 | Discovery — Add Keyword Button | button | setKeywords(kws => [...kws, newKeyword.trim()]) | None | ~~DEAD~~ → **CONNECTED** |
@@ -1353,7 +1477,7 @@ Pure presentational ReactFlow node. No interactive elements.
 
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
-| LoRA Rank visual slider | cosmetic div | width calculation only | None | DEAD |
+| LoRA Rank visual slider | input[type=range] | onChange → setLoraRank (feeds startFineTuning.mutate r param) | None (local state) | ~~DEAD (cosmetic div)~~ → **LOCAL** (S22: real `<input type="range">` at UnslothPanel.tsx:130; session 12 note said "fixed" but table row was never updated) |
 | Model Scope toggle (Global/Project) | Switch | setModelScope + localStorage: omnecor:unsloth_model_scope | None | LOCAL |
 | Dataset Path Brain-Map Button | icon button | setDatasetPath to activeMap.rootDirectories[0]/data/dataset.jsonl | None | LOCAL |
 | Start Training Pass Button | train | startFineTuning.mutate | trpc.training.startTraining | CONNECTED |
@@ -1744,6 +1868,9 @@ Read-only display. Single close button (callback).
 ### COMPONENT: MCPToolDirectory.tsx
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
+| Agentic OS Status display (auto) | output | statusQuery.data render | trpc.mcp.agenticOsStatus (mcpRouter.ts:136) | CONNECTED (S22: missing row added) |
+| Connected Servers list (auto) | output | serversQuery.data render | trpc.mcp.listConnectedServers (mcpRouter.ts:8) | CONNECTED (S22: missing row added) |
+| Tools list (auto) | output | toolsQuery.data render | trpc.mcp.listTools (mcpRouter.ts:80) | CONNECTED (S22: missing row added) |
 | Server ID Input | server-id | setForm | None | LOCAL |
 | Display Name Input | name | setForm | None | LOCAL |
 | Transport Select | transport | setForm | None | LOCAL |
@@ -1793,6 +1920,7 @@ Read-only display. Single close button (callback).
 | IoC Tab Button | tab | setActiveTab("ioc") | None | LOCAL |
 | Target Path Input | path | setTargetPath | None | LOCAL |
 | Scan Button | scan | scanMut.mutate | trpc.security.runVulnerabilityScan | CONNECTED |
+| IoC Feed Display (auto) | output | iocQuery.data render | trpc.security.getIoCFeed (securityRouter.ts:237) | CONNECTED (S22: missing row added) |
 
 ### COMPONENT: SpecializedModuleLauncher.tsx
 **Note:** Phase 1B fixed most dead inputs. Session 6 corrected Open in Blender (was calling `blender.render`) and Open in KiCad (was calling `kicad.onProject`→`kicad.openProject`) GUI-launch mutations. Session 13 confirmed: "New Config", "Add Object", and "Add Component" are LOCAL (connected to local state); "Configure (LoRA)" opens the inline LoRA editor (`setEditingLoraConfig`, :229) and "Configure (object)" opens the 3D object properties panel (`setSelectedObject`, :489). The three section-footer Configure buttons now navigate to `/settings?tab=valet` / `/settings?tab=hardware` (S13 fix — previously toast-only). **Zero DEAD items remain in this component.**
@@ -2079,9 +2207,9 @@ This section maps the interactive controls in the mobile APK client (`packaging/
 ### 1. Chat Tab (index.tsx)
 | Element | Label/ID | Handler | API/tRPC Call | Status | Notes |
 |---|---|---|---|---|---|
-| Dropdown | Session Selector | `onValueChange` | `trpc.chat.listSessions` | **CONNECTED** | Retrieves past session IDs |
+| Dropdown | Session Selector | `onValueChange` | ~~`trpc.chat.listSessions`~~ → none | ~~CONNECTED~~ → **LOCAL** | S21: APK does **not** call `chat.listSessions`; sessions are AsyncStorage (`omnecor_chats`) |
 | Dropdown | Neural Map Scope | `onValueChange` | `trpc.neuralMaps.list` | **CONNECTED** | Scopes active workspace |
-| Dropdown | Persona Selector | `onValueChange` | `trpc.persona.list` | **CONNECTED** | Sets active bot character |
+| Dropdown | Persona Selector | `onValueChange` | ~~`trpc.persona.list`~~ → `trpc.personas.list` | **CONNECTED** | S21: namespace label fixed (`persona`→`personas`); real call confirmed in `index.tsx:112` |
 | Textarea | Chat Input Box | `onChangeText` | None | **LOCAL** | Controls message text state |
 | Button | Send Message | `onPress={handleSend}` | `trpc.ai.chat.mutate` | **CONNECTED** | Dispatches prompts to host |
 | Button | Audio Recorder | `onLongPress={startRecording}` | `trpc.voice.transcribe` | **CONNECTED** | Encodes audio to desktop |
@@ -2091,32 +2219,34 @@ This section maps the interactive controls in the mobile APK client (`packaging/
 | Element | Label/ID | Handler | API/tRPC Call | Status | Notes |
 |---|---|---|---|---|---|
 | Tab Pill | 3D View Mode | `onPress={setMode("3d")}` | None | **LOCAL** | Renders WebGL canvas |
-| Tab Pill | Schematic Mode | `onPress={setMode("schematic")}` | `trpc.kicad.getLayout` | **CONNECTED** | Renders schematic nodes |
+| Tab Pill | Schematic Mode | `onPress={setMode("schematic")}` | ~~`trpc.kicad.getLayout`~~ (non-existent) → `pcbEditor.getProjects`/`getLatestDesign` | ~~CONNECTED~~ → **STUB/MOCK 🔴** | S21: `kicad.getLayout` does **not** exist; authoritative tracker shows real path is `pcbEditor.*` |
 | Tab Pill | Code Mode | `onPress={setMode("code")}` | `trpc.project.readFile` | **CONNECTED** | Fetches file text |
 | Gesture | Orbit / Zoom / Pan | `onGestureEvent` | None | **LOCAL** | Adjusts camera state locally |
 | Raycaster | Mesh Selector | `onPointerDown` | None | **LOCAL** | Highlights clicked node orange |
 | Button | Blender API Sync | `onPress={syncBlender}` | `trpc.blender.status` | **DEAD** | Unwired on mobile client |
 | Textarea | AI Inspector Input | `onChangeText` | None | **LOCAL** | Holds model prompt edits |
-| Button | Submit Edit | `onPress={submitEdit}` | `trpc.ai.editMesh` | **CONNECTED** | Dispatches layout queries |
+| Button | Submit Edit | `onPress={submitEdit}` | ~~`trpc.ai.editMesh`~~ (non-existent) → `ai.chat` / `pcbEditor.reviewDesign` | ~~CONNECTED~~ → **STUB/MOCK 🔴** | S21: `ai.editMesh` does **not** exist; authoritative tracker shows real path is `ai.chat`/`reviewDesign` |
 
 ### 3. Podcast Tab (podcast.tsx)
 | Element | Label/ID | Handler | API/tRPC Call | Status | Notes |
 |---|---|---|---|---|---|
 | Input | Title Input | `onChangeText` | None | **LOCAL** | Sets podcast metadata title |
-| Dropdown | Voice Selector | `onValueChange` | `trpc.voice.listProfiles` | **CONNECTED** | Chooses XTTS profiles |
+| Dropdown | Voice Selector | `onValueChange` | ~~`trpc.voice.listProfiles`~~ (non-existent) → none | ~~CONNECTED~~ → **LOCAL** | S21: `voice.listProfiles` does **not** exist; selector maps to `useRVC` locally, sent in `podcast.generate` |
 | Touch Grip | Timeline Handles | `onDragEnd` | None | **LOCAL** | Reorders dialogue blocks |
 | Button | Generate Audio | `onPress={generatePodcast}` | `trpc.podcast.generate` | **CONNECTED** | Dispatches to desktop daemon |
 | Button | Audio Ready Player | `onPress={playAudio}` | None | **DEAD** | Missing onPress callback |
 | Slider | Playback Timeline | `onValueChange` | None | **DEAD** | Playback control stubs |
 
 ### 4. Settings Tab (settings.tsx)
+> **Note (S22):** Section 4 is superseded by the authoritative "MOBILE APK — FULL INPUT/OUTPUT/FUNCTION TRACKER" (§4 Settings Screen there). Stale label/status errors corrected below; see the full tracker for the complete ~35-element inventory.
+
 | Element | Label/ID | Handler | API/tRPC Call | Status | Notes |
 |---|---|---|---|---|---|
-| Input | SSH Host | `onChangeText` | None | **LOCAL** | Saves IP/Hostname configuration |
-| Input | SSH Credentials | `onChangeText` | None | **LOCAL** | Holds password/keys state |
-| Button | Test Connection | `onPress={testSSH}` | `ping` socket | **CONNECTED** | Verifies connection |
-| Dropdown | Execution Mode | `onValueChange` | `trpc.auth.setExecutionMode`|**CONNECTED**| Syncs mode with desktop |
-| Switch | Dark Mode Toggle | `onValueChange` | None | **DEAD** | Switch only alters local state |
+| Input | ~~SSH Host~~ → **Server IP / Hostname** | `onChangeText → setServerIp` | None | **LOCAL** | S22: no SSH in this app; TextInput at settings.tsx:253 |
+| Input | ~~SSH Credentials~~ → **Port** | `onChangeText → setServerPort` | None | **LOCAL** | S22: second TextInput is Port (default 3000), not credentials; settings.tsx:261 |
+| Button | Test Connection | `onPress={handleTestConnection}` → `fetch(ip:port/health)` HTTP | ~~`ping` socket~~ → **`fetch /health`** | **CONNECTED** | S22: label `testSSH`/`ping socket` wrong; actual is `handleTestConnection → fetch` |
+| Dropdown | Execution Mode | `onPress → trpcMutate("auth.setExecutionMode", {mode})` | `trpc.auth.setExecutionMode` | **CONNECTED** | Sovereign/Scrapper/Big Spender pill group |
+| Switch | Dark Mode Toggle | `onValueChange → setColorScheme(v ? "dark" : "light")` | None | ~~**DEAD**~~ → **LOCAL** | S22: real handler via `useThemeContext`; drives app color scheme |
 
 ---
 

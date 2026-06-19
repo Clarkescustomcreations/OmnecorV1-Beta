@@ -17,22 +17,35 @@ import {
 } from "./chatContext";
 
 describe("Chat & Context Library", () => {
-  describe("Token Estimation", () => {
-    it("should estimate tokens based on character count", () => {
-      const text = "Hello world";
-      const tokens = estimateTokens(text);
-      expect(tokens).toBeGreaterThan(0);
-      expect(tokens).toBeLessThanOrEqual(Math.ceil(text.length / 4) + 1);
+  describe("Token Counting (real BPE via js-tiktoken)", () => {
+    it("should return exact BPE token counts for known text", () => {
+      // Reference counts from the o200k_base encoding (the default).
+      expect(estimateTokens("Hello world")).toBe(2);
+      expect(estimateTokens("The quick brown fox jumps over the lazy dog")).toBe(9);
     });
 
     it("should handle empty strings", () => {
       expect(estimateTokens("")).toBe(0);
     });
 
-    it("should handle long texts", () => {
+    it("should tokenize, not divide by characters, for long texts", () => {
+      // 1000 repeated chars collapse into far fewer BPE tokens than chars/4.
       const longText = "a".repeat(1000);
       const tokens = estimateTokens(longText);
-      expect(tokens).toBe(250);
+      expect(tokens).toBe(125);
+      expect(tokens).toBeLessThan(Math.ceil(longText.length / 4));
+    });
+
+    it("should not throw on special-token-like substrings", () => {
+      expect(() => estimateTokens("foo <|endoftext|> bar")).not.toThrow();
+      expect(estimateTokens("foo <|endoftext|> bar")).toBeGreaterThan(0);
+    });
+
+    it("should select the model-appropriate encoding", () => {
+      // Legacy GPT-4 uses cl100k_base; GPT-4o uses o200k_base. For most text the
+      // counts match, but the call must succeed for both id families.
+      expect(estimateTokens("Hello world", "gpt-4")).toBeGreaterThan(0);
+      expect(estimateTokens("Hello world", "gpt-4o")).toBe(2);
     });
   });
 

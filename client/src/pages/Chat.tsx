@@ -1204,7 +1204,7 @@ export default function Chat() {
   }, []);
 
   const transparency = useMemo(() => {
-    const systemTokens = estimateTokens(buildFullSystemPrompt());
+    const systemTokens = estimateTokens(buildFullSystemPrompt(), selectedModel?.modelId);
     const modelMaxTokens = getContextWindow(selectedModel?.providerId, selectedModel?.modelId);
     return calculateContextTransparency(conversation, modelMaxTokens, systemTokens);
   }, [conversation, buildFullSystemPrompt, selectedModel?.providerId, selectedModel?.modelId]);
