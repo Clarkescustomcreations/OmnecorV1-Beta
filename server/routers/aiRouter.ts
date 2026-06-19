@@ -176,10 +176,11 @@ export const aiRouter = router({
   // =========================================================================
   createSession: protectedProcedure
     .input(createSessionSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const sessionId = uuidv4();
       await createChatSession({
         id: sessionId,
+        userId: ctx.user.id,
         projectId: input.projectId,
         title: input.title,
         providerId: input.providerId,

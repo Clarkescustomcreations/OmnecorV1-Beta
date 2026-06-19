@@ -30,6 +30,8 @@ interface VisualControlState {
   getLockedPositions: (key: string) => LockedPositions | null;
 }
 
+const syncChannel = new BroadcastChannel('omnecor_visual_control_sync');
+
 export const useVisualControlStore = create<VisualControlState>()(
   persist(
     (set, get) => ({
@@ -42,17 +44,40 @@ export const useVisualControlStore = create<VisualControlState>()(
       showHoverDescriptions: true,
       lockedLayouts: {},
 
-      setLayout: (layout) => set({ layout }),
-      setNodeSize: (nodeSize) => set({ nodeSize: Math.max(20, Math.min(50, nodeSize)) }),
-      setSimSpeed: (simSpeed) => set({ simSpeed }),
-      setGpuEnabled: (gpuEnabled) => set({ gpuEnabled }),
-      setAutoClustering: (autoClustering) => set({ autoClustering }),
-      setShowMiniMap: (showMiniMap) => set({ showMiniMap }),
-      setShowHoverDescriptions: (showHoverDescriptions) => set({ showHoverDescriptions }),
+      setLayout: (layout) => {
+        set({ layout });
+        syncChannel.postMessage({ type: 'setLayout', payload: layout });
+      },
+      setNodeSize: (nodeSize) => {
+        const size = Math.max(20, Math.min(50, nodeSize));
+        set({ nodeSize: size });
+        syncChannel.postMessage({ type: 'setNodeSize', payload: size });
+      },
+      setSimSpeed: (simSpeed) => {
+        set({ simSpeed });
+        syncChannel.postMessage({ type: 'setSimSpeed', payload: simSpeed });
+      },
+      setGpuEnabled: (gpuEnabled) => {
+        set({ gpuEnabled });
+        syncChannel.postMessage({ type: 'setGpuEnabled', payload: gpuEnabled });
+      },
+      setAutoClustering: (autoClustering) => {
+        set({ autoClustering });
+        syncChannel.postMessage({ type: 'setAutoClustering', payload: autoClustering });
+      },
+      setShowMiniMap: (showMiniMap) => {
+        set({ showMiniMap });
+        syncChannel.postMessage({ type: 'setShowMiniMap', payload: showMiniMap });
+      },
+      setShowHoverDescriptions: (showHoverDescriptions) => {
+        set({ showHoverDescriptions });
+        syncChannel.postMessage({ type: 'setShowHoverDescriptions', payload: showHoverDescriptions });
+      },
 
       lockLayout: (key, nodes) => {
         const positions: LockedPositions = nodes.map(n => ({ id: n.id, position: n.position }));
         set(s => ({ lockedLayouts: { ...s.lockedLayouts, [key]: positions } }));
+        syncChannel.postMessage({ type: 'lockLayout', payload: { key, positions } });
       },
 
       unlockLayout: (key) => {
@@ -61,6 +86,7 @@ export const useVisualControlStore = create<VisualControlState>()(
           delete next[key];
           return { lockedLayouts: next };
         });
+        syncChannel.postMessage({ type: 'unlockLayout', payload: key });
       },
 
       isLayoutLocked: (key) => !!get().lockedLayouts[key],
@@ -70,3 +96,73 @@ export const useVisualControlStore = create<VisualControlState>()(
     { name: "omnecor_visual_control" }
   )
 );
+
+syncChannel.onmessage = (event) => {
+  const { type, payload } = event.data;
+  const store = useVisualControlStore.getState();
+
+  switch (type) {
+    case 'setLayout':
+      if (store.layout !== payload) useVisualControlStore.setState({ layout: payload });
+      break;
+    case 'setNodeSize':
+      if (store.nodeSize !== payload) useVisualControlStore.setState({ nodeSize: payload });
+      break;
+    case 'setSimSpeed':
+      if (store.simSpeed !== payload) useVisualControlStore.setState({ simSpeed: payload });
+      break;
+    case 'setGpuEnabled':
+      if (store.gpuEnabled !== payload) useVisualControlStore.setState({ gpuEnabled: payload });
+      break;
+    case 'setAutoClustering':
+      if (store.autoClustering !== payload) useVisualControlStore.setState({ autoClustering: payload });
+      break;
+    case 'setShowMiniMap':
+      if (store.showMiniMap !== payload) useVisualControlStore.setState({ showMiniMap: payload });
+      break;
+    case 'setShowHoverDescriptions':
+      if (store.showHoverDescriptions !== payload) useVisualControlStore.setState({ showHoverDescriptions: payload });
+      break;
+    case 'lockLayout':
+      useVisualControlStore.setState(s => ({
+        lockedLayouts: { ...s.lockedLayouts, [payload.key]: payload.positions }
+      }));
+      break;
+    case 'unlockLayout':
+      useVisualControlStore.setState(s => {
+        const next = { ...s.lockedLayouts };
+        delete next[payload];
+        return { lockedLayouts: next };
+      });
+      break;
+    case 'requestInitialState': {
+      const s = useVisualControlStore.getState();
+      syncChannel.postMessage({
+        type: 'initialState',
+        payload: {
+          layout: s.layout,
+          nodeSize: s.nodeSize,
+          simSpeed: s.simSpeed,
+          gpuEnabled: s.gpuEnabled,
+          autoClustering: s.autoClustering,
+          showMiniMap: s.showMiniMap,
+          showHoverDescriptions: s.showHoverDescriptions,
+          lockedLayouts: s.lockedLayouts,
+        },
+      });
+      break;
+    }
+    case 'initialState':
+      useVisualControlStore.setState({
+        layout: payload.layout,
+        nodeSize: payload.nodeSize,
+        simSpeed: payload.simSpeed,
+        gpuEnabled: payload.gpuEnabled,
+        autoClustering: payload.autoClustering,
+        showMiniMap: payload.showMiniMap,
+        showHoverDescriptions: payload.showHoverDescriptions,
+        lockedLayouts: payload.lockedLayouts,
+      });
+      break;
+  }
+};

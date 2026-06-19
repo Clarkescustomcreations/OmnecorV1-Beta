@@ -1,16 +1,8 @@
 /**
  * Hooks for the always-listening voice loop.
  *
- * Split into two concerns so the mic capturer isn't tied to any one screen:
- *
- *  - `useAlwaysListenCapture()` — headless. Owns an expo-audio recorder and
- *    registers it as the orchestrator's capture provider. Mount ONCE at the app
- *    root (`app/_layout.tsx`) so a wake event works regardless of which screen
- *    is showing (Phase 3's foreground service swaps in a background VAD provider
- *    via `setCaptureProvider`).
- *  - `useAlwaysListen()` — controls + live state for the Settings UI. Does NOT
- *    own a recorder; it drives the orchestrator, which uses the globally
- *    registered capture provider.
+ * Implements continuous sliding-window wake-word recording loop
+ * using local NPU Whisper STT, replacing Picovoice.
  */
 import { useCallback, useEffect, useState } from "react";
 import { AudioModule, RecordingPresets, useAudioRecorder } from "expo-audio";
@@ -23,16 +15,18 @@ import {
   stopListening,
   captureAndRun,
   ensureSttModelLoaded,
+  isListening,
   type ListenState,
 } from "@/lib/_core/always-listen";
+import { transcribeFile } from "@/lib/_core/local-stt";
+import { getListenConfig } from "@/lib/_core/always-listen-config";
 
 /** Max length of a single captured utterance (foreground fixed window). */
 const UTTERANCE_MS = 6000;
 
 /**
  * Headless: registers the app-wide utterance capture provider. Mount once at the
- * root. Records a fixed window and returns the file URI; the orchestrator handles
- * pausing/re-arming the wake engine around it.
+ * root. Runs continuous wake-word loop when state is "listening".
  */
 export function useAlwaysListenCapture(): void {
   const recorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
@@ -51,6 +45,65 @@ export function useAlwaysListenCapture(): void {
     setCaptureProvider(capture);
     return () => setCaptureProvider(null);
   }, [capture]);
+
+  // Continuous wake-word detection loop
+  useEffect(() => {
+    let active = true;
+    let isLooping = false;
+
+    const wakeLoop = async () => {
+      if (isLooping) return;
+      isLooping = true;
+      while (active) {
+        const state = getListenState();
+        if (state === "listening" && isListening()) {
+          try {
+            const { granted } = await AudioModule.requestRecordingPermissionsAsync();
+            if (!granted) {
+              await new Promise((r) => setTimeout(r, 2000));
+              continue;
+            }
+            await recorder.prepareToRecordAsync(RecordingPresets.HIGH_QUALITY);
+            recorder.record();
+            // Record short 1.8s chunk
+            await new Promise((r) => setTimeout(r, 1800));
+            await recorder.stop();
+
+            const uri = recorder.uri;
+            if (uri && active && getListenState() === "listening" && isListening()) {
+              // Run transcription on local NPU
+              const text = await transcribeFile(uri, { language: "en" });
+              const clean = text.toLowerCase().trim();
+
+              // Clean up punctuation
+              const cleanText = clean.replace(/[.,\/#!$%\^&\*;:{}=\-_`~()?]/g, "");
+              const wakeWord = getListenConfig().wakeWord?.toLowerCase() || "omnecor";
+
+              if (cleanText.includes(wakeWord) || cleanText.includes("computer")) {
+                // Wake word heard! Trigger utterance capture
+                void captureAndRun();
+                // Wait to prevent immediate loop re-entry
+                await new Promise((r) => setTimeout(r, 2000));
+              }
+            }
+          } catch (e) {
+            console.warn("[useAlwaysListenCapture] Loop error:", e);
+            await new Promise((r) => setTimeout(r, 1000));
+          }
+        } else {
+          // Check again in 500ms
+          await new Promise((r) => setTimeout(r, 500));
+        }
+      }
+      isLooping = false;
+    };
+
+    void wakeLoop();
+
+    return () => {
+      active = false;
+    };
+  }, [recorder]);
 }
 
 /** Controls + live state for the Settings UI (no recorder of its own). */

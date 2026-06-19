@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { FictionState, FictionNodeData, FictionRelationship, FictionTimelineEvent } from "@/types/fiction";
 import { safeStorage } from "@/lib/safeStorage";
 
@@ -25,34 +25,60 @@ const INITIAL_STATE: FictionState = {
   lore: {},
 };
 
-export const FictionModeProvider: React.FC<{ children: ReactNode; mapId?: string }> = ({
+export const FictionModeProvider: React.FC<{
+  children: ReactNode;
+  mapId?: string;
+  /** DB-loaded fiction state for this map — takes priority over localStorage on map switch. */
+  dbFictionState?: FictionState | null;
+  /** Called (debounced 1.5 s) whenever fiction state changes — use to persist to DB. */
+  onFictionStateChange?: (mapId: string, state: FictionState) => void;
+}> = ({
   children,
   mapId,
+  dbFictionState,
+  onFictionStateChange,
 }) => {
   const [isFictionMode, setIsFictionMode] = useState(false);
   const [fictionState, setFictionState] = useState<FictionState>(INITIAL_STATE);
+  const isLoadingRef = useRef(false);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onStateChangeRef = useRef(onFictionStateChange);
+  onStateChangeRef.current = onFictionStateChange;
 
-  // Load isolated state based on mapId
+  // Load state when mapId changes: DB takes priority, then localStorage, then INITIAL_STATE
   useEffect(() => {
-    if (mapId) {
+    if (!mapId) return;
+    isLoadingRef.current = true;
+    if (dbFictionState && (dbFictionState.nodes?.length > 0 || dbFictionState.relationships?.length > 0 || Object.keys(dbFictionState.lore ?? {}).length > 0)) {
+      setFictionState(dbFictionState);
+      // Also update localStorage cache
+      safeStorage.setItem(`omnecor_fiction_state_${mapId}`, JSON.stringify(dbFictionState));
+    } else {
       const saved = safeStorage.getItem(`omnecor_fiction_state_${mapId}`);
       if (saved) {
-        try {
-          setFictionState(JSON.parse(saved));
-        } catch (e) {
-          console.error("Failed to parse fiction state", e);
-        }
+        try { setFictionState(JSON.parse(saved)); }
+        catch { setFictionState(INITIAL_STATE); }
       } else {
         setFictionState(INITIAL_STATE);
       }
     }
-  }, [mapId]);
+    // Allow the state-change effect to ignore this load
+    requestAnimationFrame(() => { isLoadingRef.current = false; });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mapId, dbFictionState]);
 
-  // Save isolated state
+  // Save to localStorage (immediate) and notify parent for DB save (debounced)
   useEffect(() => {
-    if (mapId && fictionState !== INITIAL_STATE) {
+    if (isLoadingRef.current) return;
+    if (mapId) {
       safeStorage.setItem(`omnecor_fiction_state_${mapId}`, JSON.stringify(fictionState));
+      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = setTimeout(() => {
+        onStateChangeRef.current?.(mapId, fictionState);
+      }, 1500);
     }
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fictionState, mapId]);
 
   const toggleFictionMode = () => setIsFictionMode(prev => !prev);

@@ -273,3 +273,57 @@ Claude Code /home/linux/.claude/skills
   + install-duckdb
   + installing-skills
 
+
+/home/linux/.agents/skills/Lithic/Skill.md
+
+/home/linux/.claude/skills/Lithic/Skill.md
+
+
+ skills search index tts
+
+✔ Installed 5 skill(s)
+
+Universal /home/linux/.agents/skills
+  + tts-generator
+  + omniroute-tts
+  + add-tts-engine
+  + sherpa-onnx-tts
+  + openrouter-tts
+  + tts audio mastering
+  + elevenlabs-tts
+Claude Code /home/linux/.claude/skills
+  + tts-generator
+  + omniroute-tts
+  + add-tts-engine
+  + sherpa-onnx-tts
+  + openrouter-tts
+  + tts audio mastering
+  + elevenlabs-tts
+
+
+ skills search Coqui TTS
+
+✔ Installed 5 skill(s)
+
+Universal /home/linux/.agents/skills
+  + tts
+  + TTS
+  + tts-generator
+  + omniroute-tts
+  + tts-generation
+  + tts audio mastering
+  + elevenlabs-tts
+  + ifly-voiceclone-tts
+  + elevenlabs-tts
+Claude Code /home/linux/.claude/skills
+  + tts
+  + TTS
+  + tts-generator
+  + omniroute-tts
+  + tts-generation
+  + tts audio mastering
+  + elevenlabs-tts
+  + ifly-voiceclone-tts
+  + elevenlabs-tts
+
+🧟V-I-S:~$ 

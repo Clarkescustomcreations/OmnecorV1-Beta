@@ -219,6 +219,57 @@ export const API_MODEL_CATALOG: Record<
 };
 
 /**
+ * Documented context-window sizes (in tokens) for known cloud models.
+ * Used to render real remaining-capacity figures in the chat context panel
+ * instead of a hardcoded default. Values track each provider's published limits.
+ */
+export const MODEL_CONTEXT_WINDOWS: Record<string, number> = {
+  // OpenAI
+  "gpt-4o": 128_000,
+  "gpt-4o-mini": 128_000,
+  "o1": 200_000,
+  "gpt-4": 8_192,
+  // Anthropic (Claude 3.x / 4.x family)
+  "claude-opus-4-8": 200_000,
+  "claude-sonnet-4-6": 200_000,
+  "claude-haiku-4-5-20251001": 200_000,
+  "claude-3-opus": 200_000,
+  // Google Gemini
+  "gemini-2.0-flash": 1_048_576,
+  "gemini-1.5-pro": 2_097_152,
+  "gemini-1.5-flash": 1_048_576,
+  "gemini-pro": 32_768,
+  // xAI Grok
+  "grok-2": 131_072,
+  "grok-2-mini": 131_072,
+};
+
+/** Per-provider fallback context window when a specific model id is unknown. */
+const PROVIDER_DEFAULT_CONTEXT_WINDOW: Record<string, number> = {
+  openai: 128_000,
+  anthropic: 200_000,
+  gemini: 1_048_576,
+  grok: 131_072,
+  ollama: 8_192,
+};
+
+/**
+ * Resolve the real context-window size for a selected model.
+ * Falls back to the provider default, then a conservative 8K, so the chat
+ * context meter always reflects the actual model rather than a fixed constant.
+ */
+export function getContextWindow(
+  providerId?: string,
+  modelId?: string,
+): number {
+  if (modelId && MODEL_CONTEXT_WINDOWS[modelId]) return MODEL_CONTEXT_WINDOWS[modelId];
+  if (providerId && PROVIDER_DEFAULT_CONTEXT_WINDOW[providerId]) {
+    return PROVIDER_DEFAULT_CONTEXT_WINDOW[providerId];
+  }
+  return 8_192;
+}
+
+/**
  * Convert local and API models to unified AIModel format
  */
 export function convertToAIModel(

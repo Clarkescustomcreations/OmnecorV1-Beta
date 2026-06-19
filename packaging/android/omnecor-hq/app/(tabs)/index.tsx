@@ -1,6 +1,8 @@
-import { Text, View, TextInput, FlatList, ActivityIndicator } from "react-native";
+import { Text, View, TextInput, FlatList, ActivityIndicator, Image, Share, Modal } from "react-native";
 import { Pressable } from "@/components/pressable";
 import { useState, useRef, useCallback, useEffect } from "react";
+import Markdown from "react-native-markdown-display";
+import * as Clipboard from "expo-clipboard";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { useVoice } from "@/hooks/use-voice";
@@ -47,6 +49,7 @@ export default function ChatScreen() {
   const [selectedNeuralMap, setSelectedNeuralMap]           = useState("Default");
   const [selectedAgent, setSelectedAgent]                   = useState("Default Agent");
   const [autoRead, setAutoRead]                             = useState(false);
+  const [actionSheetTarget, setActionSheetTarget]           = useState<ChatMessage | null>(null);
 
   const [neuralMapList, setNeuralMapList] = useState<{ id: string; name: string; mode: string }[]>([]);
   const [personaList, setPersonaList]     = useState<{ id: string; name: string }[]>([]);
@@ -394,16 +397,104 @@ export default function ChatScreen() {
         keyExtractor={(item) => item.id}
         renderItem={({ item }) => (
           <View className={`px-4 py-3 ${item.role === "user" ? "items-end" : "items-start"}`}>
-            {/* Long-press assistant messages to read aloud */}
-            <Pressable onLongPress={() => item.role === "assistant" && voice.speak(item.content)}
-              className={`max-w-xs rounded-lg p-3 ${item.role === "user" ? "bg-primary" : "bg-surface border border-border"}`}>
-              <Text className={`text-sm ${item.role === "user" ? "text-background" : "text-foreground"}`}>{item.content}</Text>
+            <Pressable
+              onLongPress={() => setActionSheetTarget(item)}
+              className={`max-w-xs rounded-lg p-3 ${item.role === "user" ? "bg-primary" : "bg-surface border border-border"}`}
+            >
+              {item.role === "user" ? (
+                <Text className="text-sm text-background">{item.content}</Text>
+              ) : (
+                <Markdown
+                  rules={{
+                    image: (node: { key?: string; attributes?: { src?: string; alt?: string } }) => {
+                      const src = node.attributes?.src ?? "";
+                      const resolvedSrc = src.startsWith("/") ? `${getServerBaseUrl()}${src}` : src;
+                      return (
+                        <Image
+                          key={node.key}
+                          source={{ uri: resolvedSrc }}
+                          style={{ width: "100%", height: 200, borderRadius: 8, marginVertical: 4 }}
+                          resizeMode="contain"
+                        />
+                      );
+                    },
+                  }}
+                  style={{
+                    body: { color: colors.foreground, fontSize: 14, lineHeight: 20 },
+                    strong: { fontWeight: "700" },
+                    em: { fontStyle: "italic" },
+                    code_inline: { backgroundColor: colors.card, borderRadius: 4, paddingHorizontal: 4, fontFamily: "monospace" },
+                    fence: { backgroundColor: colors.card, borderRadius: 8, padding: 8, marginVertical: 4 },
+                    blockquote: { borderLeftWidth: 3, borderLeftColor: colors.muted, paddingLeft: 8, opacity: 0.8 },
+                  }}
+                >
+                  {item.content}
+                </Markdown>
+              )}
             </Pressable>
           </View>
         )}
         contentContainerStyle={{ flexGrow: 1 }}
         ListEmptyComponent={<View className="flex-1 items-center justify-center"><Text className="text-muted">No messages yet</Text></View>}
       />
+
+      {/* ── Long-press Action Sheet ── */}
+      <Modal transparent animationType="slide" visible={!!actionSheetTarget} onRequestClose={() => setActionSheetTarget(null)}>
+        <Pressable className="flex-1 bg-black/40" onPress={() => setActionSheetTarget(null)}>
+          <View className="flex-1" />
+          <Pressable onPress={() => {/* stop propagation */}}>
+            <View className="bg-surface border-t border-border rounded-t-2xl pb-8">
+              <View className="w-10 h-1 bg-border rounded-full self-center mt-3 mb-4" />
+              {[
+                {
+                  label: "Copy",
+                  onPress: async () => {
+                    if (actionSheetTarget) await Clipboard.setStringAsync(actionSheetTarget.content);
+                    setActionSheetTarget(null);
+                  },
+                },
+                {
+                  label: "Read Aloud",
+                  onPress: () => {
+                    if (actionSheetTarget) voice.speak(actionSheetTarget.content);
+                    setActionSheetTarget(null);
+                  },
+                },
+                ...(actionSheetTarget?.role === "user" ? [{
+                  label: "Delete",
+                  onPress: () => {
+                    if (!actionSheetTarget) return;
+                    setSessions(prev => prev.map(s =>
+                      s.id === activeSessionId
+                        ? { ...s, messages: s.messages.filter(m => m.id !== actionSheetTarget.id) }
+                        : s
+                    ));
+                    setActionSheetTarget(null);
+                  },
+                }] : []),
+                {
+                  label: "Share",
+                  onPress: async () => {
+                    if (actionSheetTarget) await Share.share({ message: actionSheetTarget.content });
+                    setActionSheetTarget(null);
+                  },
+                },
+              ].map((action) => (
+                <Pressable
+                  key={action.label}
+                  onPress={action.onPress}
+                  className="px-6 py-4 border-b border-border/50 active:bg-muted/20"
+                >
+                  <Text className="text-base text-foreground">{action.label}</Text>
+                </Pressable>
+              ))}
+              <Pressable onPress={() => setActionSheetTarget(null)} className="px-6 py-4 active:bg-muted/20">
+                <Text className="text-base text-primary font-semibold text-center">Cancel</Text>
+              </Pressable>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
 
       {/* ── Input area ── */}
       <View className="border-t border-border bg-surface p-4 gap-3">

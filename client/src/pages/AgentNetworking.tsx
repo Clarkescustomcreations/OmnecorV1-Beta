@@ -52,6 +52,7 @@ import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
 import PersonaCreationPanel from "@/components/settings/PersonaCreationPanel";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
+import { MeshTopologyGraph, type MeshGraphPeer } from "@/components/mesh/MeshTopologyGraph";
 import { Brain } from "lucide-react";
 
 const PERSONA_STORE_KEY = "omnecor_personas";
@@ -828,22 +829,46 @@ export default function AgentNetworking() {
   );
 }
 
-interface MeshPeer {
-  id: string;
-  name: string;
-  address: string;
-  port: number;
-  fingerprint: string;
-  isApproved?: boolean;
-}
-
 function MeshFederationPanel() {
   const utils = trpc.useUtils();
   const { data: identity } = trpc.ommesh.getIdentity.useQuery();
   const { data: peersRaw, isLoading: loadingPeers } = trpc.ommesh.discover.useQuery(undefined, {
     refetchInterval: 5000,
   });
-  const peers = peersRaw as unknown as MeshPeer[] | undefined;
+  const peers = peersRaw as unknown as MeshGraphPeer[] | undefined;
+  const { data: syncStatus } = trpc.ommesh.getCrossNodeSyncStatus.useQuery(undefined, {
+    staleTime: 30_000,
+  });
+  const [crossNodeSync, setCrossNodeSync] = useState<boolean | undefined>(undefined);
+  const [agentDiscourse, setAgentDiscourse] = useState<boolean | undefined>(undefined);
+
+  // Sync initial values from server when loaded
+  const syncStatusRef = useRef(syncStatus);
+  if (syncStatusRef.current !== syncStatus && syncStatus && crossNodeSync === undefined) {
+    syncStatusRef.current = syncStatus;
+    setCrossNodeSync(syncStatus.crossNodeSync ?? false);
+    setAgentDiscourse(syncStatus.agentDiscourse ?? false);
+  }
+
+  const setCrossNodeSyncMutation = trpc.ommesh.setCrossNodeSync.useMutation({
+    onError: (e) => toast.error("Failed to update Cross-Node Sync: " + e.message),
+  });
+  const setAgentDiscourseMutation = trpc.ommesh.setAgentDiscourse.useMutation({
+    onError: (e) => toast.error("Failed to update Agent Discourse: " + e.message),
+  });
+
+  // Peer discourse form
+  const [discourseForm, setDiscourseForm] = useState({ peerId: "", fromAgentId: "", toAgentId: "", content: "" });
+  const [personaList] = useState<Array<{ id: string; name: string }>>(() => {
+    try { return JSON.parse(localStorage.getItem("omnecor_personas") ?? "[]"); } catch { return []; }
+  });
+  const sendDiscourseMutation = trpc.ommesh.sendPeerDiscourse.useMutation({
+    onSuccess: () => {
+      toast.success("Discourse message sent to peer agent");
+      setDiscourseForm(prev => ({ ...prev, content: "" }));
+    },
+    onError: (e) => toast.error("Discourse failed: " + e.message),
+  });
 
   const approveMutation = trpc.ommesh.approvePeer.useMutation({
     onSuccess: () => {
@@ -852,65 +877,6 @@ function MeshFederationPanel() {
     },
     onError: (error) => toast.error("Approval failed: " + error.message),
   });
-
-  // Simple SVG Mesh Visualization
-  const renderMeshGraph = () => {
-    const nodes = [
-      { id: "local", name: identity?.hostname || "Local Node", type: "local", isApproved: true as boolean, x: 150, y: 150 },
-      ...(peers?.map((p, i) => {
-        const angle = (i / (peers.length || 1)) * Math.PI * 2;
-        return {
-          id: p.id,
-          name: p.name,
-          type: "peer",
-          isApproved: p.isApproved,
-          x: 150 + Math.cos(angle) * 100,
-          y: 150 + Math.sin(angle) * 100
-        };
-      }) || [])
-    ];
-
-    return (
-      <div className="relative w-full aspect-square max-w-[300px] mx-auto bg-muted/10 rounded-full border border-dashed border-accent/20 flex items-center justify-center overflow-hidden">
-        <svg viewBox="0 0 300 300" className="w-full h-full">
-          {/* Lines */}
-          {nodes.filter(n => n.type === "peer").map(node => (
-            <line
-              key={`line-${node.id}`}
-              x1="150" y1="150"
-              x2={node.x} y2={node.y}
-              stroke="currentColor"
-              strokeWidth={node.isApproved ? "2" : "1"}
-              className={cn(node.isApproved ? "text-accent" : "text-muted-foreground/30", !node.isApproved && "stroke-dasharray-4")}
-              strokeDasharray={node.isApproved ? "0" : "4"}
-            />
-          ))}
-          {/* Central Node */}
-          <circle cx="150" cy="150" r="12" className="fill-accent animate-pulse" />
-          <circle cx="150" cy="150" r="20" className="fill-accent/20" />
-          
-          {/* Peer Nodes */}
-          {nodes.filter(n => n.type === "peer").map(node => (
-            <g key={`node-${node.id}`}>
-              <circle 
-                cx={node.x} cy={node.y} r="8" 
-                className={cn(node.isApproved ? "fill-blue-500" : "fill-muted-foreground/40")} 
-              />
-              <circle 
-                cx={node.x} cy={node.y} r="14" 
-                className={cn(node.isApproved ? "fill-blue-500/20" : "fill-transparent")} 
-              />
-            </g>
-          ))}
-        </svg>
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-          <div className="text-[10px] font-bold uppercase tracking-tighter text-accent bg-background/80 px-2 py-0.5 rounded border border-accent/20">
-            Active Mesh
-          </div>
-        </div>
-      </div>
-    );
-  };
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
@@ -932,15 +898,69 @@ function MeshFederationPanel() {
                   <Label>Cross-Node Sync</Label>
                   <p className="text-[10px] text-muted-foreground">Sync persona knowledge and analytics.</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch
+                  checked={crossNodeSync ?? false}
+                  disabled={crossNodeSync === undefined}
+                  onCheckedChange={(v) => {
+                    setCrossNodeSync(v);
+                    setCrossNodeSyncMutation.mutate({ enabled: v });
+                  }}
+                />
               </div>
               <div className="flex items-center justify-between">
                 <div className="space-y-0.5">
                   <Label>Agent Discourse</Label>
                   <p className="text-[10px] text-muted-foreground">Allow agents to initiate peer-to-peer chat.</p>
                 </div>
-                <Switch defaultChecked />
+                <Switch
+                  checked={agentDiscourse ?? false}
+                  disabled={agentDiscourse === undefined}
+                  onCheckedChange={(v) => {
+                    setAgentDiscourse(v);
+                    setAgentDiscourseMutation.mutate({ enabled: v });
+                  }}
+                />
               </div>
+
+              {agentDiscourse && (
+                <div className="pt-3 border-t space-y-2">
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-wider">Send Peer Discourse</p>
+                  <Select value={discourseForm.peerId} onValueChange={(v) => setDiscourseForm(p => ({ ...p, peerId: v }))}>
+                    <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="Target peer node" /></SelectTrigger>
+                    <SelectContent>
+                      {(peers ?? []).filter(p => p.isApproved).map(p => (
+                        <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <Select value={discourseForm.fromAgentId} onValueChange={(v) => setDiscourseForm(p => ({ ...p, fromAgentId: v }))}>
+                    <SelectTrigger className="h-7 text-[10px]"><SelectValue placeholder="From (local persona)" /></SelectTrigger>
+                    <SelectContent>
+                      {personaList.map(p => <SelectItem key={p.id} value={p.id}>{p.name}</SelectItem>)}
+                    </SelectContent>
+                  </Select>
+                  <Input
+                    placeholder="Target agent ID on peer"
+                    className="h-7 text-[10px]"
+                    value={discourseForm.toAgentId}
+                    onChange={(e) => setDiscourseForm(p => ({ ...p, toAgentId: e.target.value }))}
+                  />
+                  <Input
+                    placeholder="Message to send"
+                    className="h-7 text-[10px]"
+                    value={discourseForm.content}
+                    onChange={(e) => setDiscourseForm(p => ({ ...p, content: e.target.value }))}
+                  />
+                  <Button
+                    size="sm" className="w-full h-7 text-[10px] gap-1.5"
+                    disabled={!discourseForm.peerId || !discourseForm.fromAgentId || !discourseForm.toAgentId || !discourseForm.content || sendDiscourseMutation.isPending}
+                    onClick={() => sendDiscourseMutation.mutate({ peerId: discourseForm.peerId, fromAgentId: discourseForm.fromAgentId, toAgentId: discourseForm.toAgentId, content: discourseForm.content })}
+                  >
+                    {sendDiscourseMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <MessageSquare className="w-3 h-3" />}
+                    Send to Peer
+                  </Button>
+                </div>
+              )}
               
               <div className="pt-4 border-t space-y-3">
                 <p className="text-xs font-bold uppercase text-muted-foreground tracking-wider">Discovered Peers</p>
@@ -971,13 +991,19 @@ function MeshFederationPanel() {
               </div>
             </div>
             
-            <div className="flex flex-col items-center justify-center p-4 border rounded-xl bg-muted/10">
-              <p className="text-xs font-bold uppercase text-muted-foreground mb-4">Topology Visualization</p>
-              {renderMeshGraph()}
-              <div className="mt-4 flex gap-4 text-[10px]">
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-accent" /> Local</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-blue-500" /> Linked</div>
-                <div className="flex items-center gap-1.5"><div className="w-2 h-2 rounded-full bg-muted-foreground/40" /> Pending</div>
+            <div className="flex flex-col p-4 border rounded-xl bg-muted/10 gap-3">
+              <p className="text-xs font-bold uppercase text-muted-foreground">Topology Visualization</p>
+              <MeshTopologyGraph identity={identity} peers={peers ?? []} />
+              <div className="flex gap-4 text-[10px]">
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ background: "#1d4ed8" }} /> Local
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ background: "#16a34a" }} /> Trusted
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <div className="w-2 h-2 rounded-full" style={{ background: "#dc2626" }} /> Pending
+                </div>
               </div>
             </div>
           </div>

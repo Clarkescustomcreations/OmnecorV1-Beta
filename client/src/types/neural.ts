@@ -36,6 +36,15 @@ export interface NeuralBrainMap {
     isolateMemory: boolean;
     enableAIContext: boolean;
     enableSemanticLinks: boolean;
+    collapsedFolderIds?: string[];
+    layoutPrefs?: {
+      layout?: string;
+      nodeSize?: number;
+      simSpeed?: number;
+      gpuEnabled?: boolean;
+      autoClustering?: boolean;
+    };
+    fictionState?: Record<string, unknown>;
   };
   createdAt: string;
   updatedAt: string;

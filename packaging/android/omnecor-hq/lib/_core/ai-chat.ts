@@ -12,7 +12,7 @@ import { trpcQuery, trpcMutate } from "./trpc-fetch";
 let _cachedProviderId: string | null = null;
 
 /** Resolve a usable providerId, caching the first success for the session. */
-async function resolveProviderId(): Promise<string> {
+export async function resolveProviderId(): Promise<string> {
   if (_cachedProviderId) return _cachedProviderId;
   try {
     const providers = await trpcQuery<{ id: string; name: string }[]>("ai.getProviders");

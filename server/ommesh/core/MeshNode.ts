@@ -1,6 +1,7 @@
 // server/ommesh/core/MeshNode.ts
 import * as https from 'https';
-import { NodeIdentity, NodeCapabilities } from '../../../shared/types/ommesh.types.js';
+import { createHmac } from 'crypto';
+import { NodeIdentity } from '../../../shared/types/ommesh.types.js';
 import { DiscoveryService, type PeerInfo } from './DiscoveryService.js';
 import { securityManager, SecurityManager } from './SecurityManager.js';
 import { RoutingEngine } from './RoutingEngine.js';
@@ -25,12 +26,40 @@ export interface InferenceResult {
   fellBack?: boolean;
 }
 
+/** Minimal persona shape received from or sent to a peer. */
+export interface PeerPersona {
+  id: string;
+  name: string;
+  description?: string;
+  systemPrompt?: string;
+  tags?: string[];
+}
+
+/** One entry in the in-memory received-sync cache. */
+interface SyncCacheEntry {
+  nodeId: string;
+  personas: PeerPersona[];
+  receivedAt: string;
+}
+
 export class MeshNode {
   private identity: NodeIdentity;
   private discovery: DiscoveryService;
   private security: SecurityManager;
   private routing: RoutingEngine;
   private server: MeshServer;
+
+  /** In-memory cache of persona data received from peers via /sync. */
+  private syncCache: Map<string, SyncCacheEntry> = new Map();
+
+  /** Whether cross-node persona sync is enabled (persisted via settings). */
+  private crossNodeSyncEnabled = false;
+
+  /** Whether agent discourse routing is enabled (persisted via settings). */
+  private agentDiscourseEnabled = false;
+
+  /** Interval handle for the sync heartbeat. */
+  private syncHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
   constructor() {
     this.security = securityManager;
@@ -57,6 +86,273 @@ export class MeshNode {
   getDiscovery() { return this.discovery; }
   getSecurity() { return this.security; }
   getRouting() { return this.routing; }
+
+  // ─── Cross-Node Sync Settings ─────────────────────────────────────────────
+
+  /**
+   * Enable or disable cross-node persona sync. When enabled, a heartbeat
+   * pushes local personas to all known peers every 30 seconds.
+   */
+  setCrossNodeSync(enabled: boolean): void {
+    this.crossNodeSyncEnabled = enabled;
+    if (enabled && !this.syncHeartbeatTimer) {
+      this.syncHeartbeatTimer = setInterval(() => {
+        this.pushPersonaSync().catch((err: unknown) => {
+          log.warn("Persona sync heartbeat failed", { error: (err as Error).message });
+        });
+      }, 30_000);
+      log.info("Cross-node persona sync enabled (30 s heartbeat)");
+    } else if (!enabled && this.syncHeartbeatTimer) {
+      clearInterval(this.syncHeartbeatTimer);
+      this.syncHeartbeatTimer = null;
+      log.info("Cross-node persona sync disabled");
+    }
+  }
+
+  /** Enable or disable agent discourse routing. */
+  setAgentDiscourse(enabled: boolean): void {
+    this.agentDiscourseEnabled = enabled;
+    log.info("Agent discourse routing", { enabled });
+  }
+
+  isCrossNodeSyncEnabled(): boolean { return this.crossNodeSyncEnabled; }
+  isAgentDiscourseEnabled(): boolean { return this.agentDiscourseEnabled; }
+
+  /** Return cached persona data received from all peers. */
+  getPeerSyncCache(): SyncCacheEntry[] {
+    return Array.from(this.syncCache.values());
+  }
+
+  // ─── Inbound handlers (called by MeshServer) ──────────────────────────────
+
+  /**
+   * Called when a peer sends us its persona data via POST /sync.
+   * Stores in-memory cache and broadcasts a WS event — never writes to local DB.
+   */
+  async receivePeerSync(nodeId: string, personas: unknown[]): Promise<void> {
+    const safe: PeerPersona[] = (Array.isArray(personas) ? personas : []).flatMap((p) => {
+      if (typeof p !== "object" || p === null) return [];
+      const obj = p as Record<string, unknown>;
+      if (typeof obj.id !== "string" || typeof obj.name !== "string") return [];
+      return [{
+        id: obj.id,
+        name: obj.name,
+        description: typeof obj.description === "string" ? obj.description : undefined,
+        systemPrompt: typeof obj.systemPrompt === "string" ? obj.systemPrompt : undefined,
+        tags: Array.isArray(obj.tags) ? (obj.tags as string[]).filter(t => typeof t === "string") : undefined,
+      }];
+    });
+
+    this.syncCache.set(nodeId, { nodeId, personas: safe, receivedAt: new Date().toISOString() });
+    log.info("Peer sync cached", { nodeId, personaCount: safe.length });
+
+    // Broadcast to subscribed WS clients
+    try {
+      const { getWsInstance } = await import("../../phase2/websocket/WebSocketServer.js");
+      getWsInstance()?.broadcastAll("ommesh:sync_received", { nodeId, personaCount: safe.length });
+    } catch {
+      // WS not yet initialized — acceptable during early boot
+    }
+  }
+
+  /**
+   * Called when a peer delivers an inter-agent message via POST /discourse.
+   * Looks up the target persona and appends the message to the messenger store.
+   * Non-destructive: if the persona is not found, returns { ok: false }.
+   */
+  async receiveDiscourse(
+    fromNode: string,
+    fromAgentId: string,
+    toAgentId: string,
+    content: string,
+  ): Promise<{ ok: boolean }> {
+    try {
+      const { getDb } = await import("../../db.factory.js");
+      const { personas } = await import("../../../drizzle/schema.js");
+      const { eq } = await import("drizzle-orm");
+
+      const db = await getDb();
+      const rows = await db.select().from(personas).where(eq(personas.id, toAgentId));
+      if (rows.length === 0) {
+        log.warn("Discourse: target persona not found", { toAgentId, fromNode });
+        return { ok: false };
+      }
+
+      const persona = rows[0];
+      const prefixedContent = `[From ${fromNode}/${fromAgentId}]: ${content}`;
+
+      const { AgentMessengerStore } = await import("../../_core/AgentMessengerStore.js");
+      await AgentMessengerStore.getInstance().append(persona.userId, toAgentId, "user", prefixedContent);
+
+      log.info("Discourse message delivered", { toAgentId, fromNode, fromAgentId });
+      return { ok: true };
+    } catch (err) {
+      log.warn("Discourse delivery error", { error: (err as Error).message });
+      return { ok: false };
+    }
+  }
+
+  // ─── Outbound methods ─────────────────────────────────────────────────────
+
+  /**
+   * Fetch local personas from DB and push them to all known peers via /sync.
+   * Only runs if crossNodeSync is enabled — guards are intentionally redundant
+   * so calling code doesn't need to check the flag first.
+   */
+  async pushPersonaSync(): Promise<void> {
+    if (!this.crossNodeSyncEnabled) return;
+    const peers = this.discovery.getPeers();
+    if (peers.length === 0) return;
+
+    // Fetch all personas from the local DB
+    let localPersonas: PeerPersona[] = [];
+    try {
+      const { getDb } = await import("../../db.factory.js");
+      const { personas } = await import("../../../drizzle/schema.js");
+      const db = await getDb();
+      const rows = await db.select().from(personas);
+      localPersonas = rows.map(r => ({
+        id: r.id,
+        name: r.name,
+        description: typeof (r.data as Record<string, unknown>)?.description === "string"
+          ? (r.data as Record<string, unknown>).description as string
+          : undefined,
+        systemPrompt: typeof (r.data as Record<string, unknown>)?.systemPrompt === "string"
+          ? (r.data as Record<string, unknown>).systemPrompt as string
+          : undefined,
+        tags: Array.isArray((r.data as Record<string, unknown>)?.tags)
+          ? (r.data as Record<string, unknown>).tags as string[]
+          : undefined,
+      }));
+    } catch (err) {
+      log.warn("pushPersonaSync: failed to fetch local personas", { error: (err as Error).message });
+      return;
+    }
+
+    const timestamp = Date.now();
+    const analyticsAt = new Date().toISOString();
+    const canonical = JSON.stringify({
+      nodeId: this.identity.id,
+      personas: localPersonas,
+      analyticsAt,
+      timestamp,
+    });
+    const sig = this.signPayload(canonical);
+    const body = JSON.stringify({
+      nodeId: this.identity.id,
+      personas: localPersonas,
+      analyticsAt,
+      timestamp,
+      sig,
+    });
+
+    await Promise.allSettled(
+      peers.map(peer =>
+        this.postToPeer(peer, "/sync", body).then(() => {
+          log.info("Persona sync pushed to peer", { peer: peer.name });
+        }).catch((err: unknown) => {
+          log.warn("Failed to push persona sync to peer", { peer: peer.name, error: (err as Error).message });
+        })
+      )
+    );
+  }
+
+  /**
+   * Send an inter-agent discourse message to a specific peer.
+   */
+  async sendPeerDiscourse(
+    peerId: string,
+    fromAgentId: string,
+    toAgentId: string,
+    content: string,
+  ): Promise<{ ok: boolean }> {
+    const peer = this.discovery.getPeers().find(p => p.name === peerId);
+    if (!peer) {
+      log.warn("sendPeerDiscourse: peer not found", { peerId });
+      return { ok: false };
+    }
+
+    const timestamp = new Date().toISOString();
+    const canonical = JSON.stringify({
+      fromNode: this.identity.id,
+      fromAgentId,
+      toAgentId,
+      content,
+      timestamp,
+    });
+    const sig = this.signPayload(canonical);
+    const body = JSON.stringify({
+      fromNode: this.identity.id,
+      fromAgentId,
+      toAgentId,
+      content,
+      timestamp,
+      sig,
+    });
+
+    try {
+      await this.postToPeer(peer, "/discourse", body);
+      return { ok: true };
+    } catch (err) {
+      log.warn("sendPeerDiscourse failed", { peerId, error: (err as Error).message });
+      return { ok: false };
+    }
+  }
+
+  // ─── Shared private helpers ───────────────────────────────────────────────
+
+  /**
+   * Sign a raw payload string with HMAC-SHA256 using OMMESH_SECRET.
+   * Returns an empty string if OMMESH_SECRET is not set.
+   */
+  private signPayload(payload: string): string {
+    const secret = process.env.OMMESH_SECRET;
+    if (!secret) return "";
+    return createHmac("sha256", secret).update(payload).digest("hex");
+  }
+
+  /**
+   * POST a JSON body to a peer endpoint using mTLS, matching the pattern of
+   * `routeToRemote`. Returns the response body string (for callers that don't
+   * need it) or rejects on non-2xx status.
+   */
+  private postToPeer(peer: PeerInfo, path: string, body: string): Promise<string> {
+    const tlsOptions = this.security.getClientTlsOptions(peer.fingerprint || undefined);
+
+    return new Promise<string>((resolve, reject) => {
+      const req = https.request(
+        {
+          host: peer.address,
+          port: peer.port || MESH_PORT,
+          path,
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Content-Length": Buffer.byteLength(body),
+          },
+          ...tlsOptions,
+          timeout: 15_000,
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (c: Buffer) => chunks.push(c));
+          res.on("end", () => {
+            const text = Buffer.concat(chunks).toString("utf8");
+            if (res.statusCode && res.statusCode >= 200 && res.statusCode < 300) {
+              resolve(text);
+            } else {
+              reject(new Error(`peer ${peer.name} returned ${res.statusCode}: ${text.slice(0, 200)}`));
+            }
+          });
+        },
+      );
+
+      req.on("error", reject);
+      req.on("timeout", () => req.destroy(new Error(`peer ${peer.name} timed out`)));
+      req.write(body);
+      req.end();
+    });
+  }
 
   /**
    * Route an inference request through the mesh.

@@ -76,9 +76,12 @@ export const blenderRouter = router({
         const validatedBlend = input.blendFile
           ? await validatePath(input.blendFile)
           : undefined;
+        const validatedOutput = input.outputPath
+          ? await validatePath(input.outputPath)
+          : undefined;
         const jobId = await ctx.services.blender.render(
           validatedBlend,
-          input.outputPath,
+          validatedOutput,
           input.label
         );
         return {
@@ -103,7 +106,8 @@ export const blenderRouter = router({
     .input(z.object({ filePath: z.string().optional() }))
     .mutation(async ({ input }) => {
       const blenderBin: string = PYTHON_SCRIPTS.blenderBin;
-      const args: string[] = input.filePath ? [input.filePath] : [];
+      const validatedPath = input.filePath ? await validatePath(input.filePath) : undefined;
+      const args: string[] = validatedPath ? [validatedPath] : [];
 
       const proc = spawn(blenderBin, args, {
         detached: true,
@@ -118,7 +122,7 @@ export const blenderRouter = router({
         });
       }
 
-      return { success: true, pid: proc.pid, file: input.filePath ?? null };
+      return { success: true, pid: proc.pid, file: validatedPath ?? null };
     }),
 
   /** Export a .blend file to another format (GLB, FBX, OBJ, STL) */
@@ -132,11 +136,12 @@ export const blenderRouter = router({
         const outputPath = input.toLibrary
           ? path.join(PATHS.models, path.basename(input.outputPath))
           : input.outputPath;
+        const validatedOutputPath = await validatePath(outputPath);
         const jobId = await ctx.services.blender.exportFile(
           validatedBlend,
-          outputPath
+          validatedOutputPath
         );
-        return { success: true, jobId, outputPath };
+        return { success: true, jobId, outputPath: validatedOutputPath };
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",

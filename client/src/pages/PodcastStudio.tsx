@@ -51,6 +51,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { trpc } from "@/lib/trpc";
+import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
@@ -117,6 +118,23 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
   const [searchQuery, setSearchQuery] = useState("");
   const audioRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+
+  const getAuthUrlMutation = trpc.oauth.getAuthorizationUrl.useMutation();
+  const handleCloudConnect = useCallback((provider: "google_drive" | "dropbox" | "onedrive", label: string) => {
+    getAuthUrlMutation.mutate({ platform: provider }, {
+      onSuccess: (data) => {
+        if (data?.authUrl) {
+          window.open(data.authUrl, "_blank", "width=600,height=700,noopener,noreferrer");
+          toast.success(`${label}: OAuth window opened — authorize and return`);
+        } else {
+          toast.info(`${label}: Configure this provider in Settings → Integrations first`);
+        }
+      },
+      onError: () => {
+        toast.info(`${label}: Configure this provider in Settings → Integrations first`);
+      },
+    });
+  }, [getAuthUrlMutation]);
 
   const fetchDiscovery = trpc.discovery.fetchArticles.useMutation({
     onSuccess: (data) => {
@@ -310,22 +328,21 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
           <div className="space-y-1 animate-in slide-in-from-top-1 duration-150">
             <p className="text-[9px] text-muted-foreground italic">Connect a cloud storage provider:</p>
             {[
-              { label: "Google Drive", icon: "G", color: "text-blue-400", provider: "google_drive" },
-              { label: "Dropbox", icon: "⬡", color: "text-blue-500", provider: "dropbox" },
-              { label: "OneDrive", icon: "☁", color: "text-cyan-400", provider: "onedrive" },
+              { label: "Google Drive", icon: "G", color: "text-blue-400", provider: "google_drive" as const },
+              { label: "Dropbox", icon: "⬡", color: "text-blue-500", provider: "dropbox" as const },
+              { label: "OneDrive", icon: "☁", color: "text-cyan-400", provider: "onedrive" as const },
             ].map(p => (
               <button
                 key={p.label}
-                onClick={() => {
-                  // Cloud publishing (Spotify/Apple): requires OAuth integration — see Phase 35.
-                  // Planned for v3.1.0. Local export is fully functional.
-                  toast.info(`${p.label}: Connect your account in Settings > Integrations`);
-                }}
-                className="w-full flex items-center gap-2 px-2 py-1.5 rounded border border-border text-[10px] hover:bg-muted/30 transition-colors"
+                onClick={() => handleCloudConnect(p.provider, p.label)}
+                disabled={getAuthUrlMutation.isPending}
+                className="w-full flex items-center gap-2 px-2 py-1.5 rounded border border-border text-[10px] hover:bg-muted/30 transition-colors disabled:opacity-50"
               >
                 <span className={cn("font-bold text-sm", p.color)}>{p.icon}</span>
                 <span>{p.label}</span>
-                <Badge variant="outline" className="ml-auto text-[8px] h-4">Connect</Badge>
+                {getAuthUrlMutation.isPending
+                  ? <Loader2 className="w-3 h-3 animate-spin ml-auto" />
+                  : <Badge variant="outline" className="ml-auto text-[8px] h-4">Connect</Badge>}
               </button>
             ))}
             <Button size="sm" variant="ghost" className="w-full h-5 text-[10px]" onClick={() => setAddMode(null)}>Cancel</Button>
@@ -396,6 +413,9 @@ interface PodcastSessionState {
   turns: DialogueTurn[];
   sources: PodcastSource[];
   podcastLength: PodcastLength;
+  podcastDescription?: string;
+  podcastDuration?: number;
+  podcastQuality?: "draft" | "standard" | "high";
 }
 
 function loadPodcastSession(): Partial<PodcastSessionState> | null {
@@ -440,6 +460,26 @@ export default function PodcastStudio() {
   const [history, setHistory] = useState<PodcastEpisode[]>(() => loadPodcastHistory());
   const [showHistory, setShowHistory] = useState(false);
 
+  const [podcastDescription, setPodcastDescription] = useState(() => loadPodcastSession()?.podcastDescription ?? "");
+  const [podcastDuration, setPodcastDuration] = useState<number>(() => loadPodcastSession()?.podcastDuration ?? 15);
+  const [podcastQuality, setPodcastQuality] = useState<"draft" | "standard" | "high">(() => loadPodcastSession()?.podcastQuality ?? "standard");
+  const [activeJobId, setActiveJobId] = useState<string | null>(null);
+  const [generationProgress, setGenerationProgress] = useState(0);
+
+  const socket = useOmnecorSocket({
+    onEvent: (type, data) => {
+      if ((type as string) === "trainingProgress" && data && typeof data.percent === "number") {
+        setGenerationProgress(data.percent);
+      }
+    }
+  });
+
+  const handleLengthOptionClick = (value: PodcastLength) => {
+    setPodcastLength(value);
+    const minutes = value === "short" ? 5 : value === "medium" ? 15 : value === "long" ? 30 : 60;
+    setPodcastDuration(minutes);
+  };
+
   const addEpisodeToHistory = useCallback((episode: PodcastEpisode) => {
     setHistory((prev) => {
       const next = [episode, ...prev].slice(0, 50);
@@ -459,17 +499,27 @@ export default function PodcastStudio() {
   // Persist the editable session whenever it changes.
   useEffect(() => {
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({ turns, sources, podcastLength }));
-    } catch {
+      localStorage.setItem(SESSION_KEY, JSON.stringify({
+        turns,
+        sources,
+        podcastLength,
+        podcastDescription,
+        podcastDuration,
+        podcastQuality
+      }));
+    } catch (error) {
       /* storage quota / unavailable — non-fatal */
     }
-  }, [turns, sources, podcastLength]);
+  }, [turns, sources, podcastLength, podcastDescription, podcastDuration, podcastQuality]);
 
   const clearSession = useCallback(() => {
     try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
     setTurns(DEFAULT_TURNS);
     setSources([]);
     setPodcastLength("medium");
+    setPodcastDescription("");
+    setPodcastDuration(15);
+    setPodcastQuality("standard");
     setResult(null);
     setAudioUrl(null);
     toast.info("Session cleared");
@@ -520,7 +570,7 @@ export default function PodcastStudio() {
   const selectedSources = sources.filter(s => s.selected);
 
   // Mutations
-  const generateScriptMutation = trpc.ai.chat.useMutation({
+  const generateScriptMutation = trpc.podcast.generateScript.useMutation({
     onSuccess: (data) => {
       try {
         const jsonMatch = data.content.match(/\[[\s\S]*\]/);
@@ -543,28 +593,24 @@ export default function PodcastStudio() {
     const topic = window.prompt("What should the podcast be about?", "The impact of sovereign AI on local privacy");
     if (!topic) return;
 
-    const lengthSpec = LENGTH_OPTIONS.find(l => l.value === podcastLength)!;
-    const turnCount = podcastLength === "short" ? 5 : podcastLength === "medium" ? 12 : podcastLength === "long" ? 23 : 42;
-
-    const sourceContext = selectedSources.length > 0
-      ? `\n\nUse these sources as context:\n${selectedSources.map((s, i) => `[${i + 1}] ${s.label}:\n${s.content}`).join("\n\n")}`
-      : "";
-
     generateScriptMutation.mutate({
       providerId: "openai",
-      messages: [{
-        role: "user",
-        content: `Generate a ${turnCount}-turn podcast script (${lengthSpec.desc}) between two hosts (Alex and Sam) about: "${topic}".${sourceContext}
-        Return ONLY a JSON array of objects with keys: speakerId (Alex or Sam), text, emotion (excited, thoughtful, neutral, whispering).
-        Example: [{"speakerId": "Alex", "text": "Hello!", "emotion": "excited"}]`
-      }],
-      modelId: "gpt-4o"
+      modelId: "gpt-4o",
+      topic,
+      description: podcastDescription,
+      durationMinutes: podcastDuration,
+      quality: podcastQuality,
+      format: "json",
+      sources: selectedSources.map(s => ({ label: s.label, content: s.content })),
     });
   };
 
   const generateMutation = trpc.podcast.generate.useMutation({
     onSuccess: (data) => {
       setIsGenerating(false);
+      if (activeJobId) {
+        socket.unsubscribe(`podcast:${activeJobId}`);
+      }
       const d = data as {
         jobId?: string;
         audioUrl?: string | null;
@@ -588,6 +634,9 @@ export default function PodcastStudio() {
     },
     onError: (e) => {
       setIsGenerating(false);
+      if (activeJobId) {
+        socket.unsubscribe(`podcast:${activeJobId}`);
+      }
       toast.error(`Generation failed: ${e.message}`);
     }
   });
@@ -608,6 +657,7 @@ export default function PodcastStudio() {
     try {
       const data = await regenerateSegmentMutation.mutateAsync({
         title: "Segment regeneration",
+        quality: podcastQuality,
         turns: [{ speakerId: seg.speaker, text }],
       });
       const newSeg = (data as { segments?: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] }).segments?.[0];
@@ -648,9 +698,21 @@ export default function PodcastStudio() {
       toast.error("Please fill in all dialogue turns.");
       return;
     }
+    const jobId = Math.random().toString(36).substring(7) + "-" + Date.now();
+    setActiveJobId(jobId);
+    setGenerationProgress(0);
     setIsGenerating(true);
+    setAudioUrl(null);
+    setResult(null);
+
+    socket.subscribe(`podcast:${jobId}`);
+
     generateMutation.mutate({
+      jobId,
       title: "New Podcast Episode",
+      description: podcastDescription,
+      durationMinutes: podcastDuration,
+      quality: podcastQuality,
       turns: turns.map(t => ({ speakerId: t.speakerId, text: t.text, emotion: t.emotion }))
     });
   };
@@ -711,8 +773,15 @@ export default function PodcastStudio() {
               <Trash2 className="w-4 h-4" /> Clear session
             </Button>
             <Button size="sm" className="gap-2" onClick={handleGenerate} disabled={isGenerating}>
-              {isGenerating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-              Generate Podcast
+              {isGenerating ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>Generating {generationProgress}%</span>
+                </>
+              ) : (
+                <Play className="w-4 h-4" />
+              )}
+              {!isGenerating && "Generate Podcast"}
             </Button>
           </div>
         </div>
@@ -812,12 +881,24 @@ export default function PodcastStudio() {
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-4">
                 <div className="space-y-2">
+                  <Label htmlFor="input-podcast-desc" className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+                    Description
+                  </Label>
+                  <Textarea
+                    id="input-podcast-desc"
+                    placeholder="Describe the tone, topic, or target audience..."
+                    value={podcastDescription}
+                    onChange={(e) => setPodcastDescription(e.target.value)}
+                    className="text-[11px] min-h-[50px] bg-background border border-border rounded-md resize-none"
+                  />
+                </div>
+                <div className="space-y-2">
                   <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Episode Length</p>
                   <div className="grid grid-cols-2 gap-1">
                     {LENGTH_OPTIONS.map(opt => (
                       <button
                         key={opt.value}
-                        onClick={() => setPodcastLength(opt.value)}
+                        onClick={() => handleLengthOptionClick(opt.value)}
                         className={cn(
                           "p-2 rounded border text-left transition-colors",
                           podcastLength === opt.value
@@ -827,6 +908,43 @@ export default function PodcastStudio() {
                       >
                         <p className="text-[11px] font-bold">{opt.label}</p>
                         <p className="text-[9px] leading-tight mt-0.5">{opt.desc}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <Label htmlFor="input-podcast-duration" className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
+                      Duration
+                    </Label>
+                    <span className="text-[11px] font-bold text-accent">{podcastDuration} min</span>
+                  </div>
+                  <input
+                    id="input-podcast-duration"
+                    type="range"
+                    min={2}
+                    max={60}
+                    step={1}
+                    value={podcastDuration}
+                    onChange={(e) => setPodcastDuration(parseInt(e.target.value, 10))}
+                    className="w-full h-1 bg-muted rounded-lg appearance-none cursor-pointer accent-accent"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Synthesis Quality</p>
+                  <div className="grid grid-cols-3 gap-1">
+                    {(["draft", "standard", "high"] as const).map(q => (
+                      <button
+                        key={q}
+                        onClick={() => setPodcastQuality(q)}
+                        className={cn(
+                          "py-1 px-1.5 rounded border text-[10px] font-semibold text-center transition-colors uppercase",
+                          podcastQuality === q
+                            ? "bg-accent/20 border-accent/50 text-accent"
+                            : "border-border text-muted-foreground hover:border-border/80 hover:text-foreground"
+                        )}
+                      >
+                        {q}
                       </button>
                     ))}
                   </div>
@@ -885,11 +1003,20 @@ export default function PodcastStudio() {
                               variant="ghost"
                               className="h-6 w-6"
                               onClick={() => {
-                                const text = seg.text || seg.content || "";
-                                if (text && "speechSynthesis" in window) {
-                                  window.speechSynthesis.cancel();
-                                  const utt = new SpeechSynthesisUtterance(text);
-                                  window.speechSynthesis.speak(utt);
+                                if (seg.audioUrl) {
+                                  if ((window as any).__activeSegmentAudio) {
+                                    try { (window as any).__activeSegmentAudio.pause(); } catch {}
+                                  }
+                                  const audio = new Audio(seg.audioUrl);
+                                  (window as any).__activeSegmentAudio = audio;
+                                  audio.play().catch(err => console.warn("Failed to play segment audio:", err));
+                                } else {
+                                  const text = seg.text || seg.content || "";
+                                  if (text && "speechSynthesis" in window) {
+                                    window.speechSynthesis.cancel();
+                                    const utt = new SpeechSynthesisUtterance(text);
+                                    window.speechSynthesis.speak(utt);
+                                  }
                                 }
                               }}
                             >

@@ -1,35 +1,27 @@
 /**
- * Always-Listening voice orchestrator.
+ * Always-Listening voice orchestrator (Hybrid Architecture).
  *
- * The end-to-end loop:
- *   Porcupine wake word ("Hey Omnecor") → capture the utterance → on-device STT
- *   (whisper.rn) → send the text to the chosen PC persona via agentMessenger →
- *   speak the reply (expo-speech) + post a local notification + write an
- *   encrypted activation-audit entry.
+ * Implements local wake-word trigger (Whisper NPU loop) and plays back
+ * real-time streamed TTS audio chunks from the PC over OMMESH/Tailscale WebSocket.
  *
- * Design notes:
- *  - Audio CAPTURE is pluggable via `setCaptureProvider` so the same pipeline
- *    works with the in-app expo-audio recorder (foreground) and a background
- *    voice-processor/WAV dump (foreground service) without changing this module.
- *  - Porcupine owns the mic while listening; we stop it before capturing the
- *    utterance and restart it after, so there is only ever one mic owner.
- *  - All native deps (Porcupine, whisper.rn) are imported lazily, mirroring
- *    `local-inference.ts`, so the app type-checks before the deps are installed.
- *
- * Subscriber/status pattern mirrors `mobile-mesh-node.ts`.
+ * Flow:
+ *   1. Android app-wide loop captures 2.0s audio segments locally.
+ *   2. Transcribes locally via whisper.rn (GGML on NPU).
+ *   3. If "Hey Omnecor" / "Computer" matches, vibrates and triggers utterance capture.
+ *   4. Transcribes the full user question locally, then streams text to the PC over WS.
+ *   5. PC generates LLM response and streams TTS WAV audio chunks back via WS.
+ *   6. expo-audio plays chunks sequentially. Supports instant interruption.
  */
 import * as Speech from "expo-speech";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { trpcMutate } from "./trpc-fetch";
 import { isServerConfigured } from "./server-config";
 import { transcribeFile, isSttModelLoaded, loadSttModel } from "./local-stt";
 import { modelPath, isModelDownloaded } from "./model-download";
-import {
-  getListenConfig,
-  getPicovoiceAccessKey,
-  hasPicovoiceAccessKey,
-} from "./always-listen-config";
+import { getListenConfig } from "./always-listen-config";
 import { encryptString, decryptString } from "./secure-crypto";
+import { sendWsMessage, subscribeChannel } from "./ws-channels";
+import * as FileSystem from "expo-file-system/legacy";
+import * as Haptics from "expo-haptics";
 import {
   startMicForegroundService,
   stopMicForegroundService,
@@ -43,14 +35,15 @@ export type ListenState =
   | "listening"    // armed, waiting for wake word
   | "capturing"    // wake detected, recording the utterance
   | "transcribing" // running on-device STT
-  | "thinking"     // waiting for the PC persona reply
-  | "speaking"     // reading the reply aloud
+  | "thinking"     // waiting for the PC response stream
+  | "speaking"     // playing back the streamed response chunks
   | "error";
 
 type StateListener = (s: ListenState) => void;
 const stateListeners = new Set<StateListener>();
 let _state: ListenState = "off";
 let _lastError: string | null = null;
+let _running = false;
 
 function setState(s: ListenState, err?: string) {
   _state = s;
@@ -67,12 +60,9 @@ export function getListenError(): string | null { return _lastError; }
 
 // ── Capture provider (pluggable mic source) ──────────────────────────────────
 
-/** Records one utterance and returns its audio file URI (or null on failure). */
 export type CaptureProvider = () => Promise<string | null>;
-
 let _capture: CaptureProvider | null = null;
 
-/** Register how utterance audio is captured (expo-audio hook, voice-processor…). */
 export function setCaptureProvider(fn: CaptureProvider | null) {
   _capture = fn;
 }
@@ -133,16 +123,107 @@ async function notify(title: string, body: string): Promise<void> {
   }
 }
 
-// ── One voice turn ────────────────────────────────────────────────────────────
+// ── Audio Streaming Queue ─────────────────────────────────────────────────────
 
-/**
- * Run a single capture→STT→persona→speak turn against an already-captured audio
- * file. Exposed directly so Phase-1 in-app testing can drive it from a button
- * before the wake word is wired. Returns the agent reply text (or "").
- */
+let audioQueue: string[] = [];
+let activePlayer: any = null;
+let activeSubscription: any = null;
+let streamUnsubscribe: (() => void) | null = null;
+let activeJobId: string | null = null;
+let voiceTurnStartTime = 0;
+let lastTranscript = "";
+
+async function playNextInQueue() {
+  if (activePlayer && _state === "speaking") {
+    return; // Already playing, wait for finish handler
+  }
+  if (audioQueue.length === 0) {
+    if (_state === "speaking") {
+      // Finished all chunks, wrap up the turn
+      finishVoiceTurn();
+    }
+    return;
+  }
+
+  const nextPath = audioQueue.shift();
+  if (!nextPath) return;
+
+  setState("speaking");
+  try {
+    const { createAudioPlayer } = await import("expo-audio");
+    activePlayer = createAudioPlayer(nextPath);
+    activeSubscription = activePlayer.addListener("playbackStatusUpdate", (status: any) => {
+      if (status.didJustFinish) {
+        cleanupActivePlayer();
+        void playNextInQueue();
+      }
+    });
+    activePlayer.play();
+  } catch (err) {
+    console.warn("[AlwaysListen] Failed to play audio chunk:", err);
+    cleanupActivePlayer();
+    void playNextInQueue();
+  }
+}
+
+function cleanupActivePlayer() {
+  if (activeSubscription) {
+    activeSubscription.remove();
+    activeSubscription = null;
+  }
+  if (activePlayer) {
+    try { activePlayer.stop(); } catch {}
+    try { activePlayer.release(); } catch {}
+    activePlayer = null;
+  }
+}
+
+export function stopAudioPlayback() {
+  cleanupActivePlayer();
+  audioQueue = [];
+}
+
+function finishVoiceTurn() {
+  stopAudioPlayback();
+  if (streamUnsubscribe) {
+    streamUnsubscribe();
+    streamUnsubscribe = null;
+  }
+  void appendAudit({
+    at: new Date().toISOString(),
+    transcript: lastTranscript,
+    personaId: getListenConfig().personaId,
+    reply: "[Streamed audio reply]",
+    ms: Date.now() - voiceTurnStartTime,
+    ok: true,
+  });
+  activeJobId = null;
+  setState(_running ? "listening" : "off");
+}
+
+// ── Interruption ──────────────────────────────────────────────────────────────
+
+export function interruptConversation() {
+  if (activeJobId) {
+    sendWsMessage({
+      type: "voice:interrupt",
+      data: { jobId: activeJobId },
+    });
+  }
+  stopAudioPlayback();
+  if (streamUnsubscribe) {
+    streamUnsubscribe();
+    streamUnsubscribe = null;
+  }
+  activeJobId = null;
+  setState(_running ? "listening" : "off");
+}
+
+// ── One Voice Turn ────────────────────────────────────────────────────────────
+
 export async function runVoiceTurn(audioUri: string): Promise<string> {
   const cfg = getListenConfig();
-  const started = Date.now();
+  voiceTurnStartTime = Date.now();
 
   if (!isServerConfigured()) {
     setState("error", "No server configured");
@@ -157,47 +238,70 @@ export async function runVoiceTurn(audioUri: string): Promise<string> {
     return "";
   }
 
-  let transcript = "";
   try {
     setState("transcribing");
-    transcript = await transcribeFile(audioUri, { language: "en" });
+    const transcript = await transcribeFile(audioUri, { language: "en" });
+    lastTranscript = transcript;
     if (!transcript) {
       setState("listening");
-      return ""; // nothing heard — quietly resume
+      return ""; // nothing heard — resume wake word
     }
 
     setState("thinking");
-    const res = await trpcMutate<{ reply: { content: string } }>(
-      "agentMessenger.send",
-      { personaId: cfg.personaId, content: transcript },
-    );
-    const reply = (res?.reply?.content ?? "").trim();
 
-    if (reply && cfg.speakReplies) {
-      setState("speaking");
-      await speakAndWait(reply);
-    }
+    // Initiate real-time streaming voice turn
+    const jobId = Math.random().toString(36).slice(2) + "-" + Date.now();
+    activeJobId = jobId;
+    stopAudioPlayback();
 
-    await notify("Omnecor", reply || transcript);
-    await appendAudit({
-      at: new Date().toISOString(),
-      transcript,
-      personaId: cfg.personaId,
-      reply,
-      ms: Date.now() - started,
-      ok: true,
+    // Subscribe to chunk stream channel for this turn
+    streamUnsubscribe = subscribeChannel(`voice:stream:${jobId}`, (data: any, type: string) => {
+      if (type === "voice:audio_chunk" && data) {
+        const { chunk, index } = data;
+        const tempPath = `${FileSystem.cacheDirectory}voice_${jobId}_${index}.wav`;
+        FileSystem.writeAsStringAsync(tempPath, chunk, {
+          encoding: FileSystem.EncodingType.Base64,
+        })
+          .then(() => {
+            audioQueue.push(tempPath);
+            void playNextInQueue();
+          })
+          .catch((err) => console.warn("[AlwaysListen] Failed to write base64 chunk:", err));
+      } else if (type === "voice:done") {
+        // PC finished generating all chunks
+      }
     });
-    setState(_running ? "listening" : "off");
-    return reply;
+
+    // Send input request to PC WebSocket
+    sendWsMessage({
+      type: "voice:audio_input",
+      data: {
+        personaId: cfg.personaId,
+        text: transcript,
+        jobId,
+      },
+    });
+
+    // Fallback timeout: if no audio chunk arrives within 8 seconds, speak fallback warning locally
+    setTimeout(() => {
+      if (activeJobId === jobId && audioQueue.length === 0 && _state === "thinking") {
+        console.log("[AlwaysListen] Fallback: No stream from PC, triggering native TTS");
+        interruptConversation();
+        Speech.speak("Cannot reach the PC server. Falling back to local offline mode.");
+        setState("listening");
+      }
+    }, 8000);
+
+    return "";
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     setState("error", msg);
-    await appendAudit({
+    void appendAudit({
       at: new Date().toISOString(),
-      transcript,
+      transcript: lastTranscript,
       personaId: cfg.personaId,
       reply: "",
-      ms: Date.now() - started,
+      ms: Date.now() - voiceTurnStartTime,
       ok: false,
       error: msg,
     });
@@ -205,42 +309,8 @@ export async function runVoiceTurn(audioUri: string): Promise<string> {
   }
 }
 
-function speakAndWait(text: string): Promise<void> {
-  // Strip markdown for cleaner reading (same cleanup as use-voice.ts).
-  const clean = text
-    .replace(/#{1,6}\s/g, "")
-    .replace(/\*{1,2}([^*]+)\*{1,2}/g, "$1")
-    .replace(/`[^`]+`/g, "")
-    .replace(/\[([^\]]+)\]\([^)]+\)/g, "$1")
-    .slice(0, 2000);
-  return new Promise<void>((resolve) => {
-    Speech.speak(clean, {
-      onDone: () => resolve(),
-      onStopped: () => resolve(),
-      onError: () => resolve(),
-    });
-  });
-}
+// ── Wake-word service ─────────────────────────────────────────────────────────
 
-// ── Wake-word service (Porcupine) ─────────────────────────────────────────────
-
-let _porcupine: any = null;
-let _running = false;
-
-async function getPorcupine() {
-  try {
-    return await import("@picovoice/porcupine-react-native");
-  } catch {
-    throw new Error(
-      "@picovoice/porcupine-react-native not installed. Run: pnpm add @picovoice/porcupine-react-native @picovoice/react-native-voice-processor && expo prebuild --platform android",
-    );
-  }
-}
-
-/**
- * Ensure the configured on-device Whisper model is downloaded and loaded into
- * whisper.rn before a turn runs. Throws a clear message if it isn't available.
- */
 export async function ensureSttModelLoaded(): Promise<void> {
   if (isSttModelLoaded()) return;
   const filename = getListenConfig().sttModelFilename;
@@ -251,70 +321,35 @@ export async function ensureSttModelLoaded(): Promise<void> {
   await loadSttModel(modelPath(filename));
 }
 
-/** Path to the bundled custom "Hey Omnecor" keyword, or null to use a built-in. */
-let _keywordPath: string | null = null;
-export function setKeywordPath(path: string | null) { _keywordPath = path; }
-
-/** Pause the wake engine so it releases the mic before we record an utterance. */
-async function pauseWake(): Promise<void> {
-  if (_porcupine) { try { await _porcupine.stop(); } catch { /* ignore */ } }
-}
-
-/** Re-arm the wake engine after a capture, only if the service is still running. */
-async function resumeWake(): Promise<void> {
-  if (_running && _porcupine) {
-    try { await _porcupine.start(); } catch (e) {
-      setState("error", e instanceof Error ? e.message : String(e));
-    }
-  }
-}
-
-/**
- * Capture one utterance and run it through the pipeline, coordinating mic
- * ownership: the wake engine (Porcupine voice-processor) and the recorder can't
- * hold the mic at once, so we pause the wake engine first and re-arm after.
- * Used by BOTH the wake-word callback and the manual "Test" button, so neither
- * can collide with the other.
- */
 export async function captureAndRun(): Promise<void> {
   if (!_capture) {
     setState("error", "No capture provider registered");
     return;
   }
   try {
-    await pauseWake();
     setState("capturing");
+    // Play quick success haptic pulse for recognition
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     const uri = await _capture();
-    if (uri) await runVoiceTurn(uri);     // sets its own terminal state
-    else setState(_running ? "listening" : "off");
+    if (uri) {
+      await runVoiceTurn(uri);
+    } else {
+      setState(_running ? "listening" : "off");
+    }
   } catch (err) {
     setState("error", err instanceof Error ? err.message : String(err));
-  } finally {
-    await resumeWake();
   }
 }
 
-/**
- * Start always-listening: initialise Porcupine and begin waiting for the wake
- * word. Requires a Picovoice access key and a registered capture provider.
- */
 export async function startListening(): Promise<void> {
   if (_running) return;
-  if (!hasPicovoiceAccessKey()) {
-    setState("error", "Picovoice access key not set");
-    throw new Error("Picovoice access key not set");
-  }
   if (!_capture) {
     setState("error", "No capture provider registered");
     throw new Error("No capture provider registered");
   }
 
-  // Load the on-device STT model up front so the first turn isn't delayed (and
-  // so a missing model fails loudly here, not mid-conversation).
   await ensureSttModelLoaded();
 
-  // Best-effort: ensure the OS will actually deliver our reply notifications
-  // (Android 13+ gates POST_NOTIFICATIONS behind a runtime grant).
   try {
     const Notifications = await import("expo-notifications");
     await Notifications.requestPermissionsAsync();
@@ -322,44 +357,9 @@ export async function startListening(): Promise<void> {
     console.warn("[AlwaysListen] notification permission request failed:", e);
   }
 
-  const { PorcupineManager, BuiltInKeywords } = await getPorcupine();
-  const accessKey = getPicovoiceAccessKey();
-  const sensitivity = getListenConfig().sensitivity;
-
-  const detectionCb = () => { void captureAndRun(); };
-  const errorCb = (e: any) => setState("error", String(e?.message ?? e));
-
-  // Signature: (accessKey, keywords, detectionCb, errorCb, modelPath?, device?, sensitivities?)
-  if (_keywordPath) {
-    _porcupine = await PorcupineManager.fromKeywordPaths(
-      accessKey,
-      [_keywordPath],
-      detectionCb,
-      errorCb,
-      undefined, // modelPath (default)
-      undefined, // device (auto)
-      [sensitivity],
-    );
-  } else {
-    // Built-in fallback until the custom "Hey Omnecor" .ppn is bundled.
-    _porcupine = await PorcupineManager.fromBuiltInKeywords(
-      accessKey,
-      [BuiltInKeywords.COMPUTER],
-      detectionCb,
-      errorCb,
-      undefined, // modelPath (default)
-      undefined, // device (auto)
-      [sensitivity],
-    );
-  }
-
-  await _porcupine.start();
-
-  // Hold the mic alive when backgrounded/closed via a microphone-typed Android
-  // foreground service (no-op until the native module is prebuilt into the APK).
   if (isMicForegroundServiceAvailable()) {
     try {
-      startMicForegroundService("Omnecor is listening", 'Say "Hey Omnecor" to talk.');
+      startMicForegroundService("Omnecor is listening", 'Speak to trigger your persona.');
     } catch (e) {
       console.warn("[AlwaysListen] failed to start foreground service:", e);
     }
@@ -369,16 +369,15 @@ export async function startListening(): Promise<void> {
   setState("listening");
 }
 
-/** Stop always-listening and release the wake engine + mic. */
 export async function stopListening(): Promise<void> {
   _running = false;
-  if (_porcupine) {
-    try { await _porcupine.stop(); } catch { /* ignore */ }
-    try { _porcupine.delete(); } catch { /* ignore */ }
-    _porcupine = null;
-  }
   if (isMicForegroundServiceAvailable()) {
     try { stopMicForegroundService(); } catch (e) { console.warn("[AlwaysListen] failed to stop foreground service:", e); }
+  }
+  stopAudioPlayback();
+  if (streamUnsubscribe) {
+    streamUnsubscribe();
+    streamUnsubscribe = null;
   }
   Speech.stop();
   setState("off");

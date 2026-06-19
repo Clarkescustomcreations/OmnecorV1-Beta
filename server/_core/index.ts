@@ -48,6 +48,7 @@ import { startBackupScheduler } from "./backupScheduler";
 import { startPublishWorker } from "./publishWorker";
 import { meshNode } from "../ommesh/core/MeshNode.js";
 import { ValetServerService } from "../phase2/services/ValetServerService.js";
+import { MCPClientService } from "../phase2/services/MCPClientService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Port Discovery
@@ -130,6 +131,56 @@ async function startServer() {
     log.info("[Omnecor] OMMESH Node started and broadcasting");
   } catch (error) {
     log.warn("[Omnecor] OMMESH init warning:", (error as Error).message);
+  }
+
+  // ─── Initialize AgenticOS Registry ─────────────────────────────────────
+  try {
+    const mcpClient = MCPClientService.getInstance();
+    mcpClient.connectAgenticOsRegistry().catch(error => {
+      log.warn("[Omnecor] AgenticOS Registry init warning:", (error as Error).message);
+    });
+  } catch (error) {
+    log.warn("[Omnecor] MCP Client registry init warning:", (error as Error).message);
+  }
+
+  // ─── Seed default.wav if missing ─────────────────────────────────────────
+  try {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const { PATHS } = await import("./paths.js");
+    const defaultWavPath = path.join(PATHS.data, "default.wav");
+    const exists = await fs.access(defaultWavPath).then(() => true).catch(() => false);
+    if (!exists) {
+      const sourceWav = "/home/linux/.steam/debian-installation/steamui/sounds/recording_highlight.wav";
+      const sourceExists = await fs.access(sourceWav).then(() => true).catch(() => false);
+      if (sourceExists) {
+        await fs.mkdir(path.dirname(defaultWavPath), { recursive: true });
+        await fs.copyFile(sourceWav, defaultWavPath);
+        log.info("[Omnecor] Seeded data/default.wav from steam sounds");
+      } else {
+        const dummyWav = Buffer.from([
+          0x52, 0x49, 0x46, 0x46, // "RIFF"
+          0x24, 0x08, 0x00, 0x00, // file size - 8
+          0x57, 0x41, 0x56, 0x45, // "WAVE"
+          0x66, 0x6d, 0x74, 0x20, // "fmt "
+          0x10, 0x00, 0x00, 0x00, // chunk size (16)
+          0x01, 0x00,             // format (1 = PCM)
+          0x01, 0x00,             // channels (1)
+          0x40, 0x1f, 0x00, 0x00, // sample rate (8000)
+          0x40, 0x1f, 0x00, 0x00, // byte rate (8000)
+          0x01, 0x00,             // block align (1)
+          0x08, 0x00,             // bits per sample (8)
+          0x64, 0x61, 0x74, 0x61, // "data"
+          0x00, 0x08, 0x00, 0x00, // chunk size
+          ...Array(2048).fill(128)
+        ]);
+        await fs.mkdir(path.dirname(defaultWavPath), { recursive: true });
+        await fs.writeFile(defaultWavPath, dummyWav);
+        log.info("[Omnecor] Seeded dummy data/default.wav silence");
+      }
+    }
+  } catch (err) {
+    log.warn("[Omnecor] Failed to seed default.wav:", (err as Error).message);
   }
 
   // ─── Auto-start Valet Router Inference Server ───────────────────────────

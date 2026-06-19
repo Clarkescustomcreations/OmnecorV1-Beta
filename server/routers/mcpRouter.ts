@@ -1,6 +1,6 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc.js";
+import { adminProcedure, protectedProcedure, router } from "../_core/trpc.js";
 import { MCPClientService } from "../phase2/services/MCPClientService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 
@@ -8,7 +8,11 @@ export const mcpRouter = router({
   listConnectedServers: protectedProcedure.query(() => {
     return MCPClientService.getInstance().listConnectedServers();
   }),
-  connectServer: protectedProcedure
+  // Connecting an stdio MCP server spawns a local OS process (the command/args
+  // are user-supplied). That is arbitrary local code execution by design, so it
+  // is gated behind admin/owner. The basename whitelist in MCPClientService is a
+  // secondary guard, not the authorization boundary.
+  connectServer: adminProcedure
     .input(
       z.object({
         id: z.string().min(1),
@@ -20,6 +24,26 @@ export const mcpRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      if (ctx.user?.executionMode === "sovereign" && input.transport === "websocket" && input.url) {
+        try {
+          const parsedUrl = new URL(input.url);
+          const hostname = parsedUrl.hostname;
+          const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".local");
+          if (!isLocal) {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Sovereign mode: remote MCP connections are disabled.",
+            });
+          }
+        } catch (err) {
+          if (err instanceof TRPCError) throw err;
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: "Invalid websocket URL.",
+          });
+        }
+      }
+
       await MCPClientService.getInstance().connectServer(input);
       AuditLogService.getInstance()
         .log({
@@ -67,6 +91,28 @@ export const mcpRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      const config = MCPClientService.getInstance().listConnectedServers().find(c => c.id === input.serverId);
+      if (ctx.user?.executionMode === "sovereign" && config) {
+        if (config.transport === "websocket" && config.url) {
+          try {
+            const parsedUrl = new URL(config.url);
+            const hostname = parsedUrl.hostname;
+            const isLocal = hostname === "localhost" || hostname === "127.0.0.1" || hostname.endsWith(".local");
+            if (!isLocal) {
+              throw new TRPCError({
+                code: "FORBIDDEN",
+                message: "Sovereign mode: remote MCP tool calls are disabled.",
+              });
+            }
+          } catch {
+            throw new TRPCError({
+              code: "FORBIDDEN",
+              message: "Sovereign mode: remote MCP tool calls are disabled.",
+            });
+          }
+        }
+      }
+
       const tools = MCPClientService.getInstance().listTools(input.serverId);
       const tool = tools.find(t => t.name === input.toolName);
 

@@ -16,6 +16,9 @@ export default function ExternalBrainMapWindow() {
     const storeChannel = new BroadcastChannel('omnecor_brain_map_store');
     storeChannel.postMessage({ type: 'requestInitialState' });
 
+    const visualChannel = new BroadcastChannel('omnecor_visual_control_sync');
+    visualChannel.postMessage({ type: 'requestInitialState' });
+
     // Listen for redock signal from main window
     const controlChannel = new BroadcastChannel('omnecor_neural_sync');
     controlChannel.onmessage = (event) => {
@@ -24,6 +27,7 @@ export default function ExternalBrainMapWindow() {
 
     return () => {
       storeChannel.close();
+      visualChannel.close();
       controlChannel.close();
     };
   }, []);

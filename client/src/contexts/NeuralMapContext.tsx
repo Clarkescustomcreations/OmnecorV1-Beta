@@ -30,6 +30,7 @@ const DEFAULT_SETTINGS = {
   isolateMemory: true,
   enableAIContext: true,
   enableSemanticLinks: true,
+  collapsedFolderIds: [] as string[],
 };
 
 // ── Helpers ──────────────────────────────────────────────────────────────────

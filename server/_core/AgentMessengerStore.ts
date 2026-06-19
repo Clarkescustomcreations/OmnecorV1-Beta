@@ -1,29 +1,21 @@
 /**
  * @file server/_core/AgentMessengerStore.ts
- * @description In-memory message store for the Agent Messenger.
+ * @description SQLite-persisted message store for the Agent Messenger.
  *
  * The Agent Messenger is a WhatsApp/Discord-style thread per agent/persona,
- * separate from regular project chats. Always-on agents (planner, assistant,
- * self-clone, neural-map retriever, …) can be messaged back and forth here.
+ * separate from regular project chats. Always-on agents can be messaged back and forth here.
  *
- * Like {@link NotificationService}, threads live in process memory so the
- * feature works identically across MySQL and SQLite without a migration.
- * Reply generation + persistence is driven by agentMessengerRouter.
+ * Threads are persisted in the SQLite database to survive service restarts.
  */
 
 import { randomUUID } from "node:crypto";
 import type { AgentMessage, AgentMessageRole } from "../../shared/notifications.js";
-
-/** Max messages retained per persona thread. */
-const MAX_PER_THREAD = 500;
+import { getDb } from "../db.factory.js";
+import { messengerMessages } from "../../drizzle/schema.js";
+import { eq, and, desc, sql } from "drizzle-orm";
 
 export class AgentMessengerStore {
   private static instance: AgentMessengerStore | null = null;
-
-  /** personaId → newest-last list of messages. */
-  private threads = new Map<string, AgentMessage[]>();
-  /** personaId → count of agent messages not yet read by the user. */
-  private unread = new Map<string, number>();
 
   static getInstance(): AgentMessengerStore {
     if (!AgentMessengerStore.instance) {
@@ -33,43 +25,108 @@ export class AgentMessengerStore {
   }
 
   /** Append a message to a persona thread and return the stored record. */
-  append(personaId: string, role: AgentMessageRole, content: string): AgentMessage {
+  async append(userId: number, personaId: string, role: AgentMessageRole, content: string): Promise<AgentMessage> {
+    const db = await getDb();
+    const inserted = await db.insert(messengerMessages).values({
+      userId,
+      personaId,
+      sender: role === "agent" ? "agent" : "user",
+      content,
+    }).returning({ id: messengerMessages.id, createdAt: messengerMessages.createdAt });
+
+    const msgId = inserted[0]?.id ? String(inserted[0].id) : randomUUID();
     const message: AgentMessage = {
-      id: randomUUID(),
+      id: msgId,
       personaId,
       role,
       content,
-      createdAt: new Date().toISOString(),
+      createdAt: (inserted[0]?.createdAt ?? new Date()).toISOString(),
     };
-    const thread = this.threads.get(personaId) ?? [];
-    thread.push(message);
-    if (thread.length > MAX_PER_THREAD) thread.splice(0, thread.length - MAX_PER_THREAD);
-    this.threads.set(personaId, thread);
 
-    if (role === "agent") {
-      this.unread.set(personaId, (this.unread.get(personaId) ?? 0) + 1);
-    }
+    // Agent messages persist with read=false (column default); the unread count
+    // is derived from the DB so it survives restarts.
     return message;
   }
 
   /** Full ordered thread for a persona (oldest-first). */
-  getMessages(personaId: string): AgentMessage[] {
-    return this.threads.get(personaId) ?? [];
+  async getMessages(userId: number, personaId: string): Promise<AgentMessage[]> {
+    const db = await getDb();
+    const rows = await db
+      .select()
+      .from(messengerMessages)
+      .where(
+        and(
+          eq(messengerMessages.userId, userId),
+          eq(messengerMessages.personaId, personaId)
+        )
+      )
+      .orderBy(messengerMessages.createdAt);
+
+    return rows.map(r => ({
+      id: String(r.id),
+      personaId: r.personaId,
+      role: r.sender === "agent" ? "agent" : "user",
+      content: r.content,
+      createdAt: r.createdAt.toISOString(),
+    }));
   }
 
   /** Last message in a persona thread, if any. */
-  lastMessage(personaId: string): AgentMessage | undefined {
-    const thread = this.threads.get(personaId);
-    return thread && thread.length > 0 ? thread[thread.length - 1] : undefined;
+  async lastMessage(userId: number, personaId: string): Promise<AgentMessage | undefined> {
+    const db = await getDb();
+    const rows = await db
+      .select()
+      .from(messengerMessages)
+      .where(
+        and(
+          eq(messengerMessages.userId, userId),
+          eq(messengerMessages.personaId, personaId)
+        )
+      )
+      .orderBy(desc(messengerMessages.createdAt))
+      .limit(1);
+
+    if (rows.length === 0) return undefined;
+    const r = rows[0];
+    return {
+      id: String(r.id),
+      personaId: r.personaId,
+      role: r.sender === "agent" ? "agent" : "user",
+      content: r.content,
+      createdAt: r.createdAt.toISOString(),
+    };
   }
 
-  /** Unread agent-message count for a persona. */
-  unreadCount(personaId: string): number {
-    return this.unread.get(personaId) ?? 0;
+  /** Unread agent-message count for a persona (persisted; survives restarts). */
+  async unreadCount(userId: number, personaId: string): Promise<number> {
+    const db = await getDb();
+    const rows = await db
+      .select({ count: sql<number>`count(*)` })
+      .from(messengerMessages)
+      .where(
+        and(
+          eq(messengerMessages.userId, userId),
+          eq(messengerMessages.personaId, personaId),
+          eq(messengerMessages.sender, "agent"),
+          eq(messengerMessages.read, false)
+        )
+      );
+    return Number(rows[0]?.count ?? 0);
   }
 
-  /** Mark a persona thread as read by the user. */
-  markRead(personaId: string): void {
-    this.unread.set(personaId, 0);
+  /** Mark a persona thread's agent messages as read by the user. */
+  async markRead(userId: number, personaId: string): Promise<void> {
+    const db = await getDb();
+    await db
+      .update(messengerMessages)
+      .set({ read: true })
+      .where(
+        and(
+          eq(messengerMessages.userId, userId),
+          eq(messengerMessages.personaId, personaId),
+          eq(messengerMessages.sender, "agent"),
+          eq(messengerMessages.read, false)
+        )
+      );
   }
 }

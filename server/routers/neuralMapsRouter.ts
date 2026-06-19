@@ -14,6 +14,7 @@ const settingsSchema = z.object({
   isolateMemory: z.boolean().default(false),
   enableAIContext: z.boolean().default(true),
   enableSemanticLinks: z.boolean().default(true),
+  collapsedFolderIds: z.array(z.string()).optional().default([]),
 });
 
 const projectContextSchema = z.object({

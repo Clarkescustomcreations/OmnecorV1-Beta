@@ -21,7 +21,6 @@ import { isServerConfigured } from "@/lib/_core/server-config";
 import { useAlwaysListen } from "@/hooks/use-always-listen";
 import {
   getListenConfig, saveListenConfig,
-  savePicovoiceAccessKey, hasPicovoiceAccessKey,
 } from "@/lib/_core/always-listen-config";
 import { WHISPER_MODELS } from "@/lib/_core/local-stt";
 import {
@@ -53,8 +52,7 @@ export function AlwaysListenSettings() {
   const [speakReplies, setSpeakReplies] = useState(cfg.speakReplies);
   const [sensitivity, setSensitivity] = useState(cfg.sensitivity);
   const [sttModel, setSttModel]       = useState(cfg.sttModelFilename);
-  const [accessKey, setAccessKey]     = useState("");
-  const [hasKey, setHasKey]           = useState(hasPicovoiceAccessKey());
+  const [wakeWord, setWakeWord]       = useState(cfg.wakeWord ?? "omnecor");
 
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [downloaded, setDownloaded] = useState<Record<string, boolean>>({});
@@ -94,7 +92,6 @@ export function AlwaysListenSettings() {
   const handleToggle = useCallback(async (next: boolean) => {
     if (next) {
       if (!isServerConfigured()) { Alert.alert("Set server first", "Configure your Omnecor PC connection above."); return; }
-      if (!hasKey) { Alert.alert("Picovoice key required", "Paste your Picovoice access key below first."); return; }
       if (!personaId) { Alert.alert("Pick a persona", "Choose which persona answers voice intents."); return; }
       if (!sttModel || !downloaded[sttModel]) { Alert.alert("Download a voice model", "Download an on-device STT model below first."); return; }
     }
@@ -108,14 +105,12 @@ export function AlwaysListenSettings() {
       await persist({ enabled: false });
       Alert.alert("Could not start", String(e));
     }
-  }, [hasKey, personaId, sttModel, downloaded, persist, start, stop]);
+  }, [personaId, sttModel, downloaded, persist, start, stop]);
 
-  const handleSaveKey = useCallback(async () => {
-    await savePicovoiceAccessKey(accessKey);
-    setHasKey(accessKey.trim().length > 0);
-    setAccessKey("");
-    Alert.alert("Saved", accessKey.trim() ? "Picovoice key stored in the device keystore." : "Picovoice key cleared.");
-  }, [accessKey]);
+  const handleSaveWakeWord = useCallback(async () => {
+    await persist({ wakeWord });
+    Alert.alert("Saved", `Wake word set to "${wakeWord}".`);
+  }, [wakeWord, persist]);
 
   const handleDownload = useCallback(async (filename: string) => {
     const model = WHISPER_MODELS.find((m) => m.filename === filename);
@@ -181,26 +176,26 @@ export function AlwaysListenSettings() {
           thumbColor={enabled ? colors.background : colors.foreground} />
       </View>
 
-      {/* Picovoice access key */}
+      {/* Wake Word config */}
       <View className="bg-surface border border-border rounded-lg p-4 mb-3">
         <Text className="text-sm font-semibold text-foreground mb-1">
-          Picovoice access key {hasKey ? "✓" : ""}
+          Wake word
         </Text>
         <Text className="text-xs text-muted mb-2">
-          Free from console.picovoice.ai. Stored in the device keystore, never in plaintext.
+          The phrase to trigger voice capture (e.g., "omnecor", "computer").
         </Text>
         <TextInput
-          value={accessKey}
-          onChangeText={setAccessKey}
-          placeholder={hasKey ? "•••••••• (stored) — paste to replace" : "Paste access key"}
+          value={wakeWord}
+          onChangeText={setWakeWord}
+          placeholder="omnecor"
           placeholderTextColor={colors.muted}
           autoCapitalize="none"
-          secureTextEntry
+          autoCorrect={false}
           className="bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm mb-2"
         />
-        <Pressable onPress={handleSaveKey}
+        <Pressable onPress={handleSaveWakeWord}
           className="bg-primary rounded-lg p-2 items-center active:opacity-80">
-          <Text className="text-background font-semibold text-xs">Save key</Text>
+          <Text className="text-background font-semibold text-xs">Save wake word</Text>
         </Pressable>
       </View>
 

@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -209,6 +209,8 @@ type IntegrationType = typeof INTEGRATION_TYPES[number];
 export const integrationsRouter = router({
 
   /** Return all configured integration statuses (no raw tokens ever leave the server). */
+  // Pure local read — must stay protectedProcedure so sovereign-mode users can still
+  // view connection status (cloudProcedure would throw FORBIDDEN here).
   getIntegrations: protectedProcedure.query(({ ctx }) => {
     if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
     const store = readStore();
@@ -225,7 +227,7 @@ export const integrationsRouter = router({
   }),
 
   /** Validate a token against the live service then store it encrypted. */
-  connect: protectedProcedure
+  connect: cloudProcedure
     .input(z.object({
       type: z.enum(INTEGRATION_TYPES),
       token: z.string().min(1).max(512),
@@ -314,7 +316,7 @@ export const integrationsRouter = router({
     ),
 
   /** Re-fetch live data from the connected service. */
-  sync: protectedProcedure
+  sync: cloudProcedure
     .input(z.object({ type: z.enum(INTEGRATION_TYPES) }))
     .mutation(({ input, ctx }) =>
       withLock(async () => {
@@ -460,7 +462,7 @@ export const integrationsRouter = router({
     ),
 
   /** Persist per-integration settings (non-sensitive config). */
-  updateSettings: protectedProcedure
+  updateSettings: cloudProcedure
     .input(z.object({
       type: z.enum(INTEGRATION_TYPES),
       settings: z.record(z.string(), z.unknown()),

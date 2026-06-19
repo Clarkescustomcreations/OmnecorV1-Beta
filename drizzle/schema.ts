@@ -67,7 +67,11 @@ export type InsertIntegration = typeof integrations.$inferInsert;
  */
 export const chatSessions = sqliteTable("chat_sessions", {
   id: text("id").primaryKey(), // UUID
-  projectId: text("projectId").notNull(),
+  // Nullable: this column is added to an existing table via ALTER (migration
+  // 0003), and SQLite cannot ALTER-ADD a NOT NULL + FK column. New rows always
+  // set userId (chatRouter scopes by ctx.user.id); legacy rows are backfilled.
+  userId: integer("userId").references(() => users.id, { onDelete: "cascade" }),
+  projectId: text("projectId").notNull().default(""),
   title: text("title").notNull(),
   providerId: text("providerId").notNull(),
   modelId: text("modelId").notNull(),
@@ -268,6 +272,7 @@ export type InsertOAuthState = typeof oauthStates.$inferInsert;
  */
 export const discoveredArticles = sqliteTable("discoveredArticles", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: text("projectId").references(() => neuralMaps.id, { onDelete: "cascade" }),
   title: text("title"),
   url: text("url").unique(),
   urlHash: text("urlHash").unique(),
@@ -288,6 +293,7 @@ export type InsertDiscoveredArticle = typeof discoveredArticles.$inferInsert;
  */
 export const curatedPosts = sqliteTable("curatedPosts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: text("projectId").references(() => neuralMaps.id, { onDelete: "cascade" }),
   articleId: integer("articleId"),
   platform: text("platform").notNull(),
   content: text("content"),
@@ -306,6 +312,7 @@ export type InsertCuratedPost = typeof curatedPosts.$inferInsert;
  */
 export const scheduledPosts = sqliteTable("scheduledPosts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: text("projectId").references(() => neuralMaps.id, { onDelete: "cascade" }),
   curatedPostId: integer("curatedPostId").notNull(),
   platformAccountId: integer("platformAccountId").notNull(),
   scheduledAt: integer("scheduledAt", { mode: "timestamp" }),
@@ -560,6 +567,60 @@ export const savedScripts = sqliteTable(
 export type SavedScriptRow = typeof savedScripts.$inferSelect;
 export type InsertSavedScript = typeof savedScripts.$inferInsert;
 
+/**
+ * Virtual Cards issued via Lithic.
+ */
+export const virtualCards = sqliteTable(
+  "virtual_cards",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    projectId: text("projectId").references(() => neuralMaps.id, { onDelete: "cascade" }),
+    token: text("token").unique().notNull(),
+    memo: text("memo").notNull(),
+    lastFour: text("lastFour").notNull(),
+    expMonth: integer("expMonth").notNull(),
+    expYear: integer("expYear").notNull(),
+    encryptedCredentials: text("encryptedCredentials").notNull(),
+    ivHex: text("ivHex").notNull(),
+    authTagHex: text("authTagHex").notNull(),
+    spendLimitCents: integer("spendLimitCents").notNull(),
+    status: text("status").notNull().default("OPEN"),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+    updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+  },
+  (t) => [
+    index("virtual_cards_user_id_idx").on(t.userId),
+    index("virtual_cards_project_id_idx").on(t.projectId),
+  ]
+);
+
+export type VirtualCard = typeof virtualCards.$inferSelect;
+export type InsertVirtualCard = typeof virtualCards.$inferInsert;
+
+/**
+ * Persisted Agent Messenger Messages.
+ */
+export const messengerMessages = sqliteTable(
+  "messenger_messages",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    personaId: text("personaId").notNull(),
+    sender: text("sender").notNull(), // "user" | "agent"
+    content: text("content").notNull(),
+    // Read-state for unread badges; persisted so counts survive restarts.
+    read: integer("read", { mode: "boolean" }).notNull().default(false),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  },
+  (t) => [
+    index("messenger_messages_user_persona_idx").on(t.userId, t.personaId),
+  ]
+);
+
+export type MessengerMessage = typeof messengerMessages.$inferSelect;
+export type InsertMessengerMessage = typeof messengerMessages.$inferInsert;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Relational definitions (Drizzle relational query API)
 // ─────────────────────────────────────────────────────────────────────────────
@@ -578,6 +639,8 @@ export const usersRelations = relations(users, ({ many }) => ({
   aiDesignReviews: many(aiDesignReviews),
   pipelines: many(pipelines),
   oauthStates: many(oauthStates),
+  virtualCards: many(virtualCards),
+  messengerMessages: many(messengerMessages),
 }));
 
 export const chatSessionsRelations = relations(chatSessions, ({ many }) => ({
@@ -629,8 +692,12 @@ export const oauthStatesRelations = relations(oauthStates, ({ one }) => ({
   }),
 }));
 
-export const discoveredArticlesRelations = relations(discoveredArticles, ({ many }) => ({
+export const discoveredArticlesRelations = relations(discoveredArticles, ({ many, one }) => ({
   curatedPosts: many(curatedPosts),
+  project: one(neuralMaps, {
+    fields: [discoveredArticles.projectId],
+    references: [neuralMaps.id],
+  }),
 }));
 
 export const curatedPostsRelations = relations(curatedPosts, ({ one, many }) => ({
@@ -639,6 +706,10 @@ export const curatedPostsRelations = relations(curatedPosts, ({ one, many }) => 
     references: [discoveredArticles.id],
   }),
   scheduledPosts: many(scheduledPosts),
+  project: one(neuralMaps, {
+    fields: [curatedPosts.projectId],
+    references: [neuralMaps.id],
+  }),
 }));
 
 export const scheduledPostsRelations = relations(scheduledPosts, ({ one, many }) => ({
@@ -651,6 +722,10 @@ export const scheduledPostsRelations = relations(scheduledPosts, ({ one, many })
     references: [platformAccounts.id],
   }),
   analytics: many(postAnalytics),
+  project: one(neuralMaps, {
+    fields: [scheduledPosts.projectId],
+    references: [neuralMaps.id],
+  }),
 }));
 
 export const postAnalyticsRelations = relations(postAnalytics, ({ one }) => ({
@@ -731,11 +806,15 @@ export const componentLibraryItemsRelations = relations(componentLibraryItems, (
   }),
 }));
 
-export const neuralMapsRelations = relations(neuralMaps, ({ one }) => ({
+export const neuralMapsRelations = relations(neuralMaps, ({ one, many }) => ({
   user: one(users, {
     fields: [neuralMaps.userId],
     references: [users.id],
   }),
+  discoveredArticles: many(discoveredArticles),
+  curatedPosts: many(curatedPosts),
+  scheduledPosts: many(scheduledPosts),
+  virtualCards: many(virtualCards),
 }));
 
 export const personasRelations = relations(personas, ({ one }) => ({
@@ -744,3 +823,22 @@ export const personasRelations = relations(personas, ({ one }) => ({
     references: [users.id],
   }),
 }));
+
+export const virtualCardsRelations = relations(virtualCards, ({ one }) => ({
+  user: one(users, {
+    fields: [virtualCards.userId],
+    references: [users.id],
+  }),
+  project: one(neuralMaps, {
+    fields: [virtualCards.projectId],
+    references: [neuralMaps.id],
+  }),
+}));
+
+export const messengerMessagesRelations = relations(messengerMessages, ({ one }) => ({
+  user: one(users, {
+    fields: [messengerMessages.userId],
+    references: [users.id],
+  }),
+}));
+

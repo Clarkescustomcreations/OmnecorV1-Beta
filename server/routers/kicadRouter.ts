@@ -11,6 +11,7 @@ import { TRPCError } from "@trpc/server";
 import { PCBWayService } from "../phase2/services/PCBWayService.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { validatePath } from "../_core/security.js";
 import os from "os";
 import path from "path";
 import { spawn } from "child_process";
@@ -65,10 +66,11 @@ export const kicadRouter = router({
     .input(z.object({ filePath: z.string().optional() }))
     .mutation(async ({ input }) => {
       const kicadBin = process.env.KICAD_BIN || "kicad";
-      const args: string[] = input.filePath ? [input.filePath] : [];
+      const validatedPath = input.filePath ? await validatePath(input.filePath) : undefined;
+      const args: string[] = validatedPath ? [validatedPath] : [];
 
-      if (input.filePath) {
-        const ext = path.extname(input.filePath).toLowerCase();
+      if (validatedPath) {
+        const ext = path.extname(validatedPath).toLowerCase();
         const allowed = [".kicad_pro", ".kicad_pcb", ".kicad_sch"];
         if (!allowed.includes(ext)) {
           throw new TRPCError({
@@ -91,7 +93,7 @@ export const kicadRouter = router({
         });
       }
 
-      return { success: true, pid: proc.pid, file: input.filePath ?? null };
+      return { success: true, pid: proc.pid, file: validatedPath ?? null };
     }),
 
   /** Export schematic to PDF/SVG/DXF */
@@ -99,7 +101,13 @@ export const kicadRouter = router({
     .input(kicadSchematicExportSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.services.kicad.exportSchematic(input);
+        const validatedInput = await validatePath(input.inputFile);
+        const validatedOutput = await validatePath(input.outputDir);
+        return await ctx.services.kicad.exportSchematic({
+          ...input,
+          inputFile: validatedInput,
+          outputDir: validatedOutput,
+        });
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -113,7 +121,13 @@ export const kicadRouter = router({
     .input(kicadGerberExportSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.services.kicad.exportGerbers(input);
+        const validatedInput = await validatePath(input.inputFile);
+        const validatedOutput = await validatePath(input.outputDir);
+        return await ctx.services.kicad.exportGerbers({
+          ...input,
+          inputFile: validatedInput,
+          outputDir: validatedOutput,
+        });
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -127,7 +141,8 @@ export const kicadRouter = router({
     .input(kicadDRCSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.services.kicad.runDRC(input.pcbPath);
+        const validatedPcb = await validatePath(input.pcbPath);
+        return await ctx.services.kicad.runDRC(validatedPcb);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -141,7 +156,8 @@ export const kicadRouter = router({
     .input(kicadERCSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.services.kicad.runERC(input.schematicPath);
+        const validatedSchematic = await validatePath(input.schematicPath);
+        return await ctx.services.kicad.runERC(validatedSchematic);
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -160,7 +176,12 @@ export const kicadRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.services.kicad.exportSTEP(input);
+        const validatedInput = await validatePath(input.inputFile);
+        const validatedOutput = await validatePath(input.outputFile);
+        return await ctx.services.kicad.exportSTEP({
+          inputFile: validatedInput,
+          outputFile: validatedOutput,
+        });
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -174,7 +195,13 @@ export const kicadRouter = router({
     .input(kicadBOMSchema)
     .mutation(async ({ ctx, input }) => {
       try {
-        return await ctx.services.kicad.generateBOM(input);
+        const validatedInput = await validatePath(input.inputFile);
+        const validatedOutput = await validatePath(input.outputFile);
+        return await ctx.services.kicad.generateBOM({
+          ...input,
+          inputFile: validatedInput,
+          outputFile: validatedOutput,
+        });
       } catch (error) {
         throw new TRPCError({
           code: "BAD_REQUEST",
@@ -197,13 +224,15 @@ export const kicadRouter = router({
   getQuote: protectedProcedure
     .input(z.object({ pcbPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
-      return PCBWayService.getInstance().getQuote(input.pcbPath);
+      const validatedPcb = await validatePath(input.pcbPath);
+      return PCBWayService.getInstance().getQuote(validatedPcb);
     }),
   exportForManufacturing: protectedProcedure
     .input(z.object({ pcbPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
+      const validatedPcb = await validatePath(input.pcbPath);
       const gerberDir = path.join(os.tmpdir(), "omnecor_gerbers");
-      return ctx.services.kicad.exportGerbers({ inputFile: input.pcbPath, outputDir: gerberDir });
+      return ctx.services.kicad.exportGerbers({ inputFile: validatedPcb, outputDir: gerberDir });
     }),
   placeOrder: protectedProcedure
     .input(z.object({

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Brain, Grid3x3, List, Settings, Shield, Maximize2, Anchor, ExternalLink, PanelRightClose, PanelRightOpen, Palette, Layers, Activity, Filter, Zap, X as XIcon, Pencil, Lock, LockOpen, Map, MessageSquare, FolderOpen } from "lucide-react";
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import NeuralGraphView, { BrainMapViewport } from "@/components/neural/NeuralGraphView";
 import NeuralTreeView from "@/components/neural/NeuralTreeView";
 import MapManager from "@/components/neural/MapManager";
@@ -22,6 +22,7 @@ import { generateOmnecorProjectMock } from "@/lib/demoProject";
 import { convertFileSystemToNeuralNetwork, buildMasterNetwork, type NeuralNetwork, type NeuralNode } from "@/lib/neuralNodeTree";
 import { NeuralMapProvider, useNeuralMap } from "@/contexts/NeuralMapContext";
 import { FictionModeProvider, useFictionMode } from "@/contexts/FictionModeContext";
+import type { FictionState } from "@/types/fiction";
 import { useUserPeerCard } from "@/lib/userPeerCard";
 import { useNeuralContextStore, makeEntry, NEURAL_DRAG_KEY } from "@/lib/neuralContextStore";
 import { IS_DEMO } from "@/lib/demo";
@@ -86,6 +87,40 @@ function NeuralMapToolbar() {
   } = useVisualControlStore();
   const { nodes: brainNodes, projectId: brainProjectId } = useBrainMapStore();
 
+  // ── Layout prefs DB sync ──────────────────────────────────────────────────
+  const { activeMap, updateMap } = useNeuralMap();
+  const layoutSaveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastRestoredMapIdRef = useRef<string | null>(null);
+
+  // Restore layout prefs when switching maps
+  useEffect(() => {
+    if (!activeMap || lastRestoredMapIdRef.current === activeMap.id) return;
+    lastRestoredMapIdRef.current = activeMap.id;
+    const prefs = activeMap.settings.layoutPrefs;
+    if (!prefs) return;
+    if (prefs.layout) setLayout(prefs.layout as Parameters<typeof setLayout>[0]);
+    if (prefs.nodeSize !== undefined) setNodeSize(prefs.nodeSize);
+    if (prefs.simSpeed !== undefined) setSimSpeed(prefs.simSpeed);
+    if (prefs.gpuEnabled !== undefined) setGpuEnabled(prefs.gpuEnabled);
+    if (prefs.autoClustering !== undefined) setAutoClustering(prefs.autoClustering);
+  }, [activeMap, setLayout, setNodeSize, setSimSpeed, setGpuEnabled, setAutoClustering]);
+
+  // Debounced save of current layout prefs to DB (1 second after last change)
+  const saveLayoutPrefsRef = useRef<() => void>(() => {});
+  saveLayoutPrefsRef.current = () => {
+    if (!activeMap) return;
+    updateMap(activeMap.id, {
+      settings: {
+        ...activeMap.settings,
+        layoutPrefs: { layout, nodeSize, simSpeed, gpuEnabled, autoClustering },
+      },
+    });
+  };
+  const scheduleLayoutSave = useCallback(() => {
+    if (layoutSaveTimerRef.current) clearTimeout(layoutSaveTimerRef.current);
+    layoutSaveTimerRef.current = setTimeout(() => saveLayoutPrefsRef.current(), 1000);
+  }, []);
+
   const lockKey = `${brainProjectId}:${layout}`;
   const locked = isLayoutLocked(lockKey);
 
@@ -143,7 +178,7 @@ function NeuralMapToolbar() {
               <Layers className="w-3 h-3" /> Layout Engine
             </Label>
             <div className="flex gap-1.5">
-              <Select value={layout} onValueChange={(v) => setLayout(v as typeof layout)}>
+              <Select value={layout} onValueChange={(v) => { setLayout(v as typeof layout); scheduleLayoutSave(); }}>
                 <SelectTrigger className="h-8 text-xs flex-1">
                   <SelectValue />
                 </SelectTrigger>
@@ -198,7 +233,7 @@ function NeuralMapToolbar() {
               </div>
               <Slider
                 value={[nodeSize]}
-                onValueChange={([v]) => setNodeSize(v)}
+                onValueChange={([v]) => { setNodeSize(v); scheduleLayoutSave(); }}
                 min={20}
                 max={50}
                 step={1}
@@ -206,7 +241,7 @@ function NeuralMapToolbar() {
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-[10px] text-muted-foreground">GPU Acceleration</Label>
-              <Switch checked={gpuEnabled} onCheckedChange={setGpuEnabled} />
+              <Switch checked={gpuEnabled} onCheckedChange={(v) => { setGpuEnabled(v); scheduleLayoutSave(); }} />
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-[10px] text-muted-foreground flex items-center gap-1.5">
@@ -234,7 +269,7 @@ function NeuralMapToolbar() {
               </div>
               <Slider
                 value={[simSpeed]}
-                onValueChange={([v]) => setSimSpeed(v)}
+                onValueChange={([v]) => { setSimSpeed(v); scheduleLayoutSave(); }}
                 min={0.1}
                 max={3}
                 step={0.1}
@@ -249,7 +284,7 @@ function NeuralMapToolbar() {
             </Label>
             <div className="flex items-center justify-between">
               <Label className="text-[10px] text-muted-foreground">Auto-Clustering</Label>
-              <Switch checked={autoClustering} onCheckedChange={setAutoClustering} />
+              <Switch checked={autoClustering} onCheckedChange={(v) => { setAutoClustering(v); scheduleLayoutSave(); }} />
             </div>
           </div>
         </div>
@@ -269,6 +304,40 @@ function BrainMapContent() {
   const { setFictionMode, isFictionMode } = useFictionMode();
   const [masterView, setMasterView] = useState(false);
   const { card: userCard } = useUserPeerCard();
+
+  const collapsedFolderIds = useBrainMapStore(s => s.collapsedFolderIds);
+  const setCollapsedFolderIds = useBrainMapStore(s => s.setCollapsedFolderIds);
+
+  // Sync collapsedFolderIds FROM activeMap TO useBrainMapStore on mount/project switch
+  const lastActiveMapIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (activeMap) {
+      if (lastActiveMapIdRef.current !== activeMap.id) {
+        lastActiveMapIdRef.current = activeMap.id;
+        const dbCollapsed = activeMap.settings.collapsedFolderIds || [];
+        setCollapsedFolderIds(dbCollapsed);
+      }
+    } else {
+      lastActiveMapIdRef.current = null;
+    }
+  }, [activeMap, setCollapsedFolderIds]);
+
+  // Sync collapsedFolderIds FROM useBrainMapStore TO database settings
+  useEffect(() => {
+    if (!activeMap) return;
+    const dbCollapsed = activeMap.settings.collapsedFolderIds || [];
+    const isSame = dbCollapsed.length === collapsedFolderIds.length &&
+      dbCollapsed.every(id => collapsedFolderIds.includes(id));
+    
+    if (!isSame && lastActiveMapIdRef.current === activeMap.id) {
+      updateMap(activeMap.id, {
+        settings: {
+          ...activeMap.settings,
+          collapsedFolderIds,
+        }
+      });
+    }
+  }, [collapsedFolderIds, activeMap, updateMap]);
 
   // Local edit state for project peer card (synced to map on change)
   const [projectCardEditing, setProjectCardEditing] = useState(false);
@@ -1108,9 +1177,21 @@ export default function BrainMap() {
  * Wrapper to access NeuralMapContext for FictionModeProvider
  */
 function NeuralMapWrapper() {
-  const { activeMapId } = useNeuralMap();
+  const { activeMapId, activeMap, updateMap } = useNeuralMap();
+
+  const handleFictionStateChange = useCallback((mapId: string, state: FictionState) => {
+    if (!activeMap || activeMap.id !== mapId) return;
+    updateMap(mapId, {
+      settings: { ...activeMap.settings, fictionState: state as unknown as Record<string, unknown> },
+    });
+  }, [activeMap, updateMap]);
+
   return (
-    <FictionModeProvider mapId={activeMapId || undefined}>
+    <FictionModeProvider
+      mapId={activeMapId || undefined}
+      dbFictionState={activeMap?.settings.fictionState as FictionState | undefined}
+      onFictionStateChange={handleFictionStateChange}
+    >
       <BrainMapContent />
     </FictionModeProvider>
   );

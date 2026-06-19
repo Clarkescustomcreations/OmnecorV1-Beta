@@ -12,9 +12,12 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { VirtualCardService, CardOperationError } from "../phase2/services/VirtualCardService.js";
+import { VirtualCardService, CardOperationError, type LithicTransaction } from "../phase2/services/VirtualCardService.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { createLogger } from "../_core/logger.js";
+import { getDb } from "../db.factory.js";
+import { virtualCards } from "../../drizzle/schema.js";
+import { eq, and } from "drizzle-orm";
 
 const log = createLogger("VirtualCard");
 
@@ -25,6 +28,7 @@ const RATE_LIMIT_MS = 60_000; // 1 card per 60 seconds per user
 const issueCardSchema = z.object({
   spendLimitDollars: z.number().min(1).max(1000),
   memo: z.string().max(100).optional(),
+  projectId: z.string().optional(),
 });
 
 export const virtualCardRouter = router({
@@ -32,6 +36,84 @@ export const virtualCardRouter = router({
   isConfigured: protectedProcedure.query(() => {
     return VirtualCardService.getInstance().isConfigured();
   }),
+
+  /** Get card metadata from local DB (no PAN — safe for display). */
+  getCard: protectedProcedure
+    .input(z.object({ cardToken: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      const db = await getDb();
+      const [row] = await db
+        .select()
+        .from(virtualCards)
+        .where(and(eq(virtualCards.token, input.cardToken), eq(virtualCards.userId, ctx.user.id)))
+        .limit(1);
+      if (!row) throw new TRPCError({ code: "NOT_FOUND", message: "Card not found" });
+      return {
+        token: row.token,
+        lastFour: row.lastFour,
+        expMonth: row.expMonth,
+        expYear: row.expYear,
+        status: row.status,
+        spendLimitCents: row.spendLimitCents,
+        memo: row.memo,
+      };
+    }),
+
+  /** Decrypt and return the full PAN for display (short-lived, never logged). */
+  revealCardPan: protectedProcedure
+    .input(z.object({ cardToken: z.string().min(1) }))
+    .mutation(async ({ input, ctx }) => {
+      const service = VirtualCardService.getInstance();
+      const pan = await service.revealPan(input.cardToken, ctx.user.id);
+      if (!pan) throw new TRPCError({ code: "NOT_FOUND", message: "Card not found or provider not configured" });
+      return { pan };
+    }),
+
+  /** List the 25 most-recent transactions for a card via the Lithic API. */
+  listTransactions: protectedProcedure
+    .input(z.object({ cardToken: z.string().min(1) }))
+    .query(async ({ input, ctx }) => {
+      const service = VirtualCardService.getInstance();
+      const transactions: LithicTransaction[] = await service.listTransactions(input.cardToken, ctx.user.id);
+      return transactions;
+    }),
+
+  /** List issued virtual cards for the user. */
+  listCards: protectedProcedure
+    .input(z.object({ projectId: z.string().optional() }))
+    .query(async ({ input, ctx }) => {
+      const db = await getDb();
+      // Never return encryptedCredentials / ivHex / authTagHex — the encrypted
+      // PAN blob must never leave the server. Project safe columns only.
+      const safeColumns = {
+        id: virtualCards.id,
+        token: virtualCards.token,
+        projectId: virtualCards.projectId,
+        memo: virtualCards.memo,
+        lastFour: virtualCards.lastFour,
+        expMonth: virtualCards.expMonth,
+        expYear: virtualCards.expYear,
+        spendLimitCents: virtualCards.spendLimitCents,
+        status: virtualCards.status,
+        createdAt: virtualCards.createdAt,
+        updatedAt: virtualCards.updatedAt,
+      } as const;
+      if (input.projectId) {
+        return db
+          .select(safeColumns)
+          .from(virtualCards)
+          .where(
+            and(
+              eq(virtualCards.userId, ctx.user.id),
+              eq(virtualCards.projectId, input.projectId)
+            )
+          );
+      }
+      return db
+        .select(safeColumns)
+        .from(virtualCards)
+        .where(eq(virtualCards.userId, ctx.user.id));
+    }),
 
   /** Issue a virtual card. Rate-limited to 1/60s per user. Requires LITHIC_API_KEY. */
   issueCard: protectedProcedure
@@ -102,6 +184,7 @@ export const virtualCardRouter = router({
           spendLimitCents,
           memo: input.memo,
           userId: String(userId),
+          projectId: input.projectId,
         });
       } catch (err) {
         // CardOperationError carries only a safe, redacted message (the raw

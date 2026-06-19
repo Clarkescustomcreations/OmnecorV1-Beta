@@ -16,7 +16,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
+import { router, publicProcedure, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import fs from "fs/promises";
@@ -283,7 +283,7 @@ export const trainingRouter = router({
     }),
 
   /** Return Kaggle connection status (username only, never the API key). */
-  kaggleStatus: protectedProcedure.query(async () => {
+  kaggleStatus: cloudProcedure.query(async () => {
     try {
       const data = JSON.parse(
         await fs.readFile(path.join(os.homedir(), ".kaggle", "kaggle.json"), "utf-8")
@@ -299,7 +299,7 @@ export const trainingRouter = router({
    * Upload dataset to Kaggle and push the training kernel.
    * Returns immediately — training runs in the cloud (~30–120 min).
    */
-  startKaggleTraining: protectedProcedure
+  startKaggleTraining: cloudProcedure
     .input(z.object({
       datasetPath: z.string().min(1).default("data/valet"),
       modelName: z.string().optional(),

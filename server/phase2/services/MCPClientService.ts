@@ -2,6 +2,7 @@ import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js";
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { ENV } from "../../_core/env.js";
+import path from "path";
 
 export interface MCPServerConfig {
   id: string;
@@ -56,6 +57,11 @@ export class MCPClientService {
     let transport;
     if (config.transport === "stdio") {
       if (!config.command) throw new Error(`stdio transport requires a command for server "${config.id}"`);
+      const baseCmd = path.basename(config.command).replace(/\.exe$/i, "");
+      const whitelist = ["node", "npx", "python", "python3"];
+      if (!whitelist.includes(baseCmd)) {
+        throw new Error(`Forbidden MCP stdio command: "${config.command}". Whitelisted commands are: node, npx, python, python3`);
+      }
       transport = new StdioClientTransport({ command: config.command, args: config.args ?? [] });
     } else {
       if (!config.url) throw new Error(`websocket transport requires a url for server "${config.id}"`);

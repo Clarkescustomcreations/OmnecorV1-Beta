@@ -896,7 +896,7 @@ Pure wrapper — all interactions delegated to IntegrationsHub and MCPToolDirect
 
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
-| AI Script Gen Button | button | handleGenerateScript | trpc.ai.chat.mutate | CONNECTED |
+| AI Script Gen Button | button | handleGenerateScript | trpc.podcast.generateScript.mutate | CONNECTED |
 | Generate Button | button | handleGenerate | trpc.podcast.generate.mutate | CONNECTED |
 | Search Discovery Input | input | setSearchQuery | None | LOCAL |
 | Search Discovery Button | button | handleSearchOnline | trpc.discovery.fetchArticles.mutate | CONNECTED |
@@ -2632,3 +2632,31 @@ Last updated: 2026-06-17 (Session 19)
 - Dragging state (`isDragging`) replaces the hover classes — do not nest dragging styles inside hover pseudoclasses or they will conflict.
 - Symbol SVGs are inline strings from `componentLibrary.ts` — use `dangerouslySetInnerHTML` with known-safe static library content only. Never pass user-supplied SVG here.
 - Tag display is capped at 2 (`tags.slice(0, 2)`) to keep card height consistent. Full tag list lives in the component's `properties` or `tags` array for AI reference use.
+
+### MeshTopologyGraph
+
+File: `client/src/components/mesh/MeshTopologyGraph.tsx`
+Last updated: 2026-06-18
+
+| Property | Class / Value |
+|---|---|
+| Outer container | `w-full rounded-lg border border-border overflow-hidden` |
+| Background | `#0e0f14` (inline `style` — canvas bg requires direct value; matches `background` token) |
+| Height | `320px` (fixed, inline `style`) |
+| Node — local/self fill | `#1d4ed8` (primary blue, UI-Tokens §5.1) |
+| Node — trusted peer fill | `#16a34a` (success green, UI-Tokens §5.1) |
+| Node — pending peer fill | `#dc2626` (destructive red, UI-Tokens §5.1) |
+| Node — self glow ring | `#1d4ed8` + `33` alpha suffix (canvas circle, r+5) |
+| Node label text | `#f8f9fa` (foreground, canvas `fillStyle`) |
+| Node label font | `max(9/globalScale, 2.5)px sans-serif` (scales with zoom) |
+| Edge — trusted | `#3b82f6` solid, width 1.5px |
+| Edge — pending | `#6b7280` dashed `[4, 4]`, width 1.5px |
+| Hit-test radius | 12px (nodePointerAreaPaint circle) |
+
+**Pattern notes:**
+- Direct hex values in canvas callbacks are an explicit project exception (same policy as ThreeViewer, SchematicEditor, EnhancedPCBEditor) — canvas `CanvasRenderingContext2D` cannot read CSS custom properties. Values must stay in sync with `UI-Tokens.md §5.1`.
+- `nodeCanvasObjectMode = "replace"` disables the default force-graph circle so only the custom renderer draws. Always pair with `nodePointerAreaPaint` — without it, hover/click detection breaks because the painted hit area defaults to zero.
+- Width is driven by `ResizeObserver` on a `<div ref={containerRef}>` wrapper; `width` state starts at 0 and the graph renders only when `width > 0`. This prevents a flash of the wrong size on mount.
+- `warmupTicks={50}` + `cooldownTime={3000}` — runs 50 d3 simulation ticks before first paint, then allows the layout to settle for 3 s. Prevents nodes from spawning on top of each other on small meshes.
+- Node identity (`id`) uses `peer.name || peer.id || peer.address` priority order — `name` is the Bonjour service name (= nodeId) and is the most stable identifier; `id` and `address` are fallbacks.
+- Legend dots in the parent panel (`AgentNetworking.tsx`) use inline `style={{ background: "#..." }}` rather than Tailwind color utility classes, matching the same hex values above. This avoids the raw-color-class violation while keeping the legend in sync with the graph.

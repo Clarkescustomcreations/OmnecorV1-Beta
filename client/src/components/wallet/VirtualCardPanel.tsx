@@ -12,13 +12,13 @@ import {
   CreditCard,
   Plus,
   ShieldCheck,
-  AlertCircle,
   Loader2,
   Lock,
   Eye,
   EyeOff,
   Copy,
-  Activity
+  Activity,
+  RefreshCw,
 } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
@@ -30,31 +30,71 @@ import { useLocation } from "wouter";
 export default function VirtualCardPanel() {
   const [, setLocation] = useLocation();
   const [showSensitive, setShowSensitive] = useState(false);
-  const [isIssuing, setIsArchiving] = useState(false);
+  const [revealedPan, setRevealedPan] = useState<string | null>(null);
+  const [isIssuing, setIsIssuing] = useState(false);
   const [limit, setLimit] = useState(50);
   const [memo, setMemo] = useState("AI Cloud Compute");
-  const DEMO_CARD_NUMBER = "4242 8888 1234 5678";
 
   const { data: isConfigured } = trpc.virtualCard.isConfigured.useQuery();
+  const { data: cards = [], refetch: refetchCards } = trpc.virtualCard.listCards.useQuery(
+    { projectId: undefined },
+    { enabled: isConfigured === true }
+  );
+
+  // Use the most recently issued card
+  const activeCard = cards[cards.length - 1] ?? null;
+
+  const { data: transactions = [], isFetching: loadingTx, refetch: refetchTx } = trpc.virtualCard.listTransactions.useQuery(
+    { cardToken: activeCard?.token ?? "" },
+    { enabled: !!activeCard?.token }
+  );
+
+  const revealPanMutation = trpc.virtualCard.revealCardPan.useMutation({
+    onSuccess: (data) => {
+      setRevealedPan(data.pan);
+      setShowSensitive(true);
+    },
+    onError: (e) => toast.error("Could not reveal card: " + e.message),
+  });
 
   const issueMutation = trpc.virtualCard.issueCard.useMutation({
     onSuccess: (data) => {
-      setIsArchiving(false);
+      setIsIssuing(false);
       if (data.card) {
         toast.success("Virtual card issued successfully");
+        refetchCards();
       } else {
         toast.info(data.message);
       }
     },
     onError: (e) => {
-      setIsArchiving(false);
+      setIsIssuing(false);
       toast.error(`Issuance failed: ${e.message}`);
-    }
+    },
   });
 
   const handleIssue = () => {
-    setIsArchiving(true);
+    setIsIssuing(true);
     issueMutation.mutate({ spendLimitDollars: limit, memo });
+  };
+
+  const handleReveal = () => {
+    if (!activeCard) return;
+    if (revealedPan) {
+      setShowSensitive(s => !s);
+    } else {
+      revealPanMutation.mutate({ cardToken: activeCard.token });
+    }
+  };
+
+  const handleCopyPan = () => {
+    if (!revealedPan) {
+      toast.info("Reveal the card number first");
+      return;
+    }
+    navigator.clipboard.writeText(revealedPan)
+      .then(() => toast.success("Card number copied"))
+      .catch(() => toast.error("Copy failed"));
   };
 
   if (isConfigured === false) {
@@ -70,68 +110,90 @@ export default function VirtualCardPanel() {
               Virtual card issuance requires a Lithic account. Add your API key to settings to enable this feature.
             </p>
           </div>
-                          <Button variant="outline" size="sm" onClick={() => setLocation("/settings?tab=api")}>Configure Lithic</Button>
+          <Button variant="outline" size="sm" onClick={() => setLocation("/settings?tab=api")}>Configure Lithic</Button>
         </CardContent>
       </Card>
     );
   }
 
+  const formattedPan = revealedPan && showSensitive
+    ? revealedPan.replace(/(\d{4})/g, "$1 ").trim()
+    : "•••• •••• •••• " + (activeCard?.lastFour ?? "????");
+
+  const formattedExpiry = activeCard
+    ? (showSensitive && revealedPan
+        ? `${String(activeCard.expMonth).padStart(2, "0")}/${String(activeCard.expYear).slice(-2)}`
+        : "••/••")
+    : null;
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {/* Existing Card Display */}
+        {/* Card Display */}
         <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800 text-white relative overflow-hidden group">
           <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 blur-3xl -mr-16 -mt-16 group-hover:bg-accent/20 transition-colors" />
           <CardHeader className="pb-8">
             <div className="flex justify-between items-start">
               <CreditCard className="w-8 h-8 text-accent" />
               <div className="flex flex-col items-end">
-                <Badge variant="outline" className="text-[10px] h-5 border-emerald-500/30 text-emerald-400 bg-emerald-500/5">Active</Badge>
-                <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold tracking-tighter">Single Use</p>
+                {activeCard ? (
+                  <>
+                    <Badge variant="outline" className={cn("text-[10px] h-5", activeCard.status === "OPEN" ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/5" : "border-amber-500/30 text-amber-400 bg-amber-500/5")}>
+                      {activeCard.status}
+                    </Badge>
+                    <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold tracking-tighter">Single Use</p>
+                  </>
+                ) : (
+                  <Badge variant="outline" className="text-[10px] h-5 text-muted-foreground">No Card</Badge>
+                )}
               </div>
             </div>
           </CardHeader>
           <CardContent className="space-y-6">
-            <div className="space-y-1">
-              <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Card Number</p>
-              <div className="flex items-center gap-2">
-                <p className="font-mono text-lg tracking-[0.2em]">
-                  {showSensitive ? "4242 8888 1234 5678" : "•••• •••• •••• 5678"}
-                </p>
-                <Button size="icon" variant="ghost" className="h-6 w-6 text-slate-500 hover:text-white" onClick={() => setShowSensitive(!showSensitive)}>
-                  {showSensitive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                </Button>
-              </div>
-            </div>
+            {!activeCard ? (
+              <p className="text-sm text-slate-400 italic">No virtual card issued yet. Issue one using the form.</p>
+            ) : (
+              <>
+                <div className="space-y-1">
+                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Card Number</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-mono text-lg tracking-[0.2em]">{formattedPan}</p>
+                    <Button
+                      size="icon" variant="ghost"
+                      className="h-6 w-6 text-slate-500 hover:text-white"
+                      onClick={handleReveal}
+                      disabled={revealPanMutation.isPending}
+                    >
+                      {revealPanMutation.isPending
+                        ? <Loader2 className="w-3 h-3 animate-spin" />
+                        : showSensitive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                    </Button>
+                  </div>
+                </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Expiry</p>
-                <p className="font-mono text-sm">{showSensitive ? "08/28" : "••/••"}</p>
-              </div>
-              <div className="space-y-1">
-                <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">CVV</p>
-                <p className="font-mono text-sm">{showSensitive ? "123" : "•••"}</p>
-              </div>
-            </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Expiry</p>
+                    <p className="font-mono text-sm">{formattedExpiry}</p>
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Limit</p>
+                    <p className="font-mono text-sm">${((activeCard.spendLimitCents ?? 0) / 100).toFixed(2)}</p>
+                  </div>
+                </div>
 
-            <div className="pt-2 border-t border-slate-800 flex justify-between items-end">
-               <div>
-                 <p className="text-[10px] text-slate-500 uppercase font-bold">Limit Remaining</p>
-                 <p className="text-xl font-bold text-accent">$42.15 <span className="text-[10px] text-slate-600 font-normal">/ $50.00</span></p>
-               </div>
-                               <Button
-                  size="icon"
-                  variant="outline"
-                  className="h-8 w-8 border-slate-800 bg-slate-900/50 hover:bg-slate-800"
-                  onClick={() => {
-                    const num = showSensitive ? DEMO_CARD_NUMBER : DEMO_CARD_NUMBER.replace(/\d(?=.{4})/g, "•");
-                    navigator.clipboard.writeText(DEMO_CARD_NUMBER).then(() => toast.success("Card number copied")).catch(() => toast.error("Copy failed"));
-                  }}
-                >
-                 <Copy className="w-3.5 h-3.5" />
-               </Button>
-            </div>
+                <div className="pt-2 border-t border-slate-800 flex justify-end">
+                  <Button
+                    size="icon" variant="outline"
+                    className="h-8 w-8 border-slate-800 bg-slate-900/50 hover:bg-slate-800"
+                    onClick={handleCopyPan}
+                    title="Copy card number"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+              </>
+            )}
           </CardContent>
         </Card>
 
@@ -144,18 +206,18 @@ export default function VirtualCardPanel() {
           <CardContent className="space-y-4">
             <div className="space-y-2">
               <Label className="text-[10px] uppercase font-bold">Spend Limit ($)</Label>
-              <Input 
-                type="number" 
-                value={limit} 
-                onChange={(e) => setLimit(parseInt(e.target.value) || 0)} 
+              <Input
+                type="number"
+                value={limit}
+                onChange={(e) => setLimit(parseInt(e.target.value) || 0)}
                 className="h-9 text-sm"
               />
             </div>
             <div className="space-y-2">
               <Label className="text-[10px] uppercase font-bold">Purpose / Memo</Label>
-              <Input 
-                value={memo} 
-                onChange={(e) => setMemo(e.target.value)} 
+              <Input
+                value={memo}
+                onChange={(e) => setMemo(e.target.value)}
                 placeholder="e.g. AWS Credits"
                 className="h-9 text-sm"
               />
@@ -169,7 +231,7 @@ export default function VirtualCardPanel() {
                 New card issuance requires administrator approval via the local interface.
               </p>
             </div>
-            <Button 
+            <Button
               className="w-full gap-2 h-10 bg-accent text-accent-foreground"
               disabled={isIssuing}
               onClick={handleIssue}
@@ -181,42 +243,58 @@ export default function VirtualCardPanel() {
         </Card>
       </div>
 
-      {/* Transaction Log Integration */}
+      {/* Transaction Log */}
       <Card className="bg-card shadow-sm">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
               <Activity className="w-4 h-4 text-blue-500" /> Card Activity
             </CardTitle>
-                            <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setLocation("/wallet")}>View All</Button>
+            <div className="flex items-center gap-2">
+              {loadingTx && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
+              {activeCard && (
+                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => refetchTx()}>
+                  <RefreshCw className="w-3 h-3" /> Refresh
+                </Button>
+              )}
+              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setLocation("/wallet")}>
+                View All
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent className="p-0">
-          <div className="divide-y border-t">
-            {[
-              { id: 1, merchant: "AWS", amount: 12.45, date: "2026-06-05", status: "cleared" },
-              { id: 2, merchant: "PCBWay", amount: 35.00, date: "2026-06-04", status: "pending" },
-              { id: 3, merchant: "OpenAI", amount: 2.10, date: "2026-06-03", status: "cleared" },
-            ].map(tx => (
-              <div key={tx.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded bg-muted flex items-center justify-center font-bold text-xs uppercase tracking-tighter">
-                    {tx.merchant.charAt(0)}
+          {!activeCard ? (
+            <p className="text-xs text-muted-foreground italic p-4">Issue a virtual card to see transactions here.</p>
+          ) : transactions.length === 0 && !loadingTx ? (
+            <p className="text-xs text-muted-foreground italic p-4">No transactions yet on this card.</p>
+          ) : (
+            <div className="divide-y border-t">
+              {transactions.map(tx => (
+                <div key={tx.token} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
+                  <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded bg-muted flex items-center justify-center font-bold text-xs uppercase tracking-tighter">
+                      {(tx.merchantDescriptor || "?").charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-bold">{tx.merchantDescriptor || "Unknown"}</p>
+                      <p className="text-[10px] text-muted-foreground">{tx.created ? new Date(tx.created).toLocaleDateString() : "—"}</p>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm font-bold">{tx.merchant}</p>
-                    <p className="text-[10px] text-muted-foreground">{tx.date}</p>
+                  <div className="text-right">
+                    <p className="text-sm font-mono font-bold">${(tx.amount / 100).toFixed(2)}</p>
+                    <Badge variant="outline" className={cn("text-[9px] h-4 uppercase",
+                      tx.status === "SETTLED" ? "text-emerald-500 border-emerald-500/20"
+                      : tx.status === "PENDING" ? "text-amber-500 border-amber-500/20"
+                      : "text-muted-foreground border-muted"
+                    )}>
+                      {tx.status}
+                    </Badge>
                   </div>
                 </div>
-                <div className="text-right">
-                  <p className="text-sm font-mono font-bold">${tx.amount.toFixed(2)}</p>
-                  <Badge variant="outline" className={cn("text-[9px] h-4 uppercase", tx.status === 'cleared' ? "text-emerald-500 border-emerald-500/20" : "text-amber-500 border-amber-500/20")}>
-                    {tx.status}
-                  </Badge>
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

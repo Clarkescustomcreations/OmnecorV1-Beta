@@ -12,6 +12,7 @@
 import * as https from "https";
 import type { IncomingMessage, ServerResponse } from "http";
 import * as tls from "tls";
+import { createHmac, timingSafeEqual } from "crypto";
 import { securityManager } from "./SecurityManager.js";
 import type { MeshNode } from "./MeshNode.js";
 import { createLogger } from "../../_core/logger.js";
@@ -22,6 +23,12 @@ export const MESH_PORT = 3001;
 
 /** Reject oversized request bodies (a prompt should never approach this). */
 const MAX_BODY_BYTES = 8 * 1024 * 1024;
+
+/** Sync body size cap: 1 MB */
+const MAX_SYNC_BYTES = 1 * 1024 * 1024;
+
+/** Discourse body size cap: 64 KB */
+const MAX_DISCOURSE_BYTES = 64 * 1024;
 
 export class MeshServer {
   private server: https.Server | null = null;
@@ -83,6 +90,16 @@ export class MeshServer {
       return;
     }
 
+    if (req.method === "POST" && req.url === "/sync") {
+      await this.handleSync(req, res, peerCn);
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/discourse") {
+      await this.handleDiscourse(req, res, peerCn);
+      return;
+    }
+
     if (req.method !== "POST" || req.url !== "/inference") {
       this.sendJson(res, 404, { error: "not_found" });
       return;
@@ -114,14 +131,172 @@ export class MeshServer {
     this.sendJson(res, 200, result);
   }
 
+  /**
+   * Handle POST /sync — receive persona knowledge from a remote peer.
+   * Fail-closed: reject if cert or signature verification fails.
+   */
+  private async handleSync(req: IncomingMessage, res: ServerResponse, peerCn: string): Promise<void> {
+    const rawBody = await this.readBodyCapped(req, MAX_SYNC_BYTES);
+    if (rawBody === null) {
+      this.sendJson(res, 413, { error: "payload_too_large" });
+      return;
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      this.sendJson(res, 400, { error: "invalid_json" });
+      return;
+    }
+
+    if (typeof parsed.nodeId !== "string" || !parsed.nodeId) {
+      this.sendJson(res, 400, { error: "missing_nodeId" });
+      return;
+    }
+
+    // Replay-guard: timestamp must be present and within 5 minutes
+    const ts = typeof parsed.timestamp === "number" ? parsed.timestamp : NaN;
+    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 300_000) {
+      log.warn("Sync rejected: timestamp out of window", { from: peerCn, nodeId: parsed.nodeId });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    // Signature verification — fail-closed
+    if (typeof parsed.sig !== "string" || !parsed.sig) {
+      log.warn("Sync rejected: missing signature", { from: peerCn });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    const verified = this.verifyHmacSig(parsed, parsed.sig as string);
+    if (!verified) {
+      log.warn("Sync rejected: signature mismatch", { from: peerCn, nodeId: parsed.nodeId });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    const personasArr = Array.isArray(parsed.personas) ? parsed.personas : [];
+    log.info("Received peer sync", { from: peerCn, nodeId: parsed.nodeId, personaCount: personasArr.length });
+
+    // Delegate to the node — it holds the in-memory cache and emits the WS event
+    await this.node.receivePeerSync(parsed.nodeId as string, personasArr);
+
+    this.sendJson(res, 200, { ok: true });
+  }
+
+  /**
+   * Handle POST /discourse — receive an inter-agent message from a remote peer.
+   * Fail-closed: reject if cert or signature verification fails.
+   */
+  private async handleDiscourse(req: IncomingMessage, res: ServerResponse, peerCn: string): Promise<void> {
+    const rawBody = await this.readBodyCapped(req, MAX_DISCOURSE_BYTES);
+    if (rawBody === null) {
+      this.sendJson(res, 413, { error: "payload_too_large" });
+      return;
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      this.sendJson(res, 400, { error: "invalid_json" });
+      return;
+    }
+
+    // Validate required fields
+    if (
+      typeof parsed.fromNode !== "string" || !parsed.fromNode ||
+      typeof parsed.fromAgentId !== "string" || !parsed.fromAgentId ||
+      typeof parsed.toAgentId !== "string" || !parsed.toAgentId ||
+      typeof parsed.content !== "string" || !parsed.content
+    ) {
+      this.sendJson(res, 400, { error: "missing_fields" });
+      return;
+    }
+
+    // Replay-guard
+    const ts = typeof parsed.timestamp === "string" ? Date.parse(parsed.timestamp) : NaN;
+    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 300_000) {
+      log.warn("Discourse rejected: timestamp out of window", { from: peerCn });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    // Signature verification — fail-closed
+    if (typeof parsed.sig !== "string" || !parsed.sig) {
+      log.warn("Discourse rejected: missing signature", { from: peerCn });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    const verified = this.verifyHmacSig(parsed, parsed.sig as string);
+    if (!verified) {
+      log.warn("Discourse rejected: signature mismatch", { from: peerCn });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    log.info("Received peer discourse", {
+      from: peerCn,
+      fromNode: parsed.fromNode,
+      fromAgentId: parsed.fromAgentId,
+      toAgentId: parsed.toAgentId,
+    });
+
+    const result = await this.node.receiveDiscourse(
+      parsed.fromNode as string,
+      parsed.fromAgentId as string,
+      parsed.toAgentId as string,
+      parsed.content as string,
+    );
+
+    this.sendJson(res, 200, result);
+  }
+
+  /**
+   * Verify an HMAC-SHA256 signature over the canonical payload (all fields
+   * except `sig`) using OMMESH_SECRET. The sender signs the canonical JSON and
+   * appends `sig` to the envelope, so we reconstruct the same canonical string
+   * here before verifying. Fails closed if OMMESH_SECRET is not configured.
+   */
+  private verifyHmacSig(parsedBody: Record<string, unknown>, sig: string): boolean {
+    const secret = process.env.OMMESH_SECRET;
+    if (!secret) return false;
+    try {
+      // Reconstruct canonical payload — same field set the sender signed over
+      // (everything except the `sig` field, in the same key order).
+      const canonical: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(parsedBody)) {
+        if (k !== "sig") canonical[k] = v;
+      }
+      const canonicalStr = JSON.stringify(canonical);
+      const expected = createHmac("sha256", secret).update(canonicalStr).digest("hex");
+      const expectedBuf = Buffer.from(expected, "hex");
+      // Guard against non-hex sig values before timingSafeEqual
+      if (!/^[0-9a-fA-F]{64}$/.test(sig)) return false;
+      const sigBuf = Buffer.from(sig, "hex");
+      if (sigBuf.length !== expectedBuf.length) return false;
+      return timingSafeEqual(expectedBuf, sigBuf);
+    } catch {
+      return false;
+    }
+  }
+
   /** Read the request body, enforcing a hard size cap. Returns null if exceeded. */
   private readBody(req: IncomingMessage): Promise<string | null> {
+    return this.readBodyCapped(req, MAX_BODY_BYTES);
+  }
+
+  /** Read the request body with a caller-specified byte cap. Returns null if exceeded. */
+  private readBodyCapped(req: IncomingMessage, maxBytes: number): Promise<string | null> {
     return new Promise((resolve, reject) => {
       const chunks: Buffer[] = [];
       let total = 0;
       req.on("data", (chunk: Buffer) => {
         total += chunk.length;
-        if (total > MAX_BODY_BYTES) {
+        if (total > maxBytes) {
           req.destroy();
           resolve(null);
           return;

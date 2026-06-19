@@ -3,9 +3,20 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 // LITHIC_API_KEY must be present at import time so ENV.lithicApiKey is truthy.
 process.env.LITHIC_API_KEY = process.env.LITHIC_API_KEY || "test_lithic_key";
 
+vi.mock("../db.factory.js", () => {
+  return {
+    getDb: vi.fn().mockResolvedValue({
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockResolvedValue(true),
+      }),
+    }),
+  };
+});
+
 const { VirtualCardService, CardOperationError } = await import(
   "../phase2/services/VirtualCardService.js"
 );
+const { getDb } = await import("../db.factory.js");
 const { __resetCircuitBreakers } = await import("../_core/resilientFetch.js");
 
 function jsonResponse(obj: unknown, status = 200): Response {
@@ -32,7 +43,7 @@ describe("VirtualCardService.issueCard", () => {
     const svc = VirtualCardService.getInstance();
     let thrown: unknown;
     try {
-      await svc.issueCard({ spendLimitCents: 1000, userId: "u1" });
+      await svc.issueCard({ spendLimitCents: 1000, userId: "1" });
     } catch (err) {
       thrown = err;
     }
@@ -56,7 +67,7 @@ describe("VirtualCardService.issueCard", () => {
     );
 
     const svc = VirtualCardService.getInstance();
-    const result = await svc.issueCard({ spendLimitCents: 1000, userId: "u2" });
+    const result = await svc.issueCard({ spendLimitCents: 1000, userId: "2" });
     expect(result).not.toBeNull();
     expect(result!.last4).toBe("4242");
     expect(result!.encryptedPan).toBeTruthy();
@@ -68,7 +79,33 @@ describe("VirtualCardService.issueCard", () => {
     vi.spyOn(globalThis, "fetch").mockRejectedValue(new Error("ECONNRESET secret-host-internal"));
     const svc = VirtualCardService.getInstance();
     await expect(
-      svc.issueCard({ spendLimitCents: 500, userId: "u3" })
+      svc.issueCard({ spendLimitCents: 500, userId: "3" })
     ).rejects.toBeInstanceOf(CardOperationError);
+  });
+
+  it("closes the Lithic card when local persistence fails (no orphaned live card)", async () => {
+    // Card create succeeds at the provider, but the DB insert throws.
+    vi.mocked(getDb).mockResolvedValueOnce({
+      insert: vi.fn().mockReturnValue({
+        values: vi.fn().mockRejectedValue(new Error("db locked")),
+      }),
+    } as never);
+
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({ token: "card_orphan", pan: "4242424242424242", last_four: "4242" })
+    );
+
+    const svc = VirtualCardService.getInstance();
+    await expect(
+      svc.issueCard({ spendLimitCents: 1000, userId: "4" })
+    ).rejects.toBeInstanceOf(CardOperationError);
+
+    // A PATCH to /cards/card_orphan with state CLOSED must have been issued.
+    const closeCall = fetchSpy.mock.calls.find(([url, init]) =>
+      String(url).endsWith("/cards/card_orphan") &&
+      (init as RequestInit | undefined)?.method === "PATCH"
+    );
+    expect(closeCall).toBeTruthy();
+    expect(String((closeCall![1] as RequestInit).body)).toContain("CLOSED");
   });
 });

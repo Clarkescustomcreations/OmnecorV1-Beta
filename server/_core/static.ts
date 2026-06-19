@@ -59,6 +59,27 @@ export function serveStatic(app: Express) {
     // sendFile honours Range requests and sets the appropriate 206 headers.
     res.sendFile(candidate);
   });
+  app.get("/media/podcast/:jobId/segment/:index", (req, res) => {
+    const { jobId, index } = req.params;
+    if (!UUID_RE.test(jobId)) {
+      res.status(400).end();
+      return;
+    }
+    const idx = parseInt(index, 10);
+    if (isNaN(idx) || idx < 0) {
+      res.status(400).end();
+      return;
+    }
+    const dir = path.join(podcastsRoot, jobId);
+    const file = path.join(dir, `segment_${idx}.wav`);
+    if (!fs.existsSync(file)) {
+      res.status(404).end();
+      return;
+    }
+    res.setHeader("Content-Type", "audio/wav");
+    res.setHeader("Accept-Ranges", "bytes");
+    res.sendFile(file);
+  });
   // Serve user-uploaded attachments from the on-disk uploads directory.
   // Harden the response: prevent MIME sniffing (so an attacker-controlled file
   // can't be re-interpreted as HTML/JS) and force downloads as attachments so

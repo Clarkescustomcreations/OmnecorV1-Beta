@@ -1,33 +1,31 @@
 /**
  * Persistent configuration for Always-Listening voice mode.
  *
- * Mirrors `server-config.ts`: non-sensitive settings live in AsyncStorage with
- * an in-memory cache for synchronous reads; the Picovoice access key is a
- * credential and lives in the hardware KeyStore via SecureStore — never in
- * plaintext AsyncStorage (AGENTS.md mobile rule).
+ * All settings live in AsyncStorage with an in-memory cache for synchronous reads.
+ * Removed Picovoice keys as we run 100% locally on the NPU/GPU via Whisper.
  */
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import * as SecureStore from "expo-secure-store";
 
 const KEY_ENABLED      = "omnecor_listen_enabled";
 const KEY_PERSONA      = "omnecor_listen_persona";
 const KEY_SPEAK        = "omnecor_listen_speak";
 const KEY_SENSITIVITY  = "omnecor_listen_sensitivity";
 const KEY_STT_MODEL    = "omnecor_listen_stt_model";
-// Picovoice access key is a credential → KeyStore, not AsyncStorage.
-const KEY_PV_ACCESS    = "omnecor_picovoice_key";
+const KEY_WAKE_WORD    = "omnecor_listen_wake_word";
 
 export interface AlwaysListenConfig {
   /** Master toggle — whether the wake-word service should run. */
   enabled: boolean;
   /** Persona that answers voice intents (agentMessenger personaId, a string). */
   personaId: string;
-  /** Speak the agent reply aloud via expo-speech after each turn. */
+  /** Speak the agent reply aloud via expo-speech / streaming after each turn. */
   speakReplies: boolean;
-  /** Porcupine wake-word sensitivity, 0..1 (higher = more sensitive). */
+  /** Voice trigger sensitivity, 0..1 (higher = more sensitive / lower energy threshold). */
   sensitivity: number;
   /** Filename of the downloaded Whisper GGML model used for on-device STT. */
   sttModelFilename: string;
+  /** Wake word to listen for (defaults to "omnecor"). */
+  wakeWord: string;
 }
 
 // In-memory cache so callers (the orchestrator/service) can read synchronously
@@ -38,12 +36,12 @@ let _cfg: AlwaysListenConfig = {
   speakReplies: true,
   sensitivity: 0.5,
   sttModelFilename: "",
+  wakeWord: "omnecor",
 };
-let _accessKey = "";
 
 export async function loadListenConfig(): Promise<void> {
-  const [enabled, persona, speak, sens, model] = await AsyncStorage.multiGet([
-    KEY_ENABLED, KEY_PERSONA, KEY_SPEAK, KEY_SENSITIVITY, KEY_STT_MODEL,
+  const [enabled, persona, speak, sens, model, wakeWord] = await AsyncStorage.multiGet([
+    KEY_ENABLED, KEY_PERSONA, KEY_SPEAK, KEY_SENSITIVITY, KEY_STT_MODEL, KEY_WAKE_WORD,
   ]).then((pairs) => pairs.map(([, v]) => v));
 
   _cfg = {
@@ -52,14 +50,8 @@ export async function loadListenConfig(): Promise<void> {
     speakReplies: speak !== "false", // default on
     sensitivity: sens != null ? clamp01(parseFloat(sens)) : 0.5,
     sttModelFilename: model ?? "",
+    wakeWord: wakeWord ?? "omnecor",
   };
-
-  try {
-    _accessKey = (await SecureStore.getItemAsync(KEY_PV_ACCESS)) ?? "";
-  } catch (e) {
-    console.warn("[ListenConfig] SecureStore read failed:", e);
-    _accessKey = "";
-  }
 }
 
 function clamp01(n: number): number {
@@ -70,8 +62,6 @@ function clamp01(n: number): number {
 export function getListenConfig(): AlwaysListenConfig { return _cfg; }
 export function isListenEnabled(): boolean { return _cfg.enabled; }
 export function getListenPersonaId(): string { return _cfg.personaId; }
-export function getPicovoiceAccessKey(): string { return _accessKey; }
-export function hasPicovoiceAccessKey(): boolean { return _accessKey.length > 0; }
 
 /** Persist a partial config update; only provided fields change. */
 export async function saveListenConfig(
@@ -88,16 +78,6 @@ export async function saveListenConfig(
     [KEY_SPEAK,       String(_cfg.speakReplies)],
     [KEY_SENSITIVITY, String(_cfg.sensitivity)],
     [KEY_STT_MODEL,   _cfg.sttModelFilename],
+    [KEY_WAKE_WORD,   _cfg.wakeWord],
   ]);
-}
-
-/** Store (or clear, with "") the Picovoice access key in the KeyStore. */
-export async function savePicovoiceAccessKey(key: string): Promise<void> {
-  _accessKey = key.trim();
-  try {
-    if (_accessKey) await SecureStore.setItemAsync(KEY_PV_ACCESS, _accessKey);
-    else await SecureStore.deleteItemAsync(KEY_PV_ACCESS);
-  } catch (e) {
-    console.warn("[ListenConfig] SecureStore key write failed:", e);
-  }
 }

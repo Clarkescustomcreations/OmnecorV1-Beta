@@ -17,6 +17,8 @@ import { ENV } from "../../_core/env.js";
 import { createLogger } from "../../_core/logger.js";
 import { redactSensitive } from "../../_core/redaction.js";
 import { resilientFetch, CircuitOpenError } from "../../_core/resilientFetch.js";
+import { getDb } from "../../db.factory.js";
+import { virtualCards } from "../../../drizzle/schema.js";
 
 const log = createLogger("VirtualCardService");
 
@@ -55,10 +57,20 @@ export interface VirtualCardResult {
   createdAt: string;
 }
 
+export interface LithicTransaction {
+  token: string;
+  amount: number;
+  currency: string;
+  status: string;
+  merchantDescriptor: string;
+  created: string;
+}
+
 export interface IssueCardInput {
   spendLimitCents: number;
   memo?: string;
   userId: string;
+  projectId?: string | null;
 }
 
 export class VirtualCardService {
@@ -164,14 +176,45 @@ export class VirtualCardService {
     const last4 = card.last_four ?? (card.pan ? card.pan.slice(-4) : "****");
     // card.pan goes out of scope here; nothing downstream references it.
 
+    const token = card.token ?? uuidv4();
+
+    // Persist to SQLite
+    try {
+      const db = await getDb();
+      await db.insert(virtualCards).values({
+        userId: Number(input.userId),
+        projectId: input.projectId ?? null,
+        token,
+        memo: body.memo,
+        lastFour: last4,
+        expMonth: card.exp_month ?? 0,
+        expYear: card.exp_year ?? 0,
+        encryptedCredentials: encryptedData,
+        ivHex,
+        authTagHex,
+        spendLimitCents: input.spendLimitCents,
+        status: "OPEN",
+      });
+    } catch (dbErr) {
+      log.error("card.db.insert_failed", {
+        userId: input.userId,
+        error: (dbErr as Error).message,
+      });
+      // The card already exists and is spend-enabled at Lithic, but we failed to
+      // record it locally — it would be an unlistable/unrevocable orphan. Best-effort
+      // close it at the provider so no live card escapes our tracking.
+      await this.closeCardBestEffort(token, input.userId);
+      throw new CardOperationError("Failed to persist virtual card metadata.");
+    }
+
     log.info("card.issue.success", {
       userId: input.userId,
-      cardId: card.token ?? "(generated)",
+      cardId: token,
       last4,
     });
 
     return {
-      id: card.token ?? uuidv4(),
+      id: token,
       last4,
       expMonth: card.exp_month ?? 0,
       expYear: card.exp_year ?? 0,
@@ -181,6 +224,104 @@ export class VirtualCardService {
       provider: "lithic",
       createdAt: new Date().toISOString(),
     };
+  }
+
+  /**
+   * Best-effort close of a Lithic card (PATCH /v1/cards/{token} → state CLOSED).
+   * Used to roll back the provider side when local persistence fails, so a
+   * spend-enabled card never escapes our tracking. Never throws — a failed
+   * cleanup is logged for manual reconciliation, not surfaced to the caller.
+   */
+  private async closeCardBestEffort(token: string, userId: number | string): Promise<void> {
+    if (!ENV.lithicApiKey) return;
+    try {
+      const res = await resilientFetch(`${LITHIC_API_BASE}/cards/${encodeURIComponent(token)}`, {
+        method: "PATCH",
+        headers: {
+          "Authorization": ENV.lithicApiKey,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ state: "CLOSED" }),
+        circuitKey: "lithic",
+        timeoutMs: 20_000,
+        noRetry: process.env.NODE_ENV === "test",
+      });
+      if (res.ok) {
+        log.info("card.rollback.closed", { userId, cardId: token });
+      } else {
+        log.error("card.rollback.close_failed", { userId, cardId: token, status: res.status });
+      }
+    } catch (err) {
+      log.error("card.rollback.close_error", {
+        userId,
+        cardId: token,
+        error: redactSensitive((err as Error)?.message ?? String(err)),
+      });
+    }
+  }
+
+  /**
+   * Decrypt and return the PAN for a card owned by userId.
+   * Only called when the user explicitly requests to view the card number.
+   */
+  public async revealPan(cardToken: string, userId: number): Promise<string | null> {
+    if (!ENV.lithicApiKey) return null;
+    const db = await getDb();
+    const { eq, and } = await import("drizzle-orm");
+    const [row] = await db
+      .select()
+      .from(virtualCards)
+      .where(and(eq(virtualCards.token, cardToken), eq(virtualCards.userId, userId)))
+      .limit(1);
+    if (!row || !row.encryptedCredentials || !row.ivHex || !row.authTagHex) return null;
+    return this.decryptToken(row.encryptedCredentials, row.ivHex, row.authTagHex);
+  }
+
+  /**
+   * List the 25 most-recent transactions for a card via the Lithic API.
+   * Returns an empty array when the card has no transactions or is not configured.
+   */
+  public async listTransactions(cardToken: string, userId: number): Promise<LithicTransaction[]> {
+    if (!ENV.lithicApiKey) return [];
+    // Verify ownership before making external call
+    const db = await getDb();
+    const { eq, and } = await import("drizzle-orm");
+    const [row] = await db
+      .select({ token: virtualCards.token })
+      .from(virtualCards)
+      .where(and(eq(virtualCards.token, cardToken), eq(virtualCards.userId, userId)))
+      .limit(1);
+    if (!row) return [];
+
+    try {
+      const url = `${LITHIC_API_BASE}/transactions?card_token=${encodeURIComponent(cardToken)}&page_size=25`;
+      const res = await resilientFetch(url, {
+        headers: { Authorization: ENV.lithicApiKey, "Content-Type": "application/json" },
+      });
+      if (!res.ok) {
+        log.warn("listTransactions.api_error", { status: res.status, cardToken });
+        return [];
+      }
+      const json = (await res.json()) as { data?: unknown[] };
+      const raw = Array.isArray(json.data) ? json.data : [];
+      return raw.map((t: unknown) => {
+        const tx = t as Record<string, unknown>;
+        const merchant = (tx.merchant ?? {}) as Record<string, unknown>;
+        return {
+          token: String(tx.token ?? ""),
+          amount: Number(tx.amount ?? 0),
+          currency: String(tx.currency ?? "USD"),
+          status: String(tx.status ?? ""),
+          merchantDescriptor: String(merchant.descriptor ?? ""),
+          created: String(tx.created ?? ""),
+        };
+      });
+    } catch (err) {
+      if (!(err instanceof CircuitOpenError)) {
+        log.error("listTransactions.fetch_error", { error: (err as Error).message });
+      }
+      return [];
+    }
   }
 
   /**
@@ -210,6 +351,22 @@ export class VirtualCardService {
       ivHex: iv.toString("hex"),
       authTagHex: authTag.toString("hex"),
     };
+  }
+
+  private decryptToken(encryptedData: string, ivHex: string, authTagHex: string): string {
+    const key = crypto
+      .createHash("sha256")
+      .update(ENV.lithicApiKey + "virtualcard")
+      .digest();
+    const iv = Buffer.from(ivHex, "hex");
+    const authTag = Buffer.from(authTagHex, "hex");
+    const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);
+    decipher.setAuthTag(authTag);
+    const decrypted = Buffer.concat([
+      decipher.update(Buffer.from(encryptedData, "base64")),
+      decipher.final(),
+    ]);
+    return decrypted.toString("utf8");
   }
 }
 

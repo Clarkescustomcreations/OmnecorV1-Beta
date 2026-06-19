@@ -17,6 +17,7 @@ interface BrainMapState {
   onEdgesChange: OnEdgesChange;
   onConnect: (connection: Connection) => void;
   toggleFolderCollapse: (id: string) => void;
+  setCollapsedFolderIds: (ids: string[]) => void;
   isFolderCollapsed: (id: string) => boolean;
 
   // Window management state
@@ -84,6 +85,11 @@ export const useBrainMapStore = create<BrainMapState>((set, get) => ({
     syncChannel.postMessage({ type: 'toggleFolderCollapse', payload: id });
   },
 
+  setCollapsedFolderIds: (ids) => {
+    set({ collapsedFolderIds: ids });
+    syncChannel.postMessage({ type: 'setCollapsedFolderIds', payload: ids });
+  },
+
   isFolderCollapsed: (id) => get().collapsedFolderIds.includes(id),
 
   setWindowMode: (mode) => {
@@ -119,6 +125,9 @@ syncChannel.onmessage = (event) => {
           ? s.collapsedFolderIds.filter((x: string) => x !== payload)
           : [...s.collapsedFolderIds, payload],
       }));
+      break;
+    case 'setCollapsedFolderIds':
+      useBrainMapStore.setState({ collapsedFolderIds: payload });
       break;
     case 'requestInitialState': {
       const s = useBrainMapStore.getState();

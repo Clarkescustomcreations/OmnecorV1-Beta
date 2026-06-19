@@ -13,6 +13,8 @@ const themeColors = {
   muted:       { light: '#687076',  dark: '#9BA1A6' },
   success:     { light: '#22C55E',  dark: '#4ADE80' },
   warning:     { light: '#F59E0B',  dark: '#FBBF24' },
+  surface:     { light: '#f5f5f5',  dark: '#151620' },
+  error:       { light: '#dc2626',  dark: '#dc2626' },
 };
 
 module.exports = { themeColors };

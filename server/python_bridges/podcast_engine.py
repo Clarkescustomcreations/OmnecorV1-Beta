@@ -46,7 +46,7 @@ TTS_TIMEOUT_S = 60.0           # per-turn synthesis timeout
 # Helpers
 # ---------------------------------------------------------------------------
 
-def _make_silence(seconds: float, sr: int = TTS_SILENCE_SR) -> np.ndarray:
+def _make_silence(seconds: float, sr: int) -> np.ndarray:
     return np.zeros(int(sr * seconds), dtype=np.float32)
 
 
@@ -57,6 +57,7 @@ async def _synthesize_turn(
     emotion: str,
     index: int,
     output_dir: Path,
+    sr: int,
 ) -> Path:
     """Call TTS server for one dialogue turn; fall back to silence on error."""
     segment_path = output_dir / f"segment_{index:03d}.wav"
@@ -96,18 +97,17 @@ async def _synthesize_turn(
                 shutil.copy(src, segment_path)
             else:
                 log.warning("Turn %d: audio_path %s not found — using silence", index, src)
-                sf.write(segment_path, _make_silence(1.5), TTS_SILENCE_SR)
+                sf.write(segment_path, _make_silence(1.5, sr), sr)
     except Exception as exc:  # noqa: BLE001
         log.warning("Turn %d synthesis failed (%s) — using silence", index, exc)
-        sf.write(segment_path, _make_silence(1.5), TTS_SILENCE_SR)
+        sf.write(segment_path, _make_silence(1.5, sr), sr)
 
     return segment_path
 
 
-def _stitch(segment_paths: list[Path], output_path: Path) -> float:
+def _stitch(segment_paths: list[Path], output_path: Path, sr: int) -> float:
     """Concatenate WAV segments with silence gaps; return total duration in seconds."""
     arrays: list[np.ndarray] = []
-    sr = TTS_SILENCE_SR
     gap = _make_silence(SILENCE_GAP_S, sr)
 
     for i, seg in enumerate(segment_paths):
@@ -150,25 +150,46 @@ class PodcastOrchestrator:
         title = config.get("title", "Untitled Podcast")
         turns: list[dict[str, Any]] = config.get("turns", [])
         job_id = config.get("jobId", str(uuid.uuid4()))
+        quality = config.get("quality", "standard")
 
-        log.info("Building podcast '%s' with %d turns", title, len(turns))
+        # Map quality to sample rate
+        sr = 24000
+        if quality == "high":
+            sr = 44100
+        elif quality == "draft":
+            sr = 16000
+
+        log.info("Building podcast '%s' with %d turns at %dHz", title, len(turns), sr)
+
+        completed_count = 0
+        progress_lock = asyncio.Lock()
 
         async with httpx.AsyncClient() as client:
-            tasks = [
-                _synthesize_turn(
+            async def _run_and_track_turn(i, turn):
+                nonlocal completed_count
+                res = await _synthesize_turn(
                     client=client,
                     text=turn.get("text", ""),
                     speaker_wav=turn.get("referenceWav") or turn.get("speaker_wav_path"),
                     emotion=turn.get("emotion", "neutral"),
                     index=i,
                     output_dir=self.output_dir,
+                    sr=sr,
                 )
+                async with progress_lock:
+                    completed_count += 1
+                    percent = int((completed_count / len(turns)) * 100)
+                    print(json.dumps({"type": "progress", "percent": percent}), flush=True)
+                return res
+
+            tasks = [
+                _run_and_track_turn(i, turn)
                 for i, turn in enumerate(turns)
             ]
             segment_paths = await asyncio.gather(*tasks)
 
         master_path = self.output_dir / "podcast_master.wav"
-        duration = _stitch(list(segment_paths), master_path)
+        duration = _stitch(list(segment_paths), master_path, sr)
 
         segments = [
             {
@@ -185,6 +206,9 @@ class PodcastOrchestrator:
             "audioPath": str(master_path),
             "duration": round(duration, 2),
             "segments": segments,
+            "description": config.get("description", ""),
+            "durationMinutes": config.get("durationMinutes", 0),
+            "quality": quality,
         }
 
 

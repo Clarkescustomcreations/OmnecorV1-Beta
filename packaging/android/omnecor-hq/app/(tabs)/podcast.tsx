@@ -1,14 +1,17 @@
 import { ScrollView, Text, View, TextInput, Alert } from "react-native";
 import { Pressable } from "@/components/pressable";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import * as FileSystem from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
+import * as WebBrowser from "expo-web-browser";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { trpcMutate } from "@/lib/_core/trpc-fetch";
 import { isServerConfigured, getServerBaseUrl } from "@/lib/_core/server-config";
-import { askAi } from "@/lib/_core/ai-chat";
+import { askAi, resolveProviderId } from "@/lib/_core/ai-chat";
+import { subscribeChannel } from "@/lib/_core/ws-channels";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 
 // ── Podcast sources (mirror the desktop SourcesSidebar) ───────────────────────
 // Each selected source's content is fed into the AI script generator as context.
@@ -43,12 +46,58 @@ export default function PodcastScreen() {
   const [podcastLength, setPodcastLength] = useState("medium");
   const [isScripting, setIsScripting] = useState(false);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [podcastDuration, setPodcastDuration] = useState(15);
+  const [podcastQuality, setPodcastQuality] = useState<"draft" | "standard" | "high">("standard");
 
   // ── Sources ──
   const [sources, setSources] = useState<PodcastSource[]>([]);
   const [showAddSource, setShowAddSource] = useState(false);
   const [textDraft, setTextDraft] = useState("");
   const [urlDraft, setUrlDraft] = useState("");
+
+  // Load session from AsyncStorage on mount
+  useEffect(() => {
+    const loadSession = async () => {
+      try {
+        const raw = await AsyncStorage.getItem("omnecor:mobile_podcast_session");
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (parsed.title) setTitle(parsed.title);
+          if (parsed.description) setDescription(parsed.description);
+          if (parsed.script) setScript(parsed.script);
+          if (parsed.selectedVoice) setSelectedVoice(parsed.selectedVoice);
+          if (parsed.podcastLength) setPodcastLength(parsed.podcastLength);
+          if (parsed.podcastDuration) setPodcastDuration(parsed.podcastDuration);
+          if (parsed.podcastQuality) setPodcastQuality(parsed.podcastQuality);
+          if (parsed.sources) setSources(parsed.sources);
+        }
+      } catch (err) {
+        console.warn("Failed to load podcast session:", err);
+      }
+    };
+    loadSession();
+  }, []);
+
+  // Save session to AsyncStorage whenever inputs change
+  useEffect(() => {
+    const saveSession = async () => {
+      try {
+        await AsyncStorage.setItem("omnecor:mobile_podcast_session", JSON.stringify({
+          title,
+          description,
+          script,
+          selectedVoice,
+          podcastLength,
+          podcastDuration,
+          podcastQuality,
+          sources,
+        }));
+      } catch (err) {
+        console.warn("Failed to save podcast session:", err);
+      }
+    };
+    saveSession();
+  }, [title, description, script, selectedVoice, podcastLength, podcastDuration, podcastQuality, sources]);
 
   // ── Audio player (streams the master mix from the PC over HTTP, range-capable) ──
   const player = useAudioPlayer(audioUrl ?? undefined);
@@ -131,10 +180,20 @@ export default function PodcastScreen() {
       return;
     }
 
+    const jobId = Math.random().toString(36).substring(7) + "-" + Date.now();
     setIsGenerating(true);
     setGenerationProgress(0);
     setAudioPath(null);
     setAudioUrl(null);
+
+    const unsub = subscribeChannel(`podcast:${jobId}`, (data: any) => {
+      if (typeof data?.percent === "number") {
+        setGenerationProgress(data.percent);
+      }
+    });
+
+    // Wait a brief moment to ensure subscription is active on the server before starting the HTTP request
+    await new Promise((resolve) => setTimeout(resolve, 300));
 
     try {
       // Build turns from script: split on double-newlines or --- separators
@@ -165,16 +224,25 @@ export default function PodcastScreen() {
         audioUrl: string;
         duration: number;
         segments: unknown[];
-      }>("podcast.generate", { title, turns, useRVC });
+      }>("podcast.generate", {
+        jobId,
+        title,
+        description,
+        durationMinutes: podcastDuration,
+        quality: podcastQuality,
+        turns,
+        useRVC,
+      });
 
       setAudioPath(result.audioPath);
       // Full HTTP URL the on-device player streams from (PC base + server route).
       setAudioUrl(result.audioUrl ? getServerBaseUrl() + result.audioUrl : null);
       setGenerationProgress(100);
-      setIsGenerating(false);
     } catch (err) {
-      setIsGenerating(false);
       Alert.alert("Error", err instanceof Error ? err.message : "Podcast generation failed");
+    } finally {
+      unsub();
+      setIsGenerating(false);
     }
   };
 
@@ -187,22 +255,25 @@ export default function PodcastScreen() {
       Alert.alert("No server configured", "Go to Settings and enter your PC's IP address.");
       return;
     }
-    const turnCount = LENGTH_OPTIONS.find((l) => l.value === podcastLength)!.turnCount;
+    const turnCount = Math.max(2, Math.round(podcastDuration * 0.8));
     setIsScripting(true);
     try {
-      // Fold any selected sources into the generation context so the script is
-      // grounded in the provided material (same idea as the desktop sidebar).
       const selectedSources = sources.filter((s) => s.selected);
-      const sourceContext = selectedSources.length
-        ? "Base the episode on these sources:\n\n" +
-          selectedSources.map((s) => `[${KIND_LABEL[s.kind]}: ${s.label}]\n${s.content}`).join("\n\n")
-        : undefined;
-      const text = await askAi({
-        prompt: `Generate a ${turnCount}-turn podcast script between two hosts named Host and Guest about: "${title.trim()}".${description.trim() ? " Context: " + description.trim() + "." : ""} Put each turn on its own line, alternating Host: and Guest:, no extra commentary.`,
-        systemPrompt: "You are a podcast scriptwriter. Output only the dialogue lines.",
-        context: sourceContext,
+      const providerId = await resolveProviderId();
+      const modelId = providerId === "openai" ? "gpt-4o" : "llama3.2:latest";
+
+      const result = await trpcMutate<{ content: string }>("podcast.generateScript", {
+        providerId,
+        modelId,
+        topic: title.trim(),
+        description: description.trim() || undefined,
+        durationMinutes: podcastDuration,
+        quality: podcastQuality,
+        turnsCount: turnCount,
+        format: "text",
+        sources: selectedSources.map(s => ({ label: s.label, content: s.content })),
       });
-      setScript(text);
+      setScript(result.content);
     } catch (err) {
       Alert.alert("Script generation failed", String(err));
     } finally {
@@ -299,6 +370,40 @@ export default function PodcastScreen() {
                 <Pressable onPress={addFileSource} className="rounded-lg p-2 items-center bg-background border border-border active:opacity-70">
                   <Text className="text-xs font-semibold text-foreground">📄 Add File (text)</Text>
                 </Pressable>
+                {/* Cloud storage OAuth */}
+                {isServerConfigured() && (
+                  <View className="gap-2 pt-2 border-t border-border">
+                    <Text className="text-xs text-muted">Cloud Storage (OAuth)</Text>
+                    {([
+                      { label: "Google Drive", icon: "G", provider: "google_drive" },
+                      { label: "Dropbox", icon: "⬡", provider: "dropbox" },
+                      { label: "OneDrive", icon: "☁", provider: "onedrive" },
+                    ] as const).map((p) => (
+                      <Pressable
+                        key={p.provider}
+                        onPress={async () => {
+                          try {
+                            const result = await trpcMutate<{ authUrl: string; state: string }>(
+                              "oauth.getAuthorizationUrl",
+                              { platform: p.provider }
+                            );
+                            if (result?.authUrl) {
+                              await WebBrowser.openBrowserAsync(result.authUrl);
+                            } else {
+                              Alert.alert("Not configured", `Configure ${p.label} in Settings → Integrations first.`);
+                            }
+                          } catch {
+                            Alert.alert("Not configured", `Configure ${p.label} in Settings → Integrations first.`);
+                          }
+                        }}
+                        className="rounded-lg p-2 flex-row items-center gap-2 bg-background border border-border active:opacity-70"
+                      >
+                        <Text className="font-bold text-base">{p.icon}</Text>
+                        <Text className="text-xs font-semibold text-foreground">{p.label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                )}
               </View>
             )}
 
@@ -334,7 +439,11 @@ export default function PodcastScreen() {
                   return (
                     <Pressable
                       key={opt.value}
-                      onPress={() => setPodcastLength(opt.value)}
+                      onPress={() => {
+                        setPodcastLength(opt.value);
+                        const mins = opt.value === "short" ? 5 : opt.value === "medium" ? 15 : opt.value === "long" ? 30 : 60;
+                        setPodcastDuration(mins);
+                      }}
                       className={`rounded-lg px-3 py-2 border ${
                         selected
                           ? "bg-primary border-primary"
@@ -360,6 +469,65 @@ export default function PodcastScreen() {
                 })}
               </View>
             </ScrollView>
+          </View>
+
+          {/* Episode Duration */}
+          <View>
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              Duration (Minutes): {podcastDuration} min
+            </Text>
+            <View className="flex-row items-center gap-3 bg-surface border border-border rounded-lg p-2">
+              <Pressable
+                onPress={() => setPodcastDuration(prev => Math.max(2, prev - 1))}
+                className="w-10 h-10 items-center justify-center bg-background border border-border rounded-lg active:opacity-75"
+              >
+                <Text className="text-foreground text-lg font-bold">-</Text>
+              </Pressable>
+              <TextInput
+                keyboardType="numeric"
+                value={String(podcastDuration)}
+                onChangeText={(txt) => {
+                  const val = parseInt(txt, 10);
+                  if (!isNaN(val)) setPodcastDuration(val);
+                }}
+                className="flex-1 text-center text-foreground font-semibold text-base py-1"
+              />
+              <Pressable
+                onPress={() => setPodcastDuration(prev => Math.min(120, prev + 1))}
+                className="w-10 h-10 items-center justify-center bg-background border border-border rounded-lg active:opacity-75"
+              >
+                <Text className="text-foreground text-lg font-bold">+</Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {/* Synthesis Quality */}
+          <View>
+            <Text className="text-sm font-semibold text-foreground mb-2">
+              Synthesis Quality
+            </Text>
+            <View className="flex-row gap-2">
+              {(["draft", "standard", "high"] as const).map((q) => {
+                const selected = podcastQuality === q;
+                return (
+                  <Pressable
+                    key={q}
+                    onPress={() => setPodcastQuality(q)}
+                    className={`flex-1 rounded-lg py-2 border items-center ${
+                      selected ? "bg-primary border-primary" : "bg-surface border-border"
+                    }`}
+                  >
+                    <Text
+                      className={`text-xs font-semibold uppercase ${
+                        selected ? "text-background" : "text-foreground"
+                      }`}
+                    >
+                      {q}
+                    </Text>
+                  </Pressable>
+                );
+              })}
+            </View>
           </View>
 
           {/* Script/Content */}

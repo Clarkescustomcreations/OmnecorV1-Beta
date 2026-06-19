@@ -174,13 +174,14 @@ export const mobileSyncRouter = router({
         modelId: z.string().default("llama3.2:latest"),
       })
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const chat = store.find((c) => c.syncId === input.syncId);
       if (!chat) throw new TRPCError({ code: "NOT_FOUND", message: "Synced chat not found" });
 
       const sessionId = randomUUID();
       await createChatSession({
         id: sessionId,
+        userId: ctx.user.id,
         projectId: input.projectId,
         title: chat.title || "Mobile chat",
         providerId: input.providerId,

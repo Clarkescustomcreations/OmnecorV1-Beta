@@ -38,6 +38,7 @@ import {
   clearLegacyLocalScripts,
   type SavedScript,
 } from "@/lib/scriptStorage";
+import { getContextWindow } from "@/lib/aiModels";
 import type { SlashCommand } from "@/components/chat/ChatInput";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
@@ -178,6 +179,27 @@ export default function Chat() {
     onError: (err) => console.error("[Honcho] addMessage failed:", err.message),
   });
 
+  // ── DB-backed chat persistence ────────────────────────────────────────────
+  const chatUtils = trpc.useUtils();
+  const { data: dbSessions = [], isSuccess: dbSessionsLoaded } = trpc.chat.listSessions.useQuery(undefined, {
+    enabled: !IS_DEMO,
+    refetchOnWindowFocus: false,
+  });
+  const createDbSession = trpc.chat.createSession.useMutation({
+    onError: (err) => console.error("[Chat] Failed to create DB session:", err.message),
+  });
+  const addDbMessage = trpc.chat.addMessage.useMutation({
+    onError: (err) => console.error("[Chat] Failed to save message to DB:", err.message),
+  });
+  const updateDbSession = trpc.chat.updateSession.useMutation();
+  const deleteDbSession = trpc.chat.deleteSession.useMutation();
+  const bulkImportDb = trpc.chat.bulkImport.useMutation();
+  // Set of session IDs known to exist in DB (to skip redundant creates)
+  const dbSessionIds = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    dbSessionIds.current = new Set(dbSessions.map(s => s.id));
+  }, [dbSessions]);
+
   // ── BTW notes ────────────────────────────────────────────────────────────
   const [btwNotes, setBtwNotes] = useState<string[]>(() => {
     try {
@@ -259,19 +281,108 @@ export default function Chat() {
   const sidebarCollapsed = useAppStore((s) => s.chatHistoryCollapsed);
   const setSidebarCollapsed = useAppStore((s) => s.setChatHistoryCollapsed);
 
-  // Debounced auto-save
+  // When DB sessions load, use them as the authoritative sidebar list
+  useEffect(() => {
+    if (IS_DEMO || !dbSessionsLoaded || dbSessions.length === 0) return;
+    setConversationIndex(dbSessions.map(s => ({
+      id: s.id,
+      title: s.title,
+      lastMessage: "",
+      updatedAt: new Date(s.updatedAt).toISOString(),
+      messageCount: 0,
+    })));
+  }, [dbSessions, dbSessionsLoaded]);
+
+  // One-time migration: if DB is empty on first load and localStorage has conversations, import them
+  const migrationRanRef = useRef(false);
+  useEffect(() => {
+    if (IS_DEMO || !dbSessionsLoaded || migrationRanRef.current) return;
+    migrationRanRef.current = true;
+    if (dbSessions.length > 0) return;
+    const localIndex = getStoredConversationIndex();
+    if (localIndex.length === 0) return;
+    const sessions = localIndex.flatMap(meta => {
+      const conv = loadConversationFromStorage(meta.id);
+      if (!conv) return [] as Parameters<typeof bulkImportDb.mutate>[0]["sessions"];
+      return [{
+        id: conv.id,
+        title: conv.title,
+        providerId: conv.modelId?.split(":")[0] ?? "default",
+        modelId: conv.modelId ?? "default",
+        projectId: "",
+        messages: conv.messages
+          .filter(m => m.role === "user" || m.role === "assistant")
+          .map(m => ({
+            id: m.id,
+            role: m.role as "user" | "assistant",
+            content: m.content,
+            tokenCount: m.tokens,
+          })),
+      }];
+    });
+    if (sessions.length === 0) return;
+    bulkImportDb.mutate({ sessions }, {
+      onSuccess: (result) => {
+        if (result.imported > 0) {
+          toast.success(`Migrated ${result.imported} conversation(s) to your account`);
+          chatUtils.chat.listSessions.invalidate();
+        }
+      },
+    });
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dbSessionsLoaded, dbSessions.length]);
+
+  // Debounced auto-save (localStorage — fast local persistence)
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   useEffect(() => {
     if (conversation.messages.length === 0) return;
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => {
       saveConversationToStorage(conversation);
-      setConversationIndex(getStoredConversationIndex());
+      setConversationIndex(prev => {
+        const updated = getStoredConversationIndex();
+        // Prefer DB list if loaded; otherwise use localStorage list
+        return dbSessionsLoaded && dbSessions.length > 0 ? prev : updated;
+      });
     }, 800);
     return () => {
       if (saveTimer.current) clearTimeout(saveTimer.current);
     };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversation]);
+
+  // Ref-based DB persist helper — avoids adding mutation objects to streamResponse deps.
+  // Updated every render so it always captures current mutations/model/map without
+  // forcing the expensive streamResponse useCallback to recreate.
+  const persistToDbRef = useRef<(
+    convId: string, convTitle: string,
+    userMsg: ChatMessage,
+    assistantId: string, assistantContent: string
+  ) => void>(() => {});
+  persistToDbRef.current = (convId, convTitle, userMsg, assistantId, assistantContent) => {
+    if (IS_DEMO) return;
+    const saveMessages = () => {
+      addDbMessage.mutate({ id: userMsg.id, sessionId: convId, role: "user", content: userMsg.content, tokenCount: userMsg.tokens });
+      addDbMessage.mutate({ id: assistantId, sessionId: convId, role: "assistant", content: assistantContent, tokenCount: Math.ceil(assistantContent.length / 4) });
+    };
+    if (!dbSessionIds.current.has(convId)) {
+      dbSessionIds.current.add(convId);
+      createDbSession.mutate({
+        id: convId,
+        title: convTitle || "New Conversation",
+        providerId: selectedModel?.providerId ?? "default",
+        modelId: selectedModel?.modelId ?? "default",
+        projectId: activeMap?.id ?? "",
+      }, {
+        onSuccess: () => {
+          saveMessages();
+          chatUtils.chat.listSessions.invalidate();
+        },
+      });
+    } else {
+      saveMessages();
+    }
+  };
 
   // ── Saved Scripts (server-backed, syncs across devices/projects) ──────────
   const scriptsUtils = trpc.useUtils();
@@ -360,19 +471,49 @@ export default function Chat() {
     setConversationIndex(getStoredConversationIndex());
   }, [conversation, selectedModel]);
 
-  const handleSelectConversation = useCallback((id: string) => {
-    // Save current before switching
+  const handleSelectConversation = useCallback(async (id: string) => {
     if (conversation.messages.length > 0) {
       saveConversationToStorage(conversation);
     }
     const loaded = loadConversationFromStorage(id);
+    if (loaded && loaded.messages.length > 0) {
+      setConversation(loaded);
+      return;
+    }
+    // localStorage empty or absent — try DB
+    if (!IS_DEMO) {
+      try {
+        const dbSession = await chatUtils.chat.getSession.fetch({ id });
+        if (dbSession) {
+          const conv = createConversation(dbSession.title, dbSession.modelId ?? "default");
+          conv.id = dbSession.id;
+          conv.messages = dbSession.messages.map(m => ({
+            id: m.id,
+            role: m.role as "user" | "assistant" | "system",
+            content: m.content,
+            tokens: m.tokenCount ?? estimateTokens(m.content),
+            timestamp: new Date(m.createdAt),
+          }));
+          setConversation(conv);
+          saveConversationToStorage(conv);
+          return;
+        }
+      } catch {
+        // not in DB either — fall through to whatever localStorage has
+      }
+    }
     if (loaded) setConversation(loaded);
-  }, [conversation]);
+  }, [conversation, chatUtils]);
 
   const handleDeleteConversation = useCallback(
     (id: string) => {
       deleteConversationFromStorage(id);
-      setConversationIndex(getStoredConversationIndex());
+      if (!IS_DEMO && dbSessionIds.current.has(id)) {
+        deleteDbSession.mutate({ id }, {
+          onSuccess: () => chatUtils.chat.listSessions.invalidate(),
+        });
+      }
+      setConversationIndex(prev => prev.filter(s => s.id !== id));
 
       if (conversation.id === id) {
         const remaining = getStoredConversationIndex();
@@ -383,18 +524,23 @@ export default function Chat() {
         setConversation(createConversation("New Conversation", "default"));
       }
     },
-    [conversation]
+    [conversation, deleteDbSession, chatUtils]
   );
 
   const handleRenameConversation = useCallback(
     (id: string, title: string) => {
       renameConversationInStorage(id, title);
-      setConversationIndex(getStoredConversationIndex());
+      if (!IS_DEMO && dbSessionIds.current.has(id)) {
+        updateDbSession.mutate({ id, title }, {
+          onSuccess: () => chatUtils.chat.listSessions.invalidate(),
+        });
+      }
+      setConversationIndex(prev => prev.map(s => s.id === id ? { ...s, title } : s));
       if (conversation.id === id) {
         setConversation(prev => ({ ...prev, title }));
       }
     },
-    [conversation]
+    [conversation, updateDbSession, chatUtils]
   );
 
   const handleTitleChange = useCallback(
@@ -453,6 +599,29 @@ export default function Chat() {
     }
   }, []);
 
+  // Assemble the exact system prompt that gets sent to the model. Shared by the
+  // streaming sender and the context-transparency panel so the displayed System
+  // token count reflects what is actually transmitted (not a fixed placeholder).
+  const buildFullSystemPrompt = useCallback((): string => {
+    const btwContext = btwNotes.map(n => `[Background context: ${n}]`).join("\n");
+    const honchoContext = honchoFacts?.length
+      ? honchoFacts.map(f => `[Long-term memory: ${f.content}]`).join("\n")
+      : "";
+    const neuralContext = neuralContextFiles.length > 0
+      ? `<neural_map_context>\nThe following files/folders are pinned from the neural map:\n${neuralContextFiles.map(f => `- ${f.nodeType === "folder" ? "📁" : "📄"} ${f.name} (${f.path})`).join("\n")}\n</neural_map_context>`
+      : "";
+    const activePersona = isFictionMode && fictionPersonaId
+      ? fictionPersonas.find(p => p.id === fictionPersonaId)
+      : undefined;
+    const personaContext = activePersona
+      ? `<active_persona>\nYou are roleplaying as: ${activePersona.name}.\n${activePersona.bio ? `Background: ${activePersona.bio}\n` : ""}${activePersona.agentSystemPrompt ? `Persona instructions: ${activePersona.agentSystemPrompt}\n` : ""}</active_persona>`
+      : "";
+    const fictionGuardrail = isFictionMode
+      ? `<fiction_mode_guardrails>\nYou are operating in FICTION MODE. Your role is limited to creative storytelling, roleplay, fiction writing, song lyrics, and poetry.\n\nYou MUST:\n- Stay in character and maintain the current roleplay/fiction narrative at all times\n- Keep all creative work grounded in the active story/fiction world\n- Support the user's storytelling, worldbuilding, and creative writing goals\n\nYou MUST NOT (these capabilities are disabled for this session):\n- Execute terminal commands or access the local filesystem outside the neural fiction map\n- Perform agent networking, post to social media, or run autonomous agents\n- Access wallets, make financial transactions, or manage budgets\n- Spin up cloud compute jobs or perform cloud-side automation\n- Perform system administration tasks on the host machine\n\nWeb search IS permitted to support research for the story.\nFile saves are permitted only within the active neural fiction map.\n\nIf asked to perform any blocked action, gently redirect back to the creative fiction context.\n</fiction_mode_guardrails>`
+      : "";
+    return [peerCardContext, systemPrompt.trim(), btwContext, honchoContext, neuralContext, personaContext, fictionGuardrail].filter(Boolean).join("\n\n");
+  }, [btwNotes, honchoFacts, neuralContextFiles, isFictionMode, fictionPersonaId, fictionPersonas, peerCardContext, systemPrompt]);
+
   // ── Streaming core ───────────────────────────────────────────────────────
   const streamResponse = useCallback(
     (userMsg: ChatMessage, priorMessages: ChatMessage[]) => {
@@ -474,23 +643,7 @@ export default function Chat() {
       }));
 
       const apiMessages: Array<{ role: "user" | "assistant" | "system"; content: string }> = [];
-      const btwContext = btwNotes.map(n => `[Background context: ${n}]`).join("\n");
-      const honchoContext = honchoFacts?.length
-        ? honchoFacts.map(f => `[Long-term memory: ${f.content}]`).join("\n")
-        : "";
-      const neuralContext = neuralContextFiles.length > 0
-        ? `<neural_map_context>\nThe following files/folders are pinned from the neural map:\n${neuralContextFiles.map(f => `- ${f.nodeType === "folder" ? "📁" : "📄"} ${f.name} (${f.path})`).join("\n")}\n</neural_map_context>`
-        : "";
-      const activePersona = isFictionMode && fictionPersonaId
-        ? fictionPersonas.find(p => p.id === fictionPersonaId)
-        : undefined;
-      const personaContext = activePersona
-        ? `<active_persona>\nYou are roleplaying as: ${activePersona.name}.\n${activePersona.bio ? `Background: ${activePersona.bio}\n` : ""}${activePersona.agentSystemPrompt ? `Persona instructions: ${activePersona.agentSystemPrompt}\n` : ""}</active_persona>`
-        : "";
-      const fictionGuardrail = isFictionMode
-        ? `<fiction_mode_guardrails>\nYou are operating in FICTION MODE. Your role is limited to creative storytelling, roleplay, fiction writing, song lyrics, and poetry.\n\nYou MUST:\n- Stay in character and maintain the current roleplay/fiction narrative at all times\n- Keep all creative work grounded in the active story/fiction world\n- Support the user's storytelling, worldbuilding, and creative writing goals\n\nYou MUST NOT (these capabilities are disabled for this session):\n- Execute terminal commands or access the local filesystem outside the neural fiction map\n- Perform agent networking, post to social media, or run autonomous agents\n- Access wallets, make financial transactions, or manage budgets\n- Spin up cloud compute jobs or perform cloud-side automation\n- Perform system administration tasks on the host machine\n\nWeb search IS permitted to support research for the story.\nFile saves are permitted only within the active neural fiction map.\n\nIf asked to perform any blocked action, gently redirect back to the creative fiction context.\n</fiction_mode_guardrails>`
-        : "";
-      const fullSystem = [peerCardContext, systemPrompt.trim(), btwContext, honchoContext, neuralContext, personaContext, fictionGuardrail].filter(Boolean).join("\n\n");
+      const fullSystem = buildFullSystemPrompt();
       if (fullSystem) {
         apiMessages.push({ role: "system", content: fullSystem });
       }
@@ -533,6 +686,8 @@ export default function Chat() {
               const sid = conversation.id;
               addHonchoMessage.mutate({ openId, sessionId: sid, role: "user", content: userMsg.content });
               addHonchoMessage.mutate({ openId, sessionId: sid, role: "ai", content: assistantContent });
+              // Persist to DB (fire-and-forget — also creates session if not yet tracked)
+              persistToDbRef.current(conversation.id, conversation.title, userMsg, assistantId, assistantContent);
               // Rolling buffer: auto-compress when conversation exceeds 50 messages
               setConversation(prev => {
                 const ROLLING_BUFFER_LIMIT = 50;
@@ -575,7 +730,7 @@ export default function Chat() {
 
       streamRef.current = sub;
     },
-    [selectedModel, systemPrompt, btwNotes, honchoFacts, openId, addHonchoMessage, conversation.id, excludedMessageIds, isFictionMode, neuralContextFiles, peerCardContext, fictionPersonaId, fictionPersonas]
+    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, conversation.id, excludedMessageIds]
   );
 
   // ── Send message ─────────────────────────────────────────────────────────
@@ -1048,10 +1203,11 @@ export default function Chat() {
     setContextCollapsed(true); // Auto collapse context to make room
   }, []);
 
-  const transparency = useMemo(
-    () => calculateContextTransparency(conversation),
-    [conversation]
-  );
+  const transparency = useMemo(() => {
+    const systemTokens = estimateTokens(buildFullSystemPrompt());
+    const modelMaxTokens = getContextWindow(selectedModel?.providerId, selectedModel?.modelId);
+    return calculateContextTransparency(conversation, modelMaxTokens, systemTokens);
+  }, [conversation, buildFullSystemPrompt, selectedModel?.providerId, selectedModel?.modelId]);
 
   // ── Render ───────────────────────────────────────────────────────────────
   return (

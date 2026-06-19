@@ -23,6 +23,7 @@ import { router, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import { ElevenLabsService } from "../phase2/services/ElevenLabsService.js";
+import path from "path";
 
 // ---------------------------------------------------------------------------
 // Input Schemas (Zod validation)
@@ -295,6 +296,46 @@ export const voiceRouter = router({
         audioBase64: result.audioBuffer.toString("base64"),
         mimeType: result.mimeType,
         characterCount: result.characterCount,
+      };
+    }),
+
+  listOfflineVoices: protectedProcedure.query(async () => {
+    const fs = await import("fs/promises");
+    const { PATHS } = await import("../_core/paths.js");
+    const voicesDir = path.join(PATHS.data, "voices");
+    try {
+      await fs.mkdir(voicesDir, { recursive: true });
+      const entries = await fs.readdir(voicesDir);
+      return entries.map(name => ({
+        name,
+        path: path.join(voicesDir, name),
+      }));
+    } catch {
+      return [];
+    }
+  }),
+
+  downloadVoice: cloudProcedure
+    .input(z.object({ voiceUrl: z.string().url(), voiceName: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const fs = await import("fs/promises");
+      const { PATHS } = await import("../_core/paths.js");
+      const voicesDir = path.join(PATHS.data, "voices");
+      await fs.mkdir(voicesDir, { recursive: true });
+      const targetPath = await validatePath(path.join(voicesDir, `${input.voiceName}.wav`), voicesDir);
+      
+      const jobId = await ctx.services.processManager.spawn({
+        type: "custom",
+        command: "curl",
+        args: ["-L", "-o", targetPath, input.voiceUrl],
+        label: `Download Voice: ${input.voiceName}`,
+        timeoutMs: 0,
+      });
+
+      return {
+        success: true,
+        jobId,
+        message: `Download started for ${input.voiceName}. Track via background jobs.`,
       };
     }),
 });

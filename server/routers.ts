@@ -87,6 +87,7 @@ import { workflowRouter } from "./routers/workflowRouter.js";
 import { notificationRouter } from "./routers/notificationRouter.js";
 import { agentMessengerRouter } from "./routers/agentMessengerRouter.js";
 import { scriptsRouter } from "./routers/scriptsRouter.js";
+import { chatRouter } from "./routers/chatRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -229,6 +230,7 @@ export const appRouter = router({
   // ─── Mobile chat sync (Omnecor HQ app → Notifications + Add-to-project) ───
   mobileSync: mobileSyncRouter,
   scripts: scriptsRouter,
+  chat: chatRouter,
 });
 
 export type AppRouter = typeof appRouter;

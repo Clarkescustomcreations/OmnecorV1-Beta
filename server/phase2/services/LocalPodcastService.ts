@@ -14,6 +14,7 @@ import path from "path";
 import os from "os";
 import { createLogger } from "../../_core/logger.js";
 import { PYTHON_SCRIPTS } from "../config/index.js";
+import { getWsInstance } from "../websocket/WebSocketServer.js";
 
 const log = createLogger("PodcastEngine");
 
@@ -25,7 +26,11 @@ export interface DialogueTurn {
 }
 
 export interface PodcastConfig {
+  jobId?: string;
   title: string;
+  description?: string;
+  durationMinutes?: number;
+  quality?: "draft" | "standard" | "high";
   turns: DialogueTurn[];
   outputPath?: string;
   useRVC?: boolean;
@@ -38,6 +43,9 @@ export interface PodcastResult {
   audioUrl: string;
   duration: number;
   segments: { speaker: string; text: string; path?: string; audioUrl?: string | null }[];
+  description?: string;
+  durationMinutes?: number;
+  quality?: string;
 }
 
 const PODCAST_ENGINE_TIMEOUT_MS = 10 * 60 * 1000; // 10 min max for long podcasts
@@ -48,11 +56,14 @@ function _stubResult(jobId: string, tempDir: string, config: PodcastConfig): Pod
     audioPath: path.join(tempDir, "podcast.wav"),
     audioUrl: `/media/podcast/${jobId}`,
     duration: config.turns.length * 15,
-    segments: config.turns.map(turn => ({
+    segments: config.turns.map((turn, idx) => ({
       speaker: turn.speakerId,
       text: turn.text,
-      audioUrl: null,
+      audioUrl: `/media/podcast/${jobId}/segment/${idx}`,
     })),
+    description: config.description,
+    durationMinutes: config.durationMinutes,
+    quality: config.quality,
   };
 }
 
@@ -69,8 +80,40 @@ async function callPodcastEngine(
 
     let stdout = "";
     let stderr = "";
+    let stdoutBuffer = "";
 
-    child.stdout.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+    child.stdout.on("data", (chunk: Buffer) => {
+      stdoutBuffer += chunk.toString();
+      let newlineIndex;
+      while ((newlineIndex = stdoutBuffer.indexOf("\n")) !== -1) {
+        const line = stdoutBuffer.slice(0, newlineIndex).trim();
+        stdoutBuffer = stdoutBuffer.slice(newlineIndex + 1);
+        if (!line) continue;
+
+        if (line.startsWith('{"type":"progress"') || line.startsWith('{"type": "progress"')) {
+          try {
+            const progressObj = JSON.parse(line);
+            if (progressObj.type === "progress" && typeof progressObj.percent === "number") {
+              const ws = getWsInstance();
+              if (ws) {
+                const channel = `podcast:${jobId}`;
+                ws.broadcastToChannel(channel, {
+                  type: "trainingProgress",
+                  channel,
+                  data: { jobId, percent: progressObj.percent },
+                  timestamp: new Date().toISOString(),
+                });
+              }
+            }
+          } catch (e) {
+            // Ignore parse errors on intermediate lines
+          }
+        } else {
+          stdout += line + "\n";
+        }
+      }
+    });
+
     child.stderr.on("data", (chunk: Buffer) => { stderr += chunk.toString(); });
 
     const timer = setTimeout(() => {
@@ -83,6 +126,10 @@ async function callPodcastEngine(
       if (code !== 0) {
         reject(new Error(`podcast_engine.py exited with code ${code}: ${stderr.slice(0, 500)}`));
         return;
+      }
+      const remaining = stdoutBuffer.trim();
+      if (remaining && !remaining.startsWith('{"type":"progress"') && !remaining.startsWith('{"type": "progress"')) {
+        stdout += remaining;
       }
       try {
         const raw = stdout.trim();
@@ -121,7 +168,12 @@ export class LocalPodcastService {
   }
 
   async generatePodcast(config: PodcastConfig): Promise<PodcastResult> {
-    const jobId = uuidv4();
+    const jobId = config.jobId || uuidv4();
+    // Defense-in-depth: jobId is a path segment for the on-disk output dir.
+    // Reject anything that is not a plain UUID to prevent path traversal.
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(jobId)) {
+      throw new Error(`Invalid podcast jobId: ${jobId}`);
+    }
     const tempDir = path.join(os.homedir(), ".omnecor", "podcasts", jobId);
     await fs.mkdir(tempDir, { recursive: true });
 
@@ -130,11 +182,25 @@ export class LocalPodcastService {
     try {
       const result = await callPodcastEngine(jobId, tempDir, config);
       log.info("Podcast generated", { jobId, audioPath: result.audioPath, duration: result.duration });
+      const segments = result.segments.map((seg, idx) => ({
+        ...seg,
+        audioUrl: `/media/podcast/${jobId}/segment/${idx}`,
+      }));
       // Always expose the range-capable HTTP URL keyed by jobId, regardless of
       // the absolute path the engine reported.
-      return { ...result, audioUrl: `/media/podcast/${jobId}` };
+      return { ...result, audioUrl: `/media/podcast/${jobId}`, segments };
     } catch (err) {
       log.warn("podcast_engine.py unavailable, returning stub", { err: (err as Error).message });
+      const ws = getWsInstance();
+      if (ws) {
+        const channel = `podcast:${jobId}`;
+        ws.broadcastToChannel(channel, {
+          type: "trainingProgress",
+          channel,
+          data: { jobId, percent: 100 },
+          timestamp: new Date().toISOString(),
+        });
+      }
       return _stubResult(jobId, tempDir, config);
     }
   }

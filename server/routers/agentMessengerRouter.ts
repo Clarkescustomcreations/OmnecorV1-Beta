@@ -14,6 +14,7 @@
  */
 
 import { z } from "zod";
+import { TRPCError } from "@trpc/server";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { getDb } from "../db.factory.js";
 import { personas } from "../../drizzle/schema.js";
@@ -89,40 +90,66 @@ function buildSystemPrompt(p: ResolvedPersona): string {
   return custom ? `${base}\n\n${custom}` : base;
 }
 
+const CLOUD_PROVIDER_IDS = new Set([
+  "openai",
+  "anthropic",
+  "gemini",
+  "grok",
+  "huggingface",
+]);
+
+function assertProviderAllowedInMode(
+  providerId: string,
+  executionMode: string | undefined,
+): void {
+  if (executionMode === "sovereign" && CLOUD_PROVIDER_IDS.has(providerId)) {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: `Sovereign mode: cloud provider "${providerId}" is disabled. Use a local provider (ollama, llamacpp, ommesh).`,
+    });
+  }
+}
+
 export const agentMessengerRouter = router({
   /** List messenger threads (one per persona) with last message + unread count. */
   listConversations: protectedProcedure.query(async ({ ctx }) => {
     const store = AgentMessengerStore.getInstance();
     const people = await loadPersonas(ctx.user?.id);
-    const conversations: AgentConversation[] = people.map(p => {
-      const last = store.lastMessage(p.id);
-      return {
-        personaId: p.id,
-        name: p.name,
-        type: p.type,
-        alwaysOn: p.alwaysOn,
-        lastMessage: last?.content,
-        lastMessageAt: last?.createdAt,
-        unread: store.unreadCount(p.id),
-      };
-    });
+    const conversations: AgentConversation[] = await Promise.all(
+      people.map(async p => {
+        const [last, unread] = await Promise.all([
+          store.lastMessage(ctx.user.id, p.id),
+          store.unreadCount(ctx.user.id, p.id),
+        ]);
+        return {
+          personaId: p.id,
+          name: p.name,
+          type: p.type,
+          alwaysOn: p.alwaysOn,
+          lastMessage: last?.content,
+          lastMessageAt: last?.createdAt,
+          unread,
+        };
+      })
+    );
     return { conversations };
   }),
 
   /** Full thread for a persona; marks it read. */
   getMessages: protectedProcedure
     .input(z.object({ personaId: z.string() }))
-    .query(({ input }) => {
+    .query(async ({ input, ctx }) => {
       const store = AgentMessengerStore.getInstance();
-      store.markRead(input.personaId);
-      return { messages: store.getMessages(input.personaId) };
+      await store.markRead(ctx.user.id, input.personaId);
+      const messages = await store.getMessages(ctx.user.id, input.personaId);
+      return { messages };
     }),
 
   /** Mark a thread read without fetching. */
   markRead: protectedProcedure
     .input(z.object({ personaId: z.string() }))
-    .mutation(({ input }) => {
-      AgentMessengerStore.getInstance().markRead(input.personaId);
+    .mutation(async ({ input, ctx }) => {
+      await AgentMessengerStore.getInstance().markRead(ctx.user.id, input.personaId);
       return { success: true };
     }),
 
@@ -144,21 +171,26 @@ export const agentMessengerRouter = router({
       const persona = people.find(p => p.id === input.personaId);
       if (!persona) {
         // Still record the user's message so it isn't lost.
-        store.append(input.personaId, "user", input.content);
-        return {
-          reply: store.append(
-            input.personaId,
-            "agent",
-            "This agent no longer exists. Create it again in Settings → Personas."
-          ),
-        };
+        await store.append(ctx.user.id, input.personaId, "user", input.content);
+        const reply = await store.append(
+          ctx.user.id,
+          input.personaId,
+          "agent",
+          "This agent no longer exists. Create it again in Settings → Personas."
+        );
+        return { reply };
       }
 
-      store.append(persona.id, "user", input.content);
+      await store.append(ctx.user.id, persona.id, "user", input.content);
 
       // Build the conversation context (last ~20 turns) for the model.
-      const history = store.getMessages(persona.id).slice(-20);
+      const rawHistory = await store.getMessages(ctx.user.id, persona.id);
+      const history = rawHistory.slice(-20);
       const backend = resolveBackend(persona.data);
+
+      // Enforce Sovereign Mode Check
+      assertProviderAllowedInMode(backend.providerId, ctx.user?.executionMode);
+
       const messages = [
         { role: "system" as const, content: buildSystemPrompt(persona) },
         ...history.map(m => ({
@@ -176,14 +208,15 @@ export const agentMessengerRouter = router({
           messages,
           maxTokens: 1024,
         });
-      } catch {
+      } catch (err) {
+        if (err instanceof TRPCError) throw err;
         replyText =
           `⚠️ ${persona.name} is offline right now (no reachable model backend). ` +
           `Your message was saved — configure this persona's model in ` +
           `Settings → Personas and try again.`;
       }
 
-      const reply = store.append(persona.id, "agent", replyText);
+      const reply = await store.append(ctx.user.id, persona.id, "agent", replyText);
 
       NotificationService.getInstance().notify({
         kind: "agent",

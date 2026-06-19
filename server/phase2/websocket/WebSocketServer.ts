@@ -59,6 +59,12 @@ import { AsyncJobService } from "../services/AsyncJobService.js";
 import type { AsyncJobResultEvent } from "../services/AsyncJobService.js";
 import { NotificationService } from "../../_core/NotificationService.js";
 import type { OmnecorNotification } from "../../../shared/notifications.js";
+import { meshNode } from "../../ommesh/core/MeshNode.js";
+import { AgentMessengerStore } from "../../_core/AgentMessengerStore.js";
+import { validatePath } from "../../_core/security.js";
+import { PATHS } from "../../_core/paths.js";
+import path from "path";
+
 
 // Lazy-load node-pty so the server starts even if the native binding isn't built
 let ptyModule: typeof import("node-pty") | null = null;
@@ -91,13 +97,71 @@ function secretsMatch(a: string, b: string): boolean {
   return timingSafeEqual(ha, hb);
 }
 
+const CLOUD_PROVIDER_IDS = new Set([
+  "openai",
+  "anthropic",
+  "gemini",
+  "grok",
+  "huggingface",
+]);
+
+function resolveBackend(data: any): { providerId: string; modelId: string } {
+  const mc = (data?.modelConfig ?? {}) as Record<string, unknown>;
+  const backend = typeof mc.backend === "string" ? mc.backend : "ollama";
+  switch (backend) {
+    case "api":
+      return {
+        providerId: (mc.apiProviderId as string) || "openai",
+        modelId: (mc.apiModelId as string) || "gpt-4o-mini",
+      };
+    case "ommesh":
+      return { providerId: "ommesh", modelId: "phone" };
+    case "ollama":
+    case "cloud_compute":
+    default:
+      return {
+        providerId: "ollama",
+        modelId: (mc.ollamaModel as string) || "llama3.2",
+      };
+  }
+}
+
+function buildSystemPrompt(p: any): string {
+  const custom =
+    typeof p.data?.agentSystemPrompt === "string" && p.data.agentSystemPrompt.trim()
+      ? p.data.agentSystemPrompt.trim()
+      : "";
+  const base = [
+    `You are "${p.name}", an always-on Omnecor agent (type: ${p.type}).`,
+    "You are talking to your operator over the Agent Messenger — a direct chat",
+    "separate from regular project chats. Keep your replies concise and conversational.",
+    "Do NOT output markdown format or bullet points — output plain spoken sentences only.",
+    "Since your reply will be read aloud via Text-to-Speech (TTS), avoid special characters.",
+  ].join(" ");
+  return custom ? `${base}\n\n${custom}` : base;
+}
+
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
 /** WebSocket message from client to server */
 interface ClientMessage {
-  type: "subscribe" | "unsubscribe" | "ping" | "getState" | "pty:spawn" | "pty:input" | "pty:resize" | "pty:kill" | "chat:toTerminal" | "mobile_node_register" | "mobile_node_heartbeat" | "mobile_inference_response";
+  type:
+    | "subscribe"
+    | "unsubscribe"
+    | "ping"
+    | "getState"
+    | "pty:spawn"
+    | "pty:input"
+    | "pty:resize"
+    | "pty:kill"
+    | "chat:toTerminal"
+    | "mobile_node_register"
+    | "mobile_node_heartbeat"
+    | "mobile_inference_response"
+    | "voice:audio_input"
+    | "voice:interrupt";
   channel?: string;
   data?: any;
   // mobile node registration fields (sent at top level, not nested in data)
@@ -132,7 +196,9 @@ interface ServerMessage {
     | "pty:exit"
     | "terminal:toChatOutput"
     | "systemMetrics"
-    | "asyncJobResult";
+    | "asyncJobResult"
+    | "voice:audio_chunk"
+    | "voice:done";
   channel?: string;
   data?: any;
   timestamp?: string;
@@ -152,6 +218,8 @@ interface OmnecorSocket extends WebSocket {
   connectedAt: string;
   ptySession?: PtySession;
   mobileNodeId?: string;
+  userId?: number;
+  openId?: string;
   /**
    * Whether the connection is authenticated. Set at upgrade time from the
    * session cookie (or loopback/zero-login). Unauthenticated connections may
@@ -202,11 +270,17 @@ interface PendingInference {
  * // → receives file events for project "proj_abc"
  * ```
  */
+interface ActiveVoiceSession {
+  aborted: boolean;
+  abortController?: AbortController;
+}
+
 export class OmnecorWebSocketServer {
   private wss: WSServer;
   private clients: Map<string, OmnecorSocket> = new Map();
   private mobileNodes: Map<string, MobileNodeInfo> = new Map();
   private pendingInferences: Map<string, PendingInference> = new Map();
+  private activeVoiceSessions: Map<string, ActiveVoiceSession> = new Map();
   private heartbeatInterval: ReturnType<typeof setInterval> | null = null;
   private telemetryInterval: ReturnType<typeof setInterval> | null = null;
   private prevCpuTimes: ReturnType<typeof osCpus> | null = null;
@@ -276,7 +350,7 @@ export class OmnecorWebSocketServer {
     // only when OMMESH_SECRET is configured; such connections are marked
     // unauthenticated and may send nothing but mobile_node_register until it
     // succeeds.
-    ws.authenticated = await this.resolveAuth(req);
+    ws.authenticated = await this.resolveAuth(req, ws);
     if (!ws.authenticated && !process.env.OMMESH_SECRET) {
       // No session, not loopback/zero-login, and no mesh secret to authenticate
       // a mobile node against — reject (fail-closed).
@@ -336,9 +410,24 @@ export class OmnecorWebSocketServer {
    * cookies on every platform). Mirrors the session verification used by the
    * tRPC context.
    */
-  private async resolveAuth(req: IncomingMessage): Promise<boolean> {
-    if (ENV.zeroLoginMode) return true;
-    if (isLoopbackAddress(req.socket.remoteAddress ?? undefined)) return true;
+  private async resolveAuth(req: IncomingMessage, ws: OmnecorSocket): Promise<boolean> {
+    const { getUserByOpenId } = await import("../../db.factory.js");
+    if (ENV.zeroLoginMode) {
+      const user = await getUserByOpenId("local-zero-login");
+      if (user) {
+        ws.userId = user.id;
+        ws.openId = user.openId;
+      }
+      return true;
+    }
+    if (isLoopbackAddress(req.socket.remoteAddress ?? undefined)) {
+      const user = await getUserByOpenId("local:owner");
+      if (user) {
+        ws.userId = user.id;
+        ws.openId = user.openId;
+      }
+      return true;
+    }
 
     const candidates: string[] = [];
 
@@ -360,7 +449,14 @@ export class OmnecorWebSocketServer {
 
       for (const token of candidates) {
         const session = await sdk.verifySession(token);
-        if (session != null) return true;
+        if (session != null) {
+          const user = await getUserByOpenId(session.openId);
+          if (user) {
+            ws.userId = user.id;
+            ws.openId = user.openId;
+          }
+          return true;
+        }
       }
     } catch {
       /* fall through to unauthenticated */
@@ -476,6 +572,20 @@ export class OmnecorWebSocketServer {
         // send other message types.
         ws.authenticated = true;
         ws.mobileNodeId = nodeId;
+        
+        const defaultOpenId = ENV.zeroLoginMode ? "local-zero-login" : "local:owner";
+        import("../../db.factory.js")
+          .then(({ getUserByOpenId }) => getUserByOpenId(defaultOpenId))
+          .then((dbUser) => {
+            if (dbUser) {
+              ws.userId = dbUser.id;
+              ws.openId = dbUser.openId;
+            }
+          })
+          .catch((err) => {
+            log.error("Failed to resolve user for registered mobile node", err);
+          });
+
         this.mobileNodes.set(nodeId, {
           ws,
           nodeId,
@@ -520,12 +630,331 @@ export class OmnecorWebSocketServer {
         break;
       }
 
+      // ── Voice Input and Interrupt Handlers ────────────────────────────────
+      case "voice:interrupt": {
+        const { jobId } = message.data || {};
+        if (jobId) {
+          const session = this.activeVoiceSessions.get(jobId);
+          if (session) {
+            session.aborted = true;
+            if (session.abortController) {
+              session.abortController.abort();
+            }
+            this.activeVoiceSessions.delete(jobId);
+            log.info("Voice session interrupted by client", { jobId });
+          }
+        }
+        break;
+      }
+
+      case "voice:audio_input": {
+        const { personaId, text, jobId } = message.data || {};
+        if (!personaId || !text || !jobId) {
+          this.sendToClient(ws, {
+            type: "error",
+            data: { message: "voice:audio_input missing personaId, text, or jobId" },
+          });
+          break;
+        }
+
+        // Require a resolved authenticated user — never fall back to user 0,
+        // which would mix messenger threads and skip the sovereign-mode check.
+        if (ws.userId == null) {
+          this.sendToClient(ws, {
+            type: "error",
+            data: { message: "voice:audio_input requires an authenticated session" },
+          });
+          break;
+        }
+        const userId = ws.userId;
+
+        const abortController = new AbortController();
+        const session: ActiveVoiceSession = { aborted: false, abortController };
+        this.activeVoiceSessions.set(jobId, session);
+
+        (async () => {
+          try {
+            const { getDb } = await import("../../db.factory.js");
+            const db = await getDb();
+            const { personas, users } = await import("../../../drizzle/schema.js");
+            const { eq, and } = await import("drizzle-orm");
+
+            const userRows = await db.select().from(users).where(eq(users.id, userId)).limit(1);
+            const user = userRows[0];
+            // Scope the persona to the authenticated user — prevents driving
+            // another user's persona (IDOR) via a guessed personaId.
+            const personaRows = await db
+              .select()
+              .from(personas)
+              .where(and(eq(personas.id, personaId), eq(personas.userId, userId)))
+              .limit(1);
+            const persona = personaRows[0];
+
+            if (!persona) {
+              throw new Error("Persona not found");
+            }
+
+            const personaData = (persona.data ?? {}) as any;
+            const backend = resolveBackend(personaData);
+
+            if (user?.executionMode === "sovereign" && CLOUD_PROVIDER_IDS.has(backend.providerId)) {
+              throw new Error(`Sovereign mode: cloud provider "${backend.providerId}" is disabled. Use a local provider.`);
+            }
+
+            if (this.isBusy()) {
+              const peers = meshNode.getDiscovery().getPeers();
+              if (peers.length > 0) {
+                log.info("PC busy — routing inference remotely", { peersCount: peers.length });
+                const remoteResult = await meshNode.routeInference(text, {
+                  providerId: backend.providerId,
+                  modelId: backend.modelId,
+                });
+                
+                if (session.aborted) return;
+                
+                await this.segmentAndSynthesizeStream(ws, remoteResult.content, persona, jobId, session, userId);
+                return;
+              } else {
+                log.info("PC busy, no remote peers — queueing request up to 60s");
+
+                const busyWarning = "The server is busy. Queueing your request.";
+                await this.synthesizeAndSendLocal(ws, busyWarning, 0, jobId, session);
+
+                let waited = 0;
+                while (this.isBusy() && waited < 60) {
+                  if (session.aborted) return;
+                  await new Promise(r => setTimeout(r, 1000));
+                  waited++;
+                }
+
+                if (this.isBusy()) {
+                  const timeoutWarning = "Server busy timeout. Please try again later.";
+                  await this.synthesizeAndSendLocal(ws, timeoutWarning, 1, jobId, session);
+                  this.sendToClient(ws, {
+                    type: "voice:done",
+                    channel: `voice:stream:${jobId}`,
+                  });
+                  return;
+                }
+              }
+            }
+
+            log.info("PC not busy — executing locally", { providerId: backend.providerId });
+            const { AiProviderService } = await import("../services/AiProviderService.js");
+            const aiProvider = AiProviderService.getInstance();
+
+            const systemPrompt = buildSystemPrompt(persona);
+            const store = AgentMessengerStore.getInstance();
+            const rawHistory = await store.getMessages(userId, persona.id);
+            const history = rawHistory.slice(-10);
+            
+            const messages = [
+              ...history.map(m => ({
+                role: m.role === "agent" ? "assistant" as const : "user" as const,
+                content: m.content,
+              })),
+              { role: "user" as const, content: text }
+            ];
+
+            await store.append(userId, persona.id, "user", text);
+
+            let bufferedText = "";
+            let sentenceIndex = 0;
+            const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
+            let fullReply = "";
+
+            const processChunk = async (chunkText: string, isLast = false) => {
+              bufferedText += chunkText;
+              let match;
+              let lastIndex = 0;
+              while ((match = sentenceRegex.exec(bufferedText)) !== null) {
+                if (session.aborted) return;
+                const sentence = match[0].trim();
+                if (sentence.length > 0) {
+                  await this.synthesizeAndSendLocal(ws, sentence, sentenceIndex++, jobId, session, persona);
+                }
+                lastIndex = sentenceRegex.lastIndex;
+              }
+              if (lastIndex > 0) {
+                bufferedText = bufferedText.slice(lastIndex);
+              }
+              if (isLast && bufferedText.trim().length > 0) {
+                if (session.aborted) return;
+                await this.synthesizeAndSendLocal(ws, bufferedText.trim(), sentenceIndex++, jobId, session, persona);
+                bufferedText = "";
+              }
+            };
+
+            const stream = aiProvider.streamChat({
+              providerId: backend.providerId,
+              modelId: backend.modelId,
+              messages,
+              systemPrompt,
+            });
+
+            for await (const chunk of stream) {
+              if (session.aborted) return;
+              fullReply += chunk.delta;
+              await processChunk(chunk.delta, false);
+            }
+            await processChunk("", true);
+
+            if (session.aborted) return;
+
+            await store.append(userId, persona.id, "agent", fullReply);
+
+            this.sendToClient(ws, {
+              type: "voice:done",
+              channel: `voice:stream:${jobId}`,
+            });
+
+          } catch (err) {
+            log.error("Error running voice turn", err);
+            if (!session.aborted) {
+              const errMsg = err instanceof Error ? err.message : String(err);
+              try {
+                const errorTts = await VoiceService.getInstance().synthesize({
+                  text: `Sorry, I encountered an error: ${errMsg}`,
+                  speakerWavPath: path.join(PATHS.data, "default.wav"),
+                  language: "en",
+                });
+                this.sendToClient(ws, {
+                  type: "voice:audio_chunk",
+                  channel: `voice:stream:${jobId}`,
+                  data: {
+                    chunk: (errorTts.audioBuffer ?? Buffer.alloc(0)).toString("base64"),
+                    index: 0,
+                  },
+                });
+              } catch {
+                /* ignore */
+              }
+              this.sendToClient(ws, {
+                type: "voice:done",
+                channel: `voice:stream:${jobId}`,
+              });
+            }
+          } finally {
+            this.activeVoiceSessions.delete(jobId);
+          }
+        })();
+        break;
+      }
+
       default:
         this.sendToClient(ws, {
           type: "error",
           data: { message: `Unknown message type: ${message.type}` },
         });
     }
+  }
+
+  private isBusy(): boolean {
+    const jobs = this.processManager.getAllJobs();
+    const busyTypes = ["lora_training", "blender", "esp_flash"];
+    return jobs.some(j => j.state === "running" && busyTypes.includes(j.type));
+  }
+
+  private async synthesizeAndSendLocal(
+    ws: OmnecorSocket,
+    text: string,
+    index: number,
+    jobId: string,
+    session: ActiveVoiceSession,
+    persona?: any
+  ): Promise<void> {
+    const fs = await import("fs/promises");
+    const path = await import("path");
+    const { PATHS } = await import("../../_core/paths.js");
+    const voiceSvc = VoiceService.getInstance();
+    
+    const defaultWavPath = path.join(PATHS.data, "default.wav");
+    
+    const ttsRes = await voiceSvc.synthesize({
+      text,
+      speakerWavPath: defaultWavPath,
+      language: "en",
+    });
+    
+    let audioBuffer = ttsRes.audioBuffer ?? Buffer.alloc(0);
+    
+    const vc = persona?.data?.voiceConfig;
+    if (vc && vc.rvcModelPath) {
+      try {
+        const tempBase = path.join(PATHS.data, "temp");
+        await fs.mkdir(tempBase, { recursive: true });
+        const tempInPath = path.join(tempBase, `voice_in_${jobId}_${index}.wav`);
+        await fs.writeFile(tempInPath, audioBuffer);
+        
+        const modelPath = await validatePath(vc.rvcModelPath);
+        const rvcRes = await voiceSvc.convertVoice({
+          audioFilePath: tempInPath,
+          modelPath,
+          pitchShift: typeof vc.pitchShift === "number" ? vc.pitchShift : 0,
+        });
+        
+        if (rvcRes.success && rvcRes.outputPath) {
+          audioBuffer = await fs.readFile(rvcRes.outputPath);
+          await fs.unlink(rvcRes.outputPath).catch(() => {});
+        }
+        await fs.unlink(tempInPath).catch(() => {});
+      } catch (rvcErr) {
+        log.error("RVC conversion failed, falling back to base TTS", rvcErr);
+      }
+    }
+    
+    if (session.aborted) return;
+
+    // Deliver only to the originating socket — never broadcast voice audio on a
+    // shared channel (any subscriber could otherwise eavesdrop). The channel
+    // field is retained purely for client-side jobId correlation.
+    this.sendToClient(ws, {
+      type: "voice:audio_chunk",
+      channel: `voice:stream:${jobId}`,
+      data: {
+        chunk: audioBuffer.toString("base64"),
+        index,
+      },
+    });
+  }
+
+  private async segmentAndSynthesizeStream(
+    ws: OmnecorSocket,
+    fullText: string,
+    persona: any,
+    jobId: string,
+    session: ActiveVoiceSession,
+    userId: number
+  ): Promise<void> {
+    const sentenceRegex = /[^.!?\n]+[.!?\n]+/g;
+    let match;
+    let sentenceIndex = 0;
+    
+    const store = AgentMessengerStore.getInstance();
+    if (userId) {
+      await store.append(userId, persona.id, "agent", fullText);
+    }
+    
+    let text = fullText;
+    let matchedAny = false;
+    while ((match = sentenceRegex.exec(text)) !== null) {
+      if (session.aborted) return;
+      const sentence = match[0].trim();
+      if (sentence.length > 0) {
+        matchedAny = true;
+        await this.synthesizeAndSendLocal(ws, sentence, sentenceIndex++, jobId, session, persona);
+      }
+    }
+
+    if (!matchedAny && text.trim().length > 0) {
+      if (session.aborted) return;
+      await this.synthesizeAndSendLocal(ws, text.trim(), sentenceIndex++, jobId, session, persona);
+    }
+
+    this.sendToClient(ws, {
+      type: "voice:done",
+      channel: `voice:stream:${jobId}`,
+    });
   }
 
   private async handlePtySpawn(ws: OmnecorSocket, data: any): Promise<void> {
@@ -829,7 +1258,7 @@ export class OmnecorWebSocketServer {
   // -------------------------------------------------------------------------
 
   /** Broadcast a message to all clients subscribed to a specific channel */
-  private broadcastToChannel(channel: string, message: ServerMessage): void {
+  public broadcastToChannel(channel: string, message: ServerMessage): void {
     const payload = JSON.stringify(message);
 
     for (const client of this.clients.values()) {

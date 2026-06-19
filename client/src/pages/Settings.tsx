@@ -163,6 +163,7 @@ export const Settings: React.FC = () => {
     { id: "security", label: "Security", icon: Shield },
     { id: "hardware", label: "Hardware", icon: HardDrive },
     { id: "voice", label: "Voice & Media", icon: Mic2 },
+    { id: "offline_voices", label: "Offline Voices", icon: Download },
     { id: "system", label: "System", icon: Cpu },
     { id: "accounts", label: "Accounts", icon: Users },
     { id: "valet", label: "Valet Router", icon: Route },
@@ -725,6 +726,10 @@ export const Settings: React.FC = () => {
                   <VoiceMediaPanel />
                 </TabsContent>
 
+                <TabsContent value="offline_voices">
+                  <OfflineVoicesPanel />
+                </TabsContent>
+
                 <TabsContent value="system">
                   <div className="space-y-6">
                     <WorkstationOptimizationPanel />
@@ -1062,6 +1067,113 @@ const VoiceMediaPanel: React.FC = () => {
           <Save className="w-4 h-4" /> {saveMutation.isPending ? "Saving..." : "Save Voice & Media Settings"}
         </Button>
       </div>
+    </div>
+  );
+};
+
+const OfflineVoicesPanel: React.FC = () => {
+  const { data: offlineVoices, refetch } = trpc.voice.listOfflineVoices.useQuery();
+  const downloadMutation = trpc.voice.downloadVoice.useMutation({
+    onSuccess: (res) => {
+      toast.success(res.message || "Download started");
+      refetch();
+    },
+    onError: (err) => toast.error(err.message),
+  });
+
+  const jobsQuery = trpc.jobs.list.useQuery(undefined, { refetchInterval: 3000 });
+  const activeDownloads = (jobsQuery.data?.jobs ?? []).filter(j => j.state === "running" && j.label?.startsWith("Download Voice"));
+
+  const availableVoices = [
+    { id: "kokoro", name: "Kokoro 82M ONNX", desc: "Super lightweight & ultra-fast local TTS engine model (Kokoro v1.0)", url: "https://huggingface.co/hexgrad/Kokoro-82M/resolve/main/kokoro-v1.0.onnx" },
+    { id: "xtts", name: "XTTS v2 Multilingual Model", desc: "High-quality local cloned speech synthesis weights (XTTS-v2)", url: "https://huggingface.co/coqui/XTTS-v2/resolve/main/model.pth" },
+    { id: "assistant_voice", name: "Assistant Reference Profile (WAV)", desc: "Reference voice file for local cloning", url: "https://github.com/coqui-ai/TTS/raw/main/tests/data/ljspeech/wavs/LJ001-0001.wav" },
+  ];
+
+  const getFilenameFromUrl = (url: string) => {
+    try {
+      return url.substring(url.lastIndexOf('/') + 1);
+    } catch {
+      return "model.onnx";
+    }
+  };
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader>
+          <CardTitle>Downloaded Offline Voices</CardTitle>
+          <CardDescription>Local voice models and speaker reference profiles cached in data/voices/.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {offlineVoices && offlineVoices.length > 0 ? (
+            <div className="space-y-2">
+              {offlineVoices.map((v, idx) => (
+                <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
+                  <div className="flex items-center gap-2">
+                    <Mic2 className="w-4 h-4 text-accent" />
+                    <div>
+                      <p className="text-sm font-semibold">{v.name}</p>
+                      <p className="text-xs text-muted-foreground truncate max-w-lg">{v.path}</p>
+                    </div>
+                  </div>
+                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Active</Badge>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-6 text-sm text-muted-foreground">
+              No offline voices downloaded yet. Select a model below to install it.
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Available Local Voices & Models</CardTitle>
+          <CardDescription>Install local models and references to run voice generation completely offline.</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {availableVoices.map((v) => {
+            const isDownloading = activeDownloads.some(j => j.label?.includes(v.name));
+            const filename = getFilenameFromUrl(v.url);
+            const isDownloaded = offlineVoices?.some(ov => ov.name === filename || ov.name === `${filename}.wav`);
+
+            return (
+              <div key={v.id} className="flex items-center justify-between p-4 rounded-xl border bg-card hover:border-accent/30 transition-all">
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold">{v.name}</p>
+                  <p className="text-xs text-muted-foreground">{v.desc}</p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() => downloadMutation.mutate({ voiceUrl: v.url, voiceName: filename.replace(/\.[^/.]+$/, "") })}
+                  disabled={isDownloading || isDownloaded || downloadMutation.isPending}
+                  className="gap-1.5"
+                >
+                  {isDownloading ? (
+                    <>
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                      Downloading...
+                    </>
+                  ) : isDownloaded ? (
+                    <>
+                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                      Installed
+                    </>
+                  ) : (
+                    <>
+                      <Download className="w-3.5 h-3.5" />
+                      Download
+                    </>
+                  )}
+                </Button>
+              </div>
+            );
+          })}
+        </CardContent>
+      </Card>
     </div>
   );
 };

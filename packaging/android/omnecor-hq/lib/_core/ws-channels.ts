@@ -30,6 +30,10 @@ function send(obj: object) {
   if (_ws && _ws.readyState === WebSocket.OPEN) _ws.send(JSON.stringify(obj));
 }
 
+export function sendWsMessage(obj: object) {
+  send(obj);
+}
+
 function ensureSocket() {
   if (!isServerConfigured()) return;
   if (_ws && (_ws.readyState === WebSocket.OPEN || _ws.readyState === WebSocket.CONNECTING)) return;
