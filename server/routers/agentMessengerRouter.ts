@@ -36,7 +36,7 @@ interface ResolvedPersona {
 /** Load the user's personas as Agent Messenger participants. */
 async function loadPersonas(userId: number | undefined): Promise<ResolvedPersona[]> {
   const db = await getDb();
-  if (!db || !userId) return [];
+  if (!userId) return [];
   const rows = await db.select().from(personas).where(eq(personas.userId, userId));
   return rows.map(r => ({
     id: r.id,
