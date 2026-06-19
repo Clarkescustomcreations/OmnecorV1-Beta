@@ -365,7 +365,7 @@ function SubscriptionPanel() {
 // Root panel
 // ---------------------------------------------------------------------------
 
-const CloudComputePanel: React.FC = () => {
+export const CloudComputePanel: React.FC = () => {
   const [refreshKey, setRefreshKey] = useState(0);
 
   return (
@@ -432,4 +432,3 @@ const CloudComputePanel: React.FC = () => {
   );
 };
 
-export default CloudComputePanel;

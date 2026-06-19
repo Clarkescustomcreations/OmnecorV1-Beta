@@ -25,7 +25,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/lib/store/app.store";
 
-export default function AgenticWalletPanel() {
+export function AgenticWalletPanel() {
   const { data: projects } = trpc.project.list.useQuery();
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
   const [limitDollars, setLimitDollars] = useState<string>("5.00");

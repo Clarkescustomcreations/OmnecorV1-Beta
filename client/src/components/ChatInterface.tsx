@@ -44,8 +44,8 @@ import { cn } from "@/lib/utils";
 import { Streamdown } from "streamdown";
 import { toast } from "sonner";
 import type { ChatMessage, ContextFile, SelectedModel } from "@/lib/chatContext";
-import ChatInput, { type SlashCommand } from "@/components/chat/ChatInput";
-import ModelSelector from "@/components/chat/ModelSelector";
+import { ChatInput, type SlashCommand } from "@/components/chat/ChatInput";
+import { ModelSelector } from "@/components/chat/ModelSelector";
 import { trpc } from "@/lib/trpc";
 import {
   Dialog,
@@ -545,7 +545,7 @@ export interface ChatInterfaceProps {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function ChatInterface({
+export function ChatInterface({
   messages,
   isLoading = false,
   conversationTitle = "Conversation",

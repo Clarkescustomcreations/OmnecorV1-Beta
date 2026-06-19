@@ -23,7 +23,7 @@ interface Props {
   collapsed?: boolean;
 }
 
-export default function UserIdentityCard({ collapsed = false }: Props) {
+export function UserIdentityCard({ collapsed = false }: Props) {
   const { card, update } = useUserPeerCard();
   const [open, setOpen] = useState(false);
   const [skillInput, setSkillInput] = useState("");

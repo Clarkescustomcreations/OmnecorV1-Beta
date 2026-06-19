@@ -125,4 +125,3 @@ export const VoiceProviderSelector: React.FC = () => {
   );
 };
 
-export default VoiceProviderSelector;

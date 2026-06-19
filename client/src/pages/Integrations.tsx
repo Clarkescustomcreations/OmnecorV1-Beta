@@ -1,6 +1,6 @@
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
-import IntegrationsHub from "@/components/IntegrationsHub";
-import MCPToolDirectory from "@/components/integrations/MCPToolDirectory";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
+import { IntegrationsHub } from "@/components/IntegrationsHub";
+import { MCPToolDirectory } from "@/components/integrations/MCPToolDirectory";
 import { Plug } from "lucide-react";
 
 /**
@@ -12,7 +12,7 @@ import { Plug } from "lucide-react";
  * - Slack (team communication, notifications)
  * - Cloud Storage (Google Drive, Dropbox, OneDrive)
  */
-export default function Integrations() {
+export function Integrations() {
   return (
     <OmnecorDashboardLayout>
       <div className="h-full flex flex-col bg-background">

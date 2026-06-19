@@ -228,4 +228,3 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
   );
 };
 
-export default EditorToolbar;

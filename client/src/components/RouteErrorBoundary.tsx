@@ -36,4 +36,3 @@ export function RouteErrorBoundary({ error, resetErrorBoundary }: Props) {
   );
 }
 
-export default RouteErrorBoundary;

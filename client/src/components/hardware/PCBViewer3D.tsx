@@ -15,7 +15,7 @@ interface PCBViewer3DProps {
   className?: string;
 }
 
-export default function PCBViewer3D({ filePath, className }: PCBViewer3DProps) {
+export function PCBViewer3D({ filePath, className }: PCBViewer3DProps) {
   return (
     <div className={`w-full h-96 bg-gray-900 rounded-lg overflow-hidden ${className ?? ""}`}>
       {!filePath ? (

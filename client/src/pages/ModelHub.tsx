@@ -5,7 +5,7 @@
  * API keys are managed exclusively in Settings > AI Providers — not here.
  * "Configure Providers" navigates there directly.
  */
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import {
   Card,
   CardContent,
@@ -19,13 +19,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Label } from "@/components/ui/label";
 import { Zap, RefreshCw, Download, Settings, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { useState, useEffect } from "react";
-import ModelHubPanel from "@/components/ModelHubPanel";
+import { ModelHubPanel } from "@/components/ModelHubPanel";
 import { type AIModel, type ModelMarketplaceItem } from "@/lib/aiModels";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
 
-export default function ModelHub() {
+export function ModelHub() {
   const [selectedModel, setSelectedModel] = useState<AIModel | null>(null);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [preferredQuantization, setPreferredQuantization] = useState("q4_k_m");

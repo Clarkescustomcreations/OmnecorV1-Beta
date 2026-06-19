@@ -111,4 +111,3 @@ export const PCBNode: React.FC<NodeProps<PCBNodeData>> = ({
   );
 };
 
-export default PCBNode;

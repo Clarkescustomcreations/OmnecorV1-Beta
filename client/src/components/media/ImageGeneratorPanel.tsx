@@ -13,7 +13,7 @@ const PROVIDER_LABELS: Record<Provider, string> = {
   openart: "OpenArt",
 };
 
-export default function ImageGeneratorPanel() {
+export function ImageGeneratorPanel() {
   const [provider, setProvider] = useState<Provider>("local");
   const [prompt, setPrompt] = useState("");
   const [model, setModel] = useState("");

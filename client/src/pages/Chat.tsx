@@ -1,17 +1,17 @@
 import { useState, useCallback, useMemo, useEffect, useRef } from "react";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
-import ChatIntegrationBar from "@/components/chat/ChatIntegrationBar";
-import ChatInterface from "@/components/ChatInterface";
-import ContextTransparencyIndicator from "@/components/ContextTransparencyIndicator";
-import VisualContextMap from "@/components/VisualContextMap";
-import ConversationList from "@/components/chat/ConversationList";
-import MemoryArchiverPanel from "@/components/chat/MemoryArchiverPanel";
-import TerminalPanel from "@/components/chat/TerminalPanel";
-import CliTerminalWindow from "@/components/chat/CliTerminalWindow";
-import EmbeddedTerminal from "@/components/terminal/EmbeddedTerminal";
-import HITLCommandApproval from "@/components/terminal/HITLCommandApproval";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
+import { ChatIntegrationBar } from "@/components/chat/ChatIntegrationBar";
+import { ChatInterface } from "@/components/ChatInterface";
+import { ContextTransparencyIndicator } from "@/components/ContextTransparencyIndicator";
+import { VisualContextMap } from "@/components/VisualContextMap";
+import { ConversationList } from "@/components/chat/ConversationList";
+import { MemoryArchiverPanel } from "@/components/chat/MemoryArchiverPanel";
+import { TerminalPanel } from "@/components/chat/TerminalPanel";
+import { CliTerminalWindow } from "@/components/chat/CliTerminalWindow";
+import { EmbeddedTerminal } from "@/components/terminal/EmbeddedTerminal";
+import { HITLCommandApproval } from "@/components/terminal/HITLCommandApproval";
 import { vanillaTrpc, trpc } from "@/lib/trpc";
 import { IS_DEMO } from "@/lib/demo";
 import {
@@ -60,9 +60,9 @@ import { useNeuralContextStore } from "@/lib/neuralContextStore";
 import { useFictionMode } from "@/contexts/FictionModeContext";
 import { ChevronLeft, ChevronRight, Coins, FolderOpen, Box, Cpu, Globe, Maximize2, X, UserCircle2 } from "lucide-react";
 
-import ThreeViewer from "@/components/designer/ThreeViewer";
+import { ThreeViewer } from "@/components/designer/ThreeViewer";
 import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
-import WebPreview from "@/components/designer/WebPreview";
+import { WebPreview } from "@/components/designer/WebPreview";
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -120,7 +120,7 @@ function readFileAsDataURL(file: File): Promise<string> {
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
-export default function Chat() {
+export function Chat() {
   const [, setLocation] = useLocation();
   // ── Model selection ──────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<SelectedModel | undefined>(

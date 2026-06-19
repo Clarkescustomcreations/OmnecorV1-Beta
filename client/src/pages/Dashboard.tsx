@@ -1,5 +1,5 @@
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
-import BudgetPanel from "@/components/wallet/BudgetPanel";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
+import { BudgetPanel } from "@/components/wallet/BudgetPanel";
 import logoMark from "../../../assets/logo_mark_256.png";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import {
@@ -27,7 +27,7 @@ import {
   Activity,
 } from "lucide-react";
 import { Link } from "wouter";
-import ProcessManagerPanel from "@/components/ProcessManagerPanel";
+import { ProcessManagerPanel } from "@/components/ProcessManagerPanel";
 import { trpc } from "@/lib/trpc";
 import { useState, useCallback, useEffect } from "react";
 import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
@@ -46,7 +46,7 @@ interface SystemMetrics {
 /**
  * Omnecor Dashboard Home Page
  */
-export default function Dashboard() {
+export function Dashboard() {
   const [selectedModel] = useState<SelectedModel | undefined>(() => {
     let model: SelectedModel | undefined;
     try { model = JSON.parse(localStorage.getItem("omnecor:selectedModel") ?? "null") as SelectedModel | undefined ?? undefined; } catch { model = undefined; }

@@ -13,7 +13,7 @@ interface ExecutionModeBadgeProps {
   collapsed?: boolean;
 }
 
-export default function ExecutionModeBadge({ collapsed = false }: ExecutionModeBadgeProps) {
+export function ExecutionModeBadge({ collapsed = false }: ExecutionModeBadgeProps) {
   const mode = useAppStore((s) => s.executionMode);
   const config = MODE_CONFIG[mode];
   const Icon = config.icon;

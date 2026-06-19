@@ -25,7 +25,7 @@ interface DiscoveredPeer {
   capabilities?: NodeCapabilities;
 }
 
-export default function PeerCard() {
+export function PeerCard() {
   const [expanded, setExpanded] = useState(false);
 
   const { data: peers = [], isLoading } = trpc.ommesh.discover.useQuery(undefined, {

@@ -279,4 +279,3 @@ What would you like help with?`,
   );
 };
 
-export default AIAssistantPanel;

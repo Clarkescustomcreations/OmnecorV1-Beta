@@ -11,7 +11,7 @@ import {
 import { createRoot } from "react-dom/client";
 import superjson from "superjson";
 import { toast } from "sonner";
-import App from "./App";
+import { App } from "./App";
 import { getLoginUrl } from "./const";
 import { FictionModeProvider } from "./contexts/FictionModeContext";
 import { IS_DEMO } from "@/lib/demo";

@@ -903,7 +903,7 @@ export function BrainMapViewport(props: Partial<NeuralGraphViewProps>) {
   return <BrainMapViewportInner {...props} />;
 }
 
-export default function NeuralGraphView(props: NeuralGraphViewProps) {
+export function NeuralGraphView(props: NeuralGraphViewProps) {
   const { network, projectId } = props;
   const setNodes = useBrainMapStore(s => s.setNodes);
   const setEdges = useBrainMapStore(s => s.setEdges);

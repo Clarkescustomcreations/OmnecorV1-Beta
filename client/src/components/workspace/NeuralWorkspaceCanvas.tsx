@@ -14,7 +14,7 @@ import ReactFlow, {
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 
-import FileNode from './nodes/FileNode';
+import { FileNode } from './nodes/FileNode';
 import { trpc } from '../../lib/trpc';
 import { WebSocketManager } from '../../lib/websocket';
 import { Button } from '../ui/button';

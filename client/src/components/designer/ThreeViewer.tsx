@@ -330,7 +330,7 @@ function CanvasBackground({ onDeselect }: { onDeselect: () => void }) {
 
 // ── Main export ────────────────────────────────────────────────────────────────
 
-export default function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
+export function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [aiQuery, setAiQuery] = useState("");
   const [loadedObject, setLoadedObject] = useState<THREE.Object3D | null>(null);

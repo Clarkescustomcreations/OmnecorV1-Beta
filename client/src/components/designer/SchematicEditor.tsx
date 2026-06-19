@@ -43,7 +43,7 @@ const initialEdges = [
   { id: 'e2-3', source: '2', target: '3', sourceHandle: 'out', targetHandle: 'in2', style: { stroke: '#f59e0b', strokeWidth: 2 } },
 ];
 
-export default function SchematicEditor() {
+export function SchematicEditor() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes);
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges);
 

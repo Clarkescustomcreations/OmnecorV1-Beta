@@ -29,7 +29,7 @@ interface VisualContextMapProps {
  * - Manually eject files from context
  * - View file previews and metadata
  */
-export default function VisualContextMap({
+export function VisualContextMap({
   files,
   onToggleFile,
   onRemoveFile,

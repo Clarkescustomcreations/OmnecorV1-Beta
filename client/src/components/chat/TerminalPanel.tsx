@@ -20,7 +20,7 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useCommandAllowlistStore } from "@/lib/stores/commandAllowlistStore";
-import HITLCommandApproval from "@/components/terminal/HITLCommandApproval";
+import { HITLCommandApproval } from "@/components/terminal/HITLCommandApproval";
 import { toast } from "sonner";
 
 interface LogEntry {
@@ -35,7 +35,7 @@ interface TerminalPanelProps {
   projectId?: string;
 }
 
-export default function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProps) {
+export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProps) {
   const [logs, setLogs] = useState<LogEntry[]>([
     { id: "s0", text: "Omnecor Sandbox Terminal ready. AI and user share this session.", kind: "system" },
     { id: "s1", text: "Commands are gated by HITL approval. Toggle Secret Mode for passwords.", kind: "system" },

@@ -48,7 +48,7 @@ interface EmbeddedTerminalProps {
   projectId?: string;
 }
 
-export default function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTerminalProps) {
+export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTerminalProps) {
   const termRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);

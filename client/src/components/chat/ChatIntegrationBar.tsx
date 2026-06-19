@@ -14,7 +14,7 @@ interface ChatIntegrationBarProps {
   onInjectContext: (snippet: string) => void;
 }
 
-export default function ChatIntegrationBar({ onInjectContext }: ChatIntegrationBarProps) {
+export function ChatIntegrationBar({ onInjectContext }: ChatIntegrationBarProps) {
   const { data: integrations } = trpc.integrations.getIntegrations.useQuery(undefined, {
     staleTime: 60_000,
   });

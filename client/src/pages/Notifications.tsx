@@ -13,7 +13,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useSearch } from "wouter";
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { useNotifications } from "@/hooks/useNotifications";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -300,7 +300,7 @@ function AgentMessenger({ initialPersona }: { initialPersona?: string }) {
 
 // ─── Page ────────────────────────────────────────────────────────────────────
 
-export default function Notifications() {
+export function Notifications() {
   const search = useSearch();
   const params = new URLSearchParams(search);
   const personaParam = params.get("persona") ?? undefined;

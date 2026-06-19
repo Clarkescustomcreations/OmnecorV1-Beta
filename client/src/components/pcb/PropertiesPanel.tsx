@@ -190,4 +190,3 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
   );
 };
 
-export default PropertiesPanel;

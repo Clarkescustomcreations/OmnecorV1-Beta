@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
 
-export default function UpdateBanner() {
+export function UpdateBanner() {
   const [dismissed, setDismissed] = useState(() => {
     return sessionStorage.getItem("update-banner-dismissed") === "true";
   });

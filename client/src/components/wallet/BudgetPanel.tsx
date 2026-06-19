@@ -4,14 +4,14 @@ import { Badge } from "@/components/ui/badge";
 import { Wallet, AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { useWalletStore } from "@/lib/store/app.store";
-import BudgetConfigDialog from "./BudgetConfigDialog";
+import { BudgetConfigDialog } from "./BudgetConfigDialog";
 
 interface BudgetPanelProps {
   projectId: string;
   className?: string;
 }
 
-export default function BudgetPanel({ projectId, className }: BudgetPanelProps) {
+export function BudgetPanel({ projectId, className }: BudgetPanelProps) {
   const { data: budget } = trpc.wallet.getBudget.useQuery({ projectId });
   const { data: summary } = trpc.wallet.getSpendSummary.useQuery({ projectId });
 

@@ -7,7 +7,7 @@ import { toast } from "sonner";
 
 type Finding = { tool: string; rule: string; file: string; line: number; message: string };
 
-export default function ThreatDashboard() {
+export function ThreatDashboard() {
   const [activeTab, setActiveTab] = useState<"scan" | "ioc">("scan");
   const [targetPath, setTargetPath] = useState(".");
 

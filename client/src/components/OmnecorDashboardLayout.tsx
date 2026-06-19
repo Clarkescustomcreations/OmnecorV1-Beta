@@ -26,12 +26,12 @@ import {
 import { Wallet } from "lucide-react";
 import { Link, useLocation } from "wouter";
 import { cn } from "@/lib/utils";
-import HITLAlertPanel from "./HITLAlertPanel";
+import { HITLAlertPanel } from "./HITLAlertPanel";
 import { useFictionMode } from "@/contexts/FictionModeContext";
-import ExecutionModeBadge from "@/components/shell/ExecutionModeBadge";
-import ZeroLoginBanner from "@/components/shell/ZeroLoginBanner";
-import PeerCard from "@/components/shell/PeerCard";
-import UserIdentityCard from "@/components/shell/UserIdentityCard";
+import { ExecutionModeBadge } from "@/components/shell/ExecutionModeBadge";
+import { ZeroLoginBanner } from "@/components/shell/ZeroLoginBanner";
+import { PeerCard } from "@/components/shell/PeerCard";
+import { UserIdentityCard } from "@/components/shell/UserIdentityCard";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import { useAppStore } from "@/lib/store/app.store";
 import { trpc } from "@/lib/trpc";
@@ -57,7 +57,7 @@ interface OmnecorDashboardLayoutProps {
  * - User profile and logout button
  * - Refined OKLCH color palette
  */
-export default function OmnecorDashboardLayout({
+export function OmnecorDashboardLayout({
   children,
 }: OmnecorDashboardLayoutProps) {
   const [location] = useLocation();

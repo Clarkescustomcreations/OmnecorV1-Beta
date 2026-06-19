@@ -1,4 +1,4 @@
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import {
   Card,
   CardContent,
@@ -9,10 +9,10 @@ import {
 import { Button } from "@/components/ui/button";
 import { Brain, Grid3x3, List, Settings, Shield, Maximize2, Anchor, ExternalLink, PanelRightClose, PanelRightOpen, Palette, Layers, Activity, Filter, Zap, X as XIcon, Pencil, Lock, LockOpen, Map, MessageSquare, FolderOpen } from "lucide-react";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
-import NeuralGraphView, { BrainMapViewport } from "@/components/neural/NeuralGraphView";
-import NeuralTreeView from "@/components/neural/NeuralTreeView";
-import MapManager from "@/components/neural/MapManager";
-import FictionModePanel from "@/components/neural/FictionModePanel";
+import { NeuralGraphView, BrainMapViewport } from "@/components/neural/NeuralGraphView";
+import { NeuralTreeView } from "@/components/neural/NeuralTreeView";
+import { MapManager } from "@/components/neural/MapManager";
+import { FictionModePanel } from "@/components/neural/FictionModePanel";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useBrainMapStore } from "@/lib/stores/brainMapStore";
 import { useAppStore } from "@/lib/store/app.store";
@@ -1169,7 +1169,7 @@ function BrainMapContent() {
   );
 }
 
-export default function BrainMap() {
+export function BrainMap() {
   return <NeuralMapWrapper />;
 }
 

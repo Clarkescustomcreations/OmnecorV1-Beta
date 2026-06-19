@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 
-export default function ZeroLoginBanner() {
+export function ZeroLoginBanner() {
   const [dismissed, setDismissed] = useState(false);
 
   if (dismissed) return null;

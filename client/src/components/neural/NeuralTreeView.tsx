@@ -20,7 +20,7 @@ interface NeuralTreeViewProps {
   readOnly?: boolean;
 }
 
-export default function NeuralTreeView({
+export function NeuralTreeView({
   network,
   onNodeClick,
   onNodeDoubleClick,

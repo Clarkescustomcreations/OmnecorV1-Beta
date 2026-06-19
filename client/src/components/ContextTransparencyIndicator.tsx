@@ -29,7 +29,7 @@ interface ContextTransparencyIndicatorProps {
  * - File inclusion status with quick toggle
  * - Warning indicators for high token usage
  */
-export default function ContextTransparencyIndicator({
+export function ContextTransparencyIndicator({
   transparency,
   className,
 }: ContextTransparencyIndicatorProps) {

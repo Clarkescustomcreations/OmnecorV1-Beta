@@ -42,7 +42,7 @@ interface PCBQuote {
   id: string;
 }
 
-export default function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps) {
+export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps) {
   const [activeTab, setActiveTab] = useState(mode);
   const [quote, setQuote] = useState<PCBQuote | null>(null);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);

@@ -42,7 +42,7 @@ const STEPS = [
   { id: "finish", title: "Ready to Launch", description: "Your workstation is fully configured." },
 ];
 
-export default function SetupWizard() {
+export function SetupWizard() {
   const [, setLocation] = useLocation();
   const [currentStep, setCurrentStep] = useState(0);
   const progress = ((currentStep + 1) / STEPS.length) * 100;

@@ -1792,7 +1792,7 @@ function PersonaLibraryCard({
 
 const PERSONA_MIGRATED_KEY = "omnecor_personas_migrated_v1";
 
-const PersonaCreationPanel: React.FC = () => {
+export const PersonaCreationPanel: React.FC = () => {
   const [personas, setPersonas] = useState<Persona[]>(() => loadPersonas());
   const [current, setCurrent] = useState<Persona>(() => emptyPersona());
   const [isSaving, setIsSaving] = useState(false);
@@ -2005,4 +2005,3 @@ const PersonaCreationPanel: React.FC = () => {
   );
 };
 
-export default PersonaCreationPanel;

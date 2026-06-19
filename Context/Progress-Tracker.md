@@ -26,6 +26,7 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 
 ### Security, Correctness & Design-Token Sweep — completed (2026-06-19, Linux)
 
+*   **Export Default Debt Resolved:** Conducted a mass-rename sweep across the React codebase and routers. Converted all 77 files containing default exports to use named exports exclusively. Updated all import statements and dynamic lazy-load references across 19 importing files (including `App.tsx` and `main.tsx`).
 *   **Real BPE tokenizer (`js-tiktoken@1.0.21`):** `client/src/lib/tokenizer.ts` added — model-aware encoding (o200k_base for GPT-4o/Claude 4/Gemini, cl100k_base for legacy). `estimateTokens()` in `chatContext.ts` now delegates to real BPE instead of chars/4 approximation. `Chat.tsx` passes `selectedModel.modelId` for per-model accuracy.
 *   **Dead `!db` branch removed:** `agentMessengerRouter.ts:39` — `if (!db || !userId)` → `if (!userId)`. `getDb()` never returns null; the dead branch was misleading.
 *   **Rate limiter dev-mode fix:** `server/_core/index.ts` — `skip: (req) => !req.path.startsWith("/api")` added to express-rate-limit config. Prevents 429s on cold Vite module fetches (100-request burst) while keeping the API limit intact.
@@ -419,7 +420,7 @@ Verified: live `trainingRouter` (`routers/trainingRouter.ts`) is **already fully
 
 ## Known debt (documented, not sweep-fixable — pervasive/established, would require a rewrite)
 - **RESOLVED (2026-06-15):** Cleaned up all 83 leftover `if (!db)` null-guards (harmless dead branches since `getDb()` is never null) across the server codebase.
-- ~60 default-export components vs Code-Standards §1.1 "named exports only" — established page/lazy pattern.
+- **RESOLVED (2026-06-19):** Converted all 77 default-export components/routers to named exports and updated import statements across the codebase.
 - ~649 raw Tailwind color classes + scattered hex literals in `client/src` vs AGENTS "no hardcoded colors" — established status-color style (emerald=ok, rose=err). Legit hex: `EmbeddedTerminal` (xterm theme), `ThreeViewer`/`SchematicEditor` (three.js/reactflow), `WebPreview` (iframe).
 - Template-brand ("Manus") leftovers remain only in `server/_core/{notification,map,sdk,storage}.ts` **comments/default strings** (active files — cosmetic, not dead code). `ManusDialog.tsx` itself was deleted (see cleanup above).
 - Server `: any` **type annotations** (not `as any` casts — those are eliminated, see accepted list above) remain behind validated boundaries: untyped third-party libs (`bonjour`, ChromaClient), dynamic WS event payloads, and the `db: any` context field. Intentional, not sweep-fixable.

@@ -1,8 +1,8 @@
 import { useState } from "react";
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
-import SpecializedModuleLauncher from "@/components/SpecializedModuleLauncher";
-import PhaseOutputPanel from "@/components/pipelines/PhaseOutputPanel";
-import JobsPanel from "@/components/pipelines/JobsPanel";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
+import { SpecializedModuleLauncher } from "@/components/SpecializedModuleLauncher";
+import { PhaseOutputPanel } from "@/components/pipelines/PhaseOutputPanel";
+import { JobsPanel } from "@/components/pipelines/JobsPanel";
 import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -21,7 +21,7 @@ const phaseColor: Record<string, string> = {
   DONE: "bg-accent-success text-foreground",
 };
 
-export default function Pipelines() {
+export function Pipelines() {
   const [selectedPipelineId, setSelectedPipelineId] = useState<string | null>(null);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState("");

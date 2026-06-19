@@ -54,7 +54,7 @@ function timeAgo(iso: string | Date): string {
   return new Date(iso).toLocaleDateString();
 }
 
-export default function ConversationList({
+export function ConversationList({
   conversations,
   activeId,
   onSelect,

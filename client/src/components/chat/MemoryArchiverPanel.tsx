@@ -29,7 +29,7 @@ interface MemoryArchiverPanelProps {
   selectedModel: { providerId: string; modelId: string; apiKey?: string; baseUrl?: string } | null | undefined;
 }
 
-export default function MemoryArchiverPanel({ sessionId, projectId, selectedModel }: MemoryArchiverPanelProps) {
+export function MemoryArchiverPanel({ sessionId, projectId, selectedModel }: MemoryArchiverPanelProps) {
   const [isArchiving, setIsArchiving] = useState(false);
   const utils = trpc.useUtils();
 

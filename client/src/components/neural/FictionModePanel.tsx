@@ -10,7 +10,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
 
-export default function FictionModePanel() {
+export function FictionModePanel() {
   const { fictionState, addFictionNode, addTimelineEvent, updateLore } = useFictionMode();
   const [activeTab, setActiveTab] = useState("lore");
 

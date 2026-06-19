@@ -21,14 +21,14 @@ import {
   Eye, Layout, Clock, Coins, Brain, Copy, RefreshCw, Usb, Rocket
 } from "lucide-react";
 import { useTheme, type Theme } from "../contexts/ThemeContext";
-import CloudComputePanel from "../components/settings/CloudComputePanel";
+import { CloudComputePanel } from "../components/settings/CloudComputePanel";
 import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
-import ValetRouterPanel from "../components/settings/ValetRouterPanel";
+import { ValetRouterPanel } from "../components/settings/ValetRouterPanel";
 import { AuditRetentionPanel } from "../components/settings/AuditRetentionPanel";
-import AgenticWalletPanel from "../components/settings/AgenticWalletPanel";
+import { AgenticWalletPanel } from "../components/settings/AgenticWalletPanel";
 import { advancedSettings } from "../lib/advancedSettings";
-import OmnecorDashboardLayout from "../components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "../components/OmnecorDashboardLayout";
 import { useLocation } from "wouter";
 import { cn } from "@/lib/utils";
 import { applyFontSize, getStoredFontSize } from "@/lib/fontSize";
@@ -2631,4 +2631,3 @@ const AdvancedPanel: React.FC = () => {
   );
 };
 
-export default Settings;

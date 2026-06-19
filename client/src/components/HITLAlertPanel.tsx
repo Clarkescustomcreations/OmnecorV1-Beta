@@ -30,7 +30,7 @@ interface HITLAlertPanelProps {
  * Displays human-in-the-loop alerts for loop detection.
  * Non-dismissible without explicit user action (retry, modify, or abort).
  */
-export default function HITLAlertPanel({
+export function HITLAlertPanel({
   alert: propAlert,
   onRetry,
   onModify,

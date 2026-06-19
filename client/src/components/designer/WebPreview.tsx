@@ -30,7 +30,7 @@ interface WebPreviewProps {
   onTextHighlight?: (text: string) => void;
 }
 
-export default function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps) {
+export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps) {
   const [loading, setLoading] = useState(true);
   const [editMode, setEditMode] = useState(false);
   const [selectedElement, setSelectedElement] = useState<ElementData | null>(null);

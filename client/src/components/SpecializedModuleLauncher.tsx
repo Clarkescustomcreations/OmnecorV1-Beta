@@ -36,7 +36,7 @@ interface SpecializedModuleLauncherProps {
  * 2. AI-Assisted 3D Modeler - Blender co-pilot
  * 3. AI-Assisted PCB Designer - KiCad co-pilot
  */
-export default function SpecializedModuleLauncher({
+export function SpecializedModuleLauncher({
   className,
 }: SpecializedModuleLauncherProps) {
   const [, setLocation] = useLocation();

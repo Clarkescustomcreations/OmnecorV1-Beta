@@ -166,4 +166,3 @@ export const NetlistPanel: React.FC<NetlistPanelProps> = ({
   );
 };
 
-export default NetlistPanel;

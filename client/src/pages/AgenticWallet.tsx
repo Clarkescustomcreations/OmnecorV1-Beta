@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
@@ -7,7 +7,7 @@ import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/com
 import { Progress } from "@/components/ui/progress";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import VirtualCardPanel from "@/components/wallet/VirtualCardPanel";
+import { VirtualCardPanel } from "@/components/wallet/VirtualCardPanel";
 import { 
   Wallet, 
   CreditCard, 
@@ -18,7 +18,7 @@ import {
 
 const GLOBAL_WALLET_ID = "__global__";
 
-export default function AgenticWallet() {
+export function AgenticWallet() {
   const { data: projects } = trpc.project.list.useQuery();
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
 

@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from "react";
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import { Box, Code2, Cpu, Globe, Maximize2, ExternalLink, Anchor, Columns, Plus, Trash2, Check, X, Sparkles, MessageSquare, AlertCircle, FileText, CheckCircle, RefreshCw, Folder, Save, Settings, CircuitBoard } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
@@ -10,10 +10,10 @@ import { diffLines } from "diff";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
-import ThreeViewer from "@/components/designer/ThreeViewer";
+import { ThreeViewer } from "@/components/designer/ThreeViewer";
 import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
-import WebPreview from "@/components/designer/WebPreview";
-import ManufacturingPanel from "@/components/designer/ManufacturingPanel";
+import { WebPreview } from "@/components/designer/WebPreview";
+import { ManufacturingPanel } from "@/components/designer/ManufacturingPanel";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useDesignerStore } from "@/lib/stores/designerStore";
 import { cn } from "@/lib/utils";
@@ -21,7 +21,7 @@ import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 type DesignMode = "3d" | "pcb" | "web" | "code";
 
-export default function Designer3D() {
+export function Designer3D() {
   const [mode, setMode] = useState<DesignMode>("3d");
   const [initialCode, setInitialCode] = useState("");
   const [splitView, setSplitView] = useState(false);

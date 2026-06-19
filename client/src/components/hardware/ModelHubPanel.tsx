@@ -432,4 +432,3 @@ export const ModelHubPanel: React.FC = () => {
   );
 };
 
-export default ModelHubPanel;

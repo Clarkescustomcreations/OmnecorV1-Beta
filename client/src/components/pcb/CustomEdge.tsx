@@ -69,4 +69,3 @@ export const CustomEdge: React.FC<EdgeProps> = ({
   );
 };
 
-export default CustomEdge;

@@ -3,30 +3,30 @@ import { toast } from "sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { Route, Router, Switch, useLocation } from "wouter";
 import { useEffect, Suspense, lazy, ComponentType, Component, ReactNode } from "react";
-import ErrorBoundary from "./components/ErrorBoundary";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { RouteErrorBoundary } from "./components/RouteErrorBoundary";
 import { ThemeProvider } from "./contexts/ThemeContext";
 import { NeuralMapProvider } from "./contexts/NeuralMapContext";
-import CommandPalette from "./components/shell/CommandPalette";
-import PageSkeleton from "./components/PageSkeleton";
+import { CommandPalette } from "./components/shell/CommandPalette";
+import { PageSkeleton } from "./components/PageSkeleton";
 
 // Lazy-load each page so Vite splits it into its own chunk.
 // Only the shell (CommandPalette, toaster, theme) loads eagerly.
-const Dashboard = lazy(() => import("@/pages/Dashboard"));
-const Chat = lazy(() => import("@/pages/Chat"));
-const BrainMap = lazy(() => import("@/pages/BrainMap"));
-const ModelHub = lazy(() => import("@/pages/ModelHub"));
-const Pipelines = lazy(() => import("@/pages/Pipelines"));
-const Designer3D = lazy(() => import("@/pages/3DDesigner"));
-const Integrations = lazy(() => import("@/pages/Integrations"));
-const SettingsPage = lazy(() => import("@/pages/Settings"));
-const AgentNetworking = lazy(() => import("@/pages/AgentNetworking"));
-const PodcastStudio = lazy(() => import("@/pages/PodcastStudio"));
-const NotFound = lazy(() => import("@/pages/NotFound"));
-const AgenticWallet = lazy(() => import("@/pages/AgenticWallet"));
-const Notifications = lazy(() => import("@/pages/Notifications"));
-const SetupWizard = lazy(() => import("@/pages/SetupWizard"));
-const ExternalBrainMapWindow = lazy(() => import("./components/window-system/ExternalBrainMapWindow"));
+const Dashboard = lazy(() => import("@/pages/Dashboard").then(m => ({ default: m.Dashboard })));
+const Chat = lazy(() => import("@/pages/Chat").then(m => ({ default: m.Chat })));
+const BrainMap = lazy(() => import("@/pages/BrainMap").then(m => ({ default: m.BrainMap })));
+const ModelHub = lazy(() => import("@/pages/ModelHub").then(m => ({ default: m.ModelHub })));
+const Pipelines = lazy(() => import("@/pages/Pipelines").then(m => ({ default: m.Pipelines })));
+const Designer3D = lazy(() => import("@/pages/3DDesigner").then(m => ({ default: m.Designer3D })));
+const Integrations = lazy(() => import("@/pages/Integrations").then(m => ({ default: m.Integrations })));
+const SettingsPage = lazy(() => import("@/pages/Settings").then(m => ({ default: m.Settings })));
+const AgentNetworking = lazy(() => import("@/pages/AgentNetworking").then(m => ({ default: m.AgentNetworking })));
+const PodcastStudio = lazy(() => import("@/pages/PodcastStudio").then(m => ({ default: m.PodcastStudio })));
+const NotFound = lazy(() => import("@/pages/NotFound").then(m => ({ default: m.NotFound })));
+const AgenticWallet = lazy(() => import("@/pages/AgenticWallet").then(m => ({ default: m.AgenticWallet })));
+const Notifications = lazy(() => import("@/pages/Notifications").then(m => ({ default: m.Notifications })));
+const SetupWizard = lazy(() => import("@/pages/SetupWizard").then(m => ({ default: m.SetupWizard })));
+const ExternalBrainMapWindow = lazy(() => import("./components/window-system/ExternalBrainMapWindow").then(m => ({ default: m.ExternalBrainMapWindow })));
 
 /** Per-route error boundary that renders RouteErrorBoundary on failure. */
 class RouteBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -103,7 +103,7 @@ function RouterRoutes() {
 //   to keep consistent foreground/background color across components
 // - If you want to make theme switchable, pass `switchable` ThemeProvider and use `useTheme` hook
 
-function App() {
+export function App() {
   useEffect(() => {
     // Initialize keyboard shortcuts on mount
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -140,4 +140,3 @@ function App() {
   );
 }
 
-export default App;

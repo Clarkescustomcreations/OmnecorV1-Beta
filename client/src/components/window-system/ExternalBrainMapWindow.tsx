@@ -6,7 +6,7 @@ import { useBrainMapStore } from "@/lib/stores/brainMapStore";
 import { Brain, Anchor } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
-export default function ExternalBrainMapWindow() {
+export function ExternalBrainMapWindow() {
   const { setWindowMode } = useBrainMapStore();
 
   useEffect(() => {

@@ -72,7 +72,7 @@ function SectionHeader({ label, open, onToggle, children }: { label: string; ope
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-export default function MapManager() {
+export function MapManager() {
   const { maps, activeMapId, createMap, deleteMap, setActiveMap, duplicateMap } = useNeuralMap();
   const [isOpen, setIsOpen] = useState(false);
 

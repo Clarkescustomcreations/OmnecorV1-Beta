@@ -13,7 +13,7 @@ const phaseStatusColor: Record<string, string> = {
   rejected: "bg-red-700 text-red-100",
 };
 
-export default function PhaseOutputPanel({ pipelineId }: { pipelineId: string }) {
+export function PhaseOutputPanel({ pipelineId }: { pipelineId: string }) {
   const result = trpc.pipeline.getPipeline.useQuery(
     { pipelineId },
     {

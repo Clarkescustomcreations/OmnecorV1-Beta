@@ -58,7 +58,7 @@ interface SettingsPanelProps {
  * - General preferences
  * - Advanced configuration
  */
-export default function SettingsPanel({ className }: SettingsPanelProps) {
+export function SettingsPanel({ className }: SettingsPanelProps) {
   const { data: savedSettings } = trpc.system.getSettings.useQuery(undefined, {
     staleTime: Infinity, // only fetch once per session
   });

@@ -90,7 +90,7 @@ interface IntegrationsHubProps {
   className?: string;
 }
 
-export default function IntegrationsHub({ className }: IntegrationsHubProps) {
+export function IntegrationsHub({ className }: IntegrationsHubProps) {
   const [activeTab, setActiveTab] = useState<"connected" | "available" | "social">("connected");
   const [connectType, setConnectType] = useState<IntegrationType | null>(null);
   const [tokenInput, setTokenInput] = useState("");

@@ -84,7 +84,7 @@ function iconForCommand(cmd: CommandEntry): React.ReactNode {
   }
 }
 
-export default function CommandPalette() {
+export function CommandPalette() {
   const {
     commandPaletteOpen: open,
     setCommandPaletteOpen: setOpen,

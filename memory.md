@@ -1,30 +1,28 @@
-# Memory — Voice Pipeline Experience & Phase 5 Integration
+# Memory — Export Default Debt Sweep & named Exports Refactoring
 
-Last updated: 2026-06-18T18:57:00-03:00
+Last updated: 2026-06-19T15:10:00-03:00
 
 ## What was built
 
-- **PC-Side WebSocket Voice Orchestration:** Wired client handlers for `voice:audio_input` and `voice:interrupt` inside [WebSocketServer.ts](file:///home/linux/Documents/OmnecorV1-Beta/server/phase2/websocket/WebSocketServer.ts).
-- **Workstation Busy Verification:** Implemented `isBusy()` to scan running jobs (LoRA training, Blender renders, ESP flashing) to determine node utilization.
-- **OMMESH Failover and Queueing:** Deployed failover checks inside `voice:audio_input` to route LLM inference to idle OMMESH nodes when the local server is busy, or queue request slots locally for up to 60s when no peers exist.
-- **Sentence-Segmented Synthesis Stream:** Deployed a regex sentence chunking loop that feeds punctuation-segmented sentences sequentially to `VoiceService.getInstance().synthesize` (and optional RVC post-processing), broadcasting base64 chunks directly back to the client.
-- **Default Audio Seeding:** Added startup copying/generation for a fallback `data/default.wav` speaker profile in [index.ts](file:///home/linux/Documents/OmnecorV1-Beta/server/_core/index.ts) to prevent synthesis engine path failures.
-- **Mobile Voice Fallback Timeout:** Tuned the client fallback timeout in [always-listen.ts](file:///home/linux/Documents/OmnecorV1-Beta/packaging/android/omnecor-hq/lib/_core/always-listen.ts) from 4s to 8s.
+- **Mass Named Exports Sweep:** Rewrote all 77 files containing default exports (React page files, components, and tRPC routers) to named exports in compliance with `AGENTS.md` and `Code-Standards.md` rules.
+- **Import Statements Refactoring:** Updated static import statements, brace-destructuring, and dynamic lazy-load wrapper calls (`lazy(() => import(...).then(m => ({ default: m.Component })))`) across 19 files (including `App.tsx` and `main.tsx`).
+- **Unused default exports deletion:** Cleaned up unused default exports (such as in `ommesh.router.ts`) that were already being imported as named exports elsewhere.
 
 ## Decisions made
 
-- **Dynamic Voice Service Routing:** Routed voice synthesis through the singleton `VoiceService` abstraction to delegate engine-specific payloads (Kokoro vs XTTS-v2), avoiding raw HTTP `fetch` logic inside the websocket socket controller.
-- **Fail-Safe Active Status Verification:** Configured `voice:interrupt` client signals to abort active async loops mid-execution, preventing wasted server inference.
+- **Regex-Safe Import Parsing:** Configured the import pattern regex to prevent matching across side-effect imports (like `import 'style.css'` followed by a blank space and a component import) by enforcing negative lookahead boundary checks on the `import` keyword (`(?:(?!import)[\s\S])+?`).
+- **Safe Named Memo Wrappers:** Wrapped default-exported `memo(Component)` exports (specifically in `FileNode.tsx`) inside named `memo` variable exports without needing manual bracket matches.
 
 ## Problems solved
 
-- **High-Latency Native TTS Triggers:** Solved premature triggering of mobile offline TTS during slow Tailscale route resolution by increasing the fallback timeout to 8 seconds.
-- **Speaker Profile Path Failures:** Handled synthesizer crashes on fresh workspaces when no custom WAV speaker profile exists by auto-seeding `default.wav` at boot.
+- **FileNode import compilation error (TS2613):** Fixed a tsc build block in `NeuralWorkspaceCanvas.tsx` by correctly rewriting the default `FileNode` import to the new named import syntax.
+- **Import matching skips:** Resolved issues where certain imports were skipped due to side-effect imports (like style sheets) confusing the parser.
 
 ## Current state
 
-- **Verification Status:** `pnpm check` and `pnpm test` both pass successfully (350/350 tests green).
-- **Production Readiness:** `pnpm build` successfully compiled the production client and backend bundles in 53.95s.
+- **Verification Status:** `pnpm check` typecheck passes with 0 errors.
+- **Test Suite:** `pnpm test` runs and passes with 353/353 green tests.
+- **Git status:** Clean, consistent named exports across all 77 components/routers.
 
 ## Next session starts with
 

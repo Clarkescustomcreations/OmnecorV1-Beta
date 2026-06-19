@@ -14,7 +14,7 @@ import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { useCommandAllowlistStore, type AllowScope } from "@/lib/stores/commandAllowlistStore";
 
-export default function HITLCommandApproval() {
+export function HITLCommandApproval() {
   const { pending, _resolvePending } = useCommandAllowlistStore();
   const denyRef = useRef<HTMLButtonElement>(null);
 

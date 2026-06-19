@@ -37,7 +37,7 @@ const stateColors: Record<string, string> = {
   cancelled: "bg-slate-500 text-white",
 };
 
-export default function JobsPanel() {
+export function JobsPanel() {
   const utils = trpc.useUtils();
   const { data: jobData, isLoading } = trpc.jobs.list.useQuery(undefined, {
     refetchInterval: 3000,

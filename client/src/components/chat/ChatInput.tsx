@@ -76,7 +76,7 @@ const COMMANDS: { cmd: SlashCommand; label: string; description: string }[] = [
   { cmd: "imprint", label: "/imprint", description: "Capture a component's UI patterns to the registry" },
 ];
 
-export default function ChatInput({
+export function ChatInput({
   onSend,
   onAddFile,
   onAddImage,

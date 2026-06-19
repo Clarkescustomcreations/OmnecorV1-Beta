@@ -32,7 +32,7 @@ const SOURCE_TO_PROVIDER: Record<string, ProviderId> = {
   custom: "openai",
 };
 
-export default function ModelSelector({
+export function ModelSelector({
   selectedModel,
   onSelect,
   className,

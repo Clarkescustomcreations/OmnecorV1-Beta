@@ -15,7 +15,7 @@ interface BudgetConfigDialogProps {
   projectId: string;
 }
 
-export default function BudgetConfigDialog({ projectId }: BudgetConfigDialogProps) {
+export function BudgetConfigDialog({ projectId }: BudgetConfigDialogProps) {
   const [open, setOpen] = useState(false);
   const { data: budget } = trpc.wallet.getBudget.useQuery({ projectId }, { enabled: open });
   const utils = trpc.useUtils();

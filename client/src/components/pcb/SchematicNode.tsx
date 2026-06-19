@@ -97,4 +97,3 @@ export const SchematicNode: React.FC<NodeProps<SchematicNodeData>> = ({
   );
 };
 
-export default SchematicNode;

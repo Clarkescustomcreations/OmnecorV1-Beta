@@ -38,7 +38,7 @@ interface ModelHubPanelProps {
   onModelDownload?: (item: ModelMarketplaceItem) => void;
 }
 
-export default function ModelHubPanel({
+export function ModelHubPanel({
   onModelSelect,
   onModelDownload,
 }: ModelHubPanelProps) {

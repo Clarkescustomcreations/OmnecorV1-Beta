@@ -41,7 +41,7 @@ const formatSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
 };
 
-const FileNode = ({ data, selected }: NodeProps<FileNodeData>) => {
+const FileNodeComponent = ({ data, selected }: NodeProps<FileNodeData>) => {
   return (
     <div className={cn(
       "transition-all duration-200",
@@ -79,4 +79,4 @@ const FileNode = ({ data, selected }: NodeProps<FileNodeData>) => {
   );
 };
 
-export default memo(FileNode);
+export const FileNode = memo(FileNodeComponent);

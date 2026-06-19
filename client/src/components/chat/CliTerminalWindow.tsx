@@ -23,7 +23,7 @@ interface CliTerminalWindowProps {
   selectedModel?: SelectedModel;
 }
 
-export default function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }: CliTerminalWindowProps) {
+export function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }: CliTerminalWindowProps) {
   const [logs, setLogs] = useState<string[]>([
     "[OMNECOR CLI] Ready. Type a prompt and click Launch to open in your system terminal.",
   ]);

@@ -22,7 +22,7 @@ interface JobDisplayData {
   error?: string;
 }
 
-export default function ProcessManagerPanel() {
+export function ProcessManagerPanel() {
   // We subscribe to 'voice:all' and ideally 'hardware:all' / 'training:all' if they were exposed as options
   // For now, we'll configure the hook to listen to all voice jobs as a start, and we can
   // assume the hook might be expanded to listen to all global events.

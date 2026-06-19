@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
 import { useNeuralContextStore } from "@/lib/neuralContextStore";
 import {
@@ -449,7 +449,7 @@ function loadPodcastHistory(): PodcastEpisode[] {
   }
 }
 
-export default function PodcastStudio() {
+export function PodcastStudio() {
   const [turns, setTurns] = useState<DialogueTurn[]>(() => loadPodcastSession()?.turns ?? DEFAULT_TURNS);
   const [sources, setSources] = useState<PodcastSource[]>(() => loadPodcastSession()?.sources ?? []);
   const [isGenerating, setIsGenerating] = useState(false);

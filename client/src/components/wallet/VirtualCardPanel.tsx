@@ -27,7 +27,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLocation } from "wouter";
 
-export default function VirtualCardPanel() {
+export function VirtualCardPanel() {
   const [, setLocation] = useLocation();
   const [showSensitive, setShowSensitive] = useState(false);
   const [revealedPan, setRevealedPan] = useState<string | null>(null);

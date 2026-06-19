@@ -382,7 +382,7 @@ function AgenticOsStatus() {
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function MCPToolDirectory() {
+export function MCPToolDirectory() {
   const serversQuery = trpc.mcp.listConnectedServers.useQuery();
   const toolsQuery = trpc.mcp.listTools.useQuery({});
 

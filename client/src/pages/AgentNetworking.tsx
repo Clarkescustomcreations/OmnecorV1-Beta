@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback } from "react";
-import OmnecorDashboardLayout from "@/components/OmnecorDashboardLayout";
+import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import {
   Card,
   CardContent,
@@ -50,7 +50,7 @@ import { useLocation } from "wouter";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import PersonaCreationPanel from "@/components/settings/PersonaCreationPanel";
+import { PersonaCreationPanel } from "@/components/settings/PersonaCreationPanel";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
 import { MeshTopologyGraph, type MeshGraphPeer } from "@/components/mesh/MeshTopologyGraph";
 import { Brain } from "lucide-react";
@@ -187,7 +187,7 @@ function MediaUploadTab() {
   );
 }
 
-export default function AgentNetworking() {
+export function AgentNetworking() {
   const [location] = useLocation();
   const searchParams = new URLSearchParams(window.location.search);
   const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "calendar");

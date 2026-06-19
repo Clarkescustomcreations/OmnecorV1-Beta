@@ -201,7 +201,7 @@ function KaggleTrainingCard() {
 
 // ---------------------------------------------------------------------------
 
-export default function ValetRouterPanel() {
+export function ValetRouterPanel() {
   const [localTrainingEnabled, setLocalTrainingEnabled] = useState(false);
 
   const gpuQuery = trpc.valet.gpuStatus.useQuery(undefined, { refetchOnWindowFocus: false });
