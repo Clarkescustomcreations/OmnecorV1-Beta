@@ -205,7 +205,7 @@ Authoritative, distilled facts about Omnecor. This file has **two jobs**:
 ## 19. Getting started & setup
 
 - Prerequisites: Git, Node.js v22+, pnpm. Install deps with `pnpm install`, sync the DB
-  with `pnpm run db:push`, then start with `npm run dev`. The UI is at
+  with `pnpm db:migrate`, then start with `pnpm dev`. The UI is at
   `http://localhost:3000` (the port auto-increments if 3000 is busy).
 - First launch runs an interactive **Setup Wizard** (re-openable at **Settings → System
   → Re-run Setup Wizard**). Steps: execution-mode selection, API providers, local Ollama

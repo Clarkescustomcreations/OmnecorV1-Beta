@@ -53,7 +53,7 @@ $ npm install
 ### Development
 
 ```bash
-$ npm run dev
+$ pnpm dev
 ```
 
 ### Build

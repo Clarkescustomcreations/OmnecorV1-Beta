@@ -1,5 +1,14 @@
 # tmp-valet-train — Experimental QLoRA Dual-PC Trainer
 
+> **⚠️ STATUS: Archived / Superseded.** The production Valet Router is trained
+> via Kaggle's free-tier T4 GPU pipeline (`pnpm valet:build`, see
+> [docs/ai-agents/VALET_ROUTER.md](../docs/ai-agents/VALET_ROUTER.md) and
+> [docs/ai-agents/valet-training/](../docs/ai-agents/valet-training/)) and
+> distributed as a GitHub Release GGUF artifact — that is the supported path.
+> This folder is kept for reference only, in case local dual-PC training on
+> older/low-VRAM GPUs (e.g. pre-Turing Maxwell cards without Unsloth support)
+> is needed again. It is not part of the build or CI pipeline.
+
 Experimental replacement for `localLLMfine-tuning.py` that works on Maxwell
 GPUs (GTX 750 Ti sm_50, GTX 950 sm_52) without Unsloth.
 
@@ -25,7 +34,7 @@ GPUs (GTX 750 Ti sm_50, GTX 950 sm_52) without Unsloth.
 
 ### 1. Generate the dataset (Linux only)
 ```bash
-cd "/home/linux/Documents/Omnecor (AltV1)/Omnecor-HMCI-ai-workstation-AltV1"
+cd OmnecorV1-Beta
 pnpm valet:build   # or just the dataset step
 ```
 Dataset lands at `data/valet/train.jsonl`.

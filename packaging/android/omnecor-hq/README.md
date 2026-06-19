@@ -35,6 +35,9 @@ Virtual LAN overlay via Tailscale. Access your PC securely from anywhere in the 
 
 ## OMMESH Phone AI Node
 
+> For connecting your phone as a third mesh node alongside your desktop
+> machines, see [docs/setup/OMMESH_SETUP.md](../../../docs/setup/OMMESH_SETUP.md).
+
 Your phone operates as a **bidirectional compute node** in the OMMESH network:
 
 - **Local Inference**: Run GGUF models directly on Snapdragon NPU via llama.rn
@@ -42,6 +45,16 @@ Your phone operates as a **bidirectional compute node** in the OMMESH network:
 - **Auto-Reconnect**: Maintains WebSocket connection with heartbeat monitoring
 - **Stats Tracking**: Real-time inference performance metrics
 - **Model Management**: Load/unload GGUF models from device storage
+
+---
+
+## Always-Listening Voice Mode
+
+Run a persistent background mic loop that wakes on a spoken phrase and hands
+the transcribed query off to a desktop persona — fully on-device, no
+third-party wake-word service required.
+
+> Full setup guide: [docs/user-guides/ALWAYS_LISTEN.md](../../../docs/user-guides/ALWAYS_LISTEN.md)
 
 ---
 

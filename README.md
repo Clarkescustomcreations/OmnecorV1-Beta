@@ -267,7 +267,21 @@ For upcoming features, planned enhancements, and the overall direction of the Om
 
 ## Documentation
 
-Explore the comprehensive documentation suite in the [docs/](docs/) directory for in-depth information on various aspects of Omnecor.
+Explore the comprehensive documentation suite in the [docs/](docs/) directory for in-depth information on various aspects of Omnecor. **See the [full documentation index](docs/README.md)** for the complete map of every guide.
+
+### Getting Started
+
+- [Setup Wizard Walkthrough](docs/setup/SETUP_WIZARD.md) — first-run configuration
+- [OMMESH Setup](docs/setup/OMMESH_SETUP.md) — connecting a second/third machine into your mesh
+- [OAuth Setup](docs/setup/OAUTH_SETUP.md) — social platform and identity provider configuration
+
+### Feature Guides
+
+- [Podcast Studio](docs/user-guides/PODCAST_STUDIO.md) — script generation, multi-speaker TTS, episode history
+- [3D Designer & PCB Editor](docs/user-guides/3D_DESIGNER.md) — scope, AI context bridge, Blender/KiCad handoff
+- [Fiction Mode](docs/user-guides/FICTION_MODE.md) — creative writing mode, locks, story-bible state
+- [Always-Listening Voice Mode](docs/user-guides/ALWAYS_LISTEN.md) — Android wake-word setup
+- [Slash Commands & Workflow Skills](docs/user-guides/SLASH_COMMANDS.md) — `/architect /remember /review /recover /imprint` and all chat commands
 
 ### Architecture & Integration
 

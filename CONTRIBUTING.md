@@ -27,9 +27,23 @@ To set up your local development environment, follow the [Installation Guide](IN
     ```
 4.  **Start Development Server**: Launch the development server:
     ```bash
-    npm run dev
+    pnpm dev
     ```
     This will start both the frontend and backend in development mode.
+
+5.  **Read the Agent Context System** (recommended): Omnecor uses a structured
+    context-engineering workflow for both human and AI-assisted contributions.
+    Before making non-trivial changes, skim:
+    -   [AGENTS.md](AGENTS.md) — behavioral rules, schema gotchas, and the
+        mandatory reading order for anyone (human or AI agent) working in this
+        codebase.
+    -   `Context/Architecture.md`, `Context/Code-Standards.md` — folder
+        boundaries, naming, and conventions enforced across the project.
+    -   `Context/Progress-Tracker.md` — current phase/feature status, so your
+        contribution doesn't collide with in-flight work.
+    If you use Claude Code or a similar AI coding agent, these files are
+    automatically loaded as project context — keeping them current is itself
+    a valuable contribution.
 
 ## 3. Pull Request Guidelines
 

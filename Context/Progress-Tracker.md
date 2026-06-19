@@ -529,3 +529,20 @@ All planned repairs and consistency syncs from the final phase audit plan have b
 *   **NotFound Style Re-adaptation:** Refactored `NotFound.tsx` by removing all raw Tailwind colors (`text-slate-900`, `bg-blue-600`) and standardizing them to unified design tokens (`bg-background`, `text-foreground`, `bg-card/80`, `bg-primary`, `text-destructive`). Rewrote the default component export to a standard named export structure to preserve codebase consistency.
 *   **Orphaned Code Cleanup:** Safely deleted the dead `CurationStudio.tsx` file from the client pages tree to resolve duplicate API queries.
 *   **Verification Gates:** Ran the full validation test suites: `pnpm check` typecheck (0 errors) and `pnpm test` (350/350 tests passing), resolving sandbox constraint mock issues inside `virtualCardService.test.ts`.
+
+### Documentation Gap-Closure Pass — completed (2026-06-19, follow-up to 06-17 audit)
+
+> Verified the 2026-06-17 documentation overhaul against the original P0–P3 audit list and closed the remaining gaps.
+
+*   **Verified already fixed (06-17 pass):** MySQL claim removed from README, Windows added to system requirements (README + FAQ), `npm run` → `pnpm` in QUICKSTART/DEVELOPMENT_WORKFLOWS, `docs/setup/OMMESH_SETUP.md` / `3D_DESIGNER.md` / `ALWAYS_LISTEN.md` / `SLASH_COMMANDS.md` created, stale planning docs removed (`MULTI-PLATFORM-*`, `UPGRADE-PLAN.md`, `june-3-doc-updates.md`), duplicate `OAUTH_SETUP.md` / `NEURAL_BRAIN_MAP_UI.md` resolved.
+*   **New gaps found and fixed this pass:**
+    *   `packaging/windows/BUILD-WINDOWS.md` — still referenced `git lfs pull` for the Valet GGUF, a leftover from before the GitHub-Release distribution switch (`f07624a`). Corrected to `scripts/fetch-valet-model.sh`.
+    *   `CONTRIBUTING.md`, `packaging/electron-app/README.md`, `docs/ai-agents/valet-training/OMNECOR_KNOWLEDGE_BASE.md` — remaining `npm run dev` / `pnpm run db:push` instances missed in the 06-17 sweep, fixed to `pnpm dev` / `pnpm db:migrate`.
+    *   `CONTRIBUTING.md` — added a section pointing contributors at `AGENTS.md` and the `Context/` folder as the project's context-engineering system.
+    *   **New:** `docs/user-guides/PODCAST_STUDIO.md`, `docs/user-guides/FICTION_MODE.md` — the two remaining shipped features with zero user-facing docs.
+    *   **New:** `docs/README.md` — full navigable documentation index (was previously undiscoverable outside grep/browsing).
+    *   `README.md` — Documentation section expanded with Getting Started + Feature Guides subsections linking all new docs.
+    *   `packaging/android/omnecor-hq/README.md` — added pointers to `OMMESH_SETUP.md` and `ALWAYS_LISTEN.md` (existed but weren't cross-linked from the app's own README).
+    *   `tmp-valet-train/README.md` — added an explicit "Archived/Superseded" banner (production training is now the Kaggle pipeline) and fixed a stale hardcoded path reference (`Omnecor-HMCI-ai-workstation-AltV1`).
+    *   `CHANGELOG.md` — backfilled entries for the 06-15 depth pass, the 06-16/17 OMMESH verification + doc overhaul, and the 06-19 token/design-token sweep (all previously undocumented in CHANGELOG, only in Progress-Tracker).
+*   **Not addressed (flagged, not fixed):** `tmp-valet-train/` still has 135 tracked files of training debris in the repo — marked archived but not removed/gitignored; deferred since removal risk wasn't worth taking without explicit sign-off.

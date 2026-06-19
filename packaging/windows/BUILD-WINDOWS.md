@@ -24,9 +24,11 @@ cd OmnecorV1-Beta
 pnpm install
 pnpm build
 
-# 2b. Pull the Valet Router GGUF model (via Git LFS)
-git lfs pull
-# (Or run: bash scripts/fetch-valet-model.sh if inside Git Bash/WSL)
+# 2b. Pull the Valet Router GGUF model (downloaded from GitHub Releases,
+#     NOT Git LFS — the GGUF is gitignored and ships as a release asset)
+bash scripts/fetch-valet-model.sh
+# (If the GGUF is already present locally from a prior train/build, this
+#  script detects it and just verifies the SHA-256 + writes current.json.)
 
 # 3. Build the Windows installer
 cd packaging\electron-app
