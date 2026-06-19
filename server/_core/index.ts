@@ -257,6 +257,11 @@ async function startServer() {
     standardHeaders: true,
     legacyHeaders: false,
     message: "Too many requests, please try again later.",
+    // Only count API requests. In dev, a cold page-load makes 100+ Vite
+    // module fetches which would exhaust the budget before the first real
+    // API call. In prod the frontend is a single bundled asset so this
+    // skip has no effect on production traffic shaping.
+    skip: (req) => !req.path.startsWith("/api"),
   });
 
   app.use(limiter);
