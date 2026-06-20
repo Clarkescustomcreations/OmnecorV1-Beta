@@ -1,8 +1,20 @@
 const path = require("path");
+const fs = require("fs");
 const { getDefaultConfig } = require("expo/metro-config");
 const { withNativeWind } = require("nativewind/metro");
 
+// pnpm workspace root — three levels up from packaging/android/omnecor-hq/
+const WORKSPACE_ROOT = path.resolve(__dirname, "../../..");
+
 const config = getDefaultConfig(__dirname);
+
+// Ensure Metro watches the workspace root so hoisted pnpm packages (whisper.rn,
+// etc.) are hashable. Without this, Metro fails with "Failed to get the SHA-1"
+// for any file that lives in the root node_modules instead of the local one.
+config.watchFolders = [
+  ...(config.watchFolders ?? []),
+  WORKSPACE_ROOT,
+];
 
 const nwConfig = withNativeWind(config, {
   input: "./global.css",
@@ -38,7 +50,10 @@ const NANOID_BROWSER = path.resolve(__dirname, "node_modules/nanoid/index.browse
 // specifier at the package's CommonJS entry; subpaths (whisper.rn/realtime-
 // transcription, …) still resolve normally through exports. Mirrors the nanoid
 // intercept below. tsconfig `paths` maps the same specifier for type-checking.
-const WHISPER_RN_INDEX = path.resolve(__dirname, "node_modules/whisper.rn/lib/commonjs/index.js");
+// pnpm hoists whisper.rn to the workspace root — check local first, then root.
+const _WHISPER_LOCAL = path.resolve(__dirname, "node_modules/whisper.rn/lib/commonjs/index.js");
+const _WHISPER_ROOT = path.resolve(WORKSPACE_ROOT, "node_modules/whisper.rn/lib/commonjs/index.js");
+const WHISPER_RN_INDEX = fs.existsSync(_WHISPER_LOCAL) ? _WHISPER_LOCAL : _WHISPER_ROOT;
 
 const SINGLETONS = ["react", "react-dom"];
 const prevResolveRequest = nwConfig.resolver.resolveRequest;

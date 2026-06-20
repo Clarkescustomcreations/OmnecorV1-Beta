@@ -22,5 +22,10 @@ export default defineConfig({
       "packaging/**/*.test.ts",
       "packaging/**/*.spec.ts",
     ],
+    exclude: [
+      "**/node_modules/**",
+      "**/node_modules_broken/**",
+      "**/dist/**",
+    ],
   },
 });
