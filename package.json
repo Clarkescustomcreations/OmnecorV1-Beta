@@ -5,7 +5,7 @@
   "license": "MIT",
   "scripts": {
     "dev": "cross-env NODE_ENV=development tsx watch server/_core/index.ts",
-    "build": "vite build && esbuild server/_core/index.ts --platform=node --bundle --format=esm --outdir=dist --banner:js=\"import { createRequire as __createRequire } from 'module'; const require = __createRequire(import.meta.url);\" --define:process.env.NODE_ENV=\"\\\"production\\\"\" --external:better-sqlite3 --external:onnxruntime-node --external:fsevents --external:vite --external:cohere-ai --external:ollama --external:lightningcss --external:@babel/core --external:@tailwindcss/oxide && node --input-type=commonjs -e \"require('fs').writeFileSync('dist/package.json',JSON.stringify({type:'module'}))\"",
+    "build": "vite build && node scripts/build-server.mjs",
     "start": "cross-env NODE_ENV=production node dist/index.js",
     "check": "tsc --noEmit",
     "format": "prettier --write .",
@@ -137,6 +137,7 @@
     "cross-env": "^7.0.3",
     "drizzle-kit": "^0.31.10",
     "esbuild": "^0.28.1",
+    "playwright": "^1.61.0",
     "pnpm": "^10.15.1",
     "postcss": "^8.4.47",
     "prettier": "^3.6.2",
