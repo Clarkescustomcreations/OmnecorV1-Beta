@@ -539,6 +539,8 @@ export interface ChatInterfaceProps {
   onToggleExclusion?: (id: string) => void;
   onOpenPreview?: (mode: "3d" | "pcb" | "web", code: string) => void;
 
+  valetRoutedModel?: string | null;
+
   className?: string;
 }
 
@@ -581,6 +583,7 @@ export function ChatInterface({
   excludedMessageIds,
   onToggleExclusion,
   onOpenPreview,
+  valetRoutedModel,
   className,
 }: ChatInterfaceProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -726,10 +729,18 @@ export function ChatInterface({
 
           {/* Model selector */}
           {chatSettings.showModelName && (
-            <ModelSelector
-              selectedModel={selectedModel}
-              onSelect={model => onModelChange?.(model)}
-            />
+            <div className="flex items-center gap-2">
+              <ModelSelector
+                selectedModel={selectedModel}
+                onSelect={model => onModelChange?.(model)}
+              />
+              {selectedModel?.modelId === "auto-valet" && valetRoutedModel && (
+                <Badge variant="outline" className="h-7 text-[10px] text-accent-purple border-accent-purple/30 bg-accent-purple/5 gap-1 font-mono">
+                  <Zap className="w-3 h-3" />
+                  {valetRoutedModel}
+                </Badge>
+              )}
+            </div>
           )}
 
           {/* Spacer */}

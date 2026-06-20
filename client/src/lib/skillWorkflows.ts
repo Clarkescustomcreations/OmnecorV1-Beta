@@ -11,10 +11,11 @@
 
 export type SkillWorkflowId =
   | "architect"
-  | "remember"
   | "review"
   | "recover"
-  | "imprint";
+  | "imprint"
+  | "plan"
+  | "remember";
 
 export interface SkillWorkflow {
   id: SkillWorkflowId;
@@ -53,6 +54,11 @@ const REMEMBER_PREAMBLE = `You are running the REMEMBER workflow. "/remember sav
 
 const IMPRINT_PREAMBLE = `You are running the IMPRINT workflow. After a UI component is built, its visual-consistency patterns (background, border, radius, text, spacing, hover, shadow) are captured to the project's ui-registry.md so every future component matches. Confirm what was captured and flag anything that looked inconsistent.`;
 
+const PLAN_PREAMBLE = `You are now running the PLAN workflow (Valet Router's interview wizard). You will guide the developer in setting up a new project or major feature suite.
+1. Start by asking for the core goal or describing the project.
+2. Ask probing questions to gather requirements until you have enough to create a standard project-docs/ suite (Project-Overview, Architecture, UI-Rules, etc).
+3. Draft a build plan and confirm with the developer.`;
+
 export const SKILL_WORKFLOWS: Record<SkillWorkflowId, SkillWorkflow> = {
   architect: {
     id: "architect",
@@ -88,6 +94,13 @@ export const SKILL_WORKFLOWS: Record<SkillWorkflowId, SkillWorkflow> = {
     description: "Capture a component's UI patterns to the registry",
     hasServerAction: true,
     preamble: IMPRINT_PREAMBLE,
+  },
+  plan: {
+    id: "plan",
+    command: "/plan",
+    description: "Start guided project planning with Valet",
+    hasServerAction: false,
+    preamble: PLAN_PREAMBLE,
   },
 };
 

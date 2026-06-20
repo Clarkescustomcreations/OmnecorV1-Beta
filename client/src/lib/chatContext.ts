@@ -311,7 +311,7 @@ export const mockContextFiles: ContextFile[] = [
 // ---------------------------------------------------------------------------
 
 export interface SelectedModel {
-  providerId: "ollama" | "anthropic" | "openai" | "gemini" | "grok";
+  providerId: "system" | "ollama" | "anthropic" | "openai" | "gemini" | "grok" | "huggingface" | "forge" | "llamacpp";
   modelId: string;
   apiKey?: string;
   baseUrl?: string;

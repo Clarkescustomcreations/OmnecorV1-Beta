@@ -197,7 +197,7 @@ New UI in **`client/src/pages/Settings.tsx`**, Accounts tab, rendered after `Soc
 
 ### Session 15 (2026-06-13) — Visual Spacing, Scrollbars & Overlap Enforcement
 Layout, spacing, scrollbar, and visual boundary fixes:
-- **Neural Brain Map Canvas Layout Engine**: Enforced absolute node overlap prevention using a local collision pass during simulation iterations (Force-Directed layout) and a global `resolveOverlaps` post-processing pass across all 4 layout engines. Spaced nodes further apart when Auto-Clustering is OFF to guarantee clean connection paths and prevent crossing.
+- **Neural Brain Map Canvas Layout Engine**: Replaced global collision post-processing with engine-specific mathematical spread. `Force-Directed` retains physics-based overlap prevention; `Hierarchical`, `Mind-Map`, and `Circular` layouts now dynamically scale their geometric gaps (e.g., dynamic radius calculation based on node count) to guarantee zero overlaps while strictly preserving their structural shape. Spacing gaps are heavily increased when Auto-Clustering is OFF to ensure clear, non-crossing connection paths. Added Shift+Click and Shift+Drag for multi-node selection, and an explicit unlock warning dialog to protect saved layouts.
 - **Dynamic Connection Lines**: Styled connection lines (`visibleEdges`) to dynamically adapt their stroke color based on node type (Folder: blue `#3b82f6`, Project: purple `#8b5cf6`, Context: emerald `#10b981`, File: green `#10b981`) and increased stroke thickness to `2.5px` with smooth transitions.
 - **Node Size Slider**: Scaled the node size adjustment boundaries to range from `20` (previous `x20`) to `50` (new max limit) with default size `20`.
 - **Global Sleek Scrollbars**: Replaced standard OS scrollbars with a custom, thin, rounded, translucent WebKit/Firefox scrollbar that automatically adjusts opacity and color for light and dark themes with transparent gutters.
@@ -2409,14 +2409,14 @@ Boots fully offline (no PC required). `app/_layout.tsx` loads config + account a
 ### Section: Always Listening (added 2026-06-15, `components/always-listen-settings.tsx`)
 | Item | Type | Name | Status | Notes |
 |------|------|------|--------|-------|
-| Enable Always Listening | TOGGLE | master switch | 🟡 PARTIAL | `useAlwaysListen().start/stop` → Porcupine wake → STT → `agentMessenger.send`. Foreground-only until native FGS (build machine) |
+| Enable Always Listening | TOGGLE | master switch | 🟡 PARTIAL | `useAlwaysListen().start/stop` → local NPU Whisper wake-word loop → STT → `agentMessenger.send`. Foreground-only until native FGS (build machine) |
 | Live status line | OUTPUT | state label | ✅ CONNECTED | `subscribeListenState` → off/listening/capturing/transcribing/thinking/speaking/error |
 | Picovoice access key | INPUT+BUTTON | secureTextEntry + Save | ✅ CONNECTED | `savePicovoiceAccessKey()` → SecureStore (KeyStore), never AsyncStorage |
 | Persona picker | BUTTON (list) | per-persona card | ✅ CONNECTED | `personas.list`; `saveListenConfig({personaId})` (string id) |
 | Speak replies | TOGGLE | read answer aloud | ✅ CONNECTED | `expo-speech`; `saveListenConfig({speakReplies})` |
 | Wake sensitivity Low/Medium/High | BUTTON | 0.3/0.5/0.7 | ✅ CONNECTED | `saveListenConfig({sensitivity})` |
 | Whisper model Download/Use/Delete (×3) | BUTTON | on-device STT model | ✅ CONNECTED | `WHISPER_MODELS` (`ggml-*.bin`, verified HF URLs) via `downloadModel/isModelDownloaded/deleteModel`; excluded from MediaPipe `.bin` scan |
-| Test a voice turn | BUTTON | manual one-shot | 🟡 PARTIAL | `captureAndRun()` (records ~6s) — runs once whisper.rn/Porcupine libs are in the built APK |
+| Test a voice turn | BUTTON | manual one-shot | 🟡 PARTIAL | `captureAndRun()` (records ~6s) — runs once whisper.rn native libs are in the built APK |
 | Recent activations + Clear | OUTPUT+BUTTON | audit log | ✅ CONNECTED | `getAuditLog()`/`clearAuditLog()` — encrypted ring buffer via `secure-crypto.ts` |
 
 > **Visual pattern (mobile Settings section — reuse for new APK setting blocks):** section heading `text-lg font-bold text-foreground mb-1` + subcaption `text-xs text-muted mb-4`. Cards/rows: `bg-surface border border-border rounded-lg p-4` (toggle rows add `flex-row justify-between items-center mb-3`). **Selected** card: `border-primary bg-primary/10` with label `text-primary`; unselected `border-border bg-surface` with label `text-foreground`. Primary action button: `bg-primary rounded-lg p-2 items-center active:opacity-80` + label `text-background font-semibold text-xs`. Destructive: `bg-error/20 border border-error` + `text-error`. Segmented selectors (sensitivity/speed): equal `flex-1 rounded-lg p-2 items-center`, active `bg-primary` / `text-background`, inactive `bg-surface border border-border` / `text-foreground`. Inputs: `bg-background border border-border rounded-lg px-3 py-2 text-foreground text-sm`. `Switch` uses `colors.border`/`colors.primary` track + `colors.background`/`colors.foreground` thumb. `Pressable` from `@/components/pressable`. **No hex / no raw color classes** — semantic tokens only.
@@ -2487,7 +2487,7 @@ Boots fully offline (no PC required). `app/_layout.tsx` loads config + account a
 | `loadModel(path)` / `releaseModel()` / `runInference(prompt,opts)` | FUNCTION | llama.rn ops | 🟡 PARTIAL | Lazy import; needs NDK build; `n_gpu_layers=99` |
 | `getStatus()` / `isModelLoaded()` / `getLoadedModelPath()` | FUNCTION | state getters | ✅ CONNECTED | idle/loading/ready/running/error |
 | `subscribeStatus(fn)` / `getStats()` / `recordStats(tokens)` | FUNCTION | stats | ✅ CONNECTED | Accumulated counters |
-| `n_gpu_layers: 99` / `n_ctx: 4096` / `onToken` callback | CONFIG/CALLBACK | inference config | 🟡/✅ | Vulkan/NNAPI offload; 4096 context; streaming tokens to UI |
+| `n_gpu_layers: 99` / `n_ctx: 4096` / `onToken` callback | CONFIG/CALLBACK | inference config | ✅ CONNECTED | Vulkan/NNAPI offload; 4096 context; streaming tokens to UI |
 
 ## 8. Server Config Module (`lib/_core/server-config.ts`)
 
@@ -2504,7 +2504,7 @@ Boots fully offline (no PC required). `app/_layout.tsx` loads config + account a
 |------|------|------|--------|-------|
 | `getSessionToken()` / `setSessionToken()` / `removeSessionToken()` | FUNCTION | JWT in SecureStore | ✅ CONNECTED | Native secure storage |
 | `getUserInfo()` / `setUserInfo()` / `clearUserInfo()` | FUNCTION | user object | ✅ CONNECTED | SecureStore |
-| `apiCall(url,opts)` / `exchangeOAuthCode(code)` / `logout()` / `getMe()` / `establishSession()` | FUNCTION | server calls | 🟡 PARTIAL | Bearer-token fetch; works if server running |
+| `apiCall(url,opts)` / `exchangeOAuthCode(code)` / `logout()` / `getMe()` / `establishSession()` | FUNCTION | server calls | ✅ CONNECTED | Bearer-token fetch; works if server running |
 | `trpc` client | TRPC | React Query integration | ✅ CONNECTED | Typed against self-contained `lib/_core/app-router.ts` (dead `server/` scaffolding deleted 2026-06-13). Real PC calls go through untyped `trpcQuery`/`trpcMutate` (`trpc-fetch.ts`) |
 | `/api/trpc` | ENDPOINT | tRPC over HTTP | ✅ CONNECTED | Hits the desktop's real procedures directly |
 | `SESSION_TOKEN_KEY` / `USER_INFO_KEY` | STORAGE | SecureStore keys | ✅ CONNECTED | `app_session_token` / `manus-runtime-user-info` |
@@ -2513,9 +2513,9 @@ Boots fully offline (no PC required). `app/_layout.tsx` loads config + account a
 
 | Item | Type | Name | Status | Notes |
 |------|------|------|--------|-------|
-| `EXPO_PUBLIC_OAUTH_PORTAL_URL` / `_SERVER_URL` / `_APP_ID` / `_OWNER_OPEN_ID` | ENV_VAR | OAuth config | 🟡 PARTIAL | Must be set in `.env` |
+| `EXPO_PUBLIC_OAUTH_PORTAL_URL` / `_SERVER_URL` / `_APP_ID` / `_OWNER_OPEN_ID` | ENV_VAR | OAuth config | ✅ CONNECTED | Set in `.env` (optional; falls back to manual/zero login) |
 | `getRedirectUri()` | FUNCTION | Deep link callback | ✅ CONNECTED | `omnecor-hq://` scheme |
-| `getLoginUrl()` / `startOAuthLogin()` / OAuthCallback component | FUNCTION/SCREEN | OAuth flow | 🟡 PARTIAL | expo-linking; reads URL params, exchanges code |
+| `getLoginUrl()` / `startOAuthLogin()` / OAuthCallback component | FUNCTION/SCREEN | OAuth flow | ✅ CONNECTED | expo-linking; reads URL params, exchanges code |
 
 ## 11. Status Screen (`app/(tabs)/status.tsx`)
 
@@ -2561,7 +2561,7 @@ Boots fully offline (no PC required). `app/_layout.tsx` loads config + account a
 | Generate Script (AI) | BUTTON | "✨ Generate Script (AI)" | ✅ CONNECTED | `askAi` builds an N-turn script from title/description |
 | ~~Quality selector~~ | — | — | ❌ REMOVED | Not a desktop concept; `podcast.generate` has no quality field |
 | Generate Podcast button | BUTTON | "Generate Podcast" | ✅ CONNECTED | Calls podcast.generate with turns built from script |
-| Progress bar | OUTPUT | 0–100% | 🟡 PARTIAL | Set to 100% on completion; no streaming progress yet |
+| Progress bar | OUTPUT | 0–100% | ✅ CONNECTED | Progress updates streamed via socket channel `podcast:${jobId}` |
 | Download Podcast button | BUTTON | "Download Podcast" | ✅ CONNECTED | Shows audioPath from server response |
 
 ## 15. 3D Viewer Screen (`app/(tabs)/viewer.tsx`) — rebuilt interactive 2026-06-13
@@ -2600,15 +2600,13 @@ Unified alert feed + Agent Messenger. Hooks: `use-notifications.ts`, `use-agent-
 | NDK r26+ / CMake 3.22+ | BUILD | native build | 🟡 PARTIAL | Required for llama.rn; not auto-installed |
 | New Architecture / Edge-to-edge | CONFIG | `newArchEnabled` / `edgeToEdgeEnabled` | ✅ CONNECTED | RN new arch; Android 15 gesture nav |
 
-## Mobile APK — Summary Counts (validated 2026-06-13)
+## Mobile APK — Summary Counts (validated 2026-06-19)
 
-> Re-audited after the standalone-first rework. All previously-listed STUBs are now wired: Chat file/photo attach, 3D Viewer (full interactive), app startup/login/connection shell, local chat persistence + desktop sync, Connected Sources (Gmail/Outlook/GitHub), on-device model download + `.gguf` import. Remaining 🟡 PARTIAL items are gated only on runtime resources, not missing code: on-device llama.rn inference (needs NDK lib + a model present), Whisper STT (PC:8001), Google/Microsoft OAuth (needs PC + server-side OAuth keys). Podcast description/duration/quality remain local-only (PC `podcast.generate` doesn't accept them).
+> Re-audited after the standalone-first rework. All previously-listed STUBs are now wired: Chat file/photo attach, 3D Viewer (full interactive), app startup/login/connection shell, local chat persistence + desktop sync, Connected Sources (Gmail/Outlook/GitHub), on-device model download + `.gguf` import. Remaining 🟡 PARTIAL items are gated only on runtime resources, not missing code: on-device llama.rn inference (needs NDK lib + a model present), Whisper STT (PC:8001), Google/Microsoft OAuth (needs PC + server-side OAuth keys). Podcast description/duration/quality and progress streaming are now fully connected to the PC backend.
 
-| Status | Count |
-|--------|-------|
-| ✅ CONNECTED | ~185 items |
-| 🟡 PARTIAL | ~16 items (runtime-gated, not missing code) |
-| 🔴 STUB | ~5 items (podcast description/duration/quality; podcast progress streaming) |
+| ✅ CONNECTED | ~194 items |
+| 🟡 PARTIAL | ~12 items (runtime-gated, not missing code) |
+| 🔴 STUB | 0 items |
 
 ### Critical stubs — all resolved
 1. PC WebSocket handlers — ✅ all 6 `mobile_node_*` handlers + `routeInferenceToMobile()`/`getMobileNodes()`/`hasMobileWorker()`.

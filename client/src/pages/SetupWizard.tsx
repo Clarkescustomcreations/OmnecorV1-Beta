@@ -16,7 +16,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import {
   Sparkles, Shield, Key, Share2, FolderOpen, Mic2, Cpu, HardDrive,
   ChevronRight, ArrowRight, CheckCircle2, Lock, Zap, Flame, Monitor,
-  Sun, Moon, Globe, Database, Volume2, Save, Rocket, SkipForward, CheckCircle
+  Sun, Moon, Globe, Database, Volume2, Save, Rocket, SkipForward, CheckCircle,
+  Package, AlertCircle, RefreshCw, ExternalLink, Download, Loader2,
+  Bot, Layers, BrainCircuit, Box, Wrench, Palette, Radio,
 } from "lucide-react";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
@@ -39,6 +41,7 @@ const STEPS = [
   { id: "knowledge", title: "Knowledge Base", description: "Initialize your personal memory and RAG system." },
   { id: "hardware", title: "Hardware & Voice", description: "Optimize performance for your local hardware." },
   { id: "personalization", title: "Personalization", description: "Make Omnecor look and feel like yours." },
+  { id: "checklist", title: "Launch Checklist", description: "Confirm your tools are ready before launch." },
   { id: "finish", title: "Ready to Launch", description: "Your workstation is fully configured." },
 ];
 
@@ -65,6 +68,22 @@ export function SetupWizard() {
   const { data: settings, refetch: refetchSettings } = trpc.system.getSettings.useQuery();
   const executionMode = useAppStore((s) => s.executionMode);
   const setExecutionMode = useAppStore((s) => s.setExecutionMode);
+
+  // --- Launch Checklist ---
+  const currentStepId = STEPS[currentStep]?.id;
+  const depsQuery = trpc.system.checkDependencies.useQuery(
+    undefined,
+    { enabled: currentStepId === "checklist", staleTime: 0 }
+  );
+  const utils = trpc.useUtils();
+  const installOllamaMutation = trpc.system.installOllama.useMutation({
+    onSuccess: (data) => {
+      toast.success(data.message);
+      // Re-check after a short delay to let the installer start
+      setTimeout(() => utils.system.checkDependencies.invalidate(), 4000);
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   // --- Mutations ---
   const setModeMutation = trpc.system.setExecutionMode.useMutation({
@@ -818,10 +837,216 @@ export function SetupWizard() {
           </div>
         );
 
+      case "checklist": {
+        const deps = depsQuery.data;
+        const isLoading = depsQuery.isLoading;
+
+        // Helper: open a URL using the OS default browser via a hidden anchor
+        const openUrl = (url: string) => {
+          const a = document.createElement("a");
+          a.href = url;
+          a.target = "_blank";
+          a.rel = "noopener noreferrer";
+          a.click();
+        };
+
+        const StatusBadge = ({ ok, loading }: { ok: boolean; loading: boolean }) => {
+          if (loading) return <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" />Checking…</span>;
+          return ok
+            ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-accent"><CheckCircle className="w-3 h-3" />Detected</span>
+            : <span className="inline-flex items-center gap-1 text-[10px] font-bold text-destructive"><AlertCircle className="w-3 h-3" />Not found</span>;
+        };
+
+        interface GroupProps {
+          icon: React.ReactNode;
+          label: string;
+          groupKey: keyof NonNullable<typeof deps>;
+          tools: { name: string; key: keyof NonNullable<typeof deps>; desc: string }[];
+          installNode?: React.ReactNode;
+          getItUrl: string;
+          getItLabel?: string;
+        }
+
+        const DepsGroup = ({ icon, label, groupKey, tools, installNode, getItUrl, getItLabel }: GroupProps) => {
+          const allOk = deps && tools.every(t => deps[t.key]);
+          return (
+            <div className={cn(
+              "rounded-xl border p-4 transition-colors",
+              allOk ? "border-accent/30 bg-accent/5" : "border-border bg-muted/20"
+            )}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <span className={cn("text-base", allOk ? "text-accent" : "text-muted-foreground")}>{icon}</span>
+                  <span className="text-sm font-bold">{label}</span>
+                  {allOk && <CheckCircle2 className="w-3.5 h-3.5 text-accent" />}
+                </div>
+                <div className="flex items-center gap-2">
+                  {!allOk && (
+                    installNode ?? (
+                      <button
+                        id={`checklist-get-${String(groupKey)}`}
+                        onClick={() => openUrl(getItUrl)}
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md border border-border hover:border-accent hover:text-accent transition-colors text-muted-foreground"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        {getItLabel ?? "Get It"}
+                      </button>
+                    )
+                  )}
+                  <button
+                    id={`checklist-recheck-${String(groupKey)}`}
+                    onClick={() => utils.system.checkDependencies.invalidate()}
+                    className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground transition-colors px-1.5 py-1"
+                  >
+                    <RefreshCw className="w-3 h-3" />
+                  </button>
+                </div>
+              </div>
+              <div className="space-y-1.5">
+                {tools.map(t => (
+                  <div key={t.key} className="flex items-center justify-between text-xs">
+                    <span className="text-foreground font-medium">{t.name}<span className="ml-1.5 text-[10px] text-muted-foreground font-normal">{t.desc}</span></span>
+                    <StatusBadge ok={!!deps?.[t.key]} loading={isLoading} />
+                  </div>
+                ))}
+              </div>
+            </div>
+          );
+        };
+
+        const ollamaInstallNode = (
+          <div className="flex items-center gap-1.5">
+            <button
+              id="checklist-install-ollama"
+              disabled={installOllamaMutation.isPending}
+              onClick={() => installOllamaMutation.mutate()}
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-60 transition-colors"
+            >
+              {installOllamaMutation.isPending
+                ? <><Loader2 className="w-3 h-3 animate-spin" />Installing…</>
+                : <><Download className="w-3 h-3" />Install Now</>}
+            </button>
+            <button
+              id="checklist-get-ollama"
+              onClick={() => openUrl("https://ollama.com")}
+              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-1 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
+        );
+
+        return (
+          <div className="space-y-3 animate-in fade-in duration-300">
+            <p className="text-sm text-muted-foreground pb-1">
+              Optional tools extend what Omnecor can do. Install anything that looks useful — you can always add them later from <strong>Settings → Hardware</strong>.
+            </p>
+
+            {/* ── Core AI ──────────────────────────────── */}
+            <DepsGroup
+              icon={<Bot className="w-4 h-4" />}
+              label="Core AI"
+              groupKey="ollama"
+              tools={[
+                { key: "ollama", name: "Ollama", desc: "Local LLM runtime — Llama 3, Mistral, Phi, Gemma" },
+                { key: "python", name: "Python 3.10+", desc: "Required for all AI bridges" },
+              ]}
+              installNode={(!deps?.ollama && !deps?.python) || !deps?.ollama ? ollamaInstallNode : undefined}
+              getItUrl="https://ollama.com"
+            />
+
+            {/* ── Voice STT ────────────────────────────── */}
+            <DepsGroup
+              icon={<Mic2 className="w-4 h-4" />}
+              label="Voice & STT"
+              groupKey="whisper"
+              tools={[
+                { key: "whisper", name: "Whisper Server", desc: "Speech-to-text bridge on :8001" },
+              ]}
+              getItUrl="https://github.com/openai/whisper"
+              getItLabel="View Docs"
+            />
+
+            {/* ── Podcast / TTS ─────────────────────────── */}
+            <DepsGroup
+              icon={<Volume2 className="w-4 h-4" />}
+              label="Podcast & TTS"
+              groupKey="tts"
+              tools={[
+                { key: "tts", name: "TTS / XTTS-v2 Server", desc: "Text-to-speech bridge on :8002" },
+              ]}
+              getItUrl="https://github.com/coqui-ai/TTS"
+              getItLabel="View Docs"
+            />
+
+            {/* ── 3D Design ─────────────────────────────── */}
+            <DepsGroup
+              icon={<Box className="w-4 h-4" />}
+              label="3D Design"
+              groupKey="blender"
+              tools={[
+                { key: "blender", name: "Blender", desc: "3D modelling, render, and mesh export" },
+              ]}
+              getItUrl="https://www.blender.org/download/"
+            />
+
+            {/* ── PCB Design ────────────────────────────── */}
+            <DepsGroup
+              icon={<Layers className="w-4 h-4" />}
+              label="PCB Design"
+              groupKey="kicad"
+              tools={[
+                { key: "kicad", name: "KiCad CLI", desc: "Schematic and PCB layout toolchain" },
+              ]}
+              getItUrl="https://www.kicad.org/download/"
+            />
+
+            {/* ── AI Training ───────────────────────────── */}
+            <DepsGroup
+              icon={<BrainCircuit className="w-4 h-4" />}
+              label="AI Training"
+              groupKey="llamaCpp"
+              tools={[
+                { key: "llamaCpp", name: "llama-cpp", desc: "Local LoRA fine-tuning for Valet Router" },
+              ]}
+              getItUrl="https://github.com/ggerganov/llama.cpp"
+            />
+
+            {/* ── Image Generation ──────────────────────── */}
+            <DepsGroup
+              icon={<Palette className="w-4 h-4" />}
+              label="Image Generation"
+              groupKey="comfyui"
+              tools={[
+                { key: "comfyui", name: "ComfyUI", desc: "Stable Diffusion node editor on :8188" },
+              ]}
+              getItUrl="https://github.com/comfyanonymous/ComfyUI"
+            />
+
+            {/* ── Hardware Flash ────────────────────────── */}
+            <DepsGroup
+              icon={<Radio className="w-4 h-4" />}
+              label="Hardware Flash"
+              groupKey="esptool"
+              tools={[
+                { key: "esptool", name: "esptool", desc: "ESP32/ESP8266 firmware flashing" },
+              ]}
+              getItUrl="https://github.com/espressif/esptool"
+            />
+
+            <p className="text-[10px] text-muted-foreground pt-1">
+              Server-based tools (Whisper, TTS, ComfyUI) show as detected only when their bridge server is running.
+              Start them before launch or after setup via <strong>Settings → Hardware → Bridges</strong>.
+            </p>
+          </div>
+        );
+      }
+
       default:
         return null;
     }
   };
+
 
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center p-6 relative overflow-hidden">

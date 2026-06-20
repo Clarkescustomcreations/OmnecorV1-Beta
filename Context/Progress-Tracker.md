@@ -6,6 +6,7 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 
 ## 🚦 Current Status
 *   **Active Phase:** Phase 5 — F23–F27 code-complete. **All 3 OMMESH node artifacts built** for cross-platform mesh testing. Documentation audit and professional update complete (2026-06-17).
+*   **Done (2026-06-19): Neural Brain Map Engine Upgrade.** Removed arbitrary global physics collision (`resolveOverlaps`) from structured layouts (Hierarchical, Mind-Map, Circular) to preserve structural geometry. Instead, structured layouts now dynamically scale base sizing math (`H_GAP`, `V_GAP`, `STEP`, circumference) based on node counts, specifically expanding drastically when `Auto-Clustering` is OFF to guarantee fully traceable connections without overlapping nodes. Quality of life additions: `Shift`+`Click`/`Shift`+`Drag` multi-selection enabled, and an unlocking warning dialog added.
 *   **OMMESH 3-way test readiness (2026-06-16, Linux):**
     *   **Linux node:** `packaging/electron-app/dist/Omnecor-2.3.0-beta.1-x86_64.AppImage` (373 MB) + `Omnecor_2.3.0-beta.1_amd64.deb` (220 MB) — built (electron-builder 25, Electron 39.8.10, better-sqlite3 rebuilt).
     *   **Android node:** `packaging/android/omnecor-hq/android/app/build/outputs/apk/release/app-release.apk` (118 MB, JS-bundled standalone, debug-signed → sideloadable).
@@ -35,6 +36,16 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 *   **Design-token sweep — raw Tailwind classes (14 files):** `AgentNetworking.tsx`, `Pipelines.tsx`, `Dashboard.tsx`, `ChatInterface.tsx`, `OmnecorDashboardLayout.tsx`, `ModelHub.tsx`, `SpecializedModuleLauncher.tsx`, `Notifications.tsx`, `VisualContextMap.tsx`, `Settings.tsx`, `PodcastStudio.tsx`, `ComponentLibrary.tsx`, `3DDesigner.tsx`, `AGENTS.md`. All `green-*`, `blue-*`, `red-*`, `purple-*`, `emerald-*`, `rose-*`, `amber-*`, `gray-*`, `slate-*` classes replaced with `accent-success`, `accent-cyan`, `destructive`, `accent-purple`, `accent-danger`, `muted-foreground`, etc.
 *   **UI Registry — Sessions 21–22:** 537 CONNECTED rows verified, 14 procedures confirmed live-driven, 8 previously-missing rows added, 5 label corrections.
 *   **Gates (2026-06-19):** root `tsc` **0** · `vitest` **353/353** · all changes committed.
+
+### Dependency Launch Checklist — SetupWizard (2026-06-19, Linux)
+
+New "Launch Checklist" step added to the SetupWizard, inserted between Personalization and Ready to Launch. Detects 9 optional tools in a single round-trip and surfaces them in 8 feature-grouped cards with per-group Re-check. Ollama gets a real auto-install path (download + `spawn` with arg arrays, no shell interpolation). All other tools open their official page via browser link. Nothing blocks proceeding to launch — all items are optional.
+
+*   **`server/_core/systemRouter.ts`** — Two new procedures:
+    *   `checkDependencies` (`protectedProcedure`) — single aggregate probe: Ollama (HTTP), Python 3.10+ (`execFileAsync`), llama-cpp (binary + pip), Blender, KiCad, esptool (all via `findExecutable`), Whisper/TTS/ComfyUI (HTTP probes). All checks individually try/catch'd, resolved in parallel. Never throws to client.
+    *   `installOllama` (`adminProcedure`) — platform-aware installer: Windows downloads `OllamaSetup.exe` → `spawn(dest, ["/S"])` silent; Linux downloads `install.sh` → `spawn("sh", [dest])`; macOS opens download page via `spawn("open", [url])`. Uses `https.get` with redirect following. Safe: all args in arrays, no shell interpolation.
+*   **`client/src/pages/SetupWizard.tsx`** — `"checklist"` step added to STEPS array (index 8). New query (`trpc.system.checkDependencies`) enabled only when on checklist step (`staleTime: 0`). New mutation (`trpc.system.installOllama`) with 4s delayed re-check after success. Full `case "checklist"` render: `DepsGroup` component per feature group, `StatusBadge` with loading/detected/not-found states, per-group Re-check via `utils.system.checkDependencies.invalidate()`. Design tokens only — `bg-accent/5`, `border-accent/30`, `text-accent`, `text-muted-foreground`, `text-destructive` (semantic).
+*   **Gates (2026-06-19):** root `tsc` **0** · `vitest` **353/353**.
 
 ### Chat Action Buttons Responsive Stacking — resolved (2026-06-17, Linux)
 The Terminal/CLI, Sandboxed, and Attachments/Voice/Send buttons in ChatInput were colliding on smaller/mobile viewports. Resolved via responsive flex configurations:

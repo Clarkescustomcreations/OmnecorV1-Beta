@@ -1,33 +1,31 @@
-# Memory — Export Default Debt Sweep & named Exports Refactoring
+# Memory — Always Listening Registry Alignment
 
-Last updated: 2026-06-19T15:10:00-03:00
+Last updated: 2026-06-19T18:02:00-03:00
 
 ## What was built
 
-- **Mass Named Exports Sweep:** Rewrote all 77 files containing default exports (React page files, components, and tRPC routers) to named exports in compliance with `AGENTS.md` and `Code-Standards.md` rules.
-- **Import Statements Refactoring:** Updated static import statements, brace-destructuring, and dynamic lazy-load wrapper calls (`lazy(() => import(...).then(m => ({ default: m.Component })))`) across 19 files (including `App.tsx` and `main.tsx`).
-- **Unused default exports deletion:** Cleaned up unused default exports (such as in `ommesh.router.ts`) that were already being imported as named exports elsewhere.
+- **UI Registry Update:** Adjusted the "Always Listening" section of [UI-Registry.md](file:///home/linux/Documents/OmnecorV1-Beta/Context/UI-Registry.md).
+  - Updated "Enable Always Listening" notes to specify "local NPU Whisper wake-word loop" instead of "Porcupine wake".
+  - Updated "Test a voice turn" notes to specify "whisper.rn native libs" instead of "whisper.rn/Porcupine libs".
+  - Kept the `🟡 PARTIAL` status since both features require native audio/NPU assets inside the compiled APK.
 
 ## Decisions made
 
-- **Regex-Safe Import Parsing:** Configured the import pattern regex to prevent matching across side-effect imports (like `import 'style.css'` followed by a blank space and a component import) by enforcing negative lookahead boundary checks on the `import` keyword (`(?:(?!import)[\s\S])+?`).
-- **Safe Named Memo Wrappers:** Wrapped default-exported `memo(Component)` exports (specifically in `FileNode.tsx`) inside named `memo` variable exports without needing manual bracket matches.
+- Aligned the system architecture registry with the actual codebase implementation where Picovoice/Porcupine was replaced by a local custom sliding-window wake-word recording loop running via `whisper.rn` on the NPU.
 
 ## Problems solved
 
-- **FileNode import compilation error (TS2613):** Fixed a tsc build block in `NeuralWorkspaceCanvas.tsx` by correctly rewriting the default `FileNode` import to the new named import syntax.
-- **Import matching skips:** Resolved issues where certain imports were skipped due to side-effect imports (like style sheets) confusing the parser.
+- Resolved stale references to Porcupine and Picovoice in `Context/UI-Registry.md`.
 
 ## Current state
 
 - **Verification Status:** `pnpm check` typecheck passes with 0 errors.
 - **Test Suite:** `pnpm test` runs and passes with 353/353 green tests.
-- **Git status:** Clean, consistent named exports across all 77 components/routers.
 
 ## Next session starts with
 
-- Physical device sideloading and always-listening wake word testing (F27 Android leg).
 - Network-level OMMESH testing with mobile nodes.
+- Physical device testing of the APK package.
 
 ## Open questions
 

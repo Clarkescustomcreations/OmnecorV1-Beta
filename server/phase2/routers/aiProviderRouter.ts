@@ -5,7 +5,7 @@ import { TRPCError } from "@trpc/server";
 import { AiProviderService } from "../services/AiProviderService.js";
 
 const chatInputSchema = z.object({
-  providerId: z.enum(["ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),
+  providerId: z.enum(["system", "ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),
   modelId: z.string().min(1),
   apiKey: z.string().optional(),
   baseUrl: z.string().optional(),

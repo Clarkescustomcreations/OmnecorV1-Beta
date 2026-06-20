@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from "react";
 import { FictionState, FictionNodeData, FictionRelationship, FictionTimelineEvent } from "@/types/fiction";
 import { safeStorage } from "@/lib/safeStorage";
+import { useAppStore } from "@/lib/store/app.store";
 
 interface FictionModeContextType {
   isFictionMode: boolean;
@@ -38,7 +39,9 @@ export const FictionModeProvider: React.FC<{
   dbFictionState,
   onFictionStateChange,
 }) => {
-  const [isFictionMode, setIsFictionMode] = useState(false);
+  const isFictionMode = useAppStore(s => s.isFictionMode);
+  const toggleFictionMode = useAppStore(s => s.toggleFictionMode);
+  const setFictionMode = useAppStore(s => s.setFictionMode);
   const [fictionState, setFictionState] = useState<FictionState>(INITIAL_STATE);
   const isLoadingRef = useRef(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -80,9 +83,6 @@ export const FictionModeProvider: React.FC<{
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fictionState, mapId]);
-
-  const toggleFictionMode = () => setIsFictionMode(prev => !prev);
-  const setFictionMode = (enabled: boolean) => setIsFictionMode(enabled);
 
   const addFictionNode = (node: Omit<FictionNodeData, "id">) => {
     const newNode = { ...node, id: crypto.randomUUID() };

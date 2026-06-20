@@ -168,3 +168,8 @@ OmnecorV1-Beta-main.zip
 # Local Ollama Modelfile — references absolute machine path, not portable
 modelfile.txt
 ui_audit_report.md
+
+# Broken/renamed node_modules directories and scratch folders — never commit
+node_modules_broken/
+**/node_modules_broken/
+trash/

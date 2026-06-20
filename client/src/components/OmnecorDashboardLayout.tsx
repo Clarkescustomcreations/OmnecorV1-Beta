@@ -155,13 +155,17 @@ export function OmnecorDashboardLayout({
   const isActive = (href: string) => location === href;
 
   return (
-    <div className="flex flex-col h-screen bg-background text-foreground">
+    <div className={cn(
+      "flex flex-col h-screen transition-all duration-500",
+      isFictionMode ? "bg-accent-purple/5 border-t-[3px] border-accent-purple shadow-[inset_0_20px_100px_-20px_color-mix(in_srgb,var(--color-accent-purple)_20%,transparent)] text-foreground" : "bg-background text-foreground"
+    )}>
       {me?.loginMethod === "zero-login" && <ZeroLoginBanner />}
       <div className="flex flex-1 overflow-hidden relative">
       {/* Sidebar */}
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-50 bg-sidebar border-r border-sidebar-border transition-all duration-300 ease-in-out lg:relative overflow-hidden",
+          "fixed inset-y-0 left-0 z-50 border-r border-sidebar-border transition-all duration-300 ease-in-out lg:relative overflow-hidden",
+          isFictionMode ? "bg-sidebar/80 backdrop-blur-md" : "bg-sidebar",
           sidebarOpen ? "w-64 translate-x-0" : "w-16 translate-x-0"
         )}
       >
@@ -172,8 +176,8 @@ export function OmnecorDashboardLayout({
             sidebarOpen ? "justify-between px-6" : "justify-center px-0"
           )}>
             <Link href="/" className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
-              <div className="w-8 h-8 rounded-lg bg-accent flex items-center justify-center flex-shrink-0">
-                <Brain className="w-5 h-5 text-accent-foreground" />
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors", isFictionMode ? "bg-accent-purple/20" : "bg-accent")}>
+                <Brain className={cn("w-5 h-5", isFictionMode ? "text-accent-purple" : "text-accent-foreground")} />
               </div>
               {sidebarOpen && (
                 <h1 className="text-xl font-bold text-sidebar-foreground animate-in fade-in slide-in-from-left-2 duration-300">

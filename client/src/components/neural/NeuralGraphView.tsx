@@ -40,8 +40,14 @@ const NODE_H = 60;
 
 function applyHierarchicalLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
   if (!nodes.length) return nodes;
-  const H_GAP = autoClustering ? 120 : 500;
-  const V_GAP = autoClustering ? 180 : 600;
+
+  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
+  const scale = nodeSize / 10;
+  const scaledW = NODE_W * scale;
+  const scaledH = NODE_H * scale;
+
+  const H_GAP = autoClustering ? 120 * scale : 800;
+  const V_GAP = autoClustering ? 180 * scale : 1200;
 
   const children = new Map<string, string[]>();
   const inDegree = new Map<string, number>();
@@ -74,9 +80,9 @@ function applyHierarchicalLayout(nodes: Node[], edges: Edge[], autoClustering: b
 
   const posMap = new Map<string, { x: number; y: number }>();
   byDepth.forEach((ids, depth) => {
-    const totalW = ids.length * (NODE_W + H_GAP) - H_GAP;
+    const totalW = ids.length * (scaledW + H_GAP) - H_GAP;
     ids.forEach((id, i) => {
-      posMap.set(id, { x: i * (NODE_W + H_GAP) - totalW / 2, y: depth * (NODE_H + V_GAP) });
+      posMap.set(id, { x: i * (scaledW + H_GAP) - totalW / 2, y: depth * (scaledH + V_GAP) });
     });
   });
 
@@ -85,8 +91,16 @@ function applyHierarchicalLayout(nodes: Node[], edges: Edge[], autoClustering: b
 
 function applyCircularLayout(nodes: Node[], autoClustering: boolean): Node[] {
   if (!nodes.length) return nodes;
-  const factor = autoClustering ? 80 : 250;
-  const R = Math.max(autoClustering ? 300 : 800, nodes.length * factor);
+  
+  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
+  const scale = nodeSize / 10;
+  const S_x = autoClustering ? (NODE_W * scale + 24 * scale) : (NODE_W * scale * 2.8);
+  
+  const minR = (nodes.length * S_x) / (2 * Math.PI);
+  const factor = autoClustering ? 80 : 350;
+  const baseR = Math.max(autoClustering ? 300 : 800, nodes.length * factor);
+  const R = Math.max(baseR, minR);
+
   return nodes.map((n, i) => ({
     ...n,
     position: {
@@ -98,7 +112,11 @@ function applyCircularLayout(nodes: Node[], autoClustering: boolean): Node[] {
 
 function applyMindMapLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
   if (!nodes.length) return nodes;
-  const STEP = autoClustering ? 380 : 900;
+  const STEP = autoClustering ? 380 : 1200;
+
+  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
+  const scale = nodeSize / 10;
+  const S_y = autoClustering ? (NODE_H * scale + 36 * scale) : (NODE_H * scale * 3.5);
 
   const degree = new Map<string, number>();
   nodes.forEach(n => degree.set(n.id, 0));
@@ -129,8 +147,11 @@ function applyMindMapLayout(nodes: Node[], edges: Edge[], autoClustering: boolea
     const { id, depth, aStart, aEnd } = bfsQ.shift()!;
     const unvisited = (adj.get(id) ?? []).filter(c => !visited.has(c));
     if (!unvisited.length) continue;
+
+    const minR = (unvisited.length * S_y) / (aEnd - aStart);
+    const r = Math.max((depth + 1) * STEP, minR);
+
     const aStep = (aEnd - aStart) / unvisited.length;
-    const r = (depth + 1) * STEP;
     unvisited.forEach((cid, i) => {
       visited.add(cid);
       const angle = aStart + (i + 0.5) * aStep;
@@ -141,10 +162,14 @@ function applyMindMapLayout(nodes: Node[], edges: Edge[], autoClustering: boolea
 
   const orphans = nodes.filter(n => !posMap.has(n.id));
   const R2 = (Math.max(...Array.from(posMap.values()).map(p => Math.hypot(p.x, p.y)), 0) || STEP) + STEP;
+  
+  const minOrphanR = (orphans.length * S_y) / (2 * Math.PI);
+  const finalR2 = Math.max(R2, minOrphanR);
+
   orphans.forEach((n, i) => {
     posMap.set(n.id, {
-      x: R2 * Math.cos((i * 2 * Math.PI) / Math.max(orphans.length, 1)),
-      y: R2 * Math.sin((i * 2 * Math.PI) / Math.max(orphans.length, 1)),
+      x: finalR2 * Math.cos((i * 2 * Math.PI) / Math.max(orphans.length, 1)),
+      y: finalR2 * Math.sin((i * 2 * Math.PI) / Math.max(orphans.length, 1)),
     });
   });
 
@@ -170,7 +195,7 @@ function applyForceLayout(nodes: Node[], edges: Edge[], autoClustering: boolean)
   const iterations = 80;
 
   // Read sizes for collision resolution within simulation
-  const nodeSize = useVisualControlStore.getState().nodeSize ?? 10;
+  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
   const scale = nodeSize / 10;
   const nodeWidth = NODE_W * scale;
   const nodeHeight = NODE_H * scale;
@@ -306,7 +331,7 @@ function applyForceLayout(nodes: Node[], edges: Edge[], autoClustering: boolean)
 function resolveOverlaps(nodes: Node[], autoClustering: boolean): Node[] {
   if (!nodes.length) return nodes;
 
-  const nodeSize = useVisualControlStore.getState().nodeSize ?? 10;
+  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
   const scale = nodeSize / 10;
 
   const nodeWidth = NODE_W * scale;
@@ -386,8 +411,9 @@ function computeLayout(layout: LayoutEngine, autoClustering: boolean, nodes: Nod
     laidNodes = applyMindMapLayout(nodes, edges, autoClustering);
   } else {
     laidNodes = applyForceLayout(nodes, edges, autoClustering);
+    laidNodes = resolveOverlaps(laidNodes, autoClustering);
   }
-  return resolveOverlaps(laidNodes, autoClustering);
+  return laidNodes;
 }
 
 // ---------------------------------------------------------------------------
@@ -719,16 +745,16 @@ function BrainMapViewportInner({
         const srcInCtx = checkInContext(srcNode?.data?.path);
         const tgtInCtx = checkInContext(tgtNode?.data?.path);
 
-        let color = "#475569"; // slate-600
+        let color = "var(--color-muted-foreground)"; // slate-600
 
         if (srcInCtx || tgtInCtx) {
-          color = "#10b981"; // Emerald context color
-        } else if (tgtNode?.data?.type === "folder" || srcNode?.data?.type === "folder") {
-          color = "#3b82f6"; // Folder blue
-        } else if (tgtNode?.data?.type === "project" || srcNode?.data?.type === "project") {
-          color = "#8b5cf6"; // Project purple
+          color = "var(--color-accent-success)"; // Emerald context color
         } else if (tgtNode?.data?.type === "file" || srcNode?.data?.type === "file") {
-          color = "#10b981"; // File green
+          color = "var(--color-accent-success)"; // File green
+        } else if (tgtNode?.data?.type === "folder" || srcNode?.data?.type === "folder") {
+          color = "var(--color-primary)"; // Folder blue
+        } else if (tgtNode?.data?.type === "project" || srcNode?.data?.type === "project") {
+          color = "var(--color-accent-purple)"; // Project purple
         }
 
         return {
@@ -835,6 +861,9 @@ function BrainMapViewportInner({
         onlyRenderVisibleElements={!gpuEnabled}
         className="bg-background/50"
         proOptions={{ hideAttribution: true }}
+        selectionKeyCode="Shift"
+        multiSelectionKeyCode="Shift"
+        elementsSelectable={true}
       >
         <Background color="#333" gap={20} />
         <Controls>

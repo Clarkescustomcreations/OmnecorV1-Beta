@@ -249,6 +249,16 @@ export function ChatInput({
       return;
     }
 
+    // Intercept argless commands
+    const arglessCmd = /^\/(clear|new|system|export|compress|plan|architect|review|recover|help|skill)$/.exec(trimmed);
+    if (arglessCmd) {
+      onCommand(arglessCmd[1] as SlashCommand);
+      setValue("");
+      setAttachments([]);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
+
     // Pre-upload any pending attachments, then append markdown references
     let finalMessage = trimmed;
     if (attachments.length > 0) {

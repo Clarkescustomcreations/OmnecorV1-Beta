@@ -2,11 +2,12 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./notification.js";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc.js";
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, createWriteStream } from "fs";
 import { join } from "path";
-import { homedir, platform, cpus, totalmem, freemem } from "os";
-import { execFile } from "child_process";
+import { homedir, platform, cpus, totalmem, freemem, tmpdir } from "os";
+import { execFile, spawn } from "child_process";
 import { promisify } from "util";
+import * as https from "https";
 import { getDb, updateUserExecutionMode } from "../db.factory.js";
 import { users } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
@@ -516,4 +517,189 @@ export const systemRouter = router({
       }
       return { success: true };
     }),
+
+  // ---------------------------------------------------------------------------
+  // checkDependencies — single aggregate probe for the Launch Checklist step.
+  // Returns a boolean per tool. Never throws — every check is individually
+  // try/catch'd so one missing tool cannot suppress detection of others.
+  // ---------------------------------------------------------------------------
+  checkDependencies: protectedProcedure.query(async () => {
+    const plt = platform();
+
+    // ── Helper: run a binary with a version flag, resolve true if exit 0 ──
+    const canRun = async (bin: string, args: string[]): Promise<boolean> => {
+      try {
+        await execFileAsync(bin, args, { timeout: 4000 });
+        return true;
+      } catch {
+        return false;
+      }
+    };
+
+    // ── Helper: HTTP probe with timeout ──
+    const httpOk = async (url: string): Promise<boolean> => {
+      try {
+        const controller = new AbortController();
+        const timer = setTimeout(() => controller.abort(), 2000);
+        const res = await fetch(url, { signal: controller.signal });
+        clearTimeout(timer);
+        return res.ok;
+      } catch {
+        return false;
+      }
+    };
+
+    // ── Ollama: ping its local API ──
+    const ollamaUrl = (readSettingsFile() as Record<string, unknown>)?.OLLAMA_BASE_URL
+      ?? process.env.OLLAMA_BASE_URL
+      ?? "http://localhost:11434";
+    const ollamaResult = httpOk(`${ollamaUrl}/api/version`);
+
+    // ── Python 3.10+ ──
+    const pythonBin = plt === "win32" ? "python" : "python3";
+    const pythonResult = (async () => {
+      const found = await canRun(pythonBin, ["-c", "import sys; exit(0 if sys.version_info>=(3,10) else 1)"]);
+      if (found) return true;
+      // Windows fallback
+      return plt === "win32"
+        ? canRun("python3", ["-c", "import sys; exit(0 if sys.version_info>=(3,10) else 1)"])
+        : false;
+    })();
+
+    // ── llama-cpp ──
+    const llamaCppResult = (async () => {
+      // Check for llama-server binary first, then pip-installed llama_cpp module
+      const hasBinary = await canRun("llama-server", ["--version"]).catch(() => false)
+        || await canRun("llama-cpp", ["--version"]).catch(() => false);
+      if (hasBinary) return true;
+      const pyBin = plt === "win32" ? "python" : "python3";
+      return canRun(pyBin, ["-c", "import llama_cpp"]);
+    })();
+
+    // ── Blender ──
+    const blenderResult = findExecutable([
+      ...(process.env.BLENDER_BIN ? [process.env.BLENDER_BIN] : []),
+      "/usr/bin/blender", "/usr/local/bin/blender", "/snap/bin/blender",
+      "/Applications/Blender.app/Contents/MacOS/Blender",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.4\\blender.exe",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.3\\blender.exe",
+      "C:\\Program Files\\Blender Foundation\\Blender 4.2\\blender.exe",
+    ]).then(p => p !== null);
+
+    // ── KiCad CLI ──
+    const kicadResult = findExecutable([
+      ...(process.env.KICAD_CLI_PATH ? [process.env.KICAD_CLI_PATH] : []),
+      "/usr/bin/kicad-cli", "/usr/local/bin/kicad-cli",
+      "/Applications/KiCad/KiCad.app/Contents/MacOS/kicad-cli",
+      "C:\\Program Files\\KiCad\\9.0\\bin\\kicad-cli.exe",
+      "C:\\Program Files\\KiCad\\8.0\\bin\\kicad-cli.exe",
+    ]).then(p => p !== null);
+
+    // ── Whisper STT server (Python bridge port 8001) ──
+    const whisperResult = httpOk("http://localhost:8001/health");
+
+    // ── TTS server / XTTS-v2 (Python bridge port 8002) ──
+    const ttsResult = httpOk("http://localhost:8002/health");
+
+    // ── ComfyUI (port 8188) ──
+    const comfyResult = httpOk("http://localhost:8188/system_stats");
+
+    // ── esptool ──
+    const esptoolResult = findExecutable([
+      "esptool", "esptool.py",
+      "/usr/local/bin/esptool", "/usr/local/bin/esptool.py",
+      "C:\\Python312\\Scripts\\esptool.exe",
+      "C:\\Python311\\Scripts\\esptool.exe",
+      "C:\\Python310\\Scripts\\esptool.exe",
+    ]).then(p => p !== null);
+
+    // Resolve all in parallel
+    const [
+      ollama, python, llamaCpp, blender, kicad,
+      whisper, tts, comfyui, esptool,
+    ] = await Promise.all([
+      ollamaResult, pythonResult, llamaCppResult, blenderResult, kicadResult,
+      whisperResult, ttsResult, comfyResult, esptoolResult,
+    ]);
+
+    return { ollama, python, llamaCpp, blender, kicad, whisper, tts, comfyui, esptool };
+  }),
+
+  // ---------------------------------------------------------------------------
+  // installOllama — download and silently run the official Ollama installer.
+  // Windows/Linux: fetch binary to tmpdir, run with execFile (no shell string).
+  // macOS: spawn `open` with the download URL (pkg installer needs user GUI).
+  // ---------------------------------------------------------------------------
+  installOllama: adminProcedure.mutation(async () => {
+    const plt = platform();
+
+    // ── macOS: open download page — pkg needs user-facing GUI ──
+    if (plt === "darwin") {
+      const opener = spawn("open", ["https://ollama.com/download/mac"], {
+        detached: true,
+        stdio: "ignore",
+      });
+      opener.unref();
+      return { success: true, message: "Opening Ollama download page in your browser." };
+    }
+
+    // ── Helper: download a URL to a local tmp file ──
+    const downloadToFile = (url: string, dest: string): Promise<void> =>
+      new Promise((resolve, reject) => {
+        const file = createWriteStream(dest);
+        const request = (redirectUrl: string) => {
+          https.get(redirectUrl, (res) => {
+            // Follow HTTP 301/302 redirects (Ollama CDN uses them)
+            const location = res.headers.location;
+            if ((res.statusCode === 301 || res.statusCode === 302) && location) {
+              file.close();
+              return request(location);
+            }
+            if (res.statusCode !== 200) {
+              reject(new Error(`Download failed: HTTP ${res.statusCode ?? "unknown"}`));
+              return;
+            }
+            res.pipe(file);
+            file.on("finish", () => file.close(() => resolve()));
+          }).on("error", reject);
+        };
+        request(url);
+        file.on("error", (err) => { try { unlinkSync(dest); } catch {} reject(err); });
+      });
+
+    if (plt === "win32") {
+      const dest = join(tmpdir(), "OllamaSetup.exe");
+      try {
+        await downloadToFile("https://ollama.com/download/OllamaSetup.exe", dest);
+      } catch (err) {
+        throw new TRPCError({
+          code: "INTERNAL_SERVER_ERROR",
+          message: `Ollama download failed: ${(err as Error).message}. Try https://ollama.com manually.`,
+        });
+      }
+      // Run the installer via spawn — spawn supports detached, execFile does not
+      // /S is the Ollama silent-install flag; arg passed as array (no shell string)
+      const proc = spawn(dest, ["/S"], { detached: true, stdio: "ignore" });
+      proc.on("error", (err) => console.warn("[installOllama] Installer error:", err));
+      proc.unref();
+      return { success: true, message: "Ollama installer launched. It will install in the background." };
+    }
+
+    // ── Linux: download official install script, run with sh ──
+    const dest = join(tmpdir(), "ollama-install.sh");
+    try {
+      await downloadToFile("https://ollama.com/install.sh", dest);
+    } catch (err) {
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
+        message: `Ollama download failed: ${(err as Error).message}. Try https://ollama.com manually.`,
+      });
+    }
+    // sh with the script path as a discrete argument — no shell string interpolation
+    // spawn supports detached; execFile does not when combined with a callback
+    const proc = spawn("sh", [dest], { detached: true, stdio: "ignore" });
+    proc.on("error", (err) => console.warn("[installOllama] Install script error:", err));
+    proc.unref();
+    return { success: true, message: "Ollama install script launched. Check your terminal for progress." };
+  }),
 });

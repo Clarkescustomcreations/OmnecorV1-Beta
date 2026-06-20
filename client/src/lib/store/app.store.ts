@@ -14,6 +14,8 @@ export interface AppState {
   // AI & Models
   selectedModelId: string | null;
   setSelectedModelId: (id: string | null) => void;
+  valetFallbackModel: { providerId: string; modelId: string } | null;
+  setValetFallbackModel: (model: { providerId: string; modelId: string } | null) => void;
 
   // Chat conversation state
   conversationMessages: Array<{ role: string; content: string }>;
@@ -58,7 +60,12 @@ export interface AppState {
     promptTokens: number;
     completionTokens: number;
   } | null;
-  setWalletSpend: (event: AppState['walletSpend']) => void;
+  setWalletSpend: (spend: AppState['walletSpend']) => void;
+
+  // Fiction Mode (Global Toggle)
+  isFictionMode: boolean;
+  toggleFictionMode: () => void;
+  setFictionMode: (enabled: boolean) => void;
 }
 
 export const useAppStore = create<AppState>()(
@@ -73,6 +80,9 @@ export const useAppStore = create<AppState>()(
 
   selectedModelId: null,
   setSelectedModelId: (id) => set({ selectedModelId: id }),
+
+  valetFallbackModel: { providerId: "ollama", modelId: "llama3.2:latest" },
+  setValetFallbackModel: (model) => set({ valetFallbackModel: model }),
 
   conversationMessages: [],
   clearConversation: () => set({ conversationMessages: [] }),
@@ -106,7 +116,11 @@ export const useAppStore = create<AppState>()(
   setShowTooltips: (show) => set({ showTooltips: show }),
 
   walletSpend: null,
-  setWalletSpend: (event) => set({ walletSpend: event }),
+  setWalletSpend: (spend) => set({ walletSpend: spend }),
+
+  isFictionMode: false,
+  toggleFictionMode: () => set((state) => ({ isFictionMode: !state.isFictionMode })),
+  setFictionMode: (enabled) => set({ isFictionMode: enabled }),
     }),
     {
       name: "omnecor-app-store",
@@ -120,6 +134,7 @@ export const useAppStore = create<AppState>()(
         brainMapToolbarCollapsed: state.brainMapToolbarCollapsed,
         executionMode: state.executionMode,
         selectedModelId: state.selectedModelId,
+        valetFallbackModel: state.valetFallbackModel,
       }),
     }
   )

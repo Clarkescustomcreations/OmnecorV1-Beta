@@ -37,6 +37,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import { useVisualControlStore } from "@/lib/stores/visualControlStore";
+import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
 // ---------------------------------------------------------------------------
 // Node description helper
@@ -86,6 +87,7 @@ function NeuralMapToolbar() {
     lockLayout, unlockLayout, isLayoutLocked,
   } = useVisualControlStore();
   const { nodes: brainNodes, projectId: brainProjectId } = useBrainMapStore();
+  const [unlockDialogOpen, setUnlockDialogOpen] = useState(false);
 
   // ── Layout prefs DB sync ──────────────────────────────────────────────────
   const { activeMap, updateMap } = useNeuralMap();
@@ -202,8 +204,7 @@ function NeuralMapToolbar() {
                   className={cn("h-8 w-8 flex-shrink-0", locked && "bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30")}
                   onClick={() => {
                     if (locked) {
-                      unlockLayout(lockKey);
-                      toast.success(`"${layout}" layout unlocked — will auto-arrange on next switch.`);
+                      setUnlockDialogOpen(true);
                     } else {
                       lockLayout(lockKey, brainNodes);
                       toast.success(`"${layout}" layout locked for this project.`);
@@ -235,7 +236,7 @@ function NeuralMapToolbar() {
                 value={[nodeSize]}
                 onValueChange={([v]) => { setNodeSize(v); scheduleLayoutSave(); }}
                 min={20}
-                max={50}
+                max={70}
                 step={1}
               />
             </div>
@@ -289,6 +290,26 @@ function NeuralMapToolbar() {
           </div>
         </div>
       )}
+
+      <AlertDialog open={unlockDialogOpen} onOpenChange={setUnlockDialogOpen}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Unlock Layout?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Unlocking will reset the current layout arrangement. Are you sure you want to proceed?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={() => {
+              unlockLayout(lockKey);
+              toast.success(`"${layout}" layout unlocked — will auto-arrange on next switch.`);
+            }}>
+              Unlock Layout
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Card>
   );
 }

@@ -7,8 +7,11 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
-import { Cpu, Database, GitBranch, Loader2, PackageCheck, Server, Zap, Cloud, CheckCircle2, AlertCircle, Download, RefreshCw } from "lucide-react";
+import { Cpu, Database, GitBranch, Loader2, PackageCheck, Server, Zap, Cloud, CheckCircle2, AlertCircle, Download, RefreshCw, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import { useAppStore } from "@/lib/store/app.store";
+import { ModelSelector } from "@/components/chat/ModelSelector";
+import type { SelectedModel } from "@/lib/chatContext";
 
 // ---------------------------------------------------------------------------
 // Kaggle Cloud Training Card
@@ -209,6 +212,9 @@ export function ValetRouterPanel() {
   const artifactQuery = trpc.training.getArtifact.useQuery();
   const valetStatus = trpc.valet.status.useQuery(undefined, { refetchInterval: 15000 });
 
+  const valetFallbackModel = useAppStore(s => s.valetFallbackModel);
+  const setValetFallbackModel = useAppStore(s => s.setValetFallbackModel);
+
   const startDataset = trpc.valet.startLocalTraining.useMutation({
     onSuccess: ({ jobId }) => {
       toast.success(`Dataset generation started — monitor in Jobs panel (job: ${jobId.slice(0, 8)})`);
@@ -284,6 +290,28 @@ export function ValetRouterPanel() {
               <code className="font-mono bg-muted px-1 rounded">pnpm valet:fetch --tag v1.0.0</code>.
             </p>
           )}
+        </CardContent>
+      </Card>
+
+      {/* Router Fallback */}
+      <Card>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Wand2 className="h-4 w-4" />
+            Router Fallback
+          </CardTitle>
+          <CardDescription>
+            If the Valet inference server is offline or fails to route your prompt, this model will be used as a fallback.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-muted-foreground">Fallback model</span>
+            <ModelSelector
+              selectedModel={(valetFallbackModel as SelectedModel) ?? undefined}
+              onSelect={setValetFallbackModel}
+            />
+          </div>
         </CardContent>
       </Card>
 
@@ -450,7 +478,9 @@ export function ValetRouterPanel() {
         </CardContent>
       </Card>
 
-      <KaggleTrainingCard />
+      <div className="space-y-4">
+        <KaggleTrainingCard />
+      </div>
     </div>
   );
 }

@@ -1,4 +1,4 @@
-﻿# AGENTS.md — Omnecor V1-Beta
+# AGENTS.md — Omnecor V1-Beta
 # Read this file completely before touching anything else.
 
 ---

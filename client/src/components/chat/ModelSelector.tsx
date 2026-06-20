@@ -8,7 +8,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { ChevronDown, Cpu, Cloud, Check } from "lucide-react";
+import { ChevronDown, Cpu, Cloud, Check, Sparkles } from "lucide-react";
 import { getAllModels, API_MODEL_CATALOG, type AIModel } from "@/lib/aiModels";
 import { cn } from "@/lib/utils";
 import type { SelectedModel } from "@/lib/chatContext";
@@ -95,7 +95,10 @@ export function ModelSelector({
   const local = models.filter(m => m.type === "local");
   const api = models.filter(m => m.type === "api");
 
-  const label = selectedModel
+  const isAuto = selectedModel?.modelId === "auto-valet";
+  const label = isAuto
+    ? "Auto · Valet Router"
+    : selectedModel
     ? `${selectedModel.modelId} · ${selectedModel.providerId}`
     : "No model selected";
 
@@ -112,6 +115,26 @@ export function ModelSelector({
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-60">
+        <DropdownMenuGroup>
+          <DropdownMenuItem
+            className={cn("text-xs font-semibold text-accent-purple", isAuto && "bg-accent-purple/10")}
+            onClick={() => onSelect({ providerId: "system", modelId: "auto-valet" })}
+          >
+            <Check
+              className={cn(
+                "w-3 h-3 mr-1.5 flex-shrink-0",
+                !isAuto && "opacity-0"
+              )}
+            />
+            <Sparkles className="w-3.5 h-3.5 mr-2 text-accent-purple" />
+            <div className="flex flex-col min-w-0">
+              <span>Auto — Valet Router</span>
+            </div>
+          </DropdownMenuItem>
+        </DropdownMenuGroup>
+
+        <DropdownMenuSeparator />
+
         <DropdownMenuLabel className="flex items-center gap-1.5 text-xs py-1">
           <Cpu className="w-3 h-3" />
           Local Models

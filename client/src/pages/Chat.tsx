@@ -139,6 +139,8 @@ export function Chat() {
     localStorage.setItem("omnecor:selectedModel", JSON.stringify(model));
   }, []);
 
+  const [valetRoutedModel, setValetRoutedModel] = useState<string | null>(null);
+
   // ── Peer card context ─────────────────────────────────────────────────────
   const { card: userPeerCard } = useUserPeerCard();
   const { activeMap } = useNeuralMap();
@@ -209,6 +211,22 @@ export function Chat() {
     }
   });
 
+  const [identityMap, setIdentityMap] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("omnecor:identity_map") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+
+  const [gotchas, setGotchas] = useState<string[]>(() => {
+    try {
+      return JSON.parse(localStorage.getItem("omnecor:gotchas") ?? "[]") as string[];
+    } catch {
+      return [];
+    }
+  });
+
   const handleBtw = useCallback((note: string) => {
     setBtwNotes(prev => {
       const updated = [...prev, note];
@@ -224,6 +242,22 @@ export function Chat() {
     setBtwNotes(prev => {
       const updated = prev.filter((_, i) => i !== idx);
       localStorage.setItem("omnecor:btwNotes", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const removeIdentityNote = useCallback((idx: number) => {
+    setIdentityMap(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      localStorage.setItem("omnecor:identity_map", JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
+  const removeGotchaNote = useCallback((idx: number) => {
+    setGotchas(prev => {
+      const updated = prev.filter((_, i) => i !== idx);
+      localStorage.setItem("omnecor:gotchas", JSON.stringify(updated));
       return updated;
     });
   }, []);
@@ -604,6 +638,8 @@ export function Chat() {
   // token count reflects what is actually transmitted (not a fixed placeholder).
   const buildFullSystemPrompt = useCallback((): string => {
     const btwContext = btwNotes.map(n => `[Background context: ${n}]`).join("\n");
+    const identityContext = identityMap.length > 0 ? `[User Preferences (Omnecor Identity)]\n${identityMap.map(n => `- ${n}`).join("\n")}` : "";
+    const gotchaContext = gotchas.length > 0 ? `[Project Gotchas (Avoid these)]\n${gotchas.map(n => `- ${n}`).join("\n")}` : "";
     const honchoContext = honchoFacts?.length
       ? honchoFacts.map(f => `[Long-term memory: ${f.content}]`).join("\n")
       : "";
@@ -619,8 +655,8 @@ export function Chat() {
     const fictionGuardrail = isFictionMode
       ? `<fiction_mode_guardrails>\nYou are operating in FICTION MODE. Your role is limited to creative storytelling, roleplay, fiction writing, song lyrics, and poetry.\n\nYou MUST:\n- Stay in character and maintain the current roleplay/fiction narrative at all times\n- Keep all creative work grounded in the active story/fiction world\n- Support the user's storytelling, worldbuilding, and creative writing goals\n\nYou MUST NOT (these capabilities are disabled for this session):\n- Execute terminal commands or access the local filesystem outside the neural fiction map\n- Perform agent networking, post to social media, or run autonomous agents\n- Access wallets, make financial transactions, or manage budgets\n- Spin up cloud compute jobs or perform cloud-side automation\n- Perform system administration tasks on the host machine\n\nWeb search IS permitted to support research for the story.\nFile saves are permitted only within the active neural fiction map.\n\nIf asked to perform any blocked action, gently redirect back to the creative fiction context.\n</fiction_mode_guardrails>`
       : "";
-    return [peerCardContext, systemPrompt.trim(), btwContext, honchoContext, neuralContext, personaContext, fictionGuardrail].filter(Boolean).join("\n\n");
-  }, [btwNotes, honchoFacts, neuralContextFiles, isFictionMode, fictionPersonaId, fictionPersonas, peerCardContext, systemPrompt]);
+    return [peerCardContext, systemPrompt.trim(), btwContext, identityContext, gotchaContext, honchoContext, neuralContext, personaContext, fictionGuardrail].filter(Boolean).join("\n\n");
+  }, [btwNotes, identityMap, gotchas, honchoFacts, neuralContextFiles, isFictionMode, fictionPersonaId, fictionPersonas, peerCardContext, systemPrompt]);
 
   // ── Streaming core ───────────────────────────────────────────────────────
   const streamResponse = useCallback(
@@ -654,14 +690,15 @@ export function Chat() {
       });
       apiMessages.push({ role: "user", content: userMsg.content });
 
-      const sub = vanillaTrpc.aiProvider.chatStream.subscribe(
-        {
-          providerId: selectedModel.providerId,
-          modelId: selectedModel.modelId,
-          apiKey: selectedModel.apiKey,
-          baseUrl: selectedModel.baseUrl,
-          messages: apiMessages,
-        },
+      const startStream = (providerId: SelectedModel["providerId"], modelId: string) => {
+        const sub = vanillaTrpc.aiProvider.chatStream.subscribe(
+          {
+            providerId,
+            modelId,
+            apiKey: selectedModel.apiKey,
+            baseUrl: selectedModel.baseUrl,
+            messages: apiMessages,
+          },
         {
           onData(chunk) {
             assistantContent += chunk.delta;
@@ -728,7 +765,26 @@ export function Chat() {
         }
       );
 
-      streamRef.current = sub;
+        streamRef.current = sub;
+      };
+
+      if (selectedModel.modelId === "auto-valet") {
+        const fallback = useAppStore.getState().valetFallbackModel;
+        vanillaTrpc.valet.testRoute.mutate({ task: userMsg.content })
+          .then(decision => {
+            setValetRoutedModel(`${decision.primaryProvider}/${decision.primaryModel}`);
+            startStream(decision.primaryProvider as SelectedModel["providerId"], decision.primaryModel);
+          })
+          .catch(err => {
+            console.warn("[Chat] Valet route failed, using fallback:", err);
+            toast.warning(`Valet Router offline. Falling back to ${fallback?.modelId ?? "default"}`);
+            setValetRoutedModel(`Fallback: ${fallback?.modelId ?? "unknown"}`);
+            startStream((fallback?.providerId as SelectedModel["providerId"]) ?? "ollama", fallback?.modelId ?? "llama3.2:latest");
+          });
+      } else {
+        setValetRoutedModel(null);
+        startStream(selectedModel.providerId, selectedModel.modelId);
+      }
     },
     [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, conversation.id, excludedMessageIds]
   );
@@ -929,6 +985,7 @@ export function Chat() {
           break;
 
         case "plan":
+          injectSystem(SKILL_WORKFLOWS[cmd].preamble);
           toast.info(
             "Plan mode active — Valet will guide project setup. Start by describing your goal.",
             { duration: 5000 }
@@ -991,7 +1048,7 @@ export function Chat() {
             }
             break;
           }
-          if (mode === "save") {
+          if (mode.startsWith("save")) {
             if (!selectedModel) {
               toast.error("Select a model first to summarize the session.");
               break;
@@ -1020,8 +1077,46 @@ export function Chat() {
             }
             break;
           }
-          toast.info("Use /remember save or /remember restore.", {
-            duration: 5000,
+          if (mode.startsWith("context ")) {
+            const note = mode.substring(8).trim();
+            if (!note) {
+              toast.error("Usage: /remember context <note>");
+              break;
+            }
+            handleBtw(note);
+            toast.success("Pinned note to immediate context");
+            break;
+          }
+          if (mode.startsWith("me ")) {
+            const note = mode.substring(3).trim();
+            if (!note) {
+              toast.error("Usage: /remember me <preference>");
+              break;
+            }
+            setIdentityMap(prev => {
+              const updated = [...prev, note];
+              localStorage.setItem("omnecor:identity_map", JSON.stringify(updated));
+              return updated;
+            });
+            toast.success("Added to global Omnecor Identity map");
+            break;
+          }
+          if (mode.startsWith("gotcha ")) {
+            const note = mode.substring(7).trim();
+            if (!note) {
+              toast.error("Usage: /remember gotcha <hitch to avoid>");
+              break;
+            }
+            setGotchas(prev => {
+              const updated = [...prev, note];
+              localStorage.setItem("omnecor:gotchas", JSON.stringify(updated));
+              return updated;
+            });
+            toast.success("Added to project-wide avoidance list (gotchas)");
+            break;
+          }
+          toast.info("Usage: /remember save | restore | context <note> | me <pref> | gotcha <hitch>", {
+            duration: 8000,
           });
           break;
         }
@@ -1237,13 +1332,57 @@ export function Chat() {
               <div className="flex flex-wrap gap-1.5 px-0.5 flex-shrink-0">
                 {btwNotes.map((note, i) => (
                   <div
-                    key={i}
+                    key={`btw-${i}`}
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/40 border border-border text-xs max-w-xs"
                   >
                     <span className="font-semibold text-accent-foreground opacity-70">btw</span>
                     <span className="text-muted-foreground truncate">{note}</span>
                     <button
                       onClick={() => removeBtwNote(i)}
+                      className="text-muted-foreground hover:text-destructive transition-colors leading-none ml-0.5"
+                      aria-label="Remove note"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Identity map note chips */}
+            {identityMap.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-0.5 flex-shrink-0">
+                {identityMap.map((note, i) => (
+                  <div
+                    key={`id-${i}`}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/20 border border-border text-xs max-w-xs"
+                  >
+                    <span className="font-semibold text-primary opacity-70">me</span>
+                    <span className="text-muted-foreground truncate">{note}</span>
+                    <button
+                      onClick={() => removeIdentityNote(i)}
+                      className="text-muted-foreground hover:text-destructive transition-colors leading-none ml-0.5"
+                      aria-label="Remove note"
+                    >
+                      ×
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Gotchas note chips */}
+            {gotchas.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 px-0.5 flex-shrink-0">
+                {gotchas.map((note, i) => (
+                  <div
+                    key={`gotcha-${i}`}
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/20 border border-border text-xs max-w-xs"
+                  >
+                    <span className="font-semibold text-destructive opacity-70">gotcha</span>
+                    <span className="text-muted-foreground truncate">{note}</span>
+                    <button
+                      onClick={() => removeGotchaNote(i)}
                       className="text-muted-foreground hover:text-destructive transition-colors leading-none ml-0.5"
                       aria-label="Remove note"
                     >
@@ -1295,6 +1434,7 @@ export function Chat() {
             excludedMessageIds={excludedMessageIds}
             onToggleExclusion={handleToggleExclusion}
             onOpenPreview={handleOpenPreview}
+            valetRoutedModel={valetRoutedModel}
             onToggleMemory={() => setShowMemoryArchiver(v => !v)}
             onToggleTerminal={isFictionMode ? undefined : () => setShowTerminal(v => !v)}
             onToggleCliTerminal={isFictionMode ? undefined : () => setShowCliTerminal(v => !v)}
