@@ -6,22 +6,28 @@ terminal, Agent Networking, the wallet, and cloud calls — and replaces them
 with persona-driven creative writing support and a structured story bible
 tied to your Neural Brain Map.
 
-**Access:** Toggle **Fiction Mode** from the sidebar, or from the banner
-inside Chat once a Brain Map is active.
+**Access:** Toggle **Fiction Mode** from the button in the sidebar. It is
+always visible there — you no longer need to be on the chat page to find it.
 
 ---
 
 ## 1. What Fiction Mode Changes
 
+Fiction Mode is now a **true global mode**: the toggle state lives in the
+app-wide Zustand store rather than inside a single page's component tree.
+Every part of the UI reacts to it the moment it changes.
+
 When Fiction Mode is active:
 
 - **Locked:** Terminal access, Agent Networking, the Agentic Wallet, and any
-  `cloudProcedure`-tagged call are blocked while the mode is on — the chat
-  banner shows this explicitly (`Terminal · Agent Net · Wallet · Cloud
-  blocked`).
-- **Visual indicator:** The chat surface gets a distinct purple-glow border
-  so it's always visually obvious you're in a creative session, not a
-  production/dev one.
+  `cloudProcedure`-tagged call are blocked. The `/agent-networking` and
+  `/wallet` sidebar entries are greyed out and show a tooltip — *"This
+  feature is disabled while Fiction Mode is active"* — so the restriction is
+  visible before you even try to navigate there.
+- **Whole-app visual indicator:** The entire dashboard shell gets a purple
+  tint, a glowing border, and a backdrop-blur on the sidebar — with a 500 ms
+  transition in and out. It's impossible to be in a creative session without
+  knowing it.
 - **Persona selector:** A persona picker appears directly in the chat banner
   — pick which voice/character is actively guiding the session.
 - **Custom guardrails:** Whatever guardrails you've configured are injected
@@ -57,14 +63,15 @@ devices.
 
 1. Open or create a Brain Map for your project (a novel, a campaign setting,
    a script).
-2. Toggle **Fiction Mode** on.
+2. Toggle **Fiction Mode** on from the sidebar button.
 3. Pick a persona from the chat banner — this becomes the "voice" guiding
    the session (a co-writer, an editor, a specific character, etc.).
 4. Start writing. As characters, places, and events come up, add them to the
    Fiction state via the Brain Map panel so the AI has consistent context to
    draw on in later sessions.
-5. Toggle Fiction Mode off when you're done — your regular tools (terminal,
-   Agent Networking, wallet) become available again immediately.
+5. Toggle Fiction Mode off when you're done — the purple tint fades, the
+   sidebar entries unlock, and your regular tools (terminal, Agent
+   Networking, wallet) become available again immediately.
 
 ---
 
@@ -90,3 +97,6 @@ leak into a development or admin session, and vice versa.
 - **Personas carry tone, not memory.** Switching personas mid-session changes
   voice and guardrails immediately, but your Fiction state (nodes,
   relationships, timeline, lore) stays exactly as it was.
+- **The purple tint is intentional.** The whole-app visual shift means you
+  can't accidentally stay in Fiction Mode across context switches — if the UI
+  looks different, the mode is on.
