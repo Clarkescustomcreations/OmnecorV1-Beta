@@ -28,7 +28,7 @@ A: Omnecor supports Windows 10/11 natively, Linux (Debian 12, Ubuntu 20.04+ reco
 
 ### Q: How do I install Omnecor?
 
-A: You can install Omnecor by cloning the GitHub repository, installing dependencies with `pnpm install`, configuring environment variables in a `.env` file, running database migrations with `pnpm db:migrate`, building the application with `pnpm build`, and starting it with `pnpm start` (or `pnpm dev` for local development). A quick start guide is available in [QUICKSTART.md](QUICKSTART.md).
+A: You can install Omnecor by cloning the GitHub repository, installing dependencies with `pnpm install`, configuring environment variables in a `.env` file, then running `pnpm dev` (development) or `pnpm build && pnpm start` (production). The local SQLite database is created and migrated automatically on first launch — no manual migration step is required. To regenerate migrations after a schema change run `pnpm build:push`. A quick start guide is available in [QUICKSTART.md](QUICKSTART.md).
 
 ### Q: Can I use my own local AI models with Omnecor?
 

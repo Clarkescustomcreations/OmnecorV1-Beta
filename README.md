@@ -65,7 +65,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 
 ### Voice Pipeline
 - **Speech-to-Text (STT)** — Faster-Whisper powered microservice with real-time transcription.
-- **Text-to-Speech (TTS)** — XTTS-v2 synthesis with optional ElevenLabs cloud enhancement.
+- **Text-to-Speech (TTS)** — Kokoro-TTS synthesis (default); XTTS-v2 used automatically when reference audio is provided for voice cloning.
 - **Voice Cloning (RVC)** — Real-time voice conversion for generating speech in any cloned voice.
 
 ### Persistent Memory Layer
