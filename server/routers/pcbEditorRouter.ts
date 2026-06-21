@@ -11,6 +11,7 @@
 import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { protectedProcedure, router } from "../_core/trpc.js";
+import { assertProviderAllowedInMode } from "../_core/sovereign.js";
 import {
   createProject,
   getProjectsByUserId,
@@ -279,6 +280,8 @@ export const pcbEditorRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
+      // reviewDesign calls the cloud "openai" provider directly — block sovereign users.
+      assertProviderAllowedInMode("openai", ctx.user?.executionMode);
       const design = await getDesignById(input.designSaveId);
 
       if (!design || design.userId !== ctx.user.id) {

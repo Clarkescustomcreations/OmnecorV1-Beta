@@ -28,6 +28,7 @@ import {
 } from "crypto";
 import { ENV } from "../_core/env.js";
 import { createLogger } from "../_core/logger.js";
+import type { FileTreeNode } from "./projectRouter.js";
 
 const log = createLogger("integrations");
 
@@ -158,6 +159,8 @@ async function githubFetch(path: string, token: string) {
     signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) throw new TRPCError({ code: "UNAUTHORIZED", message: "GitHub token invalid or expired." });
+  if (res.status === 403) throw new TRPCError({ code: "FORBIDDEN", message: "GitHub access forbidden — check token scopes or rate limit." });
+  if (res.status === 404) throw new TRPCError({ code: "NOT_FOUND", message: `GitHub resource not found: ${path}` });
   if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `GitHub API ${res.status}` });
   return res.json();
 }
@@ -174,6 +177,7 @@ async function notionFetch(path: string, token: string, body?: unknown) {
     signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) throw new TRPCError({ code: "UNAUTHORIZED", message: "Notion token invalid or expired." });
+  if (res.status === 404) throw new TRPCError({ code: "NOT_FOUND", message: `Notion resource not found: ${path}` });
   if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Notion API ${res.status}` });
   return res.json();
 }
@@ -195,8 +199,157 @@ async function gdriveFetch(path: string, token: string) {
     signal: AbortSignal.timeout(10_000),
   });
   if (res.status === 401) throw new TRPCError({ code: "UNAUTHORIZED", message: "Google Drive token invalid or expired." });
+  if (res.status === 404) throw new TRPCError({ code: "NOT_FOUND", message: `Google Drive resource not found: ${path}` });
   if (!res.ok) throw new TRPCError({ code: "INTERNAL_SERVER_ERROR", message: `Google Drive API ${res.status}` });
   return res.json();
+}
+
+// ---------------------------------------------------------------------------
+// Neural-map source ingestion — resolve a map root URI to real content nodes.
+// Returns FileTreeNode[] (the exact shape getFileTree returns) so the client
+// can run remote sources through fileTreeToNetwork like any local root.
+// ---------------------------------------------------------------------------
+
+/** Read the caller's decrypted token for an integration type, or throw. */
+function getUserToken(userId: string, type: string): string {
+  const store = readStore();
+  const bucket = getBucket(store, userId);
+  const entry = bucket[type];
+  if (!entry) throw new TRPCError({ code: "NOT_FOUND", message: `${type} is not connected. Connect it in Settings → Integrations.` });
+  return readToken(entry);
+}
+
+/** Build a nested FileTreeNode[] from GitHub's flat recursive git-tree. */
+function buildGithubFileTree(
+  entries: Array<{ path: string; type: "blob" | "tree"; size?: number }>,
+): FileTreeNode[] {
+  const root: FileTreeNode = { name: "", path: "", relativePath: "", type: "directory", children: [] };
+  const dirMap = new Map<string, FileTreeNode>([["", root]]);
+
+  const ensureDir = (dirPath: string): FileTreeNode => {
+    const existing = dirMap.get(dirPath);
+    if (existing) return existing;
+    const slash = dirPath.lastIndexOf("/");
+    const parent = ensureDir(slash === -1 ? "" : dirPath.slice(0, slash));
+    const name = slash === -1 ? dirPath : dirPath.slice(slash + 1);
+    const node: FileTreeNode = { name, path: dirPath, relativePath: dirPath, type: "directory", children: [] };
+    parent.children!.push(node);
+    dirMap.set(dirPath, node);
+    return node;
+  };
+
+  for (const e of entries) {
+    if (e.type === "tree") {
+      ensureDir(e.path);
+    } else {
+      const slash = e.path.lastIndexOf("/");
+      const parent = ensureDir(slash === -1 ? "" : e.path.slice(0, slash));
+      const name = slash === -1 ? e.path : e.path.slice(slash + 1);
+      const dot = name.lastIndexOf(".");
+      parent.children!.push({
+        name,
+        path: e.path,
+        relativePath: e.path,
+        type: "file",
+        size: e.size,
+        extension: dot > 0 ? name.slice(dot + 1) : undefined,
+      });
+    }
+  }
+  return root.children ?? [];
+}
+
+/** Fetch a GitHub repo's file tree (default branch, recursive, capped). */
+async function fetchGithubTree(owner: string, repo: string, token: string): Promise<FileTreeNode[]> {
+  const info = await githubFetch(`/repos/${owner}/${repo}`, token) as { default_branch?: string };
+  const branch = info.default_branch || "main";
+  const tree = await githubFetch(`/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, token) as {
+    tree?: Array<{ path: string; type: "blob" | "tree"; size?: number }>;
+  };
+  return buildGithubFileTree((tree.tree ?? []).slice(0, 1500));
+}
+
+/** List a connected integration's content items as flat FileTreeNode leaves. */
+async function fetchIntegrationItems(type: string, token: string): Promise<FileTreeNode[]> {
+  if (type === "notion") {
+    const res = await notionFetch("/search", token, { page_size: 50 }) as {
+      results: Array<{
+        id: string;
+        title?: Array<{ plain_text?: string }>;
+        properties?: Record<string, { type?: string; title?: Array<{ plain_text?: string }> }>;
+      }>;
+    };
+    return res.results.map((obj, i) => {
+      let title = obj.title?.[0]?.plain_text;
+      if (!title && obj.properties) {
+        for (const p of Object.values(obj.properties)) {
+          if (p?.type === "title" && p.title?.[0]?.plain_text) { title = p.title[0].plain_text; break; }
+        }
+      }
+      return { name: title || `Notion item ${i + 1}`, path: `notion/${obj.id}`, relativePath: obj.id, type: "file" as const };
+    });
+  }
+
+  if (type === "slack") {
+    const data = await slackFetch("conversations.list", token, { limit: "100", types: "public_channel,private_channel" }) as {
+      channels?: Array<{ id: string; name: string }>;
+    };
+    return (data.channels ?? []).map(c => ({ name: `#${c.name}`, path: `slack/${c.id}`, relativePath: c.id, type: "file" as const }));
+  }
+
+  if (type === "google-drive") {
+    const res = await gdriveFetch("/files?pageSize=100&orderBy=modifiedTime desc&fields=files(id,name,mimeType,size,modifiedTime)", token) as {
+      files?: Array<{ id: string; name: string; mimeType: string; size?: string; modifiedTime?: string }>;
+    };
+    return (res.files ?? []).map(f => {
+      const isFolder = f.mimeType === "application/vnd.google-apps.folder";
+      return {
+        name: f.name,
+        path: `gdrive/${f.id}`,
+        relativePath: f.id,
+        type: isFolder ? ("directory" as const) : ("file" as const),
+        size: f.size ? Number(f.size) : undefined,
+        modifiedAt: f.modifiedTime,
+        ...(isFolder ? { children: [] } : {}),
+      };
+    });
+  }
+
+  if (type === "outlook") {
+    const msgs = await fetch(
+      "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=40&$select=id,subject,receivedDateTime",
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+    ).then(r => r.json()) as { value?: Array<{ id: string; subject?: string; receivedDateTime?: string }> };
+    return (msgs.value ?? []).map(m => ({
+      name: m.subject || "(no subject)", path: `outlook/${m.id}`, relativePath: m.id, type: "file" as const, modifiedAt: m.receivedDateTime,
+    }));
+  }
+
+  if (type === "gmail") {
+    const list = await fetch(
+      "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=25",
+      { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+    ).then(r => r.json()) as { messages?: Array<{ id: string }> };
+    const ids = (list.messages ?? []).slice(0, 25).map(m => m.id);
+    const out: FileTreeNode[] = [];
+    for (const id of ids) {
+      try {
+        const msg = await fetch(
+          `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=metadata&metadataHeaders=Subject`,
+          { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+        ).then(r => r.json()) as { payload?: { headers?: Array<{ name: string; value: string }> } };
+        const subject = msg.payload?.headers?.find(h => h.name === "Subject")?.value ?? "(no subject)";
+        out.push({ name: subject, path: `gmail/${id}`, relativePath: id, type: "file" });
+      } catch {
+        // skip individual message errors
+      }
+    }
+    return out;
+  }
+
+  // dropbox / onedrive / generic have no ingestion adapter yet — and can't hold a
+  // token anyway (connect() has no branch for them), so getUserToken already threw.
+  throw new TRPCError({ code: "NOT_IMPLEMENTED", message: `Map ingestion for "${type}" is not available yet.` });
 }
 
 // ---------------------------------------------------------------------------
@@ -460,6 +613,35 @@ export const integrationsRouter = router({
         return { success: true, type: input.type, data: syncData };
       })
     ),
+
+  /**
+   * Resolve a neural-map source URI to real content nodes.
+   *   github://owner/repo      → the repo's recursive file tree (default branch)
+   *   integration://<type>     → the connected service's content listing
+   * Returns FileTreeNode[] (same shape as project.getFileTree) so the client can
+   * render remote sources as real expandable trees via fileTreeToNetwork.
+   * cloudProcedure: hits external APIs → blocked in Sovereign (air-gapped) mode.
+   */
+  fetchSourceTree: cloudProcedure
+    .input(z.object({ uri: z.string().min(1).max(512) }))
+    .query(async ({ input, ctx }): Promise<FileTreeNode[]> => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const userId = String(ctx.user.id);
+
+      if (input.uri.startsWith("github://")) {
+        const slug = input.uri.slice("github://".length).replace(/\.git$/, "");
+        const [owner, repo] = slug.split("/");
+        if (!owner || !repo) throw new TRPCError({ code: "BAD_REQUEST", message: `Invalid GitHub source: ${input.uri}` });
+        return fetchGithubTree(owner, repo, getUserToken(userId, "github"));
+      }
+
+      if (input.uri.startsWith("integration://")) {
+        const type = input.uri.slice("integration://".length);
+        return fetchIntegrationItems(type, getUserToken(userId, type));
+      }
+
+      throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported source URI: ${input.uri}` });
+    }),
 
   /** Persist per-integration settings (non-sensitive config). */
   updateSettings: cloudProcedure

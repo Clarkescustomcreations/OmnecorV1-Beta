@@ -14,7 +14,7 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure, cloudProcedure } from "../_core/trpc.js";
+import { router, publicProcedure, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 
 // ---------------------------------------------------------------------------
@@ -58,7 +58,7 @@ const generateVideoSchema = z.object({
 
 export const falRouter = router({
   /** List previously generated images (most recent first, process-lifetime). */
-  listImages: publicProcedure.query(async (): Promise<GeneratedImage[]> => {
+  listImages: protectedProcedure.query(async (): Promise<GeneratedImage[]> => {
     return imageGallery;
   }),
 

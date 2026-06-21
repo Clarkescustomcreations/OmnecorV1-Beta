@@ -3,6 +3,12 @@ import { v4 as uuidv4 } from "uuid";
 import type { CriticalAction } from "../../../shared/hitl.js";
 import { AuditLogService } from "./AuditLogService.js";
 import { getSetting } from "./SettingsService.js";
+import { getDb } from "../../db.factory.js";
+import { hitlPendingActions } from "../../../drizzle/schema.js";
+import { eq, lt } from "drizzle-orm";
+import { createLogger } from "../../_core/logger.js";
+
+const log = createLogger("HITL");
 
 export type { CriticalAction };
 
@@ -39,6 +45,33 @@ export class HITLApprovalService extends EventEmitter {
 
   private constructor() {
     super();
+    void this.hydrateFromDb();
+  }
+
+  /** Load surviving pending actions from DB; mark stale ones (>24h) as timed_out. */
+  private async hydrateFromDb(): Promise<void> {
+    try {
+      const db = await getDb();
+      const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      await db.update(hitlPendingActions)
+        .set({ status: "timed_out" })
+        .where(lt(hitlPendingActions.createdAt, cutoff));
+
+      const rows = await db.select().from(hitlPendingActions)
+        .where(eq(hitlPendingActions.status, "pending"));
+      for (const row of rows) {
+        const action: CriticalAction = {
+          id: row.actionId,
+          toolName: row.toolName,
+          args: row.args ?? {},
+          status: "pending",
+          timestamp: row.createdAt.toISOString(),
+        };
+        this.pendingActions.set(row.actionId, action);
+      }
+    } catch (err) {
+      log.warn("failed to hydrate from DB", { error: (err as Error).message });
+    }
   }
 
   public static getInstance(): HITLApprovalService {
@@ -72,7 +105,7 @@ export class HITLApprovalService extends EventEmitter {
         result: { autoApproved: true, category },
         ipAddress: null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.warn("audit log write failed", { error: (err as Error).message }));
       return { approved: true };
     }
 
@@ -87,6 +120,15 @@ export class HITLApprovalService extends EventEmitter {
 
     this.pendingActions.set(id, action);
     this.emit("actionPending", action);
+    getDb().then(db =>
+      db.insert(hitlPendingActions).values({
+        actionId: id,
+        toolName,
+        args: args as Record<string, unknown>,
+        category: category ?? null,
+        status: "pending",
+      })
+    ).catch(err => log.warn("failed to persist pending action", { error: (err as Error).message }));
 
     AuditLogService.getInstance().log({
       eventType: "hitl_request",
@@ -97,7 +139,7 @@ export class HITLApprovalService extends EventEmitter {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch((err) => console.warn("[AuditLog] write failed:", err));
+    }).catch((err) => log.warn("audit log write failed", { error: (err as Error).message }));
 
     // Wait for manual approval/rejection
     return new Promise(resolve => {
@@ -129,6 +171,13 @@ export class HITLApprovalService extends EventEmitter {
    * denial, delivered back to the suspended caller so the agent learns why.
    */
   approveAction(id: string, approved: boolean, reason?: string) {
+    getDb().then(db =>
+      db.update(hitlPendingActions).set({
+        status: approved ? "approved" : "rejected",
+        reason: reason ?? null,
+        resolvedAt: new Date(),
+      }).where(eq(hitlPendingActions.actionId, id))
+    ).catch(err => log.warn("failed to persist approval", { error: (err as Error).message }));
     const resolver = this.approvalResolvers.get(id);
     if (resolver) {
       resolver(approved, reason);
@@ -141,7 +190,7 @@ export class HITLApprovalService extends EventEmitter {
         result: { approved, reason: reason ?? null },
         ipAddress: null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.warn("audit log write failed", { error: (err as Error).message }));
     }
   }
 

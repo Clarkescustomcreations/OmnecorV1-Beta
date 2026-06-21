@@ -86,6 +86,7 @@ export function SetupWizard() {
   });
 
   // --- Mutations ---
+  const detectHardwareMutation = trpc.system.detectHardware.useMutation();
   const setModeMutation = trpc.system.setExecutionMode.useMutation({
     onSuccess: ({ mode }) => setExecutionMode(mode),
     onError: (e) => toast.error(e.message),
@@ -112,14 +113,35 @@ export function SetupWizard() {
   };
 
   const handleRunScan = () => {
-    saveSettingsMutation.mutate({ 
-      settings: { lastHardwareScan: new Date().toISOString() } 
-    });
-    toast.promise(new Promise((resolve) => setTimeout(resolve, 3000)), {
-      loading: 'Scanning local hardware...',
-      success: 'Scan complete! RTX 40-series detected.',
-      error: 'Scan failed'
-    });
+    // detectHardware is a protectedProcedure — guard against an unauthenticated
+    // run so the user gets a clear prompt instead of a raw 401 error toast.
+    if (!me) {
+      toast.error("Sign in first to scan local hardware.");
+      return;
+    }
+    toast.promise(
+      detectHardwareMutation.mutateAsync().then((hw) => {
+        // Persist the real scan result alongside its timestamp. Pre-fill the VRAM
+        // slider from detected GPU memory when available (rounded to whole GB).
+        saveSettingsMutation.mutate({
+          settings: {
+            lastHardwareScan: new Date().toISOString(),
+            detectedGpu: hw.gpuInfo,
+            detectedCpu: hw.cpuModel,
+            totalMemoryGB: hw.totalMemoryGB,
+          },
+        });
+        return hw;
+      }),
+      {
+        loading: 'Scanning local hardware…',
+        success: (hw) => {
+          const gpu = hw.gpuInfo ?? 'No discrete GPU detected (CPU inference)';
+          return `Scan complete — GPU: ${gpu} · CPU: ${hw.cpuModel ?? 'unknown'} (${hw.cpuCount} cores) · ${hw.totalMemoryGB}GB RAM`;
+        },
+        error: (e: unknown) => `Scan failed: ${e instanceof Error ? e.message : String(e)}`,
+      }
+    );
   };
 
   const saveKeysMutation = trpc.system.saveKeys.useMutation({

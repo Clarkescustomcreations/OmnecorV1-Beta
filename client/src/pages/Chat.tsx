@@ -596,7 +596,7 @@ export function Chat() {
     try {
       const content = await readFileAsText(file);
       const contextFile: ContextFile = {
-        id: `file_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        id: `file_${crypto.randomUUID()}`,
         path: file.name,
         name: file.name,
         type: "file",
@@ -616,7 +616,7 @@ export function Chat() {
     try {
       const dataUrl = await readFileAsDataURL(file);
       const contextFile: ContextFile = {
-        id: `img_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+        id: `img_${crypto.randomUUID()}`,
         path: file.name,
         name: file.name,
         type: "file",

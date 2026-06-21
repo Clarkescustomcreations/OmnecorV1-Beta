@@ -79,7 +79,9 @@ export const chatSessions = sqliteTable("chat_sessions", {
   metadata: text("metadata", { mode: "json" }),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
-});
+}, (t) => [
+  index("chat_sessions_user_idx").on(t.userId),
+]);
 
 export type ChatSession = typeof chatSessions.$inferSelect;
 export type InsertChatSession = typeof chatSessions.$inferInsert;
@@ -96,7 +98,9 @@ export const chatMessages = sqliteTable("chat_messages", {
   content: text("content").notNull(),
   tokenCount: integer("tokenCount"),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
-});
+}, (t) => [
+  index("chat_messages_session_idx").on(t.sessionId),
+]);
 
 export type ChatMessage = typeof chatMessages.$inferSelect;
 export type InsertChatMessage = typeof chatMessages.$inferInsert;
@@ -206,7 +210,10 @@ export const cloudComputeSessions = sqliteTable("cloud_compute_sessions", {
   totalCostMicrocents: integer("totalCostMicrocents").notNull().default(0),
   metadata: text("metadata", { mode: "json" }),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
-});
+}, (t) => [
+  index("cloud_compute_sessions_user_idx").on(t.userId),
+  index("cloud_compute_sessions_project_idx").on(t.projectId),
+]);
 
 export type CloudComputeSession = typeof cloudComputeSessions.$inferSelect;
 export type InsertCloudComputeSession = typeof cloudComputeSessions.$inferInsert;
@@ -247,7 +254,9 @@ export const platformAccounts = sqliteTable("platformAccounts", {
   lastSyncedAt: integer("lastSyncedAt", { mode: "timestamp" }),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
-});
+}, (t) => [
+  index("platform_accounts_user_idx").on(t.userId),
+]);
 
 export type PlatformAccount = typeof platformAccounts.$inferSelect;
 export type InsertPlatformAccount = typeof platformAccounts.$inferInsert;
@@ -283,7 +292,9 @@ export const discoveredArticles = sqliteTable("discoveredArticles", {
   fetchedAt: integer("fetchedAt", { mode: "timestamp" }).$defaultFn(now),
   isProcessed: integer("isProcessed").default(0),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
-});
+}, (t) => [
+  index("discovered_articles_project_idx").on(t.projectId),
+]);
 
 export type DiscoveredArticle = typeof discoveredArticles.$inferSelect;
 export type InsertDiscoveredArticle = typeof discoveredArticles.$inferInsert;
@@ -302,7 +313,9 @@ export const curatedPosts = sqliteTable("curatedPosts", {
   approvalNotes: text("approvalNotes"),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
-});
+}, (t) => [
+  index("curated_posts_project_idx").on(t.projectId),
+]);
 
 export type CuratedPost = typeof curatedPosts.$inferSelect;
 export type InsertCuratedPost = typeof curatedPosts.$inferInsert;
@@ -620,6 +633,128 @@ export const messengerMessages = sqliteTable(
 
 export type MessengerMessage = typeof messengerMessages.$inferSelect;
 export type InsertMessengerMessage = typeof messengerMessages.$inferInsert;
+
+/**
+ * Async Job Tracking — persists ProcessManagerService and AsyncJobService state
+ * across restarts. Replaces in-memory Map<string, ManagedProcess/AsyncJobContext>.
+ */
+export const asyncJobTracking = sqliteTable("async_job_tracking", {
+  jobId:          text("job_id").primaryKey(),
+  userId:         text("user_id"),
+  conversationId: text("conversation_id"),
+  label:          text("label"),
+  jobType:        text("job_type"),
+  status:         text("status", { enum: ["pending", "running", "completed", "failed", "cancelled"] }).notNull().default("pending"),
+  result:         text("result", { mode: "json" }).$type<unknown>(),
+  failReason:     text("fail_reason"),
+  createdAt:      integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(now),
+  updatedAt:      integer("updated_at", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+}, (t) => [
+  index("async_job_tracking_status_idx").on(t.status),
+  index("async_job_tracking_user_idx").on(t.userId),
+]);
+
+export type AsyncJobRecord = typeof asyncJobTracking.$inferSelect;
+export type InsertAsyncJobRecord = typeof asyncJobTracking.$inferInsert;
+
+/**
+ * HITL Pending Actions — persists HITLApprovalService.pendingActions across
+ * restarts. In-flight approvals are surfaced as timed_out in UI after restart.
+ */
+export const hitlPendingActions = sqliteTable("hitl_pending_actions", {
+  actionId:   text("action_id").primaryKey(),
+  toolName:   text("tool_name").notNull(),
+  args:       text("args", { mode: "json" }).$type<Record<string, unknown>>(),
+  category:   text("category", { enum: ["command", "file", "internet", "financial"] }),
+  status:     text("status", { enum: ["pending", "approved", "rejected", "timed_out"] }).notNull().default("pending"),
+  reason:     text("reason"),
+  createdAt:  integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(now),
+  resolvedAt: integer("resolved_at", { mode: "timestamp" }),
+}, (t) => [
+  index("hitl_pending_actions_status_idx").on(t.status),
+]);
+
+export type HitlPendingAction = typeof hitlPendingActions.$inferSelect;
+export type InsertHitlPendingAction = typeof hitlPendingActions.$inferInsert;
+
+/**
+ * MCP Server Configs — persists MCPClientService.configs across restarts so
+ * connected MCP servers are automatically restored on boot.
+ */
+export const mcpServerConfigs = sqliteTable("mcp_server_configs", {
+  id:        text("id").primaryKey(),
+  name:      text("name").notNull(),
+  transport: text("transport", { enum: ["stdio", "websocket"] }).notNull(),
+  command:   text("command"),
+  args:      text("args", { mode: "json" }).$type<string[]>(),
+  url:       text("url"),
+  createdAt: integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(now),
+});
+
+export type McpServerConfig = typeof mcpServerConfigs.$inferSelect;
+export type InsertMcpServerConfig = typeof mcpServerConfigs.$inferInsert;
+
+/**
+ * File Watcher Registrations — persists FileSystemWatcherService.watchers
+ * across restarts so chokidar watches are restored on boot.
+ */
+export const fileWatcherRegistrations = sqliteTable("file_watcher_registrations", {
+  projectId:  text("project_id").primaryKey(),
+  rootDir:    text("root_dir").notNull(),
+  debounceMs: integer("debounce_ms").notNull().default(300),
+  isActive:   integer("is_active").notNull().default(1),
+  createdAt:  integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(now),
+});
+
+export type FileWatcherRegistration = typeof fileWatcherRegistrations.$inferSelect;
+export type InsertFileWatcherRegistration = typeof fileWatcherRegistrations.$inferInsert;
+
+/**
+ * OMMESH Trusted Peers — persists SecurityManager.trustedFingerprints so mTLS
+ * peer approvals survive server restarts.
+ */
+export const ommeshTrustedPeers = sqliteTable("ommesh_trusted_peers", {
+  fingerprint: text("fingerprint").primaryKey(),
+  nodeId:      text("node_id"),
+  approvedAt:  integer("approved_at", { mode: "timestamp" }).notNull().$defaultFn(now),
+});
+
+export type OmmeshTrustedPeer = typeof ommeshTrustedPeers.$inferSelect;
+export type InsertOmmeshTrustedPeer = typeof ommeshTrustedPeers.$inferInsert;
+
+/**
+ * Wallet Alert Log — persists AiProviderService.walletAlertsSent so duplicate
+ * budget alerts are suppressed across restarts.
+ */
+export const walletAlertLog = sqliteTable("wallet_alert_log", {
+  id:        text("id").primaryKey(),
+  userId:    text("user_id").notNull(),
+  alertType: text("alert_type", { enum: ["threshold", "over"] }).notNull(),
+  sentAt:    integer("sent_at", { mode: "timestamp" }).notNull().$defaultFn(now),
+}, (t) => [
+  index("wallet_alert_log_user_idx").on(t.userId),
+  index("wallet_alert_log_sent_at_idx").on(t.sentAt),
+]);
+
+export type WalletAlertLogEntry = typeof walletAlertLog.$inferSelect;
+export type InsertWalletAlertLogEntry = typeof walletAlertLog.$inferInsert;
+
+/**
+ * Agent Sessions — provides per-agent Honcho session isolation. Each agent
+ * invocation (runCrew / runLiteAgent / runRecursiveMAS) creates a row here
+ * and uses sessionId as the Honcho session key, preventing cross-agent memory bleed.
+ */
+export const agentSessions = sqliteTable("agent_sessions", {
+  sessionId:  text("session_id").primaryKey(),
+  userId:     text("user_id"),
+  agentType:  text("agent_type"),
+  createdAt:  integer("created_at", { mode: "timestamp" }).notNull().$defaultFn(now),
+}, (t) => [
+  index("agent_sessions_user_idx").on(t.userId),
+]);
+
+export type AgentSession = typeof agentSessions.$inferSelect;
+export type InsertAgentSession = typeof agentSessions.$inferInsert;
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Relational definitions (Drizzle relational query API)

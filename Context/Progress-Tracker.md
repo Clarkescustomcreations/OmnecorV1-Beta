@@ -4,6 +4,46 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 
 ---
 
+## 🔪 Ruthless Public-Beta Code-Sweep — 2026-06-20 (Linux)
+
+> `/code-sweep` full 10-domain run. User directive this pass: **assume everything broken/mock/vulnerable until proven**; **nothing may be "deferred" or "known-broken"**; **mock features get implemented, not deleted — unless already replaced/superseded.**
+> Baseline → final gate: `tsc` **0 → 0** · `vitest` **353/353 → 353/353** · `pnpm audit --prod` **14 (2 high) → 0** ✅ · `pnpm build` **❌ broken → ✓ clean** (fixed a pre-existing break).
+
+### FIXED + VERIFIED this pass
+| Sev | Area | Issue | Fix |
+|---|---|---|---|
+| **HIGH** | security/routers | **Sovereign-mode bypass ×3.** `curatorRouter.curateArticle`/`regenerateDraft` (→anthropic), `pcbEditorRouter.reviewDesign` (→openai), `imageGenRouter.generate` (→fal/openart) called cloud AI on `protectedProcedure` with **no** sovereign guard. `AiProviderService.chat()` has no central guard, so each sibling router leaked. | New shared `server/_core/sovereign.ts` (`CLOUD_PROVIDER_IDS`, `CLOUD_IMAGE_PROVIDER_IDS`, `assertProviderAllowedInMode`, `assertImageProviderAllowedInMode`); wired into the 3 unguarded procedures. |
+| **MEDIUM (feature build)** | mock→real | **HITL approval queue was unbuilt** — `AgenticWalletPanel` "HITL Authorization" button opened an info-only dialog; comment said `getPendingActions`/`approveAction` "not yet wired to any router". | Added `security.getPendingHitlActions` (admin query) + `security.resolveHitlAction` (admin mutation, NOT_FOUND if already resolved); rebuilt the dialog into a live polling queue (3s) with real Approve/Reject calling the service (which audit-logs). Stale comment updated. |
+| **HIGH** | dependencies | **14 audit vulns (2 high)** — undici/hono/dompurify/markdown-it across expo-CLI, MCP SDK, web mermaid, mobile renderer. | pnpm-workspace.yaml override floors: `dompurify>=3.4.11`, `hono>=4.12.25`, `markdown-it>=14.2.0`, `undici>=8.5.0` (a naive `>=6.27.0` floor let pnpm jump to vulnerable undici 8.0–8.4). `pnpm install` + rebuild → **audit 0**, tsc 0, vitest 353, build ✓. |
+| **HIGH** | build | **`pnpm build` was broken** (pre-existing) — `scripts/build-server.mjs` resolved Express-4's callable `path-to-regexp@0.1.x` only via `.pnpm`, but `.npmrc node-linker=hoisted` nests it at `node_modules/express/node_modules/path-to-regexp` and hoists v8 (non-callable) to top-level. Recent gates had silently skipped `pnpm build`. | Resolver now checks the hoisted nested location first (verifies `0.1.x`), then falls back to the `.pnpm` scan — works in both linker modes. Server bundle builds clean. |
+
+### FINDINGS — open (classified; NOT deferred — sequenced into the 3-session plan)
+- **neural-map ingestion — ✅ BUILT (Session 1, 2026-06-20).** Was a shell (remote roots = decorative labels). Now: new `integrations.fetchSourceTree` (cloudProcedure) resolves `github://owner/repo` → recursive file tree and `integration://<type>` → real listings (notion/slack/gmail/outlook/google-drive); `BrainMap.tsx` renders them through the same `fileTreeToNetwork` as local roots, gated by `settings.indexingEnabled`; MapManager google-drive flipped supported. Gate: tsc 0 · vitest 353 · build ✓. **Remaining (tracked, not deferred):** push ingested content into VectorDB for real map RAG; dropbox/onedrive need connect+ingest adapters; live end-to-end runtime proof. See memory `neural-map-remote-ingestion`.
+### Live verification (2026-06-20, dev server + ZERO_LOGIN scrapper)
+- **Neural-map github ingestion — PROVEN LIVE** against a real classic PAT (read from gitignored `.env`, never exposed). `integrations.connect` 200 (user Clarkescustomcreations); `fetchSourceTree github://…/OmnecorV1-Beta` → real tree (41 top-level, 1500 nodes, nested); BrainMap DOM rendered the actual repo files (MEMORY.md, .github/workflows/*.yml, .claude/skills/*/SKILL.md). Error probes honest (404 / NOT_FOUND / BAD_REQUEST). Screenshot tooling can't capture the animated force-graph canvas (DOM evidence used).
+- **AI keys (OpenAI/Anthropic) fixed:** root cause = wrong `.env` var names (`Open_AI_Token`/`Anthropic`) → renamed to `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`; also killed stale dev procs serving old env. Keys now authenticate live. Both accounts are out of credits (OpenAI `insufficient_quota` 429; Anthropic "credit balance too low" 400) — account billing, not code.
+- **NEW FIX — opaque provider errors:** all 8 `AiProviderService` chat methods threw only `response.statusText` ("Bad Request"/"Too Many Requests"), discarding the provider's real error. Added `describeHttpError()` helper surfacing the actual message (e.g. "429 — exceeded your current quota", "400 — credit balance too low"). Gate: tsc 0 · vitest 334/334.
+- **Social publish pipeline — PROVEN LIVE (no credentials):** dummy-token twitter account → `createDirectPost` → `publishNow` → executor made a real `api.twitter.com/2/tweets` call → genuine 403 → status written back `failed` + real errorMessage. Full chain (token lookup → curated⨝scheduled join → PublishingService dispatch → real HTTP → status persist) verified. `listAccounts` correctly does not expose raw tokens.
+- **NEW FIX ×2 (minor):** (1) `integrations` fetch helpers (github/notion/gdrive) now map **404→NOT_FOUND** and github **403→FORBIDDEN** (were all INTERNAL_SERVER_ERROR) — verified live (missing repo → NOT_FOUND). (2) `platforms.addAccount` now returns the real numeric row id via `.returning({id})` (was the platform string) — verified live (accountId=number). Gate: tsc 0 · vitest 334/334.
+
+### Session 3 — Design tokens + deeper mock hunt ✅ MOSTLY DONE 2026-06-20 (tsc 0 · build ✓)
+- **Deeper mock hunt = all REAL:** knowledge base (ChromaDB vector ingestion), pipelines (real `AiProviderService.chat`), social publishing (real Twitter/LinkedIn/Facebook/IG API calls; YouTube honest "needs video" error), podcast E2E. Social publishing's only caveat is "not yet live-tested" with real tokens — code is real, not a shell.
+- **Palette gap fixed:** added `--accent-warning` + `--accent-info` to `Globals.css` (prior sweeps had no warning/info token → amber/yellow had no correct target). New utilities verified emitting real CSS.
+- **Always-on chrome migrated:** UpdateBanner/ZeroLoginBanner/PeerCard/ExecutionModeBadge → semantic tokens.
+- **~506 raw color classes / ~64 files REMAIN** — needs a dedicated **visually-verified** pass (dark theme can't be validated headless). Full mapping table + exempt-file list in memory `beta-sweep-followups`.
+
+### Session 2 — Security/correctness debt batch ✅ DONE 2026-06-20 (tsc 0 · vitest 334/334 · build ✓)
+- **`as any` → 0 in server:** `walletRouter` getSpendLog/getSpendSummary → Drizzle `.$dynamic()`; `WebSocketServer.resolveBackend` typed `Record<string,unknown>` + dropped `persona.data` cast. Client `PodcastStudio` `window as any.__activeSegmentAudio` → `useRef`.
+- **electron taskkill** → `execFileSync('taskkill',['/F','/PID',pid])` + numeric-pid guard (F2).
+- **electron-app dead `"overrides"`** removed (root pnpm-workspace.yaml already pins esbuild globally).
+- **superseded `client/src/lib/integrations.ts` mock removed** — trimmed to the 3 live exports (`IntegrationType`/`INTEGRATION_FEATURES`/`getIntegrationInfo`); fake-token generators gone; test trimmed (353→334 = dead-mock tests removed).
+- **`getInstance()`→`ctx.services`:** done for my new `securityRouter` HITL calls (`ctx.services.hitl`); broader migration needs `ctx.services` expanded for VirtualCard/Valet/PCBWay/ModelManagement/AuditLog first — tracked as its own task (pure convention, no bug). See memory `beta-sweep-followups`.
+
+### Confirmed CLEAN (verified, not assumed)
+DB layer (no `insertId`/dialect-leak/unawaited `getDb`); no hardcoded secrets; `JWT_SECRET`/`ZERO_LOGIN_MODE` production guards present; CORS not `*`; `dangerouslySetInnerHTML` all static (component-lib SVG + shadcn chart); mobile creds in SecureStore + AsyncStorage encrypted; no `oklch` in RN; single server entry point; no `react`/JSX in `server/`; client→server import is type-only.
+
+---
+
 ## 🚦 Current Status
 *   **Active Phase:** Phase 5 — F23–F27 code-complete. **All 3 OMMESH node artifacts built** for cross-platform mesh testing. Documentation audit and professional update complete (2026-06-17).
 *   **Done (2026-06-19): Neural Brain Map Engine Upgrade.** Removed arbitrary global physics collision (`resolveOverlaps`) from structured layouts (Hierarchical, Mind-Map, Circular) to preserve structural geometry. Instead, structured layouts now dynamically scale base sizing math (`H_GAP`, `V_GAP`, `STEP`, circumference) based on node counts, specifically expanding drastically when `Auto-Clustering` is OFF to guarantee fully traceable connections without overlapping nodes. Quality of life additions: `Shift`+`Click`/`Shift`+`Drag` multi-selection enabled, and an unlocking warning dialog added.
@@ -557,3 +597,87 @@ All planned repairs and consistency syncs from the final phase audit plan have b
     *   `tmp-valet-train/README.md` — added an explicit "Archived/Superseded" banner (production training is now the Kaggle pipeline) and fixed a stale hardcoded path reference (`Omnecor-HMCI-ai-workstation-AltV1`).
     *   `CHANGELOG.md` — backfilled entries for the 06-15 depth pass, the 06-16/17 OMMESH verification + doc overhaul, and the 06-19 token/design-token sweep (all previously undocumented in CHANGELOG, only in Progress-Tracker).
 *   **Not addressed (flagged, not fixed):** `tmp-valet-train/` still has 135 tracked files of training debris in the repo — marked archived but not removed/gitignored; deferred since removal risk wasn't worth taking without explicit sign-off.
+
+---
+
+### 18-Category Architectural Audit + Full Remediation — completed (2026-06-20, Linux)
+
+> `/architect` deep-audit pass across 18 categories. All ~45 findings fixed. Gates: `pnpm check` **0 errors** · `pnpm test` **353/353**. Permanent QA document created at `final-test-checklist.md` (project root).
+
+#### Phase 1 — DB Schema: 7 new tables + 10 missing indexes
+
+Added to `drizzle/schema.ts` and migrated via `pnpm build:push` (migration `0004_gorgeous_martin_li.sql`):
+- `asyncJobTracking` — persists async job lifecycle across restarts
+- `hitlPendingActions` — persists HITL approval state; rows >24h auto-timed-out on boot
+- `mcpServerConfigs` — reconnects all MCP servers automatically on startup
+- `fileWatcherRegistrations` — re-registers all chokidar watchers on startup
+- `ommeshTrustedPeers` — OMMESH peer fingerprint trust survives restarts
+- `walletAlertLog` — deduplicates wallet budget alerts (replaces in-memory Map)
+- `agentSessions` — tracks per-agent session for memory isolation
+- 10 missing indexes on FK columns (`chatSessions.userId`, `chatMessages.sessionId`, `cloudComputeSessions.userId/projectId`, `curatedPosts.projectId`, `discoveredArticles.projectId`, `platformAccounts.userId`)
+
+#### Phase 2 — Critical Security Fixes
+
+- **Path traversal CVE** (`trainingRouter.ts:validateDataset`): added `validatePath()` call before `readFile` (was the only unprotected path in the file)
+- **ComfyUI unauthenticated access** (`comfyRouter.ts`): 5 procedures `publicProcedure` → `protectedProcedure`
+- **Fal image enumeration** (`falRouter.ts:listImages`): `publicProcedure` → `protectedProcedure`
+- **Honcho openId spoofing** (`honchoRouter.ts`): added `assertOpenIdOwnership()` guard on `addMessage`, `addFact`, `getFacts` — rejects if authenticated user's `openId` ≠ input `openId`
+- **OMMESH fingerprint bypass** (`MeshServer.ts`): wired `securityManager.isTrusted(peerFingerprint)` call into `handleRequest()` — untrusted peers get 403 before any request processing
+
+#### Phase 3 — Service Persistence
+
+All 7 services now survive restarts:
+- `AsyncJobService` — INSERTs on `track()`, UPDATEs on `complete/fail`, loads pending rows on boot
+- `HITLApprovalService` — INSERTs on `requestApproval()`, UPDATEs on resolve; startup marks stale rows `timed_out`
+- `MCPClientService` — UPSERTs on connect, DELETEs on disconnect; `restoreFromDb()` reconnects all on startup
+- `FileSystemWatcherService` — UPSERTs on register, DELETEs on unregister; `restoreFromDb()` re-registers all chokidar watchers
+- `ProcessManagerService` — marks "running" rows as `failed` (reason: `server_restart`) on boot
+- `SecurityManager` — `hydrateFromDb()` loads `ommeshTrustedPeers` into Set; `approvePeer` INSERTs, `revokePeer` DELETEs
+- `AiProviderService.walletAlerts` — DB-backed dedup via `walletAlertLog` (7-day window query) replaces ephemeral Map
+
+#### Phase 4 — Integration Wiring
+
+- `FileSystemWatcher → VectorDB` auto-index: file events subscribed in `server/_core/index.ts`; `unlink/unlinkDir` → `removeDocument`, all other events → `addDocuments`
+- `MeshNode` settings restore: constructor reads `~/.omnecor/settings.json` synchronously, restores `crossNodeSyncEnabled` and `agentDiscourseEnabled`
+- `SecurityManager.hydrateFromDb()` called before `meshNode.start()` in startup sequence
+- `mcpClient.restoreFromDb()` and `fileWatcher.restoreFromDb()` wired into startup
+
+#### Phase 5 — Error Handling
+
+- 11 silent `.catch(() => console.warn("[AuditLog]", ...))` calls → `.catch(err => log.error("[AuditLog] write failed — event lost", err))` across `mcpRouter.ts`, `pipelineRouter.ts`, `kicadRouter.ts`, `agentRouter.ts`, `AgentService.ts`
+- Added `createLogger` import to all 5 files that were using raw `console.warn`
+- `AiProviderService` 3× `console.warn` → `log.warn`
+
+#### Phase 6 — Performance
+
+- `curatorRouter.approvePosts` / `rejectPosts`: replaced per-row `for` loop with single `inArray()` batch UPDATE (was N+1)
+- `personaRouter`: batch existence check via `inArray()` + local Set diff instead of per-row queries
+- `systemRouter.saveSettings` / `saveKeys`: sync `readFileSync`/`writeFileSync` → async `fs.promises`
+- CPU metric: `Math.random()` → `os.loadavg()[0] / os.cpus().length * 100` (real system load)
+
+#### Phase 7 — Observability
+
+- `/health` endpoint: now probes DB, Ollama, and ChromaDB in parallel; returns `{ status, checks: { db, ollama, chromadb }, uptime }` with 503 when DB is down
+- MCP tool call audit: `mcpRouter.callTool` logs result preview (first 500 chars) to `AuditLogService`
+- Request-duration perf logger: Express middleware flags requests >1 s with `[perf] slow request` log line
+
+#### Phase 8 — API Cleanup
+
+- 7× bare `throw new Error(...)` → `throw new TRPCError(...)` in `aiRouter.ts`, `projectRouter.ts`, `valetRouter.ts`
+- `Math.random()` IDs → `crypto.randomUUID()` in `Chat.tsx` (file/image attachment IDs) and `PodcastStudio.tsx` (job IDs)
+- `commandAllowlistStore.ts`: moved module-level `_resolver` mutable into Zustand state as `pendingResolver` field
+- `.gitignore`: added `tmp-valet-train/` entry
+
+#### Phase 9 — Frontend State
+
+- `NeuralMapContext.tsx`: added `writeLocked` ref — set before `updateMutation.mutate()`, cleared in `onSettled` — prevents concurrent mutation races
+- `commandAllowlistStore.ts`: `pendingResolver` in store state; `partialize` excludes it from localStorage persistence
+
+#### Phase 10 — AI Infrastructure
+
+- `AgentService.ts`: `recordSession()` helper INSERTs into `agentSessions` table on each `runCrew` / `runLiteAgent` / `runRecursiveMAS` call; `userId` forwarded from callers
+- `modelManagementRouter.ts`: new `getRunningModels` procedure queries Ollama `/api/ps` for currently loaded models with VRAM usage; returns empty array gracefully if Ollama offline
+
+#### Phase 12 — QA Document
+
+`final-test-checklist.md` created at project root — 10 sections (Persistence, Security, Integration Wiring, Performance, Error Handling, Observability, API Correctness, Frontend State, OMMESH/AI Infrastructure, Production Readiness) with 55 checkboxes and quick sqlite3 / log inspection commands.

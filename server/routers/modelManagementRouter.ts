@@ -231,4 +231,19 @@ export const modelManagementRouter = router({
       });
     }
   }),
+
+  /**
+   * Query Ollama /api/ps for currently loaded models with VRAM usage.
+   */
+  getRunningModels: protectedProcedure.query(async () => {
+    const ollamaUrl = process.env.OLLAMA_URL ?? "http://localhost:11434";
+    try {
+      const res = await fetch(`${ollamaUrl}/api/ps`, { signal: AbortSignal.timeout(3000) });
+      if (!res.ok) return { models: [] };
+      const data = await res.json() as { models?: unknown[] };
+      return { models: data.models ?? [] };
+    } catch {
+      return { models: [] };
+    }
+  }),
 });

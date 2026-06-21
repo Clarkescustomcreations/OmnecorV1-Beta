@@ -4,14 +4,14 @@
  */
 
 import { z } from "zod";
-import { router, publicProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 
 export const comfyRouter = router({
   /**
    * Queue a prompt/workflow to ComfyUI
    */
-  queuePrompt: publicProcedure
+  queuePrompt: protectedProcedure
     .input(z.object({
       prompt: z.record(z.string(), z.unknown()),
     }))
@@ -29,7 +29,7 @@ export const comfyRouter = router({
   /**
    * Get the current ComfyUI queue
    */
-  getQueue: publicProcedure.query(async ({ ctx }) => {
+  getQueue: protectedProcedure.query(async ({ ctx }) => {
     try {
       return await ctx.services.comfy.getQueue();
     } catch (error) {
@@ -43,7 +43,7 @@ export const comfyRouter = router({
   /**
    * Get ComfyUI system stats
    */
-  getSystemStats: publicProcedure.query(async ({ ctx }) => {
+  getSystemStats: protectedProcedure.query(async ({ ctx }) => {
     try {
       return await ctx.services.comfy.getSystemStats();
     } catch (error) {
@@ -57,7 +57,7 @@ export const comfyRouter = router({
   /**
    * Interrupt current ComfyUI execution
    */
-  interrupt: publicProcedure.mutation(async ({ ctx }) => {
+  interrupt: protectedProcedure.mutation(async ({ ctx }) => {
     try {
       await ctx.services.comfy.interrupt();
       return { success: true };
@@ -72,7 +72,7 @@ export const comfyRouter = router({
   /**
    * Clear ComfyUI queue
    */
-  clearQueue: publicProcedure.mutation(async ({ ctx }) => {
+  clearQueue: protectedProcedure.mutation(async ({ ctx }) => {
     try {
       await ctx.services.comfy.clearQueue();
       return { success: true };

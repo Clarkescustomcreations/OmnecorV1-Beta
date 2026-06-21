@@ -10,8 +10,13 @@ import { EventEmitter } from "events";
 import { ProcessManagerService } from "./ProcessManagerService.js";
 import { ENV } from "../../_core/env.js";
 import { AuditLogService } from "./AuditLogService.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("AgentService");
 import { PromptSanitizer } from "./PromptSanitizer.js";
 import { PYTHON_SCRIPTS } from "../config/index.js";
+import { getDb } from "../../db.factory.js";
+import { agentSessions } from "../../../drizzle/schema.js";
+import { v4 as uuidv4 } from "uuid";
 
 // ── RecursiveMAS types ────────────────────────────────────────────────────────
 
@@ -95,6 +100,13 @@ export class AgentService extends EventEmitter {
     this.processManager = ProcessManagerService.getInstance();
   }
 
+  /** Record an agent session in DB for memory isolation (fire-and-forget). */
+  private recordSession(agentType: string, userId?: string | null): void {
+    getDb().then(db =>
+      db.insert(agentSessions).values({ sessionId: uuidv4(), userId: userId ?? null, agentType })
+    ).catch(err => log.warn("AgentService: failed to record session", err));
+  }
+
   public static getInstance(): AgentService {
     if (!AgentService.instance) {
       AgentService.instance = new AgentService();
@@ -105,8 +117,9 @@ export class AgentService extends EventEmitter {
   /**
    * Run a CrewAI crew as a child process.
    */
-  async runCrew(config: AgentTaskConfig): Promise<string> {
+  async runCrew(config: AgentTaskConfig & { userId?: string }): Promise<string> {
     if (config.type !== "crewai") throw new Error("Invalid agent type for runCrew");
+    this.recordSession("crewai", config.userId);
 
     const sanitized = PromptSanitizer.getInstance().sanitize(config.goal);
     if (sanitized.flagged) {
@@ -119,7 +132,7 @@ export class AgentService extends EventEmitter {
         result: null,
         ipAddress: null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
       this.emit("security:injection_attempt", { procedure: "agent.runCrew", violations: sanitized.violations });
     }
     const safeConfig = { ...config, goal: sanitized.clean };
@@ -136,7 +149,7 @@ export class AgentService extends EventEmitter {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch((err) => console.warn("[AuditLog] write failed:", err));
+    }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
     return this.processManager.spawn({
       type: "custom",
       command: PYTHON_SCRIPTS.pythonBin,
@@ -148,8 +161,9 @@ export class AgentService extends EventEmitter {
   /**
    * Run a LiteAgent task.
    */
-  async runLiteAgent(config: AgentTaskConfig): Promise<string> {
+  async runLiteAgent(config: AgentTaskConfig & { userId?: string }): Promise<string> {
     if (config.type !== "liteagent") throw new Error("Invalid agent type for runLiteAgent");
+    this.recordSession("liteagent", config.userId);
 
     const sanitized = PromptSanitizer.getInstance().sanitize(config.goal);
     if (sanitized.flagged) {
@@ -162,7 +176,7 @@ export class AgentService extends EventEmitter {
         result: null,
         ipAddress: null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
       this.emit("security:injection_attempt", { procedure: "agent.runLiteAgent", violations: sanitized.violations });
     }
     const safeConfig = { ...config, goal: sanitized.clean };
@@ -176,7 +190,7 @@ export class AgentService extends EventEmitter {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch((err) => console.warn("[AuditLog] write failed:", err));
+    }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
     return this.processManager.spawn({
       type: "custom",
       command: PYTHON_SCRIPTS.pythonBin,
@@ -219,7 +233,8 @@ export class AgentService extends EventEmitter {
    * Sanitizes the goal through PromptSanitizer before sending.
    * @returns job_id string from the bridge
    */
-  async runRecursiveMAS(config: RecursiveMASConfig): Promise<string> {
+  async runRecursiveMAS(config: RecursiveMASConfig & { userId?: string }): Promise<string> {
+    this.recordSession("recursivemas", config.userId);
     // Sanitize goal
     const sanitized = PromptSanitizer.getInstance().sanitize(config.goal);
     if (sanitized.flagged) {
@@ -232,7 +247,7 @@ export class AgentService extends EventEmitter {
         result: null,
         ipAddress: null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
       this.emit("security:injection_attempt", {
         procedure: "agent.runRecursiveMAS",
         violations: sanitized.violations,

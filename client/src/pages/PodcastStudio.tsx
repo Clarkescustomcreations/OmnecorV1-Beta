@@ -455,6 +455,8 @@ export function PodcastStudio() {
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<{ segments: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  // Tracks the currently-playing per-segment preview so a new play stops the previous one.
+  const activeSegmentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [podcastLength, setPodcastLength] = useState<PodcastLength>(() => loadPodcastSession()?.podcastLength ?? "medium");
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   const [history, setHistory] = useState<PodcastEpisode[]>(() => loadPodcastHistory());
@@ -578,7 +580,7 @@ export function PodcastStudio() {
           const newTurns = JSON.parse(jsonMatch[0]);
           setTurns((newTurns as DialogueTurn[]).map((t) => ({
             ...t,
-            id: Math.random().toString(36).substring(7),
+            id: crypto.randomUUID(),
           })));
           toast.success("AI Script generated!");
         }
@@ -622,7 +624,7 @@ export function PodcastStudio() {
       setAudioUrl(d.audioUrl ?? null);
       if (d.audioUrl) {
         addEpisodeToHistory({
-          id: d.jobId ?? Math.random().toString(36).slice(2),
+          id: d.jobId ?? crypto.randomUUID(),
           title: turns[0]?.text?.slice(0, 60) || "Podcast Episode",
           date: new Date().toISOString(),
           audioUrl: d.audioUrl,
@@ -680,7 +682,7 @@ export function PodcastStudio() {
     const lastSpeaker = turns[turns.length - 1]?.speakerId;
     const nextSpeaker = lastSpeaker === "Alex" ? "Sam" : "Alex";
     setTurns([...turns, {
-      id: Math.random().toString(36).substring(7),
+      id: crypto.randomUUID(),
       speakerId: nextSpeaker,
       text: "",
       emotion: "neutral"
@@ -698,7 +700,7 @@ export function PodcastStudio() {
       toast.error("Please fill in all dialogue turns.");
       return;
     }
-    const jobId = Math.random().toString(36).substring(7) + "-" + Date.now();
+    const jobId = crypto.randomUUID() + "-" + Date.now();
     setActiveJobId(jobId);
     setGenerationProgress(0);
     setIsGenerating(true);
@@ -1004,11 +1006,11 @@ export function PodcastStudio() {
                               className="h-6 w-6"
                               onClick={() => {
                                 if (seg.audioUrl) {
-                                  if ((window as any).__activeSegmentAudio) {
-                                    try { (window as any).__activeSegmentAudio.pause(); } catch {}
+                                  if (activeSegmentAudioRef.current) {
+                                    try { activeSegmentAudioRef.current.pause(); } catch {}
                                   }
                                   const audio = new Audio(seg.audioUrl);
-                                  (window as any).__activeSegmentAudio = audio;
+                                  activeSegmentAudioRef.current = audio;
                                   audio.play().catch(err => console.warn("Failed to play segment audio:", err));
                                 } else {
                                   const text = seg.text || seg.content || "";

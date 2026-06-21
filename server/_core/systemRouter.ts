@@ -3,8 +3,9 @@ import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./notification.js";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc.js";
 import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, createWriteStream } from "fs";
+import fsPromises from "fs/promises";
 import { join } from "path";
-import { homedir, platform, cpus, totalmem, freemem, tmpdir } from "os";
+import { homedir, platform, cpus, totalmem, freemem, tmpdir, loadavg } from "os";
 import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import * as https from "https";
@@ -54,6 +55,22 @@ function readSettingsFile(): OmnecorSettings | null {
   }
 }
 
+// Async version for hot-path mutation procedures
+async function readSettingsFileAsync(): Promise<OmnecorSettings | null> {
+  try {
+    const text = await fsPromises.readFile(SETTINGS_PATH, "utf-8").catch(() => null);
+    if (!text) return null;
+    return JSON.parse(text) as OmnecorSettings;
+  } catch {
+    return null;
+  }
+}
+
+async function writeSettingsFileAsync(settings: OmnecorSettings): Promise<void> {
+  await fsPromises.mkdir(join(homedir(), ".omnecor"), { recursive: true });
+  await fsPromises.writeFile(SETTINGS_PATH, JSON.stringify(settings, null, 2), "utf-8");
+}
+
 export const systemRouter = router({
   health: publicProcedure
     .input(
@@ -61,12 +78,17 @@ export const systemRouter = router({
         timestamp: z.number().min(0, "timestamp cannot be negative"),
       }).optional()
     )
-    .query(() => ({
-      ok: true,
-      cpu: { percent: Math.round(Math.random() * 20 + 5) },
-      ollama: { status: "ok" },
-      chromadb: { status: "ok" }
-    })),
+    .query(() => {
+      const loads = loadavg();
+      const numCpus = cpus().length || 1;
+      const cpuPercent = Math.min(100, Math.round((loads[0] / numCpus) * 100));
+      return {
+        ok: true,
+        cpu: { percent: cpuPercent },
+        ollama: { status: "ok" },
+        chromadb: { status: "ok" },
+      };
+    }),
 
   loginProviders: publicProcedure.query(() => {
     const settings = readSettingsFile() || {};
@@ -131,14 +153,10 @@ export const systemRouter = router({
 
   saveSettings: publicProcedure
     .input(z.object({ settings: z.record(z.string(), z.unknown()) }))
-    .mutation(({ input }) => {
-      const current = readSettingsFile() || {};
-      const updated = { ...current, ...input.settings };
-      const dir = join(homedir(), ".omnecor");
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-      writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), "utf-8");
+    .mutation(async ({ input }) => {
+      const current = await readSettingsFileAsync() ?? {};
+      const updated = { ...current, ...input.settings } as OmnecorSettings;
+      await writeSettingsFileAsync(updated);
       return { saved: true };
     }),
 
@@ -149,7 +167,7 @@ export const systemRouter = router({
       })
     )
     .mutation(async ({ input }) => {
-      const current = readSettingsFile() || {};
+      const current = await readSettingsFileAsync() ?? {};
       // Map frontend key names to internal setting names if necessary
       const keyMap: Record<string, string> = {
         openai: "openaiApiKey",
@@ -202,11 +220,7 @@ export const systemRouter = router({
         if (v) updated[target] = v;
       }
 
-      const dir = join(homedir(), ".omnecor");
-      if (!existsSync(dir)) {
-        mkdirSync(dir, { recursive: true });
-      }
-      writeFileSync(SETTINGS_PATH, JSON.stringify(updated, null, 2), "utf-8");
+      await writeSettingsFileAsync(updated as OmnecorSettings);
       return { success: true };
     }),
 

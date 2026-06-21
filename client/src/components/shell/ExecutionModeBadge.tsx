@@ -4,9 +4,9 @@ import { Lock, Zap, Flame } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const MODE_CONFIG = {
-  sovereign: { label: "Sovereign", icon: Lock, className: "bg-red-500/15 text-red-600 border-red-500/30" },
-  scrapper: { label: "Scrapper", icon: Zap, className: "bg-green-500/15 text-green-600 border-green-500/30" },
-  big_spender: { label: "Big Spender", icon: Flame, className: "bg-amber-500/15 text-amber-600 border-amber-500/30" },
+  sovereign: { label: "Sovereign", icon: Lock, className: "bg-accent-danger/15 text-accent-danger border-accent-danger/30" },
+  scrapper: { label: "Scrapper", icon: Zap, className: "bg-accent-success/15 text-accent-success border-accent-success/30" },
+  big_spender: { label: "Big Spender", icon: Flame, className: "bg-accent-warning/15 text-accent-warning border-accent-warning/30" },
 };
 
 interface ExecutionModeBadgeProps {
@@ -20,9 +20,9 @@ export function ExecutionModeBadge({ collapsed = false }: ExecutionModeBadgeProp
 
   if (collapsed) {
     const collapsedStyles = {
-      sovereign: "bg-red-500 text-white border-red-600",
-      scrapper: "bg-green-500 text-white border-green-600",
-      big_spender: "bg-amber-500 text-white border-amber-600",
+      sovereign: "bg-accent-danger text-white border-accent-danger",
+      scrapper: "bg-accent-success text-white border-accent-success",
+      big_spender: "bg-accent-warning text-white border-accent-warning",
     };
     return (
       <div 

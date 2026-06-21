@@ -2,8 +2,12 @@ import { protectedProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { getDb } from "../db.factory.js";
 import { curatedPosts, discoveredArticles } from "../../drizzle/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { assertProviderAllowedInMode } from "../_core/sovereign.js";
+
+/** Provider used by generatePostDraft — guarded so sovereign users can't reach it. */
+const CURATION_PROVIDER = "anthropic";
 
 /** Character budget per platform for generated post copy. */
 const PLATFORM_LIMITS: Record<string, number> = {
@@ -28,7 +32,7 @@ Content: ${(article.content || article.summary || "").slice(0, 1500)}`;
 
   try {
     const draft = await aiProvider.chat({
-      providerId: "anthropic",
+      providerId: CURATION_PROVIDER,
       modelId: "claude-opus-4-1",
       messages: [{ role: "user", content: prompt }],
       maxTokens: 400,
@@ -72,6 +76,8 @@ export const curatorRouter = router({
   curateArticle: protectedProcedure
     .input(z.object({ articleId: z.number(), platform: z.string().default("x") }))
     .mutation(async ({ input, ctx }) => {
+      // Sovereign users must not reach the cloud curation provider.
+      assertProviderAllowedInMode(CURATION_PROVIDER, ctx.user?.executionMode);
       const db = await getDb();
 
       const article = await db.select()
@@ -106,13 +112,9 @@ export const curatorRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-
-      for (const postId of input.postIds) {
-        await db.update(curatedPosts)
-          .set({ status: "approved" })
-          .where(eq(curatedPosts.id, postId));
-      }
-
+      await db.update(curatedPosts)
+        .set({ status: "approved" })
+        .where(inArray(curatedPosts.id, input.postIds));
       return { success: true, approvedCount: input.postIds.length };
     }),
   rejectPosts: protectedProcedure
@@ -122,16 +124,12 @@ export const curatorRouter = router({
     }))
     .mutation(async ({ input }) => {
       const db = await getDb();
-
-      for (const postId of input.postIds) {
-        await db.update(curatedPosts)
-          .set({
-            status: "failed",
-            approvalNotes: input.rejectionReason || "Rejected by user",
-          })
-          .where(eq(curatedPosts.id, postId));
-      }
-
+      await db.update(curatedPosts)
+        .set({
+          status: "failed",
+          approvalNotes: input.rejectionReason || "Rejected by user",
+        })
+        .where(inArray(curatedPosts.id, input.postIds));
       return { success: true, rejectedCount: input.postIds.length };
     }),
   updatePost: protectedProcedure
@@ -155,6 +153,8 @@ export const curatorRouter = router({
   regenerateDraft: protectedProcedure
     .input(z.object({ articleId: z.number() }))
     .mutation(async ({ input, ctx }) => {
+      // Sovereign users must not reach the cloud curation provider.
+      assertProviderAllowedInMode(CURATION_PROVIDER, ctx.user?.executionMode);
       const db = await getDb();
 
       const article = await db.select()

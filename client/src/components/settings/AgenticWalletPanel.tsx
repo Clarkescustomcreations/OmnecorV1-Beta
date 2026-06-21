@@ -19,7 +19,9 @@ import {
   Lock,
   Loader2,
   ShieldCheck,
-  ShieldAlert
+  ShieldAlert,
+  Check,
+  X
 } from "lucide-react";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
@@ -35,6 +37,21 @@ export function AgenticWalletPanel() {
   // In sovereign (air-gapped) mode the Lithic cloud integration is disabled, so
   // there is nothing to request approval for.
   const executionMode = useAppStore((s) => s.executionMode);
+
+  // Live HITL approval queue — admin-only. Polls while the dialog is open so a
+  // pending card-issuance/order/model-deletion request appears within ~3s.
+  const utils = trpc.useUtils();
+  const pendingHitl = trpc.security.getPendingHitlActions.useQuery(undefined, {
+    enabled: hitlDialogOpen,
+    refetchInterval: hitlDialogOpen ? 3000 : false,
+  });
+  const resolveHitl = trpc.security.resolveHitlAction.useMutation({
+    onSuccess: (res) => {
+      toast.success(res.approved ? "Action approved" : "Action rejected");
+      utils.security.getPendingHitlActions.invalidate();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const setBudgetMutation = trpc.wallet.setBudget.useMutation({
     onSuccess: () => {
@@ -85,28 +102,17 @@ export function AgenticWalletPanel() {
   };
 
   /**
-   * HITL Authorization — opens the human-in-the-loop review queue.
+   * HITL Authorization — opens the live human-in-the-loop review queue.
    *
-   * SECURITY: Card issuance and other high-value financial operations are gated
+   * SECURITY: Card issuance and other high-value operations are gated
    * server-side. `virtualCard.issueCard` calls `HITLApprovalService.requestApproval`
    * and blocks until an administrator approves (5-minute timeout → auto-reject).
-   * Every request/approval/rejection is written to the audit trail there.
    *
-   * There is currently NO client-facing tRPC procedure that exposes the pending
-   * HITL queue or an approve/reject action (HITLApprovalService.getPendingActions /
-   * approveAction are not yet wired to any router). Until that exists this button
-   * surfaces an informational dialog rather than silently doing nothing.
-   *
-   * FULL IMPLEMENTATION (when the backend procedures land):
-   *   1. Add `security.getPendingHitlActions` (adminProcedure → getPendingActions())
-   *      and `security.resolveHitlAction({ id, approved })` (adminProcedure →
-   *      approveAction()) to securityRouter, both audit-logged.
-   *   2. Replace this dialog with a live list (subscribe via the /ws "actionPending"
-   *      event or poll the query) rendering `CriticalActionChecklist` per pending
-   *      action, calling resolveHitlAction on Approve/Reject.
-   *   3. On resolution: toast success + invalidate `virtualCard` / `wallet` queries.
-   *   4. Never render raw card numbers / processor responses — show only the
-   *      redacted memo, amount, and requesting user.
+   * The queue is backed by `security.getPendingHitlActions` (admin query) and
+   * `security.resolveHitlAction({ id, approved })` (admin mutation). The dialog
+   * polls the query every 3s while open and renders Approve/Reject per pending
+   * action; the service audit-logs every resolution. Args are shown as-is from
+   * HITLApprovalService, which already redacts sensitive fields server-side.
    */
   const handleOpenHitlQueue = () => {
     // Permission gate: sovereign (air-gapped) mode has no cloud financial ops,
@@ -285,20 +291,70 @@ export function AgenticWalletPanel() {
             </DialogDescription>
           </DialogHeader>
           <div className="py-4 space-y-3 text-sm">
-            <p>
-              When you issue a virtual card, the request is suspended server-side
-              and broadcast to administrators. The transaction is processed
-              automatically once an admin approves, and is rejected if no one
-              responds within 5 minutes. Every request, approval, and rejection is
-              recorded in the audit trail.
+            <p className="text-muted-foreground text-xs">
+              High-value actions (card issuance, PCB orders, model deletion) suspend
+              server-side and auto-reject after 5 minutes. Approving processes the
+              request immediately; every decision is written to the audit trail.
             </p>
-            <div className="rounded-md border border-muted bg-muted/40 p-3 text-xs text-muted-foreground">
-              Pending approvals are reviewed by administrators. To act on a request
-              now, an admin should open{" "}
-              <span className="font-semibold text-foreground">Settings &rarr; Security</span>.
-              A live approve/reject queue will appear here once the backend approval
-              endpoints are exposed to this panel.
-            </div>
+
+            {pendingHitl.isLoading && (
+              <div className="flex items-center gap-2 text-muted-foreground text-xs py-4 justify-center">
+                <Loader2 className="w-4 h-4 animate-spin" /> Loading pending actions…
+              </div>
+            )}
+
+            {pendingHitl.isError && (
+              <div className="rounded-md border border-destructive/40 bg-destructive/10 p-3 text-xs text-destructive">
+                {pendingHitl.error.message.includes("FORBIDDEN") || pendingHitl.error.data?.code === "FORBIDDEN"
+                  ? "Administrator role required to review the approval queue."
+                  : pendingHitl.error.message}
+              </div>
+            )}
+
+            {pendingHitl.data && pendingHitl.data.length === 0 && (
+              <div className="rounded-md border border-muted bg-muted/40 p-4 text-xs text-muted-foreground text-center">
+                No actions are awaiting approval.
+              </div>
+            )}
+
+            {pendingHitl.data?.map((action) => (
+              <div
+                id={`hitl-action-${action.id}`}
+                key={action.id}
+                className="rounded-md border border-border bg-card p-3 space-y-2"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <span className="font-semibold text-foreground text-sm break-words">{action.toolName}</span>
+                  <Badge variant="outline" className="text-[10px] shrink-0">
+                    {new Date(action.timestamp).toLocaleTimeString()}
+                  </Badge>
+                </div>
+                <pre className="text-[11px] text-muted-foreground bg-muted/40 rounded p-2 overflow-x-auto max-w-full break-words whitespace-pre-wrap">
+                  {JSON.stringify(action.args, null, 2)}
+                </pre>
+                <div className="flex items-center gap-2 justify-end">
+                  <Button
+                    id={`hitl-reject-${action.id}`}
+                    size="sm"
+                    variant="outline"
+                    className="gap-1 cursor-pointer transition-colors"
+                    disabled={resolveHitl.isPending}
+                    onClick={() => resolveHitl.mutate({ id: action.id, approved: false })}
+                  >
+                    <X className="w-3.5 h-3.5" /> Reject
+                  </Button>
+                  <Button
+                    id={`hitl-approve-${action.id}`}
+                    size="sm"
+                    className="gap-1 cursor-pointer transition-colors"
+                    disabled={resolveHitl.isPending}
+                    onClick={() => resolveHitl.mutate({ id: action.id, approved: true })}
+                  >
+                    <Check className="w-3.5 h-3.5" /> Approve
+                  </Button>
+                </div>
+              </div>
+            ))}
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setHitlDialogOpen(false)}>

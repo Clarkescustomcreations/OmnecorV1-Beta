@@ -30,6 +30,9 @@ import {
   type CondensedJobResult,
 } from "./JobResultCondenser.js";
 import { createLogger } from "../../_core/logger.js";
+import { getDb } from "../../db.factory.js";
+import { asyncJobTracking } from "../../../drizzle/schema.js";
+import { eq } from "drizzle-orm";
 
 const log = createLogger("AsyncJob");
 
@@ -74,6 +77,28 @@ export class AsyncJobService extends EventEmitter {
     this.processManager.on("lifecycle", (e) => {
       void this.onLifecycle(e);
     });
+    void this.hydrateFromDb();
+  }
+
+  /** Load pending jobs from DB on startup to re-populate in-memory tracking. */
+  private async hydrateFromDb(): Promise<void> {
+    try {
+      const db = await getDb();
+      const rows = await db.select().from(asyncJobTracking)
+        .where(eq(asyncJobTracking.status, "pending"));
+      for (const row of rows) {
+        this.tracked.set(row.jobId, {
+          userId: row.userId ?? undefined,
+          conversationId: row.conversationId ?? undefined,
+          label: row.label ?? undefined,
+        });
+      }
+      if (rows.length > 0) {
+        log.info("AsyncJob: restored pending jobs from DB", { count: rows.length });
+      }
+    } catch (err) {
+      log.warn("AsyncJob: failed to hydrate from DB", err);
+    }
   }
 
   public static getInstance(): AsyncJobService {
@@ -94,6 +119,16 @@ export class AsyncJobService extends EventEmitter {
   /** Remember that `jobId` was launched by the agent from `context`. */
   track(jobId: string, context: AsyncJobContext): void {
     this.tracked.set(jobId, context);
+    getDb().then(db =>
+      db.insert(asyncJobTracking).values({
+        jobId,
+        userId: context.userId != null ? String(context.userId) : null,
+        conversationId: context.conversationId ?? null,
+        label: context.label ?? null,
+        jobType: "async",
+        status: "pending",
+      }).onConflictDoNothing()
+    ).catch(err => log.warn("AsyncJob: failed to persist tracked job", err));
   }
 
   /** Whether a job is being tracked for agent continuation. */
@@ -117,6 +152,10 @@ export class AsyncJobService extends EventEmitter {
     const status = event.state;
 
     this.tracked.delete(event.jobId);
+    const terminalStatus = status === "completed" ? "completed" : "failed";
+    getDb().then(db =>
+      db.update(asyncJobTracking).set({ status: terminalStatus }).where(eq(asyncJobTracking.jobId, event.jobId))
+    ).catch(err => log.warn("AsyncJob: failed to update job status in DB", err));
 
     try {
       const captured = this.processManager.getCapturedOutput(event.jobId) ?? {

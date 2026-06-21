@@ -33,6 +33,9 @@ import fs from "fs/promises";
 import { v4 as uuidv4 } from "uuid";
 import { PYTHON_SCRIPTS, TRAINING_CONFIG } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
+import { getDb } from "../../db.factory.js";
+import { asyncJobTracking } from "../../../drizzle/schema.js";
+import { eq } from "drizzle-orm";
 const log = createLogger("ProcessManager");
 
 // ---------------------------------------------------------------------------
@@ -203,6 +206,19 @@ export class ProcessManagerService extends EventEmitter {
   private constructor() {
     super();
     this.maxConcurrent = TRAINING_CONFIG.maxConcurrentJobs;
+    void this.markOrphanedJobsFailed();
+  }
+
+  /** On startup, mark any jobs that were "running" before restart as failed. */
+  private async markOrphanedJobsFailed(): Promise<void> {
+    try {
+      const db = await getDb();
+      await db.update(asyncJobTracking)
+        .set({ status: "failed", failReason: "server_restart" })
+        .where(eq(asyncJobTracking.status, "running"));
+    } catch (err) {
+      log.warn("ProcessManager: failed to mark orphaned jobs", err);
+    }
   }
 
   /** Retrieve the singleton instance */
@@ -357,6 +373,14 @@ export class ProcessManagerService extends EventEmitter {
     };
 
     this.processes.set(jobId, managed);
+    getDb().then(db =>
+      db.insert(asyncJobTracking).values({
+        jobId,
+        label,
+        jobType: config.type,
+        status: "running",
+      }).onConflictDoNothing()
+    ).catch(err => log.warn("ProcessManager: failed to persist job", err));
 
     // Prepare sanitized environment
     const env: Record<string, string> = {
@@ -658,6 +682,16 @@ export class ProcessManagerService extends EventEmitter {
       timestamp: new Date().toISOString(),
       durationMs: startTime ? now - startTime : null,
     };
+
+    if (state === "completed" || state === "failed" || state === "cancelled") {
+      const terminalStatus = state === "completed" ? "completed" : "failed";
+      const failReason = state === "cancelled" ? "cancelled" : (event.error ?? undefined);
+      getDb().then(db =>
+        db.update(asyncJobTracking)
+          .set({ status: terminalStatus, failReason: failReason ?? null })
+          .where(eq(asyncJobTracking.jobId, managed.jobId))
+      ).catch(err => log.warn("ProcessManager: failed to update job status", err));
+    }
 
     this.emit("lifecycle", event);
   }

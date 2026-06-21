@@ -158,7 +158,7 @@ export const projectRouter = router({
         // Validate the path is a directory before handing to chokidar
         const stat = await fs.stat(resolved);
         if (!stat.isDirectory()) {
-          throw new Error(`Path is not a directory: ${resolved}`);
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Path is not a directory: ${resolved}` });
         }
 
         await ctx.services.fileWatcher.registerProject({
@@ -252,7 +252,7 @@ export const projectRouter = router({
         // Validate path is directory
         const stat = await fs.stat(resolved);
         if (!stat.isDirectory()) {
-          throw new Error(`Not a directory: ${resolved}`);
+          throw new TRPCError({ code: "BAD_REQUEST", message: `Not a directory: ${resolved}` });
         }
 
         // Build the tree starting from rootDir's immediate children

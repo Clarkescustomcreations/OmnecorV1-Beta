@@ -41,6 +41,9 @@ interface CommandAllowlistState {
   /** In-flight approval request (one at a time) */
   pending: Omit<PendingApproval, "resolve"> | null;
 
+  /** Resolver for the current pending approval (not persisted). */
+  pendingResolver: ((scope: AllowScope | null) => void) | null;
+
   addEntry: (cmd: string, scope: AllowScope, projectId?: string) => void;
   removeEntry: (cmd: string, scope: AllowScope, projectId?: string) => void;
   clearProjectEntries: (projectId: string) => void;
@@ -60,13 +63,12 @@ interface CommandAllowlistState {
   _resolvePending: (scope: AllowScope | null) => void;
 }
 
-let _resolver: ((scope: AllowScope | null) => void) | null = null;
-
 export const useCommandAllowlistStore = create<CommandAllowlistState>()(
   persist(
     (set, get) => ({
       entries: [],
       pending: null,
+      pendingResolver: null,
 
       addEntry: (cmd, scope, projectId) => {
         const normalised = normaliseCmd(cmd);
@@ -116,10 +118,10 @@ export const useCommandAllowlistStore = create<CommandAllowlistState>()(
         if (existing) return Promise.resolve(existing);
 
         return new Promise<AllowScope | null>(resolve => {
-          _resolver = resolve;
           set({
+            pendingResolver: resolve,
             pending: {
-              id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+              id: `${Date.now()}-${crypto.randomUUID().slice(0, 8)}`,
               fullCommand,
               cmd,
               cwd,
@@ -130,21 +132,20 @@ export const useCommandAllowlistStore = create<CommandAllowlistState>()(
       },
 
       _resolvePending: (scope) => {
-        const pending = get().pending;
-        if (!pending || !_resolver) return;
+        const { pending, pendingResolver } = get();
+        if (!pending || !pendingResolver) return;
 
         if (scope && scope !== "once") {
           get().addEntry(pending.cmd, scope, scope === "project" ? pending.projectId : undefined);
         }
 
-        _resolver(scope);
-        _resolver = null;
-        set({ pending: null });
+        pendingResolver(scope);
+        set({ pending: null, pendingResolver: null });
       },
     }),
     {
       name: "omnecor_cmd_allowlist",
-      // Only persist the entries list, not transient pending state
+      // Only persist the entries list; pending/resolver are transient
       partialize: (s) => ({ entries: s.entries }),
     }
   )

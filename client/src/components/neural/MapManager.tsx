@@ -50,7 +50,7 @@ interface SourceDef {
 const CLOUD_SOURCES: SourceDef[] = [
   { type: "gmail",        label: "Gmail",        icon: <Inbox className="w-4 h-4" />,   neuralMapSupported: true  },
   { type: "outlook",      label: "Outlook",      icon: <Mail className="w-4 h-4" />,    neuralMapSupported: true  },
-  { type: "google-drive", label: "Google Drive", icon: <Cloud className="w-4 h-4" />,   neuralMapSupported: false },
+  { type: "google-drive", label: "Google Drive", icon: <Cloud className="w-4 h-4" />,   neuralMapSupported: true  },
   { type: "dropbox",      label: "Dropbox",      icon: <Package className="w-4 h-4" />, neuralMapSupported: false },
   { type: "onedrive",     label: "OneDrive",     icon: <HardDrive className="w-4 h-4"/>,neuralMapSupported: false },
 ];

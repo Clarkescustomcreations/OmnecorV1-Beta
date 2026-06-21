@@ -9,19 +9,34 @@
 // Express 4's correct 0.1.x copy lives under .pnpm; we resolve it and alias the
 // server bundle's single path-to-regexp consumer (Express 4) to it.
 import { build } from "esbuild";
-import { readdirSync, writeFileSync } from "fs";
+import { readdirSync, writeFileSync, existsSync, readFileSync } from "fs";
 import { join } from "path";
 
 // Locate the 0.1.x path-to-regexp that Express 4 needs (callable default export).
+// Works under both pnpm linker modes:
+//   - node-linker=hoisted (.npmrc): the top-level path-to-regexp is the v8 copy
+//     (Express 5 / RN) which is NOT callable; Express 4 keeps its own 0.1.x nested
+//     at node_modules/express/node_modules/path-to-regexp.
+//   - isolated/.pnpm: the 0.1.x copy lives in its own virtual-store dir.
 function resolveClassicPathToRegexp() {
-  const pnpmDir = join(process.cwd(), "node_modules", ".pnpm");
-  const match = readdirSync(pnpmDir).find((d) => /^path-to-regexp@0\.1\./.test(d));
-  if (!match) {
-    throw new Error(
-      "Could not find path-to-regexp@0.1.x under node_modules/.pnpm — Express 4 needs the callable 0.1.x API. Run `pnpm install`.",
-    );
+  // 1. Hoisted mode: Express 4's incompatible 0.1.x is nested under express itself.
+  const nested = join(process.cwd(), "node_modules", "express", "node_modules", "path-to-regexp");
+  if (existsSync(join(nested, "package.json"))) {
+    try {
+      const v = JSON.parse(readFileSync(join(nested, "package.json"), "utf8")).version ?? "";
+      if (/^0\.1\./.test(v)) return nested;
+    } catch { /* fall through to .pnpm scan */ }
   }
-  return join(pnpmDir, match, "node_modules", "path-to-regexp");
+  // 2. Isolated/.pnpm mode: scan the virtual store for the 0.1.x dir.
+  const pnpmDir = join(process.cwd(), "node_modules", ".pnpm");
+  if (existsSync(pnpmDir)) {
+    const match = readdirSync(pnpmDir).find((d) => /^path-to-regexp@0\.1\./.test(d));
+    if (match) return join(pnpmDir, match, "node_modules", "path-to-regexp");
+  }
+  throw new Error(
+    "Could not find path-to-regexp@0.1.x (Express 4 needs the callable 0.1.x API). " +
+      "Checked node_modules/express/node_modules and node_modules/.pnpm. Run `pnpm install`.",
+  );
 }
 
 // OMNECOR_BUNDLE_DEV=1 produces a local-only bundle that does NOT hard-code

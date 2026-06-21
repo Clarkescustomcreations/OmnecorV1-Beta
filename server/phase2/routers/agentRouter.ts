@@ -7,6 +7,8 @@ import { z } from "zod";
 import { router, protectedProcedure } from "../../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { AuditLogService } from "../services/AuditLogService.js";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("agentRouter");
 
 const agentTaskSchema = z.object({
   type: z.enum(["crewai", "liteagent", "n8n"]),
@@ -91,7 +93,7 @@ export const agentRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
 
       const jobId = await ctx.services.agent.runRecursiveMAS(input);
       return { jobId };

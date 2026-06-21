@@ -16,7 +16,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure, adminProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 import { validatePath } from "../_core/security.js";
@@ -238,5 +238,42 @@ export const securityRouter = router({
     .query(async () => {
       const { ThreatIntelService } = await import("../phase2/services/ThreatIntelService.js");
       return ThreatIntelService.getInstance().getIoCFeed();
+    }),
+
+  // =========================================================================
+  // Human-in-the-Loop (HITL) review queue
+  //
+  // High-value/destructive operations (card issuance, PCB orders, model
+  // deletion, …) suspend server-side via HITLApprovalService.requestApproval
+  // and block until an admin resolves them (or they time out). These two
+  // admin-only procedures surface that pending queue to the UI and let an
+  // admin approve/reject. The service audit-logs every resolution internally.
+  // =========================================================================
+
+  /** List currently-pending HITL actions awaiting admin approval. */
+  getPendingHitlActions: adminProcedure.query(({ ctx }) => {
+    return ctx.services.hitl.getPendingActions();
+  }),
+
+  /** Approve or reject a pending HITL action by its id. */
+  resolveHitlAction: adminProcedure
+    .input(
+      z.object({
+        id: z.string().min(1),
+        approved: z.boolean(),
+        reason: z.string().max(500).optional(),
+      }),
+    )
+    .mutation(({ input, ctx }) => {
+      const hitl = ctx.services.hitl;
+      const pending = hitl.getPendingActions().some((a) => a.id === input.id);
+      if (!pending) {
+        throw new TRPCError({
+          code: "NOT_FOUND",
+          message: "That action is no longer pending (already resolved or timed out).",
+        });
+      }
+      hitl.approveAction(input.id, input.approved, input.reason);
+      return { success: true, id: input.id, approved: input.approved };
     }),
 });

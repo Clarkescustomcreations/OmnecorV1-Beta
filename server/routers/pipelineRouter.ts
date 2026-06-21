@@ -4,6 +4,8 @@ import { protectedProcedure, router } from "../_core/trpc.js";
 import { PipelineEngineService } from "../phase2/services/PipelineEngineService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
+import { createLogger } from "../_core/logger.js";
+const log = createLogger("pipelineRouter");
 
 export const pipelineRouter = router({
   createPipeline: protectedProcedure
@@ -41,7 +43,7 @@ export const pipelineRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
       return PipelineEngineService.getInstance().approvePhase(input.pipelineId, input.phase, ctx.user!.id);
     }),
   abortPipeline: protectedProcedure
@@ -56,7 +58,7 @@ export const pipelineRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
       return PipelineEngineService.getInstance().abortPipeline(input.pipelineId);
     }),
 });

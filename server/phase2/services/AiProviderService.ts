@@ -18,11 +18,33 @@ const log = createLogger("AiProvider");
 import { meshNode } from "../../ommesh/core/MeshNode.js";
 import { v4 as uuidv4 } from "uuid";
 import { getDb } from "../../db.factory.js";
-import { spendLog, projectBudgets } from "../../../drizzle/schema.js";
+import { spendLog, projectBudgets, walletAlertLog } from "../../../drizzle/schema.js";
+import { and, eq, gt } from "drizzle-orm";
 import { calculateCostMicrocents } from "../config/providerPricing.js";
 import { SettingsService } from "./SettingsService.js";
 import { NotificationService } from "../../_core/NotificationService.js";
 import { type PeerInfo } from "../../ommesh/core/DiscoveryService.js";
+
+/**
+ * Build a human-useful error from a failed provider HTTP response. Surfaces the
+ * provider's actual error message (e.g. "credit balance too low",
+ * "insufficient_quota") instead of the opaque `statusText` ("Bad Request"),
+ * so the user sees an actionable reason. Only called on the !response.ok path,
+ * so consuming the body here is safe.
+ */
+async function describeHttpError(response: Response): Promise<string> {
+  const body = await response.text().catch(() => "");
+  try {
+    const j = JSON.parse(body);
+    const msg =
+      j?.error?.message ??
+      (typeof j?.error === "string" ? j.error : undefined) ??
+      j?.message;
+    if (typeof msg === "string" && msg.trim()) return `${response.status} — ${msg.trim()}`;
+  } catch { /* body wasn't JSON */ }
+  const snippet = body.replace(/\s+/g, " ").trim().slice(0, 200);
+  return snippet ? `${response.status} — ${snippet}` : `${response.status} ${response.statusText}`;
+}
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -92,9 +114,6 @@ export class AiProviderService {
 
   private constructor() {}
 
-  /** Per-project wallet-alert levels already raised, to avoid repeat spam. */
-  private walletAlertsSent = new Map<string, "threshold" | "over">();
-
   public static getInstance(): AiProviderService {
     if (!AiProviderService.instance) {
       AiProviderService.instance = new AiProviderService();
@@ -103,13 +122,29 @@ export class AiProviderService {
   }
 
   /**
-   * Raise an agentic-wallet notification once per (project, level). "over"
-   * supersedes "threshold" so the user gets at most two alerts per budget run.
+   * Raise an agentic-wallet notification once per (project, level) per session.
+   * Persisted in DB so alerts don't re-fire after restart.
    */
-  private raiseWalletAlert(projectId: string, level: "threshold" | "over", body: string): void {
-    if (this.walletAlertsSent.get(projectId) === level) return;
-    if (level === "threshold" && this.walletAlertsSent.get(projectId) === "over") return;
-    this.walletAlertsSent.set(projectId, level);
+  private async raiseWalletAlert(projectId: string, userId: string, level: "threshold" | "over", body: string): Promise<void> {
+    try {
+      const db = await getDb();
+      const since = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000); // 7-day dedup window
+      const existing = await db.select().from(walletAlertLog).where(
+        and(eq(walletAlertLog.userId, userId), eq(walletAlertLog.alertType, level), gt(walletAlertLog.sentAt, since))
+      ).limit(1);
+
+      if (existing.length > 0) return;
+      if (level === "threshold") {
+        const overAlert = await db.select().from(walletAlertLog).where(
+          and(eq(walletAlertLog.userId, userId), eq(walletAlertLog.alertType, "over"), gt(walletAlertLog.sentAt, since))
+        ).limit(1);
+        if (overAlert.length > 0) return;
+      }
+
+      await db.insert(walletAlertLog).values({ id: uuidv4(), userId, alertType: level });
+    } catch {
+      // Non-critical — fire the notification anyway
+    }
     NotificationService.getInstance().notify({
       kind: "wallet",
       title: level === "over" ? "Budget limit reached" : "Budget warning",
@@ -217,11 +252,12 @@ export class AiProviderService {
             const pct = (spentCents / budget.limitCents) * 100;
 
             // Agentic Wallet alerts → Notifications feed (deduped per level).
+            const alertUserId = chatInput.sessionId ?? chatInput.projectId;
             if (pct >= 100) {
-              this.raiseWalletAlert(chatInput.projectId, "over",
+              void this.raiseWalletAlert(chatInput.projectId, alertUserId, "over",
                 `Budget reached: $${spentCents.toFixed(2)} of $${budget.limitCents} on this project.`);
             } else if (pct >= (budget.alertThreshold ?? 80)) {
-              this.raiseWalletAlert(chatInput.projectId, "threshold",
+              void this.raiseWalletAlert(chatInput.projectId, alertUserId, "threshold",
                 `Budget ${Math.round(pct)}% used: $${spentCents.toFixed(2)} of $${budget.limitCents}.`);
             }
 
@@ -235,7 +271,7 @@ export class AiProviderService {
         }
       } catch (err) {
         // Non-fatal — budget check must never break the AI call
-        console.warn("[AiProviderService] budget pre-flight failed:", err);
+        log.warn("[AiProviderService] budget pre-flight failed:", err);
       }
     }
 
@@ -274,7 +310,7 @@ export class AiProviderService {
       const { PromptSanitizer } = await import("./PromptSanitizer.js");
       const sanitized = PromptSanitizer.getInstance().sanitizeMessages(chatInput.messages);
       if (sanitized.anyFlagged) {
-        console.warn("[PromptSanitizer] Injection attempt detected:", sanitized.violations);
+        log.warn("[PromptSanitizer] Injection attempt detected:", sanitized.violations);
       }
       chatInput.messages = sanitized.messages as typeof chatInput.messages;
     } catch {
@@ -282,6 +318,19 @@ export class AiProviderService {
     }
 
     const providerId = chatInput.providerId.toLowerCase();
+
+    // Per-request inference telemetry — logged before dispatch so the model,
+    // budget context, and request size are captured even if the call throws.
+    log.info("AI inference dispatch", {
+      provider: providerId,
+      model: chatInput.modelId,
+      maxTokens: chatInput.maxTokens ?? null,
+      messageCount: chatInput.messages.length,
+      projectId: chatInput.projectId ?? null,
+      sessionId: chatInput.sessionId ?? null,
+      routingMode: chatInput.routingMode ?? null,
+      fictionMode: !!chatInput.isFictionMode,
+    });
 
     // High-performance Signal-driven Async Queue for chunks
     const queue = new SignalAsyncQueue<ChatChunk>();
@@ -456,7 +505,7 @@ export class AiProviderService {
       }
     } catch (err) {
       // Non-fatal — spend logging must never break the AI call
-      console.warn("[AiProviderService] logSpend failed:", err);
+      log.warn("[AiProviderService] logSpend failed:", err);
     }
 
     // Emit real-time budget:spend event to all connected clients
@@ -472,11 +521,14 @@ export class AiProviderService {
         completionTokens: params.completionTokens,
       });
     }
-    console.info(
-      `[AiProviderService] spend logged: project=${params.projectId} ` +
-      `provider=${params.provider} model=${params.modelId} ` +
-      `cost=${costMicrocents} microcents`
-    );
+    log.info("spend logged", {
+      projectId: params.projectId,
+      provider: params.provider,
+      model: params.modelId,
+      costMicrocents,
+      promptTokens: params.promptTokens,
+      completionTokens: params.completionTokens,
+    });
   }
 
   /**
@@ -542,7 +594,7 @@ export class AiProviderService {
     });
 
     if (!response.ok)
-      throw new Error(`Federated routing failed: ${response.statusText}`);
+      throw new Error(`Federated routing failed: ${await describeHttpError(response)}`);
 
     if (onChunk) {
       // If the peer doesn't support streaming via tRPC over HTTP easily, 
@@ -586,7 +638,7 @@ export class AiProviderService {
     });
 
     if (!response.ok) {
-      throw new Error(`Forge error: ${response.statusText}`);
+      throw new Error(`Forge error: ${await describeHttpError(response)}`);
     }
 
     if (!onChunk) {
@@ -637,7 +689,7 @@ export class AiProviderService {
     });
 
     if (!response.ok) {
-      throw new Error(`Hugging Face error: ${response.statusText}`);
+      throw new Error(`Hugging Face error: ${await describeHttpError(response)}`);
     }
 
     if (!onChunk) {
@@ -680,7 +732,7 @@ export class AiProviderService {
     });
 
     if (!response.ok) {
-      throw new Error(`Ollama error: ${response.statusText}`);
+      throw new Error(`Ollama error: ${await describeHttpError(response)}`);
     }
 
     if (!onChunk) {
@@ -726,7 +778,7 @@ export class AiProviderService {
     });
 
     if (!response.ok) {
-      throw new Error(`OpenAI error: ${response.statusText}`);
+      throw new Error(`OpenAI error: ${await describeHttpError(response)}`);
     }
 
     if (!onChunk) {
@@ -774,7 +826,7 @@ export class AiProviderService {
     });
 
     if (!response.ok) {
-      throw new Error(`xAI Grok error: ${response.statusText}`);
+      throw new Error(`xAI Grok error: ${await describeHttpError(response)}`);
     }
 
     if (!onChunk) {
@@ -826,7 +878,7 @@ export class AiProviderService {
     });
 
     if (!response.ok) {
-      throw new Error(`Anthropic error: ${response.statusText}`);
+      throw new Error(`Anthropic error: ${await describeHttpError(response)}`);
     }
 
     if (!onChunk) {
@@ -896,7 +948,7 @@ export class AiProviderService {
     });
 
     if (!response.ok) {
-      throw new Error(`Gemini error: ${response.statusText}`);
+      throw new Error(`Gemini error: ${await describeHttpError(response)}`);
     }
 
     if (!onChunk) {

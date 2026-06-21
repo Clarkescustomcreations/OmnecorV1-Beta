@@ -7,7 +7,7 @@ export function ZeroLoginBanner() {
   if (dismissed) return null;
 
   return (
-    <div className="w-full bg-yellow-500/10 border-b border-yellow-500/30 px-4 py-2 flex items-center justify-between text-xs text-yellow-700 dark:text-yellow-400">
+    <div className="w-full bg-accent-warning/10 border-b border-accent-warning/30 px-4 py-2 flex items-center justify-between text-xs text-accent-warning">
       <div className="flex items-center gap-2">
         <AlertTriangle className="h-3.5 w-3.5 flex-shrink-0" />
         <span>
@@ -16,7 +16,7 @@ export function ZeroLoginBanner() {
       </div>
       <button
         onClick={() => setDismissed(true)}
-        className="ml-4 text-yellow-600 hover:text-yellow-800 dark:text-yellow-500 font-medium flex-shrink-0"
+        className="ml-4 text-accent-warning hover:text-accent-warning/80 font-medium flex-shrink-0"
         aria-label="Dismiss zero-login warning"
       >
         Dismiss

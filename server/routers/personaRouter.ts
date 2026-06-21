@@ -2,7 +2,7 @@ import { protectedProcedure, router } from "../_core/trpc.js";
 import { z } from "zod";
 import { getDb } from "../db.factory.js";
 import { personas } from "../../drizzle/schema.js";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 
 const personaDataSchema = z.record(z.string(), z.unknown());
@@ -82,16 +82,18 @@ export const personaRouter = router({
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
       let migrated = 0;
-      for (const p of input) {
-        const existing = await db.select({ id: personas.id }).from(personas)
-          .where(and(eq(personas.id, p.id), eq(personas.userId, userId)));
-        if (existing.length === 0) {
-          await db.insert(personas).values({
-            id: p.id, userId, name: p.name, type: p.type,
-            alwaysOn: p.alwaysOn ? 1 : 0, data: p.data,
-          });
-          migrated++;
-        }
+      if (input.length === 0) return { migrated };
+      const inputIds = input.map(p => p.id);
+      const existingRows = await db.select({ id: personas.id }).from(personas)
+        .where(and(inArray(personas.id, inputIds), eq(personas.userId, userId)));
+      const existingSet = new Set(existingRows.map(r => r.id));
+      const toInsert = input.filter(p => !existingSet.has(p.id));
+      for (const p of toInsert) {
+        await db.insert(personas).values({
+          id: p.id, userId, name: p.name, type: p.type,
+          alwaysOn: p.alwaysOn ? 1 : 0, data: p.data,
+        });
+        migrated++;
       }
       return { migrated };
     }),

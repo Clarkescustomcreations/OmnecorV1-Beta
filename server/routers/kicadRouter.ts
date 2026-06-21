@@ -12,7 +12,9 @@ import { PCBWayService } from "../phase2/services/PCBWayService.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { validatePath } from "../_core/security.js";
+import { createLogger } from "../_core/logger.js";
 import os from "os";
+const log = createLogger("kicadRouter");
 import path from "path";
 import { spawn } from "child_process";
 
@@ -260,7 +262,7 @@ export const kicadRouter = router({
         result: null,
         ipAddress: ctx.req.ip ?? null,
         sessionId: null,
-      }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
       return PCBWayService.getInstance().placeOrder(input.quoteId, input.shippingAddress);
     }),
 });

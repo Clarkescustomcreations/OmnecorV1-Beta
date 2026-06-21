@@ -16,11 +16,11 @@ export function UpdateBanner() {
   const { latestVersion, releaseUrl } = result.data;
 
   return (
-    <div className="w-full bg-blue-950 border-b border-blue-800 px-4 py-2 flex items-center justify-between text-sm text-blue-200">
+    <div className="w-full bg-accent-info/10 border-b border-accent-info/30 px-4 py-2 flex items-center justify-between text-sm text-accent-info">
       <span>
         Update available: v{latestVersion}.{" "}
         {releaseUrl && (
-          <a href={releaseUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-white">
+          <a href={releaseUrl} target="_blank" rel="noopener noreferrer" className="underline hover:text-foreground">
             View release notes
           </a>
         )}
@@ -30,7 +30,7 @@ export function UpdateBanner() {
           sessionStorage.setItem("update-banner-dismissed", "true");
           setDismissed(true);
         }}
-        className="ml-4 text-blue-400 hover:text-white"
+        className="ml-4 text-accent-info hover:text-foreground"
         aria-label="Dismiss update banner"
       >
         &#x2715;

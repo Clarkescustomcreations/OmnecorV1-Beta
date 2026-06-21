@@ -3,6 +3,11 @@ import { StdioClientTransport } from "@modelcontextprotocol/sdk/client/stdio.js"
 import { WebSocketClientTransport } from "@modelcontextprotocol/sdk/client/websocket.js";
 import { ENV } from "../../_core/env.js";
 import path from "path";
+import { getDb } from "../../db.factory.js";
+import { mcpServerConfigs } from "../../../drizzle/schema.js";
+import { eq } from "drizzle-orm";
+import { createLogger } from "../../_core/logger.js";
+const log = createLogger("MCPClient");
 
 export interface MCPServerConfig {
   id: string;
@@ -47,6 +52,32 @@ export class MCPClientService {
     return MCPClientService.instance;
   }
 
+  /** Restore all previously connected MCP servers from DB (call at startup). */
+  async restoreFromDb(): Promise<void> {
+    try {
+      const db = await getDb();
+      const rows = await db.select().from(mcpServerConfigs);
+      for (const row of rows) {
+        const config: MCPServerConfig = {
+          id: row.id,
+          name: row.name,
+          transport: row.transport,
+          command: row.command ?? undefined,
+          args: (row.args as string[] | null) ?? undefined,
+          url: row.url ?? undefined,
+        };
+        await this.connectServer(config).catch(err =>
+          log.warn("MCP: failed to restore server connection", { id: row.id, err: (err as Error).message })
+        );
+      }
+      if (rows.length > 0) {
+        log.info("MCP: restored server connections from DB", { count: rows.length });
+      }
+    } catch (err) {
+      log.warn("MCP: failed to restore from DB", err);
+    }
+  }
+
   async connectServer(config: MCPServerConfig): Promise<void> {
     if (this.clients.has(config.id)) {
       await this.disconnectServer(config.id);
@@ -83,6 +114,20 @@ export class MCPClientService {
     this.clients.set(config.id, client);
     this.configs.set(config.id, config);
     this.toolCache.set(config.id, mcpTools);
+
+    getDb().then(db =>
+      db.insert(mcpServerConfigs).values({
+        id: config.id,
+        name: config.name,
+        transport: config.transport,
+        command: config.command ?? null,
+        args: config.args ?? null,
+        url: config.url ?? null,
+      }).onConflictDoUpdate({
+        target: mcpServerConfigs.id,
+        set: { name: config.name, command: config.command ?? null, args: config.args ?? null, url: config.url ?? null },
+      })
+    ).catch(err => log.warn("MCP: failed to persist server config", err));
   }
 
   async disconnectServer(serverId: string): Promise<void> {
@@ -93,6 +138,9 @@ export class MCPClientService {
     this.clients.delete(serverId);
     this.configs.delete(serverId);
     this.toolCache.delete(serverId);
+    getDb().then(db =>
+      db.delete(mcpServerConfigs).where(eq(mcpServerConfigs.id, serverId))
+    ).catch(err => log.warn("MCP: failed to remove server config from DB", err));
   }
 
   listConnectedServers(): MCPServerConfig[] {

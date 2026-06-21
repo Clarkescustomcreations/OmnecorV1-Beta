@@ -237,7 +237,7 @@ export const aiRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const session = await getChatSession(input.sessionId);
-      if (!session) throw new Error("Session not found");
+      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
 
       const messages = await getChatMessages(input.sessionId);
       if (messages.length === 0)

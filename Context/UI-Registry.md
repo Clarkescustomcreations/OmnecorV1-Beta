@@ -24,6 +24,19 @@ The `Status` column above records *what the handler is wired to*. The new **Veri
 
 ---
 
+## Session 23 (2026-06-20) — Ruthless beta code-sweep + live verification
+
+UI-affecting changes from the 3-session sweep (full detail in `Progress-Tracker.md`):
+
+- **`AgenticWalletPanel` HITL Authorization** — was a DEAD/LOCAL info-dialog; now a **live admin approval queue** (CONNECTED). New `security.getPendingHitlActions` (admin query, 3s poll) + `security.resolveHitlAction` (admin mutation); per-action **Approve/Reject** buttons. **Live-verified.**
+- **`MapManager` Cloud source toggle** — google-drive flipped from "coming soon" to supported; gmail/outlook/google-drive selections + github repos now ingest for real via the new **`integrations.fetchSourceTree`** (cloudProcedure) when the map renders in `BrainMap`. Dropbox/onedrive remain "coming soon" (no connect adapter yet). **GitHub ingestion live-verified** (real 1500-node repo tree rendered).
+- **No new interactive elements** from the Session-3 design-token migration (UpdateBanner/ZeroLoginBanner/PeerCard/ExecutionModeBadge) — pure styling (raw Tailwind colors → semantic tokens); wiring unchanged.
+- **`client/src/lib/integrations.ts`** trimmed to live metadata only (dead mock token generators removed) — superseded by the real tRPC `integrations.*` backend; no UI wiring change.
+
+> Verified verdict for the new procedures: `security.getPendingHitlActions`, `security.resolveHitlAction`, `integrations.fetchSourceTree` → **VERIFIED-REAL ✅** (driven live this session). See `Progress-Tracker.md` "Live verification (2026-06-20)".
+
+---
+
 ## Session 22 (2026-06-19) — LOCAL/DEAD/PARTIAL Verification + Missing-Element Hunt (registry-tracker)
 
 **Scope:** second pass over the same day's run — re-prove every LOCAL, DEAD, and PARTIAL entry (Session 21 only covered CONNECTED) and enumerate every interactive element in both UIs to surface anything absent from the registry entirely. Method: (1) static-trace all active LOCAL/DEAD/PARTIAL rows against current source; (2) exhaustive file-by-file interactive-element inventory across `client/src/` and `packaging/android/omnecor-hq/`; (3) grep-verify every router reference before adding any new row.
@@ -560,7 +573,7 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 - SetupWizard Browse button (SetupWizard.tsx): Implemented `webkitdirectory` file picker with path extraction
 - PodcastStudio Cloud buttons (PodcastStudio.tsx): Stubbed with guidance to Settings > Integrations; TODO: OAuth flows
 - AgenticWalletPanel Issue Project Card (AgenticWalletPanel.tsx): Wired to `trpc.virtualCard.issueCard` mutation with HITL loading state
-- AgenticWalletPanel HITL Authorization (AgenticWalletPanel.tsx): Wired to informational dialog with security gate (sovereign mode disabled)
+- AgenticWalletPanel HITL Authorization (AgenticWalletPanel.tsx): **(Session 23)** now a live admin approval queue — `trpc.security.getPendingHitlActions` (3s poll) + per-action Approve/Reject via `trpc.security.resolveHitlAction`; sovereign-mode guarded
 
 **✓ All backend dependencies now CONNECTED (Session 10):**
 - ✓ `trpc.scheduling.publishNow` — AgentNetworking Calendar Publish Now button (CONNECTED - commit 159ae26)
@@ -639,7 +652,7 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 
 ### Remaining known dead zones (lower priority, not yet fixed)
 - `AgenticWalletPanel` Issue Project Card button: needs `trpc.wallet.issueCard` + Lithic provisioning flow
-- `AgenticWalletPanel` HITL Authorization button: now opens an explanatory review-queue dialog (sovereign-mode guarded). Full live approve/reject queue still needs `security.getPendingHitlActions` + `security.resolveHitlAction` adminProcedures exposing `HITLApprovalService.getPendingActions()/approveAction()` (documented in-component).
+- `AgenticWalletPanel` HITL Authorization button: ✅ **RESOLVED (Session 23, 2026-06-20).** `security.getPendingHitlActions` + `security.resolveHitlAction` adminProcedures built (expose `HITLApprovalService.getPendingActions()/approveAction()`, audit-logged); dialog rebuilt into a live 3s-polling queue with per-action Approve/Reject. Live-verified.
 - `PodcastStudio` History button: needs history modal or `trpc.podcast.getHistory` query  
 - `SettingsPanel` (component, not page) file type blacklist badge remove: needs save
 - `AgentNetworking` Publish Now button: needs `trpc.scheduler.publishNow`
@@ -1388,7 +1401,7 @@ Read-only display component. No interactive elements.
 | GitHub Repo Enter key | add | addRepo | None | LOCAL |
 | Add Repo Button | add | addRepo | None | LOCAL |
 | Remove Repo × | remove | removeRepo | None | LOCAL |
-| Cloud source toggle | toggle | toggleCloud | None | LOCAL |
+| Cloud source toggle | toggle | toggleCloud (gmail/outlook/google-drive now ingestable; dropbox/onedrive still "coming soon") | selected `integration://`/`github://` roots → `integrations.fetchSourceTree` when the map renders in BrainMap | **LOCAL** (feeds CONNECTED ingestion, Session 23) |
 | Create Map Button | create | createMap (context hook) | useNeuralMap().createMap | CONNECTED |
 | Duplicate Map Button | duplicate | duplicateMap (context hook) | useNeuralMap().duplicateMap | CONNECTED |
 | Delete Map Button | delete | deleteMap (context hook) | useNeuralMap().deleteMap | CONNECTED |
@@ -1803,7 +1816,9 @@ Read-only display. Single close button (callback).
 | Enforcement Mode RadioGroup | soft/hard | setMode | None | LOCAL |
 | Save Budget Button | save | handleSaveBudget | trpc.wallet.setBudget | CONNECTED |
 | Issue Project Card Button | issue | handleIssueProjectCard | trpc.virtualCard.issueCard (server-side HITL gate) | CONNECTED |
-| HITL Authorization Button | auth | handleOpenHitlQueue → dialog (sovereign-mode guarded) | None (no client HITL queue procedure yet) | ~~DEAD~~ → **LOCAL** |
+| HITL Authorization Button | auth | handleOpenHitlQueue → live polling queue (sovereign-mode guarded) | trpc.security.getPendingHitlActions (admin, 3s poll) | ~~DEAD~~ → **CONNECTED** (Session 23) |
+| HITL Approve Button (per pending action) | approve | resolveHitl.mutate({id,approved:true}) | trpc.security.resolveHitlAction (admin) | **CONNECTED** (Session 23) |
+| HITL Reject Button (per pending action) | reject | resolveHitl.mutate({id,approved:false}) | trpc.security.resolveHitlAction (admin) | **CONNECTED** (Session 23) |
 
 ### COMPONENT: CloudComputePanel.tsx
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |

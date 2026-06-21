@@ -105,7 +105,7 @@ const CLOUD_PROVIDER_IDS = new Set([
   "huggingface",
 ]);
 
-function resolveBackend(data: any): { providerId: string; modelId: string } {
+function resolveBackend(data: Record<string, unknown>): { providerId: string; modelId: string } {
   const mc = (data?.modelConfig ?? {}) as Record<string, unknown>;
   const backend = typeof mc.backend === "string" ? mc.backend : "ollama";
   switch (backend) {
@@ -694,7 +694,7 @@ export class OmnecorWebSocketServer {
               throw new Error("Persona not found");
             }
 
-            const personaData = (persona.data ?? {}) as any;
+            const personaData = persona.data ?? {};
             const backend = resolveBackend(personaData);
 
             if (user?.executionMode === "sovereign" && CLOUD_PROVIDER_IDS.has(backend.providerId)) {

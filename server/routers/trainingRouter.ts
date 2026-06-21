@@ -73,7 +73,8 @@ export const trainingRouter = router({
     .input(validateDatasetSchema)
     .mutation(async ({ input }) => {
       try {
-        const content = await fs.readFile(input.datasetPath, "utf-8");
+        const safePath = await validatePath(input.datasetPath);
+        const content = await fs.readFile(safePath, "utf-8");
         const lines = content
           .split("\n")
           .filter(line => line.trim().length > 0);

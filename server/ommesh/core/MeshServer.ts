@@ -83,10 +83,32 @@ export class MeshServer {
   }
 
   private async handleRequest(req: IncomingMessage, res: ServerResponse): Promise<void> {
-    const peerCn = this.peerName(req.socket as tls.TLSSocket);
+    const socket = req.socket as tls.TLSSocket;
+    const peerCn = this.peerName(socket);
 
+    // Liveness probe is answerable to any mTLS-valid peer BEFORE the per-peer
+    // fingerprint trust gate. A peer must be able to confirm reachability during
+    // the approval handshake (before it appears in the trusted set), and /health
+    // only exposes { ok, nodeId } — no inference, sync, or discourse capability.
+    // The endpoint is still fully protected by mutual TLS (CA-signed certs only).
     if (req.method === "GET" && req.url === "/health") {
       this.sendJson(res, 200, { ok: true, nodeId: this.node.getIdentity().id });
+      return;
+    }
+
+    // Enforce explicit per-peer fingerprint trust on top of CA-cert mTLS validation.
+    // The trusted set is loaded from DB at startup; an empty set means no peers
+    // have been approved yet — all inbound work requests are rejected (fail-closed).
+    const peerFingerprint = (() => {
+      try {
+        return socket.getPeerCertificate?.()?.fingerprint ?? "";
+      } catch {
+        return "";
+      }
+    })();
+    if (!securityManager.isTrusted(peerFingerprint)) {
+      log.warn("Mesh request rejected: untrusted peer fingerprint", { from: peerCn, fingerprint: peerFingerprint });
+      this.sendJson(res, 403, { error: "untrusted_peer" });
       return;
     }
 

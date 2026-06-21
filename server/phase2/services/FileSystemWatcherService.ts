@@ -23,6 +23,9 @@ import path from "path";
 import fs from "fs/promises";
 import { WATCHER_CONFIG } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
+import { getDb } from "../../db.factory.js";
+import { fileWatcherRegistrations } from "../../../drizzle/schema.js";
+import { eq } from "drizzle-orm";
 const log = createLogger("FileSystemWatcher");
 
 // ---------------------------------------------------------------------------
@@ -118,6 +121,29 @@ export class FileSystemWatcherService extends EventEmitter {
     return FileSystemWatcherService.instance;
   }
 
+  /** Restore previously registered watchers from DB (call at startup). */
+  async restoreFromDb(): Promise<void> {
+    try {
+      const db = await getDb();
+      const rows = await db.select().from(fileWatcherRegistrations)
+        .where(eq(fileWatcherRegistrations.isActive, 1));
+      for (const row of rows) {
+        await this.registerProject({
+          projectId: row.projectId,
+          rootDir: row.rootDir,
+          debounceMs: row.debounceMs,
+        }).catch(err =>
+          log.warn("FileWatcher: failed to restore watcher", { projectId: row.projectId, err: (err as Error).message })
+        );
+      }
+      if (rows.length > 0) {
+        log.info("FileWatcher: restored watchers from DB", { count: rows.length });
+      }
+    } catch (err) {
+      log.warn("FileWatcher: failed to restore from DB", err);
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Public API
   // -------------------------------------------------------------------------
@@ -194,6 +220,17 @@ export class FileSystemWatcherService extends EventEmitter {
 
     this.watchers.set(projectId, managed);
     log.info("Watcher update", { projectId, root: resolvedRoot });
+    getDb().then(db =>
+      db.insert(fileWatcherRegistrations).values({
+        projectId,
+        rootDir: resolvedRoot,
+        debounceMs: debounceMs ?? this.debounceMs,
+        isActive: 1,
+      }).onConflictDoUpdate({
+        target: fileWatcherRegistrations.projectId,
+        set: { rootDir: resolvedRoot, debounceMs: debounceMs ?? this.debounceMs, isActive: 1 },
+      })
+    ).catch(err => log.warn("FileWatcher: failed to persist registration", err));
   }
 
   /**
@@ -216,6 +253,9 @@ export class FileSystemWatcherService extends EventEmitter {
     this.watchers.delete(projectId);
 
     log.info("Watcher unregistered", { projectId });
+    getDb().then(db =>
+      db.delete(fileWatcherRegistrations).where(eq(fileWatcherRegistrations.projectId, projectId))
+    ).catch(err => log.warn("FileWatcher: failed to remove registration from DB", err));
   }
 
   /**

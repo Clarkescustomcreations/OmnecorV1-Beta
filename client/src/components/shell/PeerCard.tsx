@@ -47,7 +47,7 @@ export function PeerCard() {
           {isLoading ? (
             <span className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse flex-shrink-0" />
           ) : online ? (
-            <span className="w-2 h-2 rounded-full bg-green-500 flex-shrink-0" />
+            <span className="w-2 h-2 rounded-full bg-accent-success flex-shrink-0" />
           ) : (
             <span className="w-2 h-2 rounded-full bg-muted-foreground/40 flex-shrink-0" />
           )}
@@ -56,7 +56,7 @@ export function PeerCard() {
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <Badge
             variant={online ? "default" : "secondary"}
-            className={cn("text-[10px] px-1.5 py-0", online && "bg-green-500/20 text-green-400 border-green-500/30")}
+            className={cn("text-[10px] px-1.5 py-0", online && "bg-accent-success/20 text-accent-success border-accent-success/30")}
           >
             {peers.length}
           </Badge>
@@ -89,7 +89,7 @@ export function PeerCard() {
                 className="flex items-center justify-between px-2 py-1.5 rounded bg-background/40 gap-2"
               >
                 <div className="flex items-center gap-1.5 min-w-0">
-                  <Wifi className="w-3 h-3 text-green-500 flex-shrink-0" />
+                  <Wifi className="w-3 h-3 text-accent-success flex-shrink-0" />
                   <span className="font-mono text-[10px] truncate text-sidebar-foreground">{label}</span>
                 </div>
                 <div className="flex items-center gap-1 flex-shrink-0">

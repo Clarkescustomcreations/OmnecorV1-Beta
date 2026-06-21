@@ -314,6 +314,17 @@ function NeuralMapToolbar() {
   );
 }
 
+/** Human label for a remote map-source URI (github:// / integration://). */
+function remoteSourceLabel(uri: string): string {
+  if (uri.startsWith("github://")) return `🐙 ${uri.slice("github://".length)}`;
+  const type = uri.slice("integration://".length);
+  const icons: Record<string, string> = {
+    gmail: "✉️ Gmail", outlook: "📧 Outlook", "google-drive": "☁️ Drive",
+    notion: "📝 Notion", slack: "💬 Slack", dropbox: "📦 Dropbox", onedrive: "💼 OneDrive",
+  };
+  return icons[type] ?? type;
+}
+
 /**
  * Neural Brain Map Page Content
  * Extracted to use contexts provided in the main BrainMap export
@@ -406,8 +417,26 @@ function BrainMapContent() {
     )
   );
 
-  const isLoading = fileTreeQueries.some(q => q.isLoading);
+  // Remote sources (github:// / integration://) are ingested into real content
+  // trees via integrations.fetchSourceTree — gated by the map's indexing setting.
+  const indexingEnabled = activeMap?.settings.indexingEnabled ?? true;
+  const remoteSourceQueries = trpc.useQueries(t =>
+    remoteRoots.map(uri =>
+      t.integrations.fetchSourceTree(
+        { uri },
+        {
+          enabled: !!activeMap && indexingEnabled,
+          refetchInterval: activeMap?.settings.realtimeSync ? 60000 : false,
+          retry: false, // don't hammer external APIs on auth/not-connected errors
+        }
+      )
+    )
+  );
+
+  const isLoading =
+    fileTreeQueries.some(q => q.isLoading) || remoteSourceQueries.some(q => q.isLoading);
   const loadedCount = fileTreeQueries.filter(q => !!q.data).length;
+  const remoteLoadedCount = remoteSourceQueries.filter(q => !!q.data).length;
 
   // Register watchers for all local roots of the active map
   const registerProject = trpc.project.registerProject.useMutation({
@@ -423,44 +452,69 @@ function BrainMapContent() {
   }, [activeMap?.id]); // Only on map switch
 
   const neuralNetwork = useMemo(() => {
+    // No map selected → render the labeled "Omnecor Demo" showcase network so
+    // first-run users still see the product's flagship visualization.
     if (!activeMap) {
-      return convertFileSystemToNeuralNetwork(generateOmnecorProjectMock(), "Omnecor Workspace");
+      return convertFileSystemToNeuralNetwork(generateOmnecorProjectMock(), "Omnecor Demo");
     }
 
-    const loadedTrees = fileTreeQueries.map(q => q.data).filter(Boolean);
+    // Build one network per local root from its filesystem tree.
+    const localNetworks = fileTreeQueries
+      .map(q => q.data)
+      .filter((t): t is NonNullable<typeof t> => !!t)
+      .map((tree, i) =>
+        fileTreeToNetwork(tree, {
+          projectId: `${activeMap.id}:${i}`,
+          projectName: localRoots[i]
+            ? localRoots[i].split("/").pop() ?? activeMap.name
+            : activeMap.name,
+        })
+      );
 
-    if (loadedTrees.length === 0) {
-      return convertFileSystemToNeuralNetwork(generateOmnecorProjectMock(), "Omnecor Workspace");
-    }
+    // Build one network per remote source. When indexing is on and the fetch
+    // returned content, render the REAL expandable tree (identical to a local
+    // root); otherwise fall back to a single labelled placeholder node so the
+    // source is still visible while loading / not-indexed / not-connected.
+    const remoteNetworks = remoteRoots.map((uri, i) => {
+      const tree = remoteSourceQueries[i]?.data;
+      const label = remoteSourceLabel(uri);
+      if (indexingEnabled && tree && tree.length > 0) {
+        return fileTreeToNetwork(tree, {
+          projectId: `${activeMap.id}:remote:${i}`,
+          projectName: label,
+        });
+      }
+      const placeholder: NeuralNode = {
+        id: `remote:${uri}`,
+        label,
+        type: "integration",
+        data: { path: uri, isRemote: true, depth: 0 },
+        position: { x: 0, y: 0 },
+      };
+      return { id: `remote-${i}`, name: label, type: "project" as const, nodes: [placeholder], edges: [] };
+    });
 
-    // Build one network per local root and merge them
-    const networks = loadedTrees.map((tree, i) =>
-      fileTreeToNetwork(tree!, {
-        projectId: `${activeMap.id}:${i}`,
-        projectName: localRoots[i]
-          ? localRoots[i].split("/").pop() ?? activeMap.name
-          : activeMap.name,
-      })
-    );
+    const allNodes = [
+      ...localNetworks.flatMap(n => n.nodes),
+      ...remoteNetworks.flatMap(n => n.nodes),
+    ];
+    const allEdges = [
+      ...localNetworks.flatMap(n => n.edges),
+      ...remoteNetworks.flatMap(n => n.edges),
+    ];
 
-    // Represent remote sources as placeholder root nodes in the graph
-    const remoteNodes: NeuralNode[] = remoteRoots.map(r => ({
-      id: `remote:${r}`,
-      label: r.replace("github://", "🐙 ").replace("integration://gmail", "✉️ Gmail").replace("integration://outlook", "📧 Outlook").replace("integration://", ""),
-      type: "integration" as const,
-      data: { path: r, isRemote: true, depth: 0 },
-      position: { x: 0, y: 0 },
-    }));
-
+    // A real map whose roots produced no nodes (still resolving, empty directory,
+    // or a load error) renders as a genuine empty network — never the demo. The
+    // viewport below surfaces the loading spinner / empty-state message instead.
     return {
       id: activeMap.id,
       name: activeMap.name,
       type: "project" as const,
-      nodes: [...networks.flatMap(n => n.nodes), ...remoteNodes],
-      edges: networks.flatMap(n => n.edges),
+      nodes: allNodes,
+      edges: allEdges,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMap?.id, loadedCount, localRoots.join(","), remoteRoots.join(",")]);
+  }, [activeMap?.id, loadedCount, remoteLoadedCount, indexingEnabled, localRoots.join(","), remoteRoots.join(",")]);
 
   // Global master network — aggregates all maps, no file-tree queries needed
   const masterNetwork = useMemo(() => buildMasterNetwork(maps), [maps]);
@@ -598,7 +652,7 @@ function BrainMapContent() {
                   <Brain className="w-6 h-6 text-accent flex-shrink-0" />
                   <div className="min-w-0">
                     <h1 className="text-xl font-bold flex flex-wrap items-center gap-2">
-                      {activeMap?.name ?? "Omnecor Workspace"}
+                      {activeMap?.name ?? "Omnecor Demo"}
                       {isFictionMode && (
                         <Badge variant="outline" className="text-accent border-accent text-[10px] py-0">
                           Fiction Mode
@@ -606,7 +660,7 @@ function BrainMapContent() {
                       )}
                       {!activeMap && (
                         <Badge variant="secondary" className="text-[10px] py-0 bg-accent/10 text-accent border-accent/20">
-                          Preview Mode
+                          Omnecor Demo
                         </Badge>
                       )}
                     </h1>
@@ -700,6 +754,17 @@ function BrainMapContent() {
                     {isLoading && !masterView ? (
                       <div className="flex-1 flex items-center justify-center text-muted-foreground animate-pulse">
                         Indexing Neural Network...
+                      </div>
+                    ) : !masterView && activeMap && displayNetwork.nodes.length === 0 ? (
+                      <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-muted/20">
+                        <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center mb-4">
+                          <Brain className="h-6 w-6 text-accent" />
+                        </div>
+                        <h3 className="text-lg font-semibold mb-2">No indexed files yet</h3>
+                        <p className="text-sm text-muted-foreground max-w-md">
+                          &ldquo;{activeMap.name}&rdquo; has no mapped files. Add a project
+                          directory in the Map Manager to visualize it as a neural network.
+                        </p>
                       </div>
                     ) : (
                       <>

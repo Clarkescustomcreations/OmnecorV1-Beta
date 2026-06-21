@@ -65,7 +65,7 @@ export const platformsRouter = router({
       const db = await getDb();
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-      await db.insert(platformAccounts).values({
+      const [created] = await db.insert(platformAccounts).values({
         userId: ctx.user.id,
         platform: input.platform,
         accountName: input.accountName,
@@ -73,9 +73,9 @@ export const platformsRouter = router({
         oauthRefreshToken: input.oauthRefreshToken,
         accountMetadata: input.accountMetadata,
         isActive: 1,
-      });
+      }).returning({ id: platformAccounts.id });
 
-      return { success: true, accountId: input.platform };
+      return { success: true, accountId: created.id };
     }),
   updateAccount: protectedProcedure
     .input(z.object({

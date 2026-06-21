@@ -10,11 +10,20 @@
 
 import { z } from "zod";
 import { publicProcedure, router } from "../_core/trpc.js";
+import { TRPCError } from "@trpc/server";
 import { honchoService } from "../phase2/services/HonchoService.js";
 
 // All Honcho procedures use publicProcedure so they work in zero-login mode
 // (the openId is provided by the client, which already knows its identity from
 // the auth.me query or the zero-login sentinel).
+// When a real session exists, the openId is validated server-side to prevent
+// session spoofing (user A reading user B's memory).
+
+function assertOpenIdOwnership(userOpenId: string | undefined | null, inputOpenId: string) {
+  if (userOpenId && userOpenId !== inputOpenId) {
+    throw new TRPCError({ code: "FORBIDDEN", message: "openId mismatch" });
+  }
+}
 
 export const honchoRouter = router({
   /** Sync one message to Honcho (fire-and-forget from the client). */
@@ -25,7 +34,8 @@ export const honchoRouter = router({
       role: z.enum(["user", "ai"]),
       content: z.string().max(200_000),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      assertOpenIdOwnership(ctx.user?.openId, input.openId);
       await honchoService.addMessage(input.openId, input.sessionId, input.role, input.content);
       return { ok: true };
     }),
@@ -36,7 +46,8 @@ export const honchoRouter = router({
       openId: z.string().min(1).max(256),
       content: z.string().min(1).max(2000),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
+      assertOpenIdOwnership(ctx.user?.openId, input.openId);
       await honchoService.addFact(input.openId, input.content);
       return { ok: true };
     }),
@@ -47,7 +58,8 @@ export const honchoRouter = router({
       openId: z.string().min(1).max(256),
       limit: z.number().int().min(1).max(50).optional(),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
+      assertOpenIdOwnership(ctx.user?.openId, input.openId);
       return honchoService.getFacts(input.openId, input.limit ?? 20);
     }),
 });

@@ -5,6 +5,9 @@ import { pipelines, pipelinePhases, type Pipeline, type PipelinePhase } from "..
 import { PromptSanitizer } from "./PromptSanitizer.js";
 import { AuditLogService } from "./AuditLogService.js";
 import { AiProviderService } from "./AiProviderService.js";
+import { createLogger } from "../../_core/logger.js";
+
+const log = createLogger("Pipeline");
 
 const PHASE_ORDER = ["DEFINE", "PLAN", "EXECUTE", "REVIEW", "SHIP"] as const;
 type PhaseName = typeof PHASE_ORDER[number];
@@ -118,7 +121,7 @@ export class PipelineEngineService {
       result: null,
       ipAddress: null,
       sessionId: null,
-    }).catch((err) => console.warn("[AuditLog] write failed:", err));
+    }).catch((err) => log.warn("audit log write failed", { error: (err as Error).message }));
 
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, id));
     return pipeline;
@@ -140,7 +143,7 @@ export class PipelineEngineService {
 
     if (!nextPhase) {
       await db.update(pipelines).set({ status: "complete", currentPhase: "DONE" }).where(eq(pipelines.id, pipelineId));
-      AuditLogService.getInstance().log({ eventType: "pipeline_complete", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      AuditLogService.getInstance().log({ eventType: "pipeline_complete", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase }, result: null, ipAddress: null, sessionId: null }).catch((err) => log.warn("audit log write failed", { error: (err as Error).message }));
     } else {
       await db.update(pipelines).set({ currentPhase: nextPhase }).where(eq(pipelines.id, pipelineId));
       const output = PromptSanitizer.getInstance().sanitize(await generatePhaseOutput(nextPhase, pipeline.goal)).clean;
@@ -151,7 +154,7 @@ export class PipelineEngineService {
         status: "awaiting_approval",
         outputText: output,
       });
-      AuditLogService.getInstance().log({ eventType: "pipeline_phase_approved", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase, nextPhase }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
+      AuditLogService.getInstance().log({ eventType: "pipeline_phase_approved", actorId: userId, actorType: "user", procedure: "pipeline.approvePhase", args: { pipelineId, phase, nextPhase }, result: null, ipAddress: null, sessionId: null }).catch((err) => log.warn("audit log write failed", { error: (err as Error).message }));
     }
 
     const [updated] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
@@ -162,7 +165,7 @@ export class PipelineEngineService {
     const db = await getDb();
 
     await db.update(pipelines).set({ status: "aborted" }).where(eq(pipelines.id, pipelineId));
-    AuditLogService.getInstance().log({ eventType: "pipeline_aborted", actorId: null, actorType: "user", procedure: "pipeline.abort", args: { pipelineId }, result: null, ipAddress: null, sessionId: null }).catch((err) => console.warn("[AuditLog] write failed:", err));
+    AuditLogService.getInstance().log({ eventType: "pipeline_aborted", actorId: null, actorType: "user", procedure: "pipeline.abort", args: { pipelineId }, result: null, ipAddress: null, sessionId: null }).catch((err) => log.warn("audit log write failed", { error: (err as Error).message }));
     const [pipeline] = await db.select().from(pipelines).where(eq(pipelines.id, pipelineId));
     return pipeline;
   }

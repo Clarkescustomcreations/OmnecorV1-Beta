@@ -46,6 +46,11 @@ export const walletRouter = router({
     .input(z.object({ projectId: projectIdSchema }))
     .query(async ({ input }) => {
       const db = await getDb();
+      // __global__ doesn't have a specific project budget, but we might want to return null or a global sum later. 
+      // For now, if __global__, we can return a default or null.
+      if (input.projectId === "__global__") {
+        return null;
+      }
       const rows = await db
         .select()
         .from(projectBudgets)
@@ -92,10 +97,13 @@ export const walletRouter = router({
     .input(getSpendLogSchema)
     .query(async ({ input }) => {
       const db = await getDb();
-      return db
-        .select()
-        .from(spendLog)
-        .where(eq(spendLog.projectId, input.projectId))
+      let query = db.select().from(spendLog).$dynamic();
+
+      if (input.projectId !== "__global__") {
+        query = query.where(eq(spendLog.projectId, input.projectId));
+      }
+
+      return query
         .orderBy(desc(spendLog.createdAt))
         .limit(input.limit);
     }),
@@ -106,15 +114,20 @@ export const walletRouter = router({
     .query(async ({ input }) => {
       const db = await getDb();
 
-      const rows = await db
+      let query = db
         .select({
           provider: spendLog.provider,
           totalMicrocents: sum(spendLog.estimatedCostMicrocents),
           callCount: sum(spendLog.promptTokens), // proxy count — not ideal but avoids COUNT(*) type issues
         })
         .from(spendLog)
-        .where(eq(spendLog.projectId, input.projectId))
-        .groupBy(spendLog.provider);
+        .$dynamic();
+
+      if (input.projectId !== "__global__") {
+        query = query.where(eq(spendLog.projectId, input.projectId));
+      }
+
+      const rows = await query.groupBy(spendLog.provider);
 
       const totalMicrocents = rows.reduce(
         (acc, r) => acc + (Number(r.totalMicrocents) || 0),

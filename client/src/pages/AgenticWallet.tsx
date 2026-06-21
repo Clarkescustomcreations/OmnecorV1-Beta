@@ -45,6 +45,12 @@ export function AgenticWallet() {
     { enabled: !!effectiveProjectId, refetchInterval: 10000 }
   );
 
+  const { data: isConfigured } = trpc.virtualCard.isConfigured.useQuery();
+  const { data: cards = [] } = trpc.virtualCard.listCards.useQuery(
+    { projectId: undefined },
+    { enabled: isConfigured === true }
+  );
+
   const spendPercent = budget && spendSummary && spendSummary.totalCentsDollars !== undefined
     ? Math.min(100, (spendSummary.totalCentsDollars / (budget.limitCents / 100)) * 100)
     : 0;
@@ -115,8 +121,8 @@ export function AgenticWallet() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">$12.45</div>
-                    <p className="text-[10px] text-muted-foreground mt-1">Across all active projects</p>
+                    <div className="text-2xl font-bold">${spendSummary?.totalCentsDollars?.toFixed(2) || "0.00"}</div>
+                    <p className="text-[10px] text-muted-foreground mt-1">{globalMode ? "Across all active projects" : "For selected project"}</p>
                   </CardContent>
                 </Card>
                 <Card className="shadow-sm">
@@ -126,7 +132,7 @@ export function AgenticWallet() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">3</div>
+                    <div className="text-2xl font-bold">{isConfigured === true ? cards.filter(c => c.status === "OPEN").length : 0}</div>
                     <p className="text-[10px] text-muted-foreground mt-1">Active Lithic containers</p>
                   </CardContent>
                 </Card>
@@ -137,7 +143,7 @@ export function AgenticWallet() {
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
-                    <div className="text-2xl font-bold">2</div>
+                    <div className="text-2xl font-bold">0</div>
                     <p className="text-[10px] text-muted-foreground mt-1">Runaway tasks blocked</p>
                   </CardContent>
                 </Card>

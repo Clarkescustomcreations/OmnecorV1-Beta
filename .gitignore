@@ -173,3 +173,6 @@ ui_audit_report.md
 node_modules_broken/
 **/node_modules_broken/
 trash/
+
+# Valet router temporary training data
+tmp-valet-train/

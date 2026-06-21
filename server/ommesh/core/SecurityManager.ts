@@ -9,6 +9,9 @@ import { EventEmitter } from 'events';
 import os from 'os';
 import { createLogger } from "../../_core/logger.js";
 import { PATHS } from "../../_core/paths.js";
+import { getDb } from "../../db.js";
+import { ommeshTrustedPeers } from "../../../drizzle/schema.js";
+import { eq } from "drizzle-orm";
 const log = createLogger("OMMESH:Security");
 
 // Resolves to centralized application data directory
@@ -277,9 +280,28 @@ export class SecurityManager extends EventEmitter {
 
   // ==================== Trust Management ====================
 
+  /** Load persisted trusted peers from DB into memory (call at server startup). */
+  async hydrateFromDb(): Promise<void> {
+    try {
+      const db = await getDb();
+      const rows = await db.select().from(ommeshTrustedPeers);
+      for (const row of rows) {
+        this.trustedFingerprints.add(row.fingerprint);
+      }
+      log.info("OMMESH: loaded trusted peers from DB", { count: rows.length });
+    } catch (err) {
+      log.warn("OMMESH: failed to load trusted peers from DB", err);
+    }
+  }
+
   approvePeer(fingerprint: string): void {
     this.trustedFingerprints.add(fingerprint);
     this.emit('peer-trusted', fingerprint);
+    getDb().then(db =>
+      db.insert(ommeshTrustedPeers)
+        .values({ fingerprint })
+        .onConflictDoNothing()
+    ).catch(err => log.warn("OMMESH: failed to persist trusted peer", err));
   }
 
   isTrusted(fingerprint: string): boolean {
@@ -288,6 +310,9 @@ export class SecurityManager extends EventEmitter {
 
   revokePeer(fingerprint: string): void {
     this.trustedFingerprints.delete(fingerprint);
+    getDb().then(db =>
+      db.delete(ommeshTrustedPeers).where(eq(ommeshTrustedPeers.fingerprint, fingerprint))
+    ).catch(err => log.warn("OMMESH: failed to revoke trusted peer from DB", err));
   }
 
   getIdentity(): NodeIdentity {

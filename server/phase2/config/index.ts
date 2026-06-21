@@ -58,8 +58,9 @@ export const VOICE_CONFIG = {
 // ---------------------------------------------------------------------------
 
 export const VECTOR_DB_CONFIG = {
-  /** ChromaDB server URL */
-  chromaUrl: process.env.CHROMADB_URL || "http://localhost:8000",
+  /** ChromaDB server URL. Accepts CHROMADB_URL (canonical) or the legacy
+   *  CHROMA_URL alias for back-compat with existing deployments. */
+  chromaUrl: process.env.CHROMADB_URL || process.env.CHROMA_URL || "http://localhost:8000",
   /** Default collection for project context */
   defaultCollection: "omnecor_context",
   /** Maximum documents per batch ingestion */

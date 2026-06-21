@@ -56,6 +56,18 @@ function rowToMap(row: Record<string, unknown>): NeuralBrainMap {
   };
 }
 
+/** Map a partial NeuralBrainMap to the DB-storable subset accepted by the update mutation. */
+function toDbUpdateFields(updates: Partial<NeuralBrainMap>) {
+  return {
+    ...(updates.name            !== undefined && { name: updates.name }),
+    ...(updates.mode            !== undefined && { mode: updates.mode }),
+    ...(updates.rootDirectories !== undefined && { rootDirectories: updates.rootDirectories }),
+    ...(updates.projectContext  !== undefined && { projectContext: updates.projectContext ?? undefined }),
+    ...(updates.labelOverrides  !== undefined && { labelOverrides: updates.labelOverrides ?? null }),
+    ...(updates.settings        !== undefined && { settings: updates.settings as Record<string, unknown> | undefined }),
+  };
+}
+
 // ── Provider ─────────────────────────────────────────────────────────────────
 
 export const NeuralMapProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
@@ -64,12 +76,59 @@ export const NeuralMapProvider: React.FC<{ children: ReactNode }> = ({ children 
   const [dbReady, setDbReady] = useState(false);
   // Track whether the initial DB load happened so we don't double-apply localStorage
   const initialised = useRef(false);
+  // Write-lock prevents concurrent mutation races (optimistic local state is
+  // already applied; DB mutations queue behind this).
+  const writeLocked = useRef(false);
+  // Updates that arrive while a write is in flight are coalesced here (latest
+  // snapshot per map id) and flushed once the lock releases, so a burst of
+  // rapid repositions still persists its final state instead of being dropped.
+  const pendingUpdates = useRef<Map<string, Partial<NeuralBrainMap>>>(new Map());
 
   // ── tRPC mutations ──────────────────────────────────────────────────────
+  const utils           = trpc.useUtils();
   const createMutation  = trpc.neuralMaps.create.useMutation();
   const updateMutation  = trpc.neuralMaps.update.useMutation();
   const deleteMutation  = trpc.neuralMaps.delete.useMutation();
   const migrateMutation = trpc.neuralMaps.migrate.useMutation();
+
+  // On a failed mutation, re-load authoritative state from the server rather
+  // than trusting the stale localStorage fallback — keeps local and DB in sync.
+  const reloadFromServer = useCallback(async () => {
+    try {
+      // Force a network fetch (staleTime: 0) so we reconcile against authoritative
+      // server state, not the Infinity-staleTime cache the list query holds.
+      const fresh = await utils.neuralMaps.list.fetch(undefined, { staleTime: 0 });
+      if (Array.isArray(fresh)) {
+        const converted = (fresh as Record<string, unknown>[]).map(rowToMap);
+        setMaps(converted);
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(converted));
+      }
+    } catch {
+      // Server unreachable — keep optimistic local state (localStorage mirror holds it).
+    }
+  }, [utils]);
+
+  // Ref-held sender so onSettled can recursively drain the coalesced queue
+  // without creating a circular useCallback dependency.
+  const sendUpdateRef = useRef<(id: string, updates: Partial<NeuralBrainMap>) => void>(() => {});
+  sendUpdateRef.current = (id, updates) => {
+    writeLocked.current = true;
+    updateMutation.mutate(
+      { id, ...toDbUpdateFields(updates) },
+      {
+        onError: () => { void reloadFromServer(); },
+        onSettled: () => {
+          writeLocked.current = false;
+          const it = pendingUpdates.current.entries().next();
+          if (!it.done) {
+            const [nextId, nextUpdates] = it.value;
+            pendingUpdates.current.delete(nextId);
+            sendUpdateRef.current(nextId, nextUpdates);
+          }
+        },
+      },
+    );
+  };
 
   // ── DB load on mount ───────────────────────────────────────────────────
   // We use `useQuery` for the initial fetch. `trpc.neuralMaps.list` is a
@@ -213,19 +272,15 @@ export const NeuralMapProvider: React.FC<{ children: ReactNode }> = ({ children 
       prev.map(m => m.id === id ? { ...m, ...updates, updatedAt: now } : m)
     );
 
-    if (dbReady) {
-      // Only send DB-storable fields
-      updateMutation.mutate({
-        id,
-        ...(updates.name           !== undefined && { name: updates.name }),
-        ...(updates.mode           !== undefined && { mode: updates.mode }),
-        ...(updates.rootDirectories !== undefined && { rootDirectories: updates.rootDirectories }),
-        ...(updates.projectContext  !== undefined && { projectContext: updates.projectContext ?? undefined }),
-        ...(updates.labelOverrides  !== undefined && { labelOverrides: updates.labelOverrides ?? null }),
-        ...(updates.settings        !== undefined && { settings: updates.settings as Record<string, unknown> | undefined }),
-      });
+    if (!dbReady) return;
+    if (writeLocked.current) {
+      // A write is in flight — coalesce so the latest snapshot still reaches the DB.
+      const merged = { ...(pendingUpdates.current.get(id) ?? {}), ...updates };
+      pendingUpdates.current.set(id, merged);
+      return;
     }
-  }, [dbReady, updateMutation]);
+    sendUpdateRef.current(id, updates);
+  }, [dbReady]);
 
   const setActiveMap = useCallback((id: string) => {
     setActiveMapId(id);

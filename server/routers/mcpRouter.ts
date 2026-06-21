@@ -3,6 +3,8 @@ import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc.js";
 import { MCPClientService } from "../phase2/services/MCPClientService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { createLogger } from "../_core/logger.js";
+const log = createLogger("mcpRouter");
 
 export const mcpRouter = router({
   listConnectedServers: protectedProcedure.query(() => {
@@ -56,7 +58,7 @@ export const mcpRouter = router({
           ipAddress: ctx.req.ip ?? null,
           sessionId: null,
         })
-        .catch((err) => console.warn("[AuditLog] write failed:", err));
+        .catch((err) => log.error("[AuditLog] write failed — event lost", err));
       return { connected: true };
     }),
   disconnectServer: protectedProcedure
@@ -74,7 +76,7 @@ export const mcpRouter = router({
           ipAddress: ctx.req.ip ?? null,
           sessionId: null,
         })
-        .catch((err) => console.warn("[AuditLog] write failed:", err));
+        .catch((err) => log.error("[AuditLog] write failed — event lost", err));
       return { disconnected: true };
     }),
   listTools: protectedProcedure
@@ -131,7 +133,18 @@ export const mcpRouter = router({
       const sanitized = ctx.services.promptSanitizer.sanitize(JSON.stringify(input.args));
       const safeArgs = JSON.parse(sanitized.clean) as Record<string, unknown>;
 
-      return ctx.services.agent.callMCPTool(input.serverId, input.toolName, safeArgs);
+      const result = await ctx.services.agent.callMCPTool(input.serverId, input.toolName, safeArgs);
+      AuditLogService.getInstance().log({
+        eventType: "mcp_tool_result",
+        actorId: ctx.user?.id ?? null,
+        actorType: "user",
+        procedure: `mcp.callTool/${input.toolName}`,
+        args: { serverId: input.serverId, toolName: input.toolName },
+        result: { preview: JSON.stringify(result).slice(0, 500) },
+        ipAddress: null,
+        sessionId: null,
+      }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
+      return result;
     }),
   agenticOsStatus: protectedProcedure.query(() => ({
     configured: MCPClientService.getInstance().isAgenticOsConfigured(),

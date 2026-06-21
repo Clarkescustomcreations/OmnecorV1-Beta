@@ -5,6 +5,7 @@ import { access, constants } from "fs/promises";
 import { homedir } from "os";
 import path from "path";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc.js";
+import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
 import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
@@ -142,19 +143,21 @@ export const valetRouter = router({
       // GPU gate.
       const gpu = await detectGpu();
       if (!gpu.available || gpu.vramMb < MIN_TRAINING_VRAM_MB) {
-        throw new Error(
-          gpu.available
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: gpu.available
             ? `GPU has ${gpu.vramMb} MB VRAM — minimum ${MIN_TRAINING_VRAM_MB} MB required for local training.`
             : "No GPU detected. Local router training requires a supported NVIDIA or AMD GPU.",
-        );
+        });
       }
 
       // ML venv gate.
       const venv = await detectMlVenv();
       if (!venv.installed) {
-        throw new Error(
-          "Unsloth ML environment not found. Run `pnpm valet:setup-ml` to install the training stack.",
-        );
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message: "Unsloth ML environment not found. Run `pnpm valet:setup-ml` to install the training stack.",
+        });
       }
 
       if (input.step === "dataset") {

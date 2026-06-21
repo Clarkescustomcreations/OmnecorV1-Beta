@@ -2,7 +2,7 @@ import { app, shell, BrowserWindow, ipcMain, dialog, Menu, MenuItem, protocol, n
 import { join, extname } from 'path'
 import { randomBytes } from 'crypto'
 import { appendFile, readFileSync, writeFileSync, existsSync } from 'fs'
-import { execSync, spawn, ChildProcess } from 'child_process'
+import { execSync, execFileSync, spawn, ChildProcess } from 'child_process'
 import { electronApp, optimizer, is } from '@electron-toolkit/utils'
 import icon from '../../resources/icon.png?asset'
 
@@ -45,8 +45,10 @@ function freePortIfBusy(port: number): void {
         { encoding: 'utf8', timeout: 5000 }
       ).trim()
       const pid = out.split(/\s+/).pop()
-      if (pid && pid !== '0') {
-        execSync(`taskkill /F /PID ${pid}`, { timeout: 5000 })
+      // Validate the PID is numeric (and not the system idle pid) before passing it
+      // to taskkill via an arg array — never via a shell-interpolated string (F2).
+      if (pid && /^\d+$/.test(pid) && pid !== '0') {
+        execFileSync('taskkill', ['/F', '/PID', pid], { timeout: 5000 })
         log(`Freed port ${port}: killed stale PID ${pid} (Windows)`)
       }
     } else {

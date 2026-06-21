@@ -17,6 +17,7 @@
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { validatePath } from "../_core/security.js";
+import { VECTOR_DB_CONFIG } from "../phase2/config/index.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas
@@ -61,7 +62,7 @@ export const knowledgeBaseRouter = router({
     } catch {
       return {
         online: false,
-        chromaUrl: process.env.CHROMA_URL || "http://localhost:8000",
+        chromaUrl: VECTOR_DB_CONFIG.chromaUrl,
         initialized: false,
       };
     }

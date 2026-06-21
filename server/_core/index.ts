@@ -33,7 +33,8 @@ import { serveStatic } from "./static";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { createLogger, closeAuditLog } from "./logger.js";
-import { SERVER_CONFIG } from "../phase2/config/index.js";
+import { SERVER_CONFIG, VECTOR_DB_CONFIG } from "../phase2/config/index.js";
+import { version as APP_VERSION } from "../../package.json";
 import { ENV } from "./env.js";
 import { initPaths } from "./paths.js";
 
@@ -44,9 +45,11 @@ import { OmnecorWebSocketServer, setWsInstance } from "../phase2/websocket/WebSo
 import { ProcessManagerService } from "../phase2/services/ProcessManagerService";
 import { SecurityService } from "../phase2/services/SecurityService";
 import { VectorDBService } from "../phase2/services/VectorDBService";
+import { FileSystemWatcherService } from "../phase2/services/FileSystemWatcherService";
 import { startBackupScheduler } from "./backupScheduler";
 import { startPublishWorker } from "./publishWorker";
 import { meshNode } from "../ommesh/core/MeshNode.js";
+import { securityManager } from "../ommesh/core/SecurityManager.js";
 import { ValetServerService } from "../phase2/services/ValetServerService.js";
 import { MCPClientService } from "../phase2/services/MCPClientService.js";
 
@@ -125,19 +128,43 @@ async function startServer() {
     );
   }
 
+  // ─── Restore File Watchers + Wire VectorDB Auto-Index ───────────────────
+  try {
+    const fileWatcher = FileSystemWatcherService.getInstance();
+    const vectorDB = VectorDBService.getInstance();
+    const fsp = await import("fs/promises");
+    fileWatcher.on("fileEvent", (event: { projectId: string; filePath: string; eventType: string }) => {
+      const collection = `omnecor_${event.projectId}`;
+      if (event.eventType === "unlink" || event.eventType === "unlinkDir") {
+        vectorDB.removeDocument(collection, event.filePath).catch(() => {});
+      } else {
+        fsp.readFile(event.filePath, "utf-8").then(text =>
+          vectorDB.addDocuments(collection, [{ id: event.filePath, text, metadata: { path: event.filePath, projectId: event.projectId } }])
+        ).catch(() => {});
+      }
+    });
+    await fileWatcher.restoreFromDb();
+  } catch (error) {
+    log.warn("[Omnecor] FileWatcher restore warning:", (error as Error).message);
+  }
+
   // ─── Initialize OMMESH Node ─────────────────────────────────────────────
   try {
+    await securityManager.hydrateFromDb();
     await meshNode.start();
     log.info("[Omnecor] OMMESH Node started and broadcasting");
   } catch (error) {
     log.warn("[Omnecor] OMMESH init warning:", (error as Error).message);
   }
 
-  // ─── Initialize AgenticOS Registry ─────────────────────────────────────
+  // ─── Initialize AgenticOS Registry + Restore MCP Connections ───────────────
   try {
     const mcpClient = MCPClientService.getInstance();
     mcpClient.connectAgenticOsRegistry().catch(error => {
       log.warn("[Omnecor] AgenticOS Registry init warning:", (error as Error).message);
+    });
+    mcpClient.restoreFromDb().catch(error => {
+      log.warn("[Omnecor] MCP restore warning:", (error as Error).message);
     });
   } catch (error) {
     log.warn("[Omnecor] MCP Client registry init warning:", (error as Error).message);
@@ -266,6 +293,16 @@ async function startServer() {
 
   app.use(limiter);
 
+  // Request-duration logger — flags slow requests above 1s threshold.
+  app.use((req, res, next) => {
+    const start = Date.now();
+    res.on("finish", () => {
+      const ms = Date.now() - start;
+      if (ms > 1000) log.warn(`[perf] slow request ${req.method} ${req.path} ${ms}ms`);
+    });
+    next();
+  });
+
   // Stricter limiter for authentication endpoints (OAuth login + callbacks).
   // Brute-forcing/abuse of the login flow should be throttled far harder than
   // general traffic. Successful requests are not counted so a legitimate user
@@ -285,16 +322,23 @@ async function startServer() {
   app.use(express.urlencoded({ limit: "50mb", extended: true }));
 
   // ─── Health Check (not behind tRPC) ─────────────────────────────────────
-  app.get("/health", (_req, res) => {
-    res.json({
-      status: "healthy",
+  app.get("/health", async (_req, res) => {
+    const ollamaUrl = ENV.ollamaUrl;
+    const chromaUrl = VECTOR_DB_CONFIG.chromaUrl;
+    const [dbOk, ollamaOk, chromaOk] = await Promise.all([
+      getDb().then(() => true).catch(() => false),
+      fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false),
+      fetch(`${chromaUrl}/api/v1/heartbeat`, { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false),
+    ]);
+    const ready = dbOk;
+    res.status(ready ? 200 : 503).json({
+      status: ready ? "healthy" : "degraded",
       service: "omnecor",
-      version: "2.1.0",
+      version: APP_VERSION,
       architecture: "unified",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      // Echoed back so the Electron main process can verify it's talking to its
-      // own backend instance and not a stale process left over on the same port.
+      checks: { db: dbOk, ollama: ollamaOk, chromadb: chromaOk },
       nonce: process.env.BACKEND_NONCE ?? "",
     });
   });
@@ -452,7 +496,7 @@ async function startServer() {
   async function logStartupChecklist() {
     const checks = [
       { name: "Ollama", url: `${ENV.ollamaUrl}/api/tags` },
-      { name: "ChromaDB", url: "http://localhost:8000/api/v1/heartbeat" },
+      { name: "ChromaDB", url: `${VECTOR_DB_CONFIG.chromaUrl}/api/v1/heartbeat` },
     ];
     for (const check of checks) {
       try {

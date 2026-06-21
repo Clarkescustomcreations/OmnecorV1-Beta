@@ -1,6 +1,9 @@
 // server/ommesh/core/MeshNode.ts
 import * as https from 'https';
 import { createHmac } from 'crypto';
+import { readFileSync, existsSync } from 'fs';
+import { join } from 'path';
+import { homedir } from 'os';
 import { NodeIdentity } from '../../../shared/types/ommesh.types.js';
 import { DiscoveryService, type PeerInfo } from './DiscoveryService.js';
 import { securityManager, SecurityManager } from './SecurityManager.js';
@@ -8,6 +11,8 @@ import { RoutingEngine } from './RoutingEngine.js';
 import { MeshServer, MESH_PORT } from './MeshServer.js';
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("OMMESH:MeshNode");
+
+const SETTINGS_PATH = join(homedir(), '.omnecor', 'settings.json');
 
 // Providers that reach an external cloud API. OMMESH distributes *local* compute
 // across LAN nodes; tunnelling a cloud provider through mesh routing would make a
@@ -67,6 +72,18 @@ export class MeshNode {
     this.discovery = new DiscoveryService(this.identity, this.security);
     this.routing = new RoutingEngine(this);
     this.server = new MeshServer(this);
+
+    // Restore persisted OMMESH settings synchronously at construction time.
+    try {
+      if (existsSync(SETTINGS_PATH)) {
+        const settings = JSON.parse(readFileSync(SETTINGS_PATH, 'utf-8')) as Record<string, unknown>;
+        if (settings['ommesh.crossNodeSync'] === true) this.crossNodeSyncEnabled = true;
+        if (settings['ommesh.agentDiscourse'] === true) this.agentDiscourseEnabled = true;
+        log.info("OMMESH: restored settings", { crossNodeSyncEnabled: this.crossNodeSyncEnabled, agentDiscourseEnabled: this.agentDiscourseEnabled });
+      }
+    } catch {
+      // Non-critical — defaults are already set above
+    }
 
     // Wire up peer notification broadcast logic
     this.security.on('certificate-rotated', async (data: { newFingerprint: string }) => {

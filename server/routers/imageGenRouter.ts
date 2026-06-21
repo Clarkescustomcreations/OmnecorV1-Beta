@@ -3,6 +3,7 @@ import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc.js";
 import { OpenArtService } from "../phase2/services/OpenArtService.js";
 import { ENV } from "../_core/env.js";
+import { assertImageProviderAllowedInMode } from "../_core/sovereign.js";
 
 export const imageGenRouter = router({
   providers: protectedProcedure.query(() => ({
@@ -19,6 +20,8 @@ export const imageGenRouter = router({
       height: z.number().min(64).max(2048).default(512),
     }))
     .mutation(async ({ ctx, input }) => {
+      // fal/openart are cloud image services — block sovereign users (local ComfyUI still allowed).
+      assertImageProviderAllowedInMode(input.provider, ctx.user?.executionMode);
       if (input.provider === "openart") {
         return OpenArtService.getInstance().generate(
           input.prompt,
