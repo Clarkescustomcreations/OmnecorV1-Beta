@@ -4,6 +4,71 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 
 ---
 
+## 📌 TODO — Expo SDK 55 / React Native 0.83 upgrade (Android HQ) — opened 2026-06-21
+
+**Why:** the only reason the `apk:debug`/`apk:release`/`apk:install` scripts in
+`packaging/android/omnecor-hq/package.json` run `rm -rf app/.cxx app/build/generated/autolinking`
+before Gradle is a New-Architecture autolinking-codegen **ordering bug** on RN 0.81/Expo 54
+(legacy `gradlew clean` re-ran CMake against not-yet-generated JNI dirs). It's a workaround, not a
+fix. The root-cause fix is an upstream bump to **Expo SDK 55 (ships RN 0.83)** — RN 0.82 is
+canary-only; SDK 55 = RN 0.83, New Architecture mandatory (the app already has `newArchEnabled: true`).
+
+**Native-module compatibility — verified 2026-06-21 via shallow-clone of each repo:**
+| Module | Now → target | New-Arch / codegen | Verdict |
+|---|---|---|---|
+| `llama.rn` | `^0.9.0` → **`0.12.4`** | `codegenConfig` present; README: "v0.10+ **requires** New Arch" | ✅ Bump; New-Arch ready |
+| `whisper.rn` | `0.6.0` (keep) | `codegenConfig` present; **dev-tested on RN 0.84.1** | ✅ Already validated above 0.83 |
+| `react-native-llm-mediapipe` | `0.5.0` | ❌ **no `codegenConfig`** — legacy bridge, unmaintained since Oct 2024 | ⛔ **Blocker — replace** |
+
+**MediaPipe replacement decision (the "fix it altogether" path):** Google's MediaPipe LLM Inference
+API is now **maintenance-only**; the maintained successor is **LiteRT-LM**. Replace
+`react-native-llm-mediapipe` with **`react-native-litert-lm`** (`0.4.2`, Nitro Modules / New Arch,
+maintained Jun 2026, `.litertlm` models — the app already references `.litertlm`). It **requires
+Expo ≥ 55**, so it is adopted *as part of* this upgrade. Trade-offs: ARM64-only; adds
+`react-native-nitro-modules`; `lib/_core/mediapipe-inference.ts` must be rewritten to its
+`useModel`/`sendMessage` API. Fallback if litert-lm is unsuitable: `expo-llm-mediapipe` (keeps
+`.task`, Expo-native, but rides the deprecated MediaPipe runtime).
+
+**Staged plan:** (0) branch + baseline; (1) `expo install expo@^55` → `expo install --fix` (lands RN
+0.83, realigns expo-*/reanimated/worklets/screens/etc.); (2) bump `llama.rn`→0.12.4, keep
+`whisper.rn`, swap `react-native-llm-mediapipe`→`react-native-litert-lm` (+ rewrite
+`mediapipe-inference.ts`, + `react-native-nitro-modules`); (3) re-validate New-Arch config &
+`expo-build-properties`; (4) **verification gate** — `expo prebuild` then build with the *original*
+unguarded `./gradlew clean assembleRelease` (NO `rm -rf`); a clean build proves the codegen bug is
+gone; (5) on success, strip the `rm -rf` from the three `apk:*` scripts + add a CHANGELOG entry.
+Contingency: if the bug survives, keep the workaround + document it inline and file upstream.
+
+**Status 2026-06-21 — IN PROGRESS (code complete, native build running):**
+- ✅ Deps upgraded: `expo ~55.0.26`, `react-native 0.83.6`, `react 19.2.0`, all `expo-*` aligned to
+  the SDK-55 `bundledNativeModules` map; `expo-share-intent`→`^6.1.1`; `reanimated 4.2.1` /
+  `worklets 0.7.4`. `pnpm install` clean.
+- ✅ Native modules: `llama.rn`→`^0.12.4` (New-Arch); `whisper.rn` kept `0.6.0` (dev-tested RN 0.84);
+  `react-native-llm-mediapipe` **removed**, `react-native-litert-lm@^0.4.2` + `react-native-nitro-modules`
+  added.
+- ✅ Dropped the obsolete `patches/llama.rn.patch` (forced `hasHexagon=false` to dodge a Snapdragon
+  `libcdsprpc.so` crash) — llama.rn 0.12.4's `tryLoadLibrary` now catches that `UnsatisfiedLinkError`
+  and falls back to the `dotprod_i8mm` CPU variant, so the guard is upstreamed. **Revisit if a
+  Snapdragon device crashes on model load.**
+- ✅ `lib/_core/mediapipe-inference.ts` rewritten onto LiteRT-LM (`createLLM`/`loadModel`/`sendMessage`/
+  `sendMessageAsync`/`close`); same exported API so `settings.tsx` is unchanged.
+- ✅ Config: removed `newArchEnabled` (always-on in SDK 55) + `edgeToEdgeEnabled` (removed from
+  ExpoConfig); `expo-build-properties` → `minSdkVersion 26`, `buildArchs ["arm64-v8a"]` (LiteRT-LM is
+  ARM64-only, API 26+); registered the `react-native-litert-lm` config plugin.
+- ✅ `tsc --noEmit` green; `expo prebuild --platform android --clean` succeeded.
+- ✅ Fixed `react-native-gesture-handler` (2.30.1 failed `compileDebugKotlin` against RN 0.83.6 —
+  `ReactRoot.getRootViewTag()` became a function); bumped to `^2.31.2` (resolves 2.32.0).
+- ✅ **VERIFIED: `assembleDebug` BUILD SUCCESSFUL (21m26s) → 101 MB `app-debug.apk`, built WITHOUT the
+  `rm -rf` workaround.** The fresh `expo prebuild` + `assembleDebug` ran all codegen/NDK/autolinking/
+  Nitro tasks with no autolinking-codegen ordering failure → root cause resolved by the upgrade.
+- ✅ Removed the `rm -rf app/.cxx app/build/generated/autolinking` from the three `apk:*` scripts +
+  CHANGELOG entry.
+- ⬜ **Remaining (functional, tracked):** update `model-download.ts` + `settings.tsx` user-facing text
+  (`.task`/"MediaPipe" → `.litertlm`/"LiteRT-LM") and point model downloads at `.litertlm` models so
+  the LiteRT-LM engine has loadable models; on-device install + runtime smoke test on an arm64 device;
+  consider `apk:release` (signed) build.
+
+---
+
 ## 🔪 Ruthless Public-Beta Code-Sweep — 2026-06-20 (Linux)
 
 > `/code-sweep` full 10-domain run. User directive this pass: **assume everything broken/mock/vulnerable until proven**; **nothing may be "deferred" or "known-broken"**; **mock features get implemented, not deleted — unless already replaced/superseded.**

@@ -84,20 +84,23 @@ and adds:
 
 ---
 
-## APK (Android Thin Client) from Windows
+## APK (Omnecor HQ) from Windows
+
+The Android app is **Omnecor HQ**, a standalone React Native / Expo project at
+`packaging/android/omnecor-hq/`. Building it from Windows requires JDK 17, the
+Android SDK (Target SDK 34) and the NDK r26+ (for the `llama.rn` native build).
 
 ```powershell
-# Build the Capacitor web bundle
-pnpm build:android
-
-# Open in Android Studio
-npx cap open android
+cd packaging\android\omnecor-hq
+pnpm install
+pnpm apk:release
+# output: android\app\build\outputs\apk\release\app-release.apk
 ```
 
-Then in Android Studio: **Build → Generate Signed Bundle / APK → APK**.
+For a sideloadable debug build instead, run `pnpm apk:debug`. Then sign the
+release APK in Android Studio (**Build → Generate Signed Bundle / APK → APK**)
+for Play Store distribution.
 
-For LAN connectivity, set the server IP before building:
-```powershell
-$env:OMNECOR_SERVER_IP="192.168.1.100"
-pnpm build:android
-```
+The phone connects to your desktop over LAN Wi-Fi or Tailscale — set the
+server IP in-app (Settings → Omnecor Server), not at build time. See
+[../android/BUILD-ANDROID.md](../android/BUILD-ANDROID.md) for the full guide.

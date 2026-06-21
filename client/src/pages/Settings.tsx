@@ -51,6 +51,7 @@ interface SavedSettings {
   googleClientId?: string; googleClientSecret?: string; microsoftClientId?: string; microsoftClientSecret?: string;
   autoIndex?: boolean; indexInterval?: number; maxFileSize?: number;
   zeroLoginMode?: boolean; telemetry?: boolean; crashReports?: boolean; analytics?: boolean; cloudSync?: boolean;
+  sovereignBlockAiOnly?: boolean;
   temperature?: number; topP?: number; apiServerEnabled?: boolean; apiPort?: number;
   requireAuthToken?: boolean; debugMode?: boolean; devTools?: boolean; cacheEnabled?: boolean; logLevel?: string;
 }
@@ -104,6 +105,15 @@ export const Settings: React.FC = () => {
     },
     onError: (e) => toast.error(e.message),
   });
+  // Admin-only — this toggle relaxes Sovereign mode, so it's persisted through a
+  // dedicated adminProcedure (NOT the public saveSettings endpoint).
+  const setSovereignAiOnlyMutation = trpc.system.setSovereignBlockAiOnly.useMutation({
+    onSuccess: ({ enabled }) => {
+      toast.success(`Sovereign "block AI only" ${enabled ? "enabled" : "disabled"}`);
+      refetchSettings();
+    },
+    onError: (e) => toast.error(e.message),
+  });
 
   const [selectedMode, setSelectedMode] = useState<"sovereign" | "scrapper" | "big_spender">("scrapper");
   useEffect(() => {
@@ -130,11 +140,13 @@ export const Settings: React.FC = () => {
   const [scanOnUpload, setScanOnUpload] = useState(true);
   const [encryptApiKeys, setEncryptApiKeys] = useState(true);
   const [sessionTimeout, setSessionTimeout] = useState(30);
+  const [sovereignBlockAiOnly, setSovereignBlockAiOnly] = useState(false);
 
   useEffect(() => {
     if (settings) {
       const s = settings as SavedSettings;
       setLocalEncryption(!!s.localEncryption);
+      setSovereignBlockAiOnly(!!s.sovereignBlockAiOnly);
       setHitlCommandExecution(s.hitlCommandExecution !== false);
       setHitlFileDeletion(s.hitlFileDeletion !== false);
       setHitlInternetAccess(!!s.hitlInternetAccess);
@@ -147,6 +159,10 @@ export const Settings: React.FC = () => {
   }, [settings]);
   const { data: me } = trpc.auth.me.useQuery();
   const isAdmin = me?.role === "admin" || me?.role === "owner";
+  // In zero-login the execution mode is fixed by the ZERO_LOGIN_EXECUTION_MODE
+  // env var (server-forced on every request), so the selector below can't change
+  // it — disable it and explain, rather than letting the change silently revert.
+  const isZeroLogin = me?.loginMethod === "zero-login";
 
   const handleSaveKeys = () => {
     const payload: Record<string, string> = { ...keys };
@@ -588,14 +604,19 @@ export const Settings: React.FC = () => {
                     <CardContent className="space-y-6">
                       <div className="space-y-3">
                         <Label>Execution Mode</Label>
-                        <RadioGroup value={selectedMode} onValueChange={(v) => setSelectedMode(v as "sovereign" | "scrapper" | "big_spender")}>
+                        <RadioGroup
+                          value={selectedMode}
+                          onValueChange={(v) => setSelectedMode(v as "sovereign" | "scrapper" | "big_spender")}
+                          disabled={isZeroLogin}
+                          className={isZeroLogin ? "opacity-60" : undefined}
+                        >
                           <div className="flex items-start gap-3 rounded-md border p-3">
                             <RadioGroupItem value="sovereign" id="mode-sovereign" className="mt-0.5" />
                             <div>
                               <Label htmlFor="mode-sovereign" className="font-medium cursor-pointer flex items-center gap-1.5">
                                 <Lock className="h-3.5 w-3.5 text-destructive" /> Sovereign
                               </Label>
-                              <p className="text-xs text-muted-foreground">Air-gapped lockdown. All cloud provider calls are blocked server-side.</p>
+                              <p className="text-xs text-muted-foreground">Air-gapped lockdown. Cloud AI inference is blocked server-side (and other external services too, unless "block AI providers only" is on below).</p>
                             </div>
                           </div>
                           <div className="flex items-start gap-3 rounded-md border p-3">
@@ -617,6 +638,21 @@ export const Settings: React.FC = () => {
                             </div>
                           </div>
                         </RadioGroup>
+                        {isZeroLogin && (
+                          <p className="text-xs text-accent-warning">
+                            Zero-login session: the execution mode is fixed by the <code>ZERO_LOGIN_EXECUTION_MODE</code> environment variable and can't be changed here. Set it in <code>.env</code> and restart the server.
+                          </p>
+                        )}
+                        <div className="flex items-start justify-between gap-4 rounded-md border border-accent-danger/30 bg-accent-danger/5 p-3">
+                          <div className="space-y-0.5">
+                            <Label htmlFor="sovereign-ai-only" className="font-medium">In Sovereign mode, block AI providers only</Label>
+                            <p className="text-xs text-muted-foreground">When on, Sovereign blocks only cloud <strong>AI model</strong> calls (OpenAI, Anthropic, Gemini, Fal, voice, training). Non-AI external services — GitHub/Notion/Drive sync, email, web search — keep working so research can continue. When off, Sovereign blocks all external calls (strict air-gap).</p>
+                            {!isAdmin && (
+                              <p className="text-xs text-accent-warning">Requires an admin or owner account to change.</p>
+                            )}
+                          </div>
+                          <Switch id="sovereign-ai-only" checked={sovereignBlockAiOnly} onCheckedChange={setSovereignBlockAiOnly} disabled={!isAdmin} />
+                        </div>
                       </div>
                       <div className="flex items-center justify-between">
                         <div className="space-y-0.5">
@@ -705,7 +741,17 @@ export const Settings: React.FC = () => {
                                 sessionTimeout,
                               }
                             });
-                            setModeMutation.mutate({ mode: selectedMode });
+                            // sovereignBlockAiOnly is admin-gated and persisted via
+                            // its own mutation — only fire it when it actually
+                            // changed, so a non-admin saving other settings doesn't
+                            // hit a FORBIDDEN they didn't ask for.
+                            if (sovereignBlockAiOnly !== !!(settings as SavedSettings | undefined)?.sovereignBlockAiOnly) {
+                              setSovereignAiOnlyMutation.mutate({ enabled: sovereignBlockAiOnly });
+                            }
+                            // In zero-login the mode is fixed by the server env
+                            // var; firing this would write a value that's instantly
+                            // overridden and show a misleading toast.
+                            if (!isZeroLogin) setModeMutation.mutate({ mode: selectedMode });
                           }}
                           disabled={setModeMutation.isPending || saveSettingsMutation.isPending}
                           className="gap-2"

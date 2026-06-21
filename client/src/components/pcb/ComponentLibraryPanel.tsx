@@ -15,15 +15,19 @@ import {
   getAllCategories,
   searchComponents,
 } from '@/lib/componentLibrary';
-import { Search } from 'lucide-react';
+import { Search, X, ChevronLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 export interface ComponentLibraryPanelProps {
   onAddComponent: (componentId: string, position: { x: number; y: number }) => void;
   mode: 'schematic' | 'pcb';
+  onClose?: () => void;
 }
 
 export const ComponentLibraryPanel: React.FC<ComponentLibraryPanelProps> = ({
   onAddComponent,
+  onClose,
+  mode: _mode,
 }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [draggedComponent, setDraggedComponent] = useState<string | null>(null);
@@ -65,7 +69,14 @@ export const ComponentLibraryPanel: React.FC<ComponentLibraryPanelProps> = ({
     <div className="w-64 border-r border-border bg-card flex flex-col min-h-0 shadow-sm">
       {/* Header */}
       <div className="p-3 border-b border-border">
-        <h2 className="text-sm font-semibold text-foreground mb-1">Component Library</h2>
+        <div className="flex items-center justify-between mb-1">
+          <h2 className="text-sm font-semibold text-foreground">Component Library</h2>
+          {onClose && (
+            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={onClose} title="Collapse Panel">
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+          )}
+        </div>
         <p className="text-[10px] text-muted-foreground mb-2">Click to add · Drag to position</p>
 
         <div className="relative">

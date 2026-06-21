@@ -1,5 +1,30 @@
 # Changelog
 
+## [Unreleased] - 2026-06-21 — Android HQ: Expo SDK 55 / RN 0.83 upgrade, LiteRT-LM, mock-data wiring, tech-debt cleanup
+
+### Changed
+
+- **Android HQ upgraded to Expo SDK 55 / React Native 0.83.6 / React 19.2.0.** All `expo-*` packages aligned to the SDK-55 `bundledNativeModules` map; `expo-share-intent`→`^6.1.1`; `react-native-reanimated`→`4.2.1`, `react-native-worklets`→`0.7.4`. Removed `newArchEnabled` (always-on in SDK 55) and `edgeToEdgeEnabled` (removed from `ExpoConfig`). New Architecture is mandatory and enabled. Verified: mobile `tsc` 0 errors, `expo prebuild --clean` clean, **`assembleDebug` produces a working APK**.
+- **On-device LLM engine swapped: `react-native-llm-mediapipe` → `react-native-litert-lm`** (`^0.4.2`, + `react-native-nitro-modules`). Google's MediaPipe LLM Inference API is now maintenance-only; LiteRT-LM is its maintained successor. `lib/_core/mediapipe-inference.ts` rewritten onto `createLLM`/`loadModel`/`sendMessage`/`sendMessageAsync`/`close` with the same exported API (callers unchanged). Models move from `.task` → `.litertlm`. `expo-build-properties` now sets `minSdkVersion 26` + `buildArchs ["arm64-v8a"]` (LiteRT-LM is ARM64-only, API 26+).
+- **`llama.rn` bumped `^0.9.0` → `^0.12.4`** (New Architecture). `react-native-gesture-handler` bumped to `^2.31.2` (resolves `2.32.0`) — `2.30.x` failed to compile against RN 0.83.6 (`ReactRoot.getRootViewTag()` became a function).
+- **Mock data removed from the mobile chat & podcast screens.** Chat now wires real model selection (provider switch + `ollama.listModels` / cloud catalog mirroring the desktop `API_MODEL_CATALOG`) instead of a hardcoded `"llama3.2:latest"`; the fake neural-map (`Project A/B`) and agent (`Creative/Technical/Analyst`) fallback lists are replaced with the real `neuralMaps.list` / `personas.list` data + truthful empty states. Podcast: hardcoded model id replaced with real resolution; the fake 5-item voice list replaced with the only real control (RVC voice-conversion on/off). Shared `askAi` (3D Viewer) uses the same real model resolver.
+- **Phase-2 routers relocated:** `agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter` moved from `server/phase2/routers/` to the canonical `server/routers/` (services stay in `phase2/services/`). Import paths and docs (CLAUDE.md, AGENTS.md, ROUTER_INVENTORY.md, TRPC_API.md) updated. tRPC namespaces unchanged → no client impact.
+
+### Fixed
+
+- **`apk:debug`/`apk:release`/`apk:install`: removed the `rm -rf app/.cxx app/build/generated/autolinking` workaround** (added 2026-06-16). The autolinking-codegen ordering bug it papered over is resolved by the SDK 55 / RN 0.83 toolchain — a fresh `expo prebuild` + `assembleDebug` builds cleanly through all codegen/NDK/autolinking tasks without it.
+- **Dropped the obsolete `patches/llama.rn.patch`** (forced `hasHexagon=false` to dodge a Snapdragon `libcdsprpc.so` `UnsatisfiedLinkError`). `llama.rn` 0.12.4's `tryLoadLibrary` now catches that error and falls back to the `dotprod_i8mm` CPU variant — the guard is upstreamed. (Revisit if a Snapdragon device crashes on model load.)
+- **`pnpm check` no longer fails on a stray `node_modules_broken/` directory** — deleted the untracked dir and added it to the mobile `tsconfig.json` `exclude` (it had been flooding `tsc` with ~30 errors from a quarantined node_modules snapshot).
+
+### Documentation
+
+- Clarified the three migration paths (`pnpm build:push` dev / `pnpm db:migrate` prod-CI / `server/db.ts` runtime fallback) in CLAUDE.md and `server/db.ts` — `db:migrate` is complementary, not legacy.
+- Added an Expo 55 / RN 0.83 upgrade record at the top of `Context/Progress-Tracker.md`.
+
+**Gates:** mobile `tsc` 0 · `expo prebuild` clean · `assembleDebug` → 101 MB `app-debug.apk` ✓ · root `tsc` 0 · `vitest` 326/326
+
+---
+
 ## [Unreleased] - 2026-06-19 — Security, Correctness & Design-Token Sweep
 
 ### Changed

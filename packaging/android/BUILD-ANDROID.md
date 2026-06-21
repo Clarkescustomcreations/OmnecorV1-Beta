@@ -2,9 +2,11 @@
 
 The Omnecor Android app is **Omnecor HQ** — a React Native (Expo) companion app for the desktop workstation. It connects over Tailscale or LAN Wi-Fi and runs on-device GGUF inference via llama.rn.
 
-For complete build instructions, see the dedicated guide:
-
-**[packaging/android/omnecor-hq/BUILD.md](omnecor-hq/BUILD.md)**
+For the full step-by-step build, sideload and connection instructions, see
+[INSTALL.md § 4.6](../../INSTALL.md#46-android--omnecor-hq-companion-app). The
+project source and scripts live in
+[packaging/android/omnecor-hq/](omnecor-hq/) — see its
+[README.md](omnecor-hq/README.md) for the app's feature set.
 
 ## Quick Reference
 

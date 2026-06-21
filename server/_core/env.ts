@@ -31,10 +31,33 @@ export const ENV = {
   virtualCardProvider: process.env.VIRTUAL_CARD_PROVIDER ?? "lithic",
   sovereignMode: process.env.SOVEREIGN_MODE === "true",
   zeroLoginMode: process.env.ZERO_LOGIN_MODE === "true",
+  // Execution mode the zero-login local-admin runs under. Defaults to "sovereign"
+  // so air-gapped/classified installs cannot silently leak inference to cloud
+  // providers (the README markets zero-login as the air-gapped mode). Set to
+  // "scrapper" (or "big_spender") to opt this local-admin session into cloud
+  // calls for testing — cloud is then allowed and spend-tracked. The flag is the
+  // single source of truth and overrides any stale value persisted on the
+  // local-zero-login user (see server/_core/context.ts).
+  zeroLoginExecutionMode: ((): "sovereign" | "scrapper" | "big_spender" => {
+    const raw = process.env.ZERO_LOGIN_EXECUTION_MODE;
+    return raw === "scrapper" || raw === "big_spender" || raw === "sovereign"
+      ? raw
+      : "sovereign";
+  })(),
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",
+  // Base URL of a local emulated Google OAuth/OIDC provider (the `google` skill's
+  // `npx emulate --service google`, default http://localhost:4002). When set, the
+  // Google auth/token/userinfo endpoints are pointed at the emulator instead of
+  // real Google — local OAuth testing without real credentials. Empty = real Google.
+  googleEmulatorUrl: (process.env.GOOGLE_EMULATOR_URL ?? "").replace(/\/$/, ""),
   microsoftClientId: process.env.MICROSOFT_CLIENT_ID ?? "",
   microsoftClientSecret: process.env.MICROSOFT_CLIENT_SECRET ?? "",
+  // Base URL of a local emulated Microsoft Entra ID provider (the `microsoft`
+  // skill's `npx emulate --service microsoft`, default http://localhost:4005).
+  // When set, Microsoft authorize/token/Graph-me endpoints point at the emulator.
+  // Empty = real Microsoft.
+  microsoftEmulatorUrl: (process.env.MICROSOFT_EMULATOR_URL ?? "").replace(/\/$/, ""),
   ollamaProxyToken: process.env.OLLAMA_PROXY_TOKEN ?? "",
   elevenLabsApiKey: process.env.ELEVENLABS_API_KEY ?? "",
   huggingfaceApiKey: process.env.HUGGINGFACE_API_KEY ?? "",

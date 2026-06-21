@@ -17,9 +17,6 @@
     "postinstall": "electron-builder install-app-deps"
   },
   "dependencies": {
-    "@capacitor/android": "^5.7.0",
-    "@capacitor/cli": "^5.7.0",
-    "@capacitor/core": "^5.7.0",
     "@electron-toolkit/preload": "^3.0.0",
     "@electron-toolkit/utils": "^3.0.0",
     "@radix-ui/react-label": "^2.0.2",

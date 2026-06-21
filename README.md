@@ -101,7 +101,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **Immutable Audit Log** — Append-only `audit_log` table captures all privileged events. No delete/update API exists.
 - **PII Redaction** — `redactSensitiveData()` scrubs API keys and personal data before any log entry is written.
 - **Prompt Injection Defense** — `PromptSanitizer` blocks injection attempts and fires `security:injection_attempt` events.
-- **Zero-Login / Air-Gapped Mode** — `ZERO_LOGIN_MODE=true` bypasses OAuth entirely; auto-enforces Sovereign Mode.
+- **Zero-Login / Air-Gapped Mode** — `ZERO_LOGIN_MODE=true` bypasses OAuth entirely and runs every request as a local admin. The session's execution mode is set by `ZERO_LOGIN_EXECUTION_MODE` (**defaults to `sovereign`**, blocking all cloud inference); set it to `scrapper`/`big_spender` to allow spend-tracked cloud calls for local testing.
 - **Extended OAuth** — Google and Microsoft identity providers supported out of the box. Zero-login / air-gapped mode available for classified environments.
 - **External API Hardening** — All cloud API calls (OpenAI, Lithic, cloud compute, etc.) protected by circuit breakers, exponential backoff, token refresh safety, and atomic transactions. Payment card data never exposed in errors or logs.
 - **Role-Based Access Control** — Four roles: `viewer`, `user`, `admin`, `owner`.
@@ -169,7 +169,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **Multi-Surface Access** — Available in Settings, Setup Wizard, LLM Builder, and Valet Router panel.
 
 ### Android Companion App
-- **Thin Client Architecture** — React Native (Expo) mobile app connecting to Omnecor desktop over LAN.
+- **Native Companion App** — Standalone React Native (Expo) app (Omnecor HQ) connecting to the Omnecor desktop over LAN Wi-Fi or Tailscale.
 - **8-Tab Interface** — Chat (with Neural Map + agent selectors), HITL approvals, AI Node (on-device GGUF inference), Status, Terminal, Podcast, 3D Viewer, and Settings.
 - **Seamless Sync** — All data synchronized in real-time with the desktop workstation.
 - **OMMESH Phone Node** — Use your phone's Snapdragon NPU as a bidirectional OMMESH compute node via llama.rn (llama.cpp NDK). Route inference to the phone from the PC, or use the PC's models from the phone.
@@ -247,7 +247,7 @@ The repository is organized into several key directories:
 - `client/`: Contains the frontend application built with React and Vite.
 - `server/`: Houses the backend services, tRPC routers, and AI integration bridges.
 - `docs/`: Stores detailed documentation, including architecture, API, and user guides.
-- `packaging/`: Contains scripts and configurations for application packaging (AppImage, Deb, Flatpak, and `packaging/android/omnecor-hq/` for the React Native Expo Android thin client).
+- `packaging/`: Contains scripts and configurations for application packaging (AppImage, Deb, Flatpak, and `packaging/android/omnecor-hq/` for the Omnecor HQ React Native (Expo) Android companion app).
 - `drizzle/`: Database schema and migration files.
 - `shared/`: Shared types and utilities between client and server.
 

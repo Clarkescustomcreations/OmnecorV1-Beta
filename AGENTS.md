@@ -3,6 +3,25 @@
 
 ---
 
+## Testing With an Authenticated Session (read first)
+
+To exercise the app end-to-end you need a real session. **Do not reach for
+`ZERO_LOGIN_MODE` to test cloud features** — by default it now runs the local
+admin in **Sovereign** mode (cloud AI blocked). Use one of these instead, both
+documented in [`docs/development/LOCAL_TESTING.md`](docs/development/LOCAL_TESTING.md):
+
+- **Option A — Emulated OAuth:** set `GOOGLE_EMULATOR_URL` / `MICROSOFT_EMULATOR_URL`
+  (the `google` / `microsoft` skills' `npx emulate` servers) and sign in through the
+  real login flow with no real credentials. Best for testing the login/session flow.
+- **Option B — Seed script:** `pnpm tsx server/scripts/dev-seed-user.ts` mints a
+  valid `app_session_id` cookie (default `scrapper`, cloud allowed) for headless
+  Playwright/curl tests. The script is git-ignored; recreate it from the doc if missing.
+
+If you do use zero-login for cloud work, set `ZERO_LOGIN_EXECUTION_MODE=scrapper`.
+`.env` is read once at startup — **restart the dev server after editing it.**
+
+---
+
 ## Mandatory Reading Order
 
 Read every file in this exact sequence before writing a single line of code.
@@ -187,8 +206,9 @@ shim was deleted — do not recreate it.
 
 A router that is not registered in `server/routers.ts` does not exist at runtime.
 Before assessing any router's security posture, confirm it appears in `routers.ts`.
-The `server/phase2/routers/` directory contains legacy duplicates — some have been
-deleted, some remain registered. Check `routers.ts` first, always.
+All routers now live in `server/routers/` (the old `server/phase2/routers/` tree was
+emptied — its three surviving routers were relocated and the rest deleted). Check
+`routers.ts` first, always.
 
 ### Frontend Imports
 

@@ -109,8 +109,9 @@ export function isDownloading(filename: string): boolean {
 
 /** GGUF model file extensions llama.rn can load. */
 const GGUF_EXTS = [".gguf"];
-/** LiteRT / MediaPipe model file extensions (Google AI Edge Gallery). */
-const TASK_EXTS = [".task", ".bin", ".litertlm"];
+/** LiteRT-LM model file extensions (Google AI Edge Gallery). `.litertlm` is the
+ *  format the LiteRT-LM engine loads; legacy `.task` is MediaPipe-only. */
+const TASK_EXTS = [".litertlm", ".task", ".bin"];
 
 function hasExt(name: string, exts: string[]): boolean {
   const lower = name.toLowerCase();
@@ -121,9 +122,9 @@ function isGguf(name: string): boolean { return hasExt(name, GGUF_EXTS); }
 
 /**
  * whisper.rn STT models are `ggml-*.bin` (whisper.cpp GGML) and live in the same
- * /models dir as the LLMs. They are NOT LiteRT/MediaPipe models, so they must be
- * excluded from the `.task`/.bin/.litertlm scanner — otherwise a downloaded
- * Whisper model would show up (and fail to load) in the MediaPipe model list.
+ * /models dir as the LLMs. They are NOT LiteRT-LM models, so they must be
+ * excluded from the `.litertlm`/.task/.bin scanner — otherwise a downloaded
+ * Whisper model would show up (and fail to load) in the LiteRT-LM model list.
  */
 function isWhisperGgml(name: string): boolean {
   const lower = name.toLowerCase();
@@ -156,8 +157,8 @@ export async function listLocalGguf(): Promise<DownloadedModel[]> {
  * model another app saved) and copy it into the app's models directory so it
  * can be loaded by llama.rn. Returns the imported model, or null if cancelled.
  *
- * NOTE: Google AI Edge Gallery models are LiteRT .task/.litertlm — a different
- * runtime than llama.rn (GGUF). Those are handled by the separate MediaPipe
+ * NOTE: Google AI Edge Gallery models are LiteRT `.litertlm` — a different
+ * runtime than llama.rn (GGUF). Those are handled by the separate LiteRT-LM
  * engine, not this importer.
  */
 export async function importModelFromDevice(): Promise<DownloadedModel | null> {
@@ -167,7 +168,7 @@ export async function importModelFromDevice(): Promise<DownloadedModel | null> {
   if (!asset) return null;
   if (!isGguf(asset.name)) {
     throw new Error(
-      `"${asset.name}" is not a .gguf model. Edge Gallery .task/.litertlm files use the MediaPipe engine instead.`
+      `"${asset.name}" is not a .gguf model. Edge Gallery .litertlm files use the LiteRT-LM engine instead.`
     );
   }
   await ensureDir();

@@ -6,7 +6,7 @@ This document outlines the future development plans and strategic direction for 
 
 Omnecor aims to be the definitive local-first AI workstation, empowering users with unparalleled control over their data, AI models, and creative workflows. We envision a future where complex multi-modal projects are seamlessly orchestrated, and human-machine collaboration reaches new heights.
 
-The core platform feature set is fully code-complete, packaged, and verified. Pre-built binaries are available for Windows (native installer), Linux (AppImage/deb/Flatpak), and the Android companion app thin-client APK.
+The core platform feature set is fully code-complete, packaged, and verified. Pre-built binaries are available for Windows (native installer), Linux (AppImage/deb/Flatpak), and the Omnecor HQ Android companion app (React Native / Expo).
 
 ## Future Milestones
 

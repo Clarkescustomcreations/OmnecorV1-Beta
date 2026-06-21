@@ -14,7 +14,7 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
   - `cloudProcedure` — Protected + blocked when user is in sovereign execution mode (air-gapped deployments).
   - `adminProcedure` — Requires `admin` or `owner` role.
   - `ownerProcedure` — Requires `owner` role only.
-- **Legacy Phase 2 Routers**: Two routers (`agentRouter`, `aiProviderRouter`) live in `server/phase2/routers/` for historical reasons but are unified into the main tRPC context.
+- **Formerly Phase 2 Routers**: Three routers (`agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter`) were relocated from `server/phase2/routers/` into `server/routers/`. They share the unified tRPC context; the services they call still live in `server/phase2/services/`.
 
 ---
 
@@ -27,12 +27,12 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 | jobs | jobRouter.ts | Background job orchestration (list, status, cancel) | 6+ | public/protected |
 | knowledgeBase | knowledgeBase.ts | VectorDB search, document ingestion, memory | 6+ | public/protected |
 | ai | aiRouter.ts | Chat completion, session persistence, provider health | 7+ | public/protected |
-| aiProvider | phase2/routers/aiProviderRouter.ts | Multi-provider inference routing (Ollama, OpenAI, etc.) | 3+ | public |
+| aiProvider | aiProviderRouter.ts | Multi-provider inference routing (Ollama, OpenAI, etc.) | 3+ | public |
 | voice | voiceRouter.ts | Whisper transcription, TTS synthesis, RVC conversion | 6+ | public/cloudProcedure |
 | podcast | podcastRouter.ts | Multi-speaker podcast generation | 2+ | protected |
 | training | trainingRouter.ts | LoRA fine-tuning job control, dataset validation | 3+ | public/protected |
 | project | projectRouter.ts | File watching, neural node trees, loop detection | 7+ | public/protected |
-| agent | phase2/routers/agentRouter.ts | CrewAI, LiteAgent, n8n orchestration | 3+ | public/protected |
+| agent | agentRouter.ts | CrewAI, LiteAgent, n8n orchestration | 3+ | public/protected |
 | ommesh | ommesh.router.ts | OMMESH LAN discovery, mesh routing, cert rotation | 4+ | public |
 | fal | falRouter.ts | Fal.ai image gen (Flux), video cloning (MiniMax) | 4+ | public/cloudProcedure |
 | comfy | comfyRouter.ts | ComfyUI workflow queueing, queue status | 2+ | public |
@@ -46,7 +46,7 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 | audit | auditRouter.ts | Append-only event log retrieval + retention window control (admin-only) | 5 | admin |
 | valet | valetRouter.ts | Intelligent multi-API routing, GPU detection, training setup | 4+ | protected |
 | ollama | ollamaRouter.ts | Ollama model lifecycle (list, info, pull, delete) | 5+ | protected/admin |
-| modelMarketplace | phase2/routers/modelMarketplaceRouter.ts | Model search across Ollama + HuggingFace (search, featured) | 2 | protected |
+| modelMarketplace | modelMarketplaceRouter.ts | Model search across Ollama + HuggingFace (search, featured) | 2 | protected |
 | modelManagement | modelManagementRouter.ts | Model registry CRUD, versioning, lifecycle | 5+ | protected |
 | mcp | mcpRouter.ts | Model Context Protocol client (connect, disconnect, list) | 4+ | protected |
 | pipeline | pipelineRouter.ts | GodMode pipeline framework (CRUD, phase approval) | 5+ | protected |
@@ -376,25 +376,27 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 
 ---
 
-## Legacy Routers (server/phase2/routers/)
+## Formerly Phase 2 Routers (now in server/routers/)
 
-### Agent Router (Phase 2)
+These three were relocated from `server/phase2/routers/` into `server/routers/`; the services they call still live in `server/phase2/services/`.
+
+### Agent Router
 - **Namespace**: `agent`
-- **File**: `server/phase2/routers/agentRouter.ts`
+- **File**: `server/routers/agentRouter.ts`
 - **Description**: Agent orchestration for CrewAI, LiteAgent, and n8n workflows. Unified into main tRPC context.
 - **Key Procedures**: `runCrew`, `runLiteAgent`, `runN8nWorkflow`
 - **Procedure Types**: `publicProcedure`, `protectedProcedure`
 
-### AI Provider Router (Phase 2)
+### AI Provider Router
 - **Namespace**: `aiProvider`
-- **File**: `server/phase2/routers/aiProviderRouter.ts`
+- **File**: `server/routers/aiProviderRouter.ts`
 - **Description**: Multi-provider inference routing across Ollama, OpenAI, Anthropic, Gemini, Grok, HuggingFace, Forge, and llama.cpp. Unified into main tRPC context.
 - **Key Procedures**: `getProviders`, `discoverOllamaModels`, `chatStream`
 - **Procedure Types**: `publicProcedure`
 
-### Model Marketplace Router (Phase 2)
+### Model Marketplace Router
 - **Namespace**: `modelMarketplace`
-- **File**: `server/phase2/routers/modelMarketplaceRouter.ts`
+- **File**: `server/routers/modelMarketplaceRouter.ts`
 - **Description**: Curated model library with automated sync across Ollama and HuggingFace repositories.
 - **Key Procedures**: `search`, `featured`
 - **Procedure Types**: `protectedProcedure`

@@ -25,8 +25,16 @@ Client Request → tRPC Router → sovereignCheck() → FORBIDDEN (if sovereign)
 ```
 
 **Auto-enforced when:**
-- `ZERO_LOGIN_MODE=true` is set in `.env`
+- `ZERO_LOGIN_MODE=true` is set in `.env` **and** `ZERO_LOGIN_EXECUTION_MODE` is unset or `sovereign` (the default). The local-admin session then runs Sovereign.
 - The user manually selects Sovereign Mode via the header badge or Settings
+
+> **Zero-login is not unconditionally sovereign.** The execution mode of the
+> zero-login local-admin session is controlled by `ZERO_LOGIN_EXECUTION_MODE`,
+> which **defaults to `sovereign`** so an air-gapped install cannot silently leak
+> to cloud. Set `ZERO_LOGIN_EXECUTION_MODE=scrapper` (or `big_spender`) to let the
+> local-admin session make cloud calls for testing — cloud is then allowed and
+> spend-tracked, and the in-app banner reflects this. See
+> [docs/development/LOCAL_TESTING.md](../development/LOCAL_TESTING.md).
 
 **Features available in Sovereign Mode:**
 - All local Ollama and Llama.cpp inference
@@ -41,7 +49,8 @@ Client Request → tRPC Router → sovereignCheck() → FORBIDDEN (if sovereign)
 - OpenAI, Anthropic, Gemini, Fal.ai inference
 - Lithic virtual card issuance
 - ElevenLabs TTS
-- Any `cloudProcedure`-tagged tRPC endpoint
+- Any `cloudProcedure`-tagged tRPC endpoint (cloud **AI** calls — always blocked)
+- Non-AI external services (`externalServiceProcedure`: GitHub/Notion/Drive sync) — blocked too, **unless** an admin enables **Settings → Security → "In Sovereign mode, block AI providers only"** (`sovereignBlockAiOnly`, default off). With that toggle on, only cloud AI calls are blocked while research integrations, email, and web search keep working air-gapped from cloud AI. The toggle is **admin-only** — it persists via the `system.setSovereignBlockAiOnly` admin procedure and cannot be set through the public settings endpoint.
 
 ---
 

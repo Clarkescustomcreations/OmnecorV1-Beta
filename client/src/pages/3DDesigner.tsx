@@ -26,6 +26,7 @@ export function Designer3D() {
   const [initialCode, setInitialCode] = useState("");
   const [splitView, setSplitView] = useState(false);
   const [showManufacturing, setShowManufacturing] = useState(false);
+  const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
   const { windowMode, setWindowMode, windowPosition, windowSize } = useDesignerStore();
 
   const [location, setLocation] = useLocation();
@@ -553,7 +554,7 @@ export function Designer3D() {
           onObjectSelect={(name) => setThreeDSelectionName(name || null)}
         />
       )}
-      {mode === "pcb" && <EnhancedPCBEditor />}
+      {mode === "pcb" && <EnhancedPCBEditor onAIToggle={setIsAIPanelOpen} />}
       {mode === "web" && (
         <WebPreview
           code={activeFileCode}
@@ -850,7 +851,7 @@ export function Designer3D() {
       )}
 
       {/* Floating "Ask AI" button for 3D and PCB modes (no text selection in those views) */}
-      {(mode === "3d" || mode === "pcb") && selectedText.trim().length === 0 && !threeDSelectionName && (
+      {(mode === "3d" || mode === "pcb") && !isAIPanelOpen && selectedText.trim().length === 0 && !threeDSelectionName && (
         <button
           className="absolute bottom-5 right-5 flex items-center gap-2 bg-slate-900 border border-accent/40 hover:border-accent text-accent text-[11px] font-semibold px-3 py-2 rounded-xl shadow-xl z-30 transition-all hover:bg-slate-800 font-sans"
           onClick={() => {

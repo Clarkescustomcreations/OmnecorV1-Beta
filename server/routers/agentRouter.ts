@@ -1,13 +1,13 @@
 /**
- * @file server/phase2/routers/agentRouter.ts
+ * @file server/routers/agentRouter.ts
  * @description Omnecor — Agent Orchestration Router
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../../_core/trpc.js";
+import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { AuditLogService } from "../services/AuditLogService.js";
-import { createLogger } from "../../_core/logger.js";
+import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { createLogger } from "../_core/logger.js";
 const log = createLogger("agentRouter");
 
 const agentTaskSchema = z.object({

@@ -41,7 +41,7 @@ graph TD
 
 ### 2.1. Routers
 
-Each router (`server/routers/*.ts` and `server/phase2/routers/*.ts`) defines a set of procedures (queries, mutations, and subscriptions) related to its domain.
+Each router (`server/routers/*.ts`) defines a set of procedures (queries, mutations, and subscriptions) related to its domain.
 
 **Examples**:
 -   `aiRouter.ts`: Procedures for interacting with AI models, managing providers, and inference.

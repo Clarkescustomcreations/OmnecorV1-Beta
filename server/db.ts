@@ -71,9 +71,11 @@ async function init(): Promise<Db> {
     }
   }
 
-  // Apply generated migrations so the schema exists out-of-the-box.
-  // Non-fatal: a migration failure logs a warning but does not abort boot.
-  // For production deployments run `pnpm db:migrate` before `pnpm start`.
+  // Runtime fallback: apply generated migrations on first connect so the schema
+  // exists out-of-the-box. Non-fatal — a failure logs a warning but does not abort
+  // boot. This is one of three paths onto the same `drizzle/migrations/`: `pnpm
+  // build:push` (dev: regenerate from schema + apply) and `pnpm db:migrate` (prod/CI:
+  // apply explicitly before `pnpm start`, the fail-loud alternative to this fallback).
   try {
     if (fs.existsSync(MIGRATIONS_DIR)) {
       await migrate(db, { migrationsFolder: MIGRATIONS_DIR });
@@ -114,6 +116,7 @@ export async function upsertUser(user: InsertUser): Promise<void> {
     if (user.loginMethod !== undefined) update.loginMethod = user.loginMethod;
     if (user.passwordHash !== undefined) update.passwordHash = user.passwordHash;
     if (user.role !== undefined) update.role = user.role;
+    if (user.executionMode !== undefined) update.executionMode = user.executionMode;
     if (user.lastSignedIn !== undefined) update.lastSignedIn = user.lastSignedIn;
     await db.update(users).set(update).where(eq(users.openId, user.openId));
   } else {

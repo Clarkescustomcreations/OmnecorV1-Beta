@@ -548,7 +548,12 @@ async function startServer() {
     }
 
     if (ENV.zeroLoginMode) {
-      log.warn("ZERO_LOGIN_MODE enabled — OAuth disabled, all requests authenticated as local admin");
+      const mode = ENV.zeroLoginExecutionMode;
+      const cloudNote =
+        mode === "sovereign"
+          ? "execution mode is SOVEREIGN — cloud inference blocked (air-gapped)"
+          : `execution mode is ${mode.toUpperCase()} — cloud inference ALLOWED (spend-tracked). Set ZERO_LOGIN_EXECUTION_MODE=sovereign for a true air-gap.`;
+      log.warn(`ZERO_LOGIN_MODE enabled — OAuth disabled, all requests authenticated as local admin; ${cloudNote}`);
     }
   }
   logStartupChecklist();

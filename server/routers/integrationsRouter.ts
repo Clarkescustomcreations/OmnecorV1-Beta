@@ -15,7 +15,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure, externalServiceProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from "fs";
 import { join } from "path";
@@ -363,7 +363,7 @@ export const integrationsRouter = router({
 
   /** Return all configured integration statuses (no raw tokens ever leave the server). */
   // Pure local read — must stay protectedProcedure so sovereign-mode users can still
-  // view connection status (cloudProcedure would throw FORBIDDEN here).
+  // view connection status (a cloud/externalService procedure would throw FORBIDDEN here).
   getIntegrations: protectedProcedure.query(({ ctx }) => {
     if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
     const store = readStore();
@@ -380,7 +380,7 @@ export const integrationsRouter = router({
   }),
 
   /** Validate a token against the live service then store it encrypted. */
-  connect: cloudProcedure
+  connect: externalServiceProcedure
     .input(z.object({
       type: z.enum(INTEGRATION_TYPES),
       token: z.string().min(1).max(512),
@@ -469,7 +469,7 @@ export const integrationsRouter = router({
     ),
 
   /** Re-fetch live data from the connected service. */
-  sync: cloudProcedure
+  sync: externalServiceProcedure
     .input(z.object({ type: z.enum(INTEGRATION_TYPES) }))
     .mutation(({ input, ctx }) =>
       withLock(async () => {
@@ -620,9 +620,10 @@ export const integrationsRouter = router({
    *   integration://<type>     → the connected service's content listing
    * Returns FileTreeNode[] (same shape as project.getFileTree) so the client can
    * render remote sources as real expandable trees via fileTreeToNetwork.
-   * cloudProcedure: hits external APIs → blocked in Sovereign (air-gapped) mode.
+   * externalServiceProcedure: hits external (non-AI) APIs → blocked in Sovereign
+   * mode unless the operator enables "block AI providers only".
    */
-  fetchSourceTree: cloudProcedure
+  fetchSourceTree: externalServiceProcedure
     .input(z.object({ uri: z.string().min(1).max(512) }))
     .query(async ({ input, ctx }): Promise<FileTreeNode[]> => {
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
@@ -644,7 +645,7 @@ export const integrationsRouter = router({
     }),
 
   /** Persist per-integration settings (non-sensitive config). */
-  updateSettings: cloudProcedure
+  updateSettings: externalServiceProcedure
     .input(z.object({
       type: z.enum(INTEGRATION_TYPES),
       settings: z.record(z.string(), z.unknown()),

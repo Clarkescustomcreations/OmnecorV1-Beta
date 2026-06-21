@@ -10,6 +10,7 @@ import { getServerBaseUrl, isServerConfigured } from "@/lib/_core/server-config"
 import * as Auth from "@/lib/_core/auth";
 import { isModelLoaded, runInference } from "@/lib/_core/local-inference";
 import { trpcQuery, trpcMutate } from "@/lib/_core/trpc-fetch";
+import { listModelsForProvider, resolveDefaultModel, type ChatModel } from "@/lib/_core/ai-models";
 import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
@@ -57,9 +58,12 @@ export default function ChatScreen() {
   const [selectedPersonaId, setSelectedPersonaId]     = useState<string | null>(null);
   const [providers, setProviders] = useState<{ id: string; name: string }[]>([]);
 
-  // Hardcoded fallback arrays (used when server is offline or lists are empty)
-  const neuralMaps    = ["Default", "Project A", "Project B"];
-  const agents        = ["Default Agent", "Creative", "Technical", "Analyst"];
+  // ── Model selection (real: PC-installed Ollama models / cloud catalog) ──
+  const [selectedProviderId, setSelectedProviderId] = useState<string | null>(null);
+  const [models, setModels]                         = useState<ChatModel[]>([]);
+  const [selectedModelId, setSelectedModelId]       = useState<string | null>(null);
+  const [showModelSelector, setShowModelSelector]   = useState(false);
+
   const activeSession = sessions.find((s) => s.id === activeSessionId);
 
   // ── Load persisted chats on mount ──
@@ -114,12 +118,31 @@ export default function ChatScreen() {
         ]);
         if (maps?.length)        setNeuralMapList(maps);
         if (personas?.length)    setPersonaList(personas);
-        if (providerList?.length) setProviders(providerList);
+        if (providerList?.length) {
+          setProviders(providerList);
+          // Default to a real provider (prefer a non-mesh one for direct chat).
+          const pick = providerList.find((p) => p.id !== "ommesh") ?? providerList[0];
+          if (pick) setSelectedProviderId((cur) => cur ?? pick.id);
+        }
       } catch {
-        // Server offline — silently fail; hardcoded fallbacks remain active
+        // Server offline — leave lists empty; the UI shows truthful empty states.
       }
     })();
   }, []);
+
+  // Load the selected provider's real models (PC-installed Ollama models or the
+  // cloud catalog) and default the model to the first available one.
+  useEffect(() => {
+    if (!selectedProviderId || !isServerConfigured()) return;
+    let cancelled = false;
+    (async () => {
+      const list = await listModelsForProvider(selectedProviderId);
+      if (cancelled) return;
+      setModels(list);
+      setSelectedModelId((cur) => (cur && list.some((m) => m.id === cur) ? cur : list[0]?.id ?? null));
+    })();
+    return () => { cancelled = true; };
+  }, [selectedProviderId]);
 
   const appendMessage = useCallback((sessionId: string, msg: ChatMessage) => {
     setSessions((prev) =>
@@ -141,34 +164,41 @@ export default function ChatScreen() {
 
     try {
       let reply = "";
+      let noModel = false;
 
       if (isServerConfigured()) {
-        // Try PC server (ai.chat tRPC mutation)
-        const base     = getServerBaseUrl();
-        const token    = await Auth.getSessionToken();
-        const provider = providers[0] ?? { id: "ollama", name: "Ollama" };
+        // Try PC server (ai.chat tRPC mutation) with the real selected model.
+        const base       = getServerBaseUrl();
+        const token      = await Auth.getSessionToken();
+        const providerId = selectedProviderId ?? providers[0]?.id ?? "ollama";
+        const modelId    = selectedModelId ?? (await resolveDefaultModel(providerId));
 
-        const systemParts: string[] = [];
-        if (selectedNeuralMap !== "Default") systemParts.push(`Neural Map context: ${selectedNeuralMap}`);
-        if (selectedAgent !== "Default Agent") systemParts.push(`Assistant persona: ${selectedAgent}`);
-        const systemPrompt = systemParts.length ? systemParts.join(". ") : undefined;
+        if (!modelId) {
+          // No installed/cataloged model — don't guess a tag the PC may not have.
+          noModel = true;
+        } else {
+          const systemParts: string[] = [];
+          if (selectedNeuralMap !== "Default") systemParts.push(`Neural Map context: ${selectedNeuralMap}`);
+          if (selectedAgent !== "Default Agent") systemParts.push(`Assistant persona: ${selectedAgent}`);
+          const systemPrompt = systemParts.length ? systemParts.join(". ") : undefined;
 
-        const resp = await fetch(`${base}/api/trpc/ai.chat`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
-          },
-          body: JSON.stringify({ json: {
-            providerId: provider.id,
-            modelId: "llama3.2:latest",
-            messages: [{ role: "user", content: text }],
-            ...(systemPrompt ? { systemPrompt } : {}),
-          }}),
-        });
-        if (resp.ok) {
-          const data = await resp.json();
-          reply = data?.result?.data?.json?.content ?? data?.result?.data?.content ?? "";
+          const resp = await fetch(`${base}/api/trpc/ai.chat`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify({ json: {
+              providerId,
+              modelId,
+              messages: [{ role: "user", content: text }],
+              ...(systemPrompt ? { systemPrompt } : {}),
+            }}),
+          });
+          if (resp.ok) {
+            const data = await resp.json();
+            reply = data?.result?.data?.json?.content ?? data?.result?.data?.content ?? "";
+          }
         }
       }
 
@@ -178,9 +208,11 @@ export default function ChatScreen() {
       }
 
       if (!reply) {
-        reply = isServerConfigured()
-          ? "Could not reach the Omnecor server. Check Settings → Connection."
-          : "No server configured. Go to Settings to enter your PC's Tailscale or LAN IP.";
+        reply = !isServerConfigured()
+          ? "No server configured. Go to Settings to enter your PC's Tailscale or LAN IP."
+          : noModel
+            ? "Connected, but no model is available. Install an Ollama model on the PC, or pick a provider/model above."
+            : "Could not reach the Omnecor server. Check Settings → Connection.";
       }
 
       const assistantMsg: ChatMessage = {
@@ -196,7 +228,7 @@ export default function ChatScreen() {
     } finally {
       setIsSending(false);
     }
-  }, [messageInput, isSending, activeSessionId, appendMessage, autoRead, voice, providers, selectedNeuralMap, selectedAgent]);
+  }, [messageInput, isSending, activeSessionId, appendMessage, autoRead, voice, providers, selectedProviderId, selectedModelId, selectedNeuralMap, selectedAgent]);
 
   const handleMicPress = useCallback(async () => {
     if (voice.isRecording) {
@@ -324,6 +356,48 @@ export default function ChatScreen() {
           </View>
         )}
 
+        {/* Model — real PC-installed Ollama models / cloud catalog */}
+        <Pressable onPress={() => setShowModelSelector(!showModelSelector)}
+          className="bg-background border border-border rounded-lg p-3">
+          <Text className="text-sm text-muted">Model</Text>
+          <Text className="text-base font-semibold text-foreground" numberOfLines={1}>
+            {selectedModelId
+              ? `${models.find((m) => m.id === selectedModelId)?.name ?? selectedModelId}`
+                + `${selectedProviderId ? `  ·  ${providers.find((p) => p.id === selectedProviderId)?.name ?? selectedProviderId}` : ""}`
+              : isServerConfigured() ? "No models found — install one on the PC" : "Connect to your PC first"}
+          </Text>
+        </Pressable>
+        {showModelSelector && (
+          <View className="bg-background border border-border rounded-lg overflow-hidden">
+            {providers.length > 1 && (
+              <View className="flex-row flex-wrap gap-2 p-2 border-b border-border">
+                {providers.map((p) => (
+                  <Pressable key={p.id} onPress={() => setSelectedProviderId(p.id)}
+                    className={`rounded-lg px-3 py-1 ${selectedProviderId === p.id ? "bg-primary" : "bg-surface border border-border"}`}>
+                    <Text className={`text-xs font-semibold ${selectedProviderId === p.id ? "text-background" : "text-foreground"}`}>{p.name}</Text>
+                  </Pressable>
+                ))}
+              </View>
+            )}
+            {models.length > 0 ? (
+              models.map((m) => (
+                <Pressable key={m.id} onPress={() => { setSelectedModelId(m.id); setShowModelSelector(false); }}
+                  className={`p-3 border-b border-border ${selectedModelId === m.id ? "bg-primary/10" : ""}`}>
+                  <Text className={`text-sm ${selectedModelId === m.id ? "text-primary font-semibold" : "text-foreground"}`}>{m.name}</Text>
+                </Pressable>
+              ))
+            ) : (
+              <View className="p-3">
+                <Text className="text-sm text-muted">
+                  {isServerConfigured()
+                    ? "No models available for this provider. Install an Ollama model on the PC, or add an API key for the provider in Settings."
+                    : "Connect to your PC in Settings to load available models."}
+                </Text>
+              </View>
+            )}
+          </View>
+        )}
+
         <View className="flex-row gap-2">
           <Pressable onPress={() => setShowNeuralMapSelector(!showNeuralMapSelector)}
             className="flex-1 bg-background border border-border rounded-lg p-2">
@@ -344,48 +418,48 @@ export default function ChatScreen() {
 
         {showNeuralMapSelector && (
           <View className="bg-background border border-border rounded-lg overflow-hidden">
-            {(neuralMapList.length > 0
-              ? neuralMapList.map((m) => ({
-                  key: m.id,
-                  label: m.name,
-                  onPress: () => { setSelectedNeuralMapId(m.id); setSelectedNeuralMap(m.name); setShowNeuralMapSelector(false); },
-                  active: selectedNeuralMap === m.name,
-                }))
-              : neuralMaps.map((m) => ({
-                  key: m,
-                  label: m,
-                  onPress: () => { setSelectedNeuralMap(m); setShowNeuralMapSelector(false); },
-                  active: selectedNeuralMap === m,
-                }))
-            ).map((item) => (
+            {[
+              { key: "__default", label: "Default", onPress: () => { setSelectedNeuralMapId(null); setSelectedNeuralMap("Default"); setShowNeuralMapSelector(false); }, active: selectedNeuralMap === "Default" },
+              ...neuralMapList.map((m) => ({
+                key: m.id,
+                label: m.name,
+                onPress: () => { setSelectedNeuralMapId(m.id); setSelectedNeuralMap(m.name); setShowNeuralMapSelector(false); },
+                active: selectedNeuralMap === m.name,
+              })),
+            ].map((item) => (
               <Pressable key={item.key} onPress={item.onPress}
                 className={`p-3 border-b border-border ${item.active ? "bg-primary/10" : ""}`}>
                 <Text className={`text-sm ${item.active ? "text-primary font-semibold" : "text-foreground"}`}>{item.label}</Text>
               </Pressable>
             ))}
+            {neuralMapList.length === 0 && isServerConfigured() && (
+              <View className="p-3 border-t border-border">
+                <Text className="text-xs text-muted">No neural maps on the PC yet — create one in the desktop app.</Text>
+              </View>
+            )}
           </View>
         )}
         {showAgentSelector && (
           <View className="bg-background border border-border rounded-lg overflow-hidden">
-            {(personaList.length > 0
-              ? personaList.map((a) => ({
-                  key: a.id,
-                  label: a.name,
-                  onPress: () => { setSelectedPersonaId(a.id); setSelectedAgent(a.name); setShowAgentSelector(false); },
-                  active: selectedAgent === a.name,
-                }))
-              : agents.map((a) => ({
-                  key: a,
-                  label: a,
-                  onPress: () => { setSelectedAgent(a); setShowAgentSelector(false); },
-                  active: selectedAgent === a,
-                }))
-            ).map((item) => (
+            {[
+              { key: "__default", label: "Default Agent", onPress: () => { setSelectedPersonaId(null); setSelectedAgent("Default Agent"); setShowAgentSelector(false); }, active: selectedAgent === "Default Agent" },
+              ...personaList.map((a) => ({
+                key: a.id,
+                label: a.name,
+                onPress: () => { setSelectedPersonaId(a.id); setSelectedAgent(a.name); setShowAgentSelector(false); },
+                active: selectedAgent === a.name,
+              })),
+            ].map((item) => (
               <Pressable key={item.key} onPress={item.onPress}
                 className={`p-3 border-b border-border ${item.active ? "bg-primary/10" : ""}`}>
                 <Text className={`text-sm ${item.active ? "text-primary font-semibold" : "text-foreground"}`}>{item.label}</Text>
               </Pressable>
             ))}
+            {personaList.length === 0 && isServerConfigured() && (
+              <View className="p-3 border-t border-border">
+                <Text className="text-xs text-muted">No personas on the PC yet — create one in the desktop app.</Text>
+              </View>
+            )}
           </View>
         )}
       </View>

@@ -9,6 +9,12 @@ interface DesignerState {
   setWindowMode: (mode: 'embedded' | 'floating' | 'external') => void;
   setWindowPosition: (pos: { x: number; y: number }) => void;
   setWindowSize: (size: { width: number; height: number }) => void;
+
+  // Cross-system AI Context
+  active3DContext: string | null;
+  activePCBContext: string | null;
+  setActive3DContext: (context: string | null) => void;
+  setActivePCBContext: (context: string | null) => void;
 }
 
 const syncChannel = new BroadcastChannel('omnecor_designer_store');
@@ -25,6 +31,17 @@ export const useDesignerStore = create<DesignerState>((set) => ({
   
   setWindowPosition: (pos) => set({ windowPosition: pos }),
   setWindowSize: (size) => set({ windowSize: size }),
+
+  active3DContext: null,
+  activePCBContext: null,
+  setActive3DContext: (context) => {
+    set({ active3DContext: context });
+    syncChannel.postMessage({ type: 'setActive3DContext', payload: context });
+  },
+  setActivePCBContext: (context) => {
+    set({ activePCBContext: context });
+    syncChannel.postMessage({ type: 'setActivePCBContext', payload: context });
+  },
 }));
 
 // Listen for sync messages
@@ -35,6 +52,12 @@ syncChannel.onmessage = (event) => {
   switch (type) {
     case 'setWindowMode':
       if (store.windowMode !== payload) useDesignerStore.setState({ windowMode: payload });
+      break;
+    case 'setActive3DContext':
+      if (store.active3DContext !== payload) useDesignerStore.setState({ active3DContext: payload });
+      break;
+    case 'setActivePCBContext':
+      if (store.activePCBContext !== payload) useDesignerStore.setState({ activePCBContext: payload });
       break;
   }
 };

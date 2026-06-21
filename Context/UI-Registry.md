@@ -2803,3 +2803,37 @@ Last updated: 2026-06-18
 - `warmupTicks={50}` + `cooldownTime={3000}` — runs 50 d3 simulation ticks before first paint, then allows the layout to settle for 3 s. Prevents nodes from spawning on top of each other on small meshes.
 - Node identity (`id`) uses `peer.name || peer.id || peer.address` priority order — `name` is the Bonjour service name (= nodeId) and is the most stable identifier; `id` and `address` are fallbacks.
 - Legend dots in the parent panel (`AgentNetworking.tsx`) use inline `style={{ background: "#..." }}` rather than Tailwind color utility classes, matching the same hex values above. This avoids the raw-color-class violation while keeping the legend in sync with the graph.
+
+### ComponentLibraryPanel
+
+File: client/src/components/pcb/ComponentLibraryPanel.tsx
+Last updated: 2026-06-21
+
+| Property         | Class           |
+| ---------------- | --------------- |
+| Background       | `bg-card` |
+| Border           | `border-border` |
+| Text — primary   | `text-foreground` |
+| Text — secondary | `text-muted-foreground` |
+| Interactive state| `hover:text-foreground` |
+
+**Pattern notes:**
+- The panel header has a `ghost` button for collapsing it `onClick={onClose}`. The icon used is `ChevronLeft` to match the left sidebar collapse standard.
+
+### AIAssistantPanel
+
+File: client/src/components/pcb/AIAssistantPanel.tsx
+Last updated: 2026-06-21
+
+| Property         | Class           |
+| ---------------- | --------------- |
+| Background       | `bg-card` / `bg-background` |
+| Border           | `border-border` |
+| Text — primary   | `text-foreground` |
+| Text — secondary | `text-muted-foreground` |
+| Accent usage     | `bg-accent` / `text-accent-foreground` |
+| Hover state      | `hover:bg-accent/90` / `hover:text-foreground` |
+
+**Pattern notes:**
+- Converted from hardcoded white/blue/gray utility classes to semantic design system tokens to ensure proper dark mode support.
+- User message bubbles use `bg-accent text-accent-foreground` while system messages use `bg-muted text-foreground`.

@@ -44,7 +44,8 @@ const config: ExpoConfig = {
   icon: "./assets/images/icon.png",
   scheme: env.scheme,
   userInterfaceStyle: "automatic",
-  newArchEnabled: true,
+  // SDK 55 / RN 0.83: New Architecture is always on; the `newArchEnabled` flag
+  // was removed from ExpoConfig.
   ios: {
     supportsTablet: true,
     bundleIdentifier: env.iosBundleId,
@@ -59,7 +60,6 @@ const config: ExpoConfig = {
       backgroundImage: "./assets/images/android-icon-background.png",
       monochromeImage: "./assets/images/android-icon-monochrome.png",
     },
-    edgeToEdgeEnabled: true,
     predictiveBackGestureEnabled: false,
     package: env.androidPackage,
     permissions: [
@@ -122,11 +122,15 @@ const config: ExpoConfig = {
       "expo-build-properties",
       {
         android: {
-          buildArchs: ["armeabi-v7a", "arm64-v8a"],
-          minSdkVersion: 24,
+          // LiteRT-LM (react-native-litert-lm) is ARM64-only and requires API 26+.
+          // 32-bit (armeabi-v7a) is dropped — on-device LLM needs 64-bit anyway.
+          buildArchs: ["arm64-v8a"],
+          minSdkVersion: 26,
         },
       },
     ],
+    // Nitro-based on-device LiteRT-LM engine (replaces react-native-llm-mediapipe).
+    "react-native-litert-lm",
     [
       // Lets users "Share → Omnecor HQ" a model file (e.g. a .task from Google
       // AI Edge Gallery) straight into the app — handled in app/_layout.tsx.

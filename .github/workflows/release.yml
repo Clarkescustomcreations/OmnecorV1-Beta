@@ -116,7 +116,7 @@ jobs:
             packaging/electron-app/dist/*.exe
 
   package-android:
-    name: Package Android (APK)
+    name: Package Android (Omnecor HQ APK)
     needs: build-shared
     runs-on: ubuntu-latest
     steps:
@@ -133,31 +133,26 @@ jobs:
           java-version: '17'
           distribution: 'temurin'
 
-      - name: Download dist
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-          path: dist/
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Install NDK + CMake (required for the llama.rn native build)
+        run: sdkmanager "ndk;26.1.10909125" "cmake;3.22.1"
 
       - name: Install dependencies
-        run: |
-          pnpm install --frozen-lockfile
-          cd packaging/electron-app
-          pnpm install --frozen-lockfile
+        run: pnpm install --frozen-lockfile
+        working-directory: packaging/android/omnecor-hq
 
-      - name: Sync Android
-        run: |
-          cd packaging/electron-app
-          npx cap sync android
+      - name: Prebuild (generate the android/ Gradle project)
+        run: pnpm prebuild:android
+        working-directory: packaging/android/omnecor-hq
 
-      - name: Build APK
-        run: |
-          cd packaging/electron-app/android
-          chmod +x gradlew
-          ./gradlew assembleDebug
+      - name: Build debug APK
+        run: pnpm apk:debug
+        working-directory: packaging/android/omnecor-hq
 
       - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            packaging/electron-app/android/app/build/outputs/apk/debug/app-debug.apk
+            packaging/android/omnecor-hq/android/app/build/outputs/apk/debug/app-debug.apk

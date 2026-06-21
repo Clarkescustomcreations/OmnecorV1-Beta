@@ -15,7 +15,7 @@ This guide provides comprehensive instructions for installing and setting up Omn
    - 4.3 [Linux — Flatpak](#43-linux--flatpak)
    - 4.4 [Linux — systemd Service](#44-linux--systemd-service)
    - 4.5 [Windows — NSIS Installer / Portable EXE](#45-windows--nsis-installer--portable-exe)
-   - 4.6 [Android — Thin Client APK](#46-android--thin-client-apk)
+   - 4.6 [Android — Omnecor HQ Companion App](#46-android--omnecor-hq-companion-app)
 5. [Building All Packages](#5-building-all-packages)
 6. [Troubleshooting](#6-troubleshooting)
 
@@ -292,14 +292,15 @@ For the full Windows build reference, see [packaging/windows/BUILD-WINDOWS.md](p
 
 ---
 
-### 4.6 Android — Thin Client APK
+### 4.6 Android — Omnecor HQ Companion App
 
-The Omnecor Android app is a **thin client** that connects to a running Omnecor desktop instance over your local network (Wi-Fi / LAN). It provides the full workstation UI on a mobile screen.
+The Omnecor Android app is **Omnecor HQ** — a standalone React Native (Expo) companion app, **not** a wrapped web view. It connects to a running Omnecor desktop instance over LAN Wi-Fi or Tailscale, mirrors the workstation on a mobile screen, and can run on-device GGUF inference via `llama.rn`.
 
 **System requirements for building:**
 
 - JDK 17
 - Android SDK (Target SDK 34, Build Tools 34.0.0+) — install via Android Studio
+- Android NDK r26+ and CMake 3.22+ (required for the `llama.rn` native build)
 - Node.js & pnpm (see section 2)
 
 **Install a pre-built debug APK (sideload):**

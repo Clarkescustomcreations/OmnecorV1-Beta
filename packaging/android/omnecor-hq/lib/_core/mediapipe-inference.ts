@@ -1,23 +1,26 @@
 /**
- * On-device LiteRT / MediaPipe LLM inference for Google AI Edge Gallery models
- * (`.task` / `.bin`).
+ * On-device LLM inference via **LiteRT-LM** (`react-native-litert-lm`).
  *
- * This is a SECOND engine alongside llama.rn (`local-inference.ts`):
- *   - llama.rn  → GGUF models
- *   - MediaPipe → LiteRT `.task` models (what Edge Gallery downloads)
+ * LiteRT-LM is Google's maintained successor to the (now maintenance-only)
+ * MediaPipe LLM Inference API. This is a SECOND engine alongside llama.rn
+ * (`local-inference.ts`):
+ *   - llama.rn   → GGUF models
+ *   - LiteRT-LM  → `.litertlm` models (Gemma / Google AI Edge family)
  *
- * It wraps the native `LlmInferenceModule` (react-native-llm-mediapipe) directly
- * with an imperative API, mirroring the structure of `local-inference.ts`. The
- * native module is accessed lazily so the JS bundle still runs even if the
- * native library isn't present in a given build.
+ * The engine is a Nitro HybridObject created lazily, so the JS bundle still
+ * runs even when the native library isn't present in a given build (e.g. an
+ * older APK). The exported API is kept identical to the previous MediaPipe
+ * wrapper so callers (`settings.tsx`) need no structural change — only the
+ * underlying engine and the model format (`.task` → `.litertlm`) changed.
  *
- * Native API (see node_modules/react-native-llm-mediapipe/src/llmInference.ts):
- *   createModel(modelPath, maxTokens, topK, temperature, randomSeed) → handle
- *   generateResponse(handle, requestId, prompt) → string
- *   releaseModel(handle) → boolean
- *   events: onPartialResponse {handle,requestId,response}, onErrorResponse
+ * Installed API (react-native-litert-lm@0.4.x):
+ *   createLLM() → instance
+ *   instance.loadModel(pathOrUrl, config) → Promise<void>
+ *   instance.sendMessage(prompt) → Promise<string>            (blocking)
+ *   instance.sendMessageAsync(prompt, (token, done) => void)  (streaming)
+ *   instance.close()
  */
-import { NativeModules, NativeEventEmitter } from "react-native";
+import { createLLM, type LiteRTLMInstance, type LLMConfig } from "react-native-litert-lm";
 
 export type MpStatus = "idle" | "loading" | "ready" | "running" | "error";
 
@@ -27,105 +30,106 @@ function setStatus(s: MpStatus) { _status = s; _listeners.forEach((fn) => fn(s))
 export function subscribeMpStatus(fn: (s: MpStatus) => void) { _listeners.add(fn); return () => _listeners.delete(fn); }
 export function getMpStatus(): MpStatus { return _status; }
 
-let _handle: number | null = null;
+let _llm: LiteRTLMInstance | null = null;
+let _available: boolean | null = null;
 let _modelPath: string | null = null;
-let _emitter: NativeEventEmitter | null = null;
-let _requestId = 0;
+let _loaded = false;
 
-interface LlmNative {
-  createModel: (modelPath: string, maxTokens: number, topK: number, temperature: number, randomSeed: number) => Promise<number>;
-  releaseModel: (handle: number) => Promise<boolean>;
-  generateResponse: (handle: number, requestId: number, prompt: string) => Promise<string>;
-}
-
-/** Lazily resolve the native module; throws a clear error if not built in. */
-function getNative(): LlmNative {
-  const mod = (NativeModules as Record<string, unknown>).LlmInferenceModule as LlmNative | undefined;
-  if (!mod) {
-    throw new Error(
-      "MediaPipe engine not available in this build. Rebuild the APK with react-native-llm-mediapipe linked (expo prebuild + assembleDebug)."
-    );
+/**
+ * Lazily create the Nitro LiteRT-LM engine. Returns null (and caches that)
+ * when the native library isn't linked into the current build.
+ */
+function getEngine(): LiteRTLMInstance | null {
+  if (_llm) return _llm;
+  try {
+    _llm = createLLM();
+    _available = true;
+    return _llm;
+  } catch {
+    _available = false;
+    return null;
   }
-  if (!_emitter) _emitter = new NativeEventEmitter(NativeModules.LlmInferenceModule);
-  return mod;
 }
 
-/** True if the native MediaPipe module is present (engine usable). */
+/** True if the native LiteRT-LM engine is present (engine usable). */
 export function isMediapipeAvailable(): boolean {
-  return !!(NativeModules as Record<string, unknown>).LlmInferenceModule;
+  if (_available !== null) return _available;
+  return getEngine() !== null;
 }
 
-export function isTaskModelLoaded(): boolean { return _handle !== null; }
+export function isTaskModelLoaded(): boolean { return _loaded; }
 export function getLoadedTaskPath(): string | null { return _modelPath; }
 
 export interface MpLoadOptions {
   maxTokens?: number;
   topK?: number;
   temperature?: number;
+  /** Accepted for API compatibility; LiteRT-LM does not expose a seed. */
   randomSeed?: number;
 }
 
-/** Load a local `.task`/.bin model by absolute path. */
+/** Load a local `.litertlm` model by absolute path (a remote URL also works). */
 export async function loadTaskModel(modelPath: string, opts: MpLoadOptions = {}): Promise<void> {
+  const llm = getEngine();
+  if (!llm) {
+    throw new Error(
+      "LiteRT-LM engine not available in this build. Rebuild the APK with react-native-litert-lm linked (expo prebuild + assembleRelease)."
+    );
+  }
   setStatus("loading");
   try {
-    const native = getNative();
-    if (_handle !== null) {
-      try { await native.releaseModel(_handle); } catch { /* ignore */ }
-      _handle = null;
-    }
-    _handle = await native.createModel(
-      modelPath,
-      opts.maxTokens ?? 1024,
-      opts.topK ?? 40,
-      opts.temperature ?? 0.8,
-      opts.randomSeed ?? 0,
-    );
+    if (_loaded) { try { llm.close(); } catch { /* ignore */ } _loaded = false; }
+    const config: LLMConfig = {
+      backend: "cpu", // safe default — always available; GPU/NPU may fail per device/model
+      temperature: opts.temperature ?? 0.8,
+      topK: opts.topK ?? 40,
+      maxTokens: opts.maxTokens ?? 1024,
+    };
+    await llm.loadModel(modelPath, config);
     _modelPath = modelPath;
+    _loaded = true;
     setStatus("ready");
   } catch (err) {
-    _handle = null;
     _modelPath = null;
+    _loaded = false;
     setStatus("error");
     throw err;
   }
 }
 
 export async function releaseTaskModel(): Promise<void> {
-  if (_handle !== null) {
-    try { await getNative().releaseModel(_handle); } catch { /* ignore */ }
-    _handle = null;
-  }
+  if (_llm && _loaded) { try { _llm.close(); } catch { /* ignore */ } }
+  _loaded = false;
   _modelPath = null;
   setStatus("idle");
 }
 
-/** Generate a response from the loaded `.task` model. Streams via onToken. */
+/**
+ * Generate a response from the loaded model. When `onToken` is given, streams
+ * the cumulative text as tokens arrive (matching the previous engine's
+ * contract); otherwise runs a single blocking generation.
+ */
 export async function generateTask(
   prompt: string,
   onToken?: (partial: string) => void,
 ): Promise<string> {
-  if (_handle === null) throw new Error("No .task model loaded");
-  const native = getNative();
+  const llm = getEngine();
+  if (!llm || !_loaded) throw new Error("No LiteRT-LM model loaded");
   setStatus("running");
-  const requestId = _requestId++;
-  let partialSub: { remove: () => void } | null = null;
-  let errorSub: { remove: () => void } | null = null;
-  if (_emitter) {
-    partialSub = _emitter.addListener("onPartialResponse", (ev: { requestId: number; response: string }) => {
-      if (ev.requestId === requestId && onToken) onToken(ev.response);
-    });
-    errorSub = _emitter.addListener("onErrorResponse", () => { /* surfaced via reject below */ });
-  }
   try {
-    const text = await native.generateResponse(_handle, requestId, prompt);
+    let full = "";
+    if (onToken) {
+      await llm.sendMessageAsync(prompt, (token: string, _done: boolean) => {
+        full += token;
+        onToken(full);
+      });
+    } else {
+      full = await llm.sendMessage(prompt);
+    }
     setStatus("ready");
-    return text ?? "";
+    return full;
   } catch (err) {
     setStatus("ready");
     throw err;
-  } finally {
-    partialSub?.remove();
-    errorSub?.remove();
   }
 }

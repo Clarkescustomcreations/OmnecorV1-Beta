@@ -66,7 +66,7 @@ export default function SettingsScreen() {
   const [localGguf, setLocalGguf] = useState<{filename:string;path:string;sizeBytes:number}[]>([]);
   const [importing, setImporting] = useState(false);
 
-  // LiteRT / MediaPipe .task models
+  // LiteRT-LM (.litertlm) models
   const [localTask, setLocalTask] = useState<{filename:string;path:string;sizeBytes:number}[]>([]);
   const [importingTask, setImportingTask] = useState(false);
   const [loadedTaskPath, setLoadedTaskPath] = useState<string | null>(getLoadedTaskPath());
@@ -225,7 +225,7 @@ export default function SettingsScreen() {
     try {
       await loadTaskModel(path);
       setLoadedTaskPath(path);
-      Alert.alert("Loaded", "MediaPipe model ready");
+      Alert.alert("Loaded", "LiteRT-LM model ready");
     } catch (err) {
       Alert.alert("Load failed", String(err));
     }
@@ -532,18 +532,18 @@ export default function SettingsScreen() {
               </>
             )}
 
-            {/* ── LiteRT models (.task) — Edge Gallery ─────────────────── */}
+            {/* ── LiteRT-LM models (.litertlm) — Edge Gallery ──────────── */}
             <Text className="text-sm font-semibold text-foreground mt-2 mb-2">
-              LiteRT models (.task) — Edge Gallery
+              LiteRT-LM models (.litertlm) — Edge Gallery
             </Text>
             <Text className="text-xs text-muted mb-3">
-              Import a .task model exported or shared from Google AI Edge Gallery. Runs on the on-device MediaPipe engine.
+              Import a .litertlm model exported or shared from Google AI Edge Gallery. Runs on the on-device LiteRT-LM engine.
             </Text>
 
             {!isMediapipeAvailable() && (
               <View className="bg-surface border border-border rounded-lg p-3 mb-3">
                 <Text className="text-xs text-warning">
-                  MediaPipe engine not present in this build yet.
+                  LiteRT-LM engine not present in this build yet.
                 </Text>
               </View>
             )}
@@ -554,7 +554,7 @@ export default function SettingsScreen() {
               className="bg-surface border border-border rounded-lg p-3 items-center active:opacity-80 mb-3">
               {importingTask
                 ? <ActivityIndicator size="small" color={colors.primary} />
-                : <Text className="text-foreground font-semibold text-sm">📂 Import a .task model</Text>
+                : <Text className="text-foreground font-semibold text-sm">📂 Import a .litertlm model</Text>
               }
             </Pressable>
 

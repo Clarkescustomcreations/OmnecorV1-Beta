@@ -306,6 +306,47 @@ export function registerOAuthRoutes(app: Express) {
   });
 }
 
+// Resolve the Google OAuth endpoints. When GOOGLE_EMULATOR_URL is set (the
+// `google` skill's local emulator) the auth/token/userinfo endpoints point at
+// it; otherwise the real Google URLs are used. Emulator paths match the skill's
+// documented URL mapping (/o/oauth2/v2/auth, /oauth2/token, /oauth2/v2/userinfo).
+function googleEndpoints() {
+  const base = ENV.googleEmulatorUrl;
+  if (base) {
+    return {
+      auth: `${base}/o/oauth2/v2/auth`,
+      token: `${base}/oauth2/token`,
+      userinfo: `${base}/oauth2/v2/userinfo`,
+    };
+  }
+  return {
+    auth: "https://accounts.google.com/o/oauth2/v2/auth",
+    token: "https://oauth2.googleapis.com/token",
+    userinfo: "https://www.googleapis.com/oauth2/v3/userinfo",
+  };
+}
+
+// Resolve the Microsoft Entra ID endpoints. When MICROSOFT_EMULATOR_URL is set
+// (the `microsoft` skill's local emulator) the authorize/token/Graph-me
+// endpoints point at it; otherwise the real Microsoft URLs are used.
+function microsoftEndpoints() {
+  const base = ENV.microsoftEmulatorUrl;
+  if (base) {
+    return {
+      auth: `${base}/oauth2/v2.0/authorize`,
+      token: `${base}/oauth2/v2.0/token`,
+      me: `${base}/v1.0/me`,
+    };
+  }
+  return {
+    // Real Microsoft v2.0 endpoints: the path is /common/oauth2/v2.0/<verb>
+    // (NOT /common/v2.0/oauth2/<verb>, which 404s — the segments were swapped).
+    auth: "https://login.microsoftonline.com/common/oauth2/v2.0/authorize",
+    token: "https://login.microsoftonline.com/common/oauth2/v2.0/token",
+    me: "https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName",
+  };
+}
+
 export function registerGoogleOAuthRoutes(app: Express) {
   const pendingVerifiers = new Map<string, string>(); // state → code_verifier
 
@@ -325,7 +366,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
     res.cookie("google_oauth_state", state, { ...cookieOptions, maxAge: 10 * 60 * 1000, httpOnly: true });
 
     const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/google/callback`;
-    const url = new URL("https://accounts.google.com/o/oauth2/v2/auth");
+    const url = new URL(googleEndpoints().auth);
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
@@ -353,7 +394,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
 
     try {
       const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/google/callback`;
-      const tokenRes = await fetch("https://oauth2.googleapis.com/token", {
+      const tokenRes = await fetch(googleEndpoints().token, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -368,7 +409,7 @@ export function registerGoogleOAuthRoutes(app: Express) {
       const tokenData = await tokenRes.json() as { access_token?: string; id_token?: string };
       if (!tokenData.access_token) throw new Error("No access token from Google");
 
-      const userRes = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+      const userRes = await fetch(googleEndpoints().userinfo, {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
       const userInfo = await userRes.json() as { sub?: string; name?: string; email?: string };
@@ -418,7 +459,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
     res.cookie("ms_oauth_state", state, { ...cookieOptions, maxAge: 10 * 60 * 1000, httpOnly: true });
 
     const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/microsoft/callback`;
-    const url = new URL("https://login.microsoftonline.com/common/v2.0/oauth2/authorize");
+    const url = new URL(microsoftEndpoints().auth);
     url.searchParams.set("client_id", clientId);
     url.searchParams.set("redirect_uri", redirectUri);
     url.searchParams.set("response_type", "code");
@@ -446,7 +487,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
 
     try {
       const redirectUri = `${req.protocol}://${getValidatedHost(req)}/api/oauth/microsoft/callback`;
-      const tokenRes = await fetch("https://login.microsoftonline.com/common/v2.0/oauth2/token", {
+      const tokenRes = await fetch(microsoftEndpoints().token, {
         method: "POST",
         headers: { "Content-Type": "application/x-www-form-urlencoded" },
         body: new URLSearchParams({
@@ -461,7 +502,7 @@ export function registerMicrosoftOAuthRoutes(app: Express) {
       const tokenData = await tokenRes.json() as { access_token?: string };
       if (!tokenData.access_token) throw new Error("No access token from Microsoft");
 
-      const userRes = await fetch("https://graph.microsoft.com/v1.0/me?$select=id,displayName,mail,userPrincipalName", {
+      const userRes = await fetch(microsoftEndpoints().me, {
         headers: { Authorization: `Bearer ${tokenData.access_token}` },
       });
       const userInfo = await userRes.json() as { id?: string; displayName?: string; mail?: string; userPrincipalName?: string };

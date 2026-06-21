@@ -117,9 +117,9 @@ See the [Light Mode / Appearance Guide](../user-guides/LIGHT_MODE.md) for full d
 
 ---
 
-## Step 8 — Local Network (Android Thin Client)
+## Step 8 — Local Network (Omnecor HQ Android Companion App)
 
-**What it does:** Configures the workstation's LAN IP address so the Android thin client can connect.
+**What it does:** Configures the workstation's LAN IP address so the Omnecor HQ Android companion app can connect.
 
 This step is especially relevant when completing setup via the Android APK:
 

@@ -120,15 +120,27 @@ export async function createContext(
   let user: User | null = null;
 
   if (ENV.zeroLoginMode) {
+    // ZERO_LOGIN_EXECUTION_MODE is the single source of truth (defaults to
+    // "sovereign"). It overrides whatever is persisted on the local-zero-login
+    // user, so toggling the flag takes effect immediately even on installs that
+    // already created this user under an older default.
+    const mode = ENV.zeroLoginExecutionMode;
     let dbUser = await getUserByOpenId("local-zero-login");
     if (!dbUser) {
       await upsertUser({
         openId: "local-zero-login",
         name: "Local Admin",
         role: "admin",
-        executionMode: "scrapper",
+        executionMode: mode,
       });
       dbUser = await getUserByOpenId("local-zero-login");
+      if (!dbUser) {
+        throw new Error("Failed to create zero-login user: row not found after upsert");
+      }
+    } else if (dbUser.executionMode !== mode) {
+      // Keep the persisted record in sync with the flag (one-time write until
+      // they match) so anything reading the DB user sees the same mode.
+      await upsertUser({ openId: "local-zero-login", executionMode: mode });
     }
     user = {
       id: dbUser?.id ?? 0,
@@ -138,7 +150,7 @@ export async function createContext(
       loginMethod: "zero-login",
       passwordHash: null,
       role: "admin",
-      executionMode: dbUser?.executionMode ?? "scrapper",
+      executionMode: mode,
       createdAt: dbUser?.createdAt ?? new Date(),
       updatedAt: dbUser?.updatedAt ?? new Date(),
       lastSignedIn: dbUser?.lastSignedIn ?? new Date(),

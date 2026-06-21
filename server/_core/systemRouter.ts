@@ -155,9 +155,26 @@ export const systemRouter = router({
     .input(z.object({ settings: z.record(z.string(), z.unknown()) }))
     .mutation(async ({ input }) => {
       const current = await readSettingsFileAsync() ?? {};
-      const updated = { ...current, ...input.settings } as OmnecorSettings;
+      // `sovereignBlockAiOnly` relaxes Sovereign mode's blocking of non-AI
+      // external services, so it must NOT be settable through this
+      // unauthenticated endpoint. Strip it here — it is changed only via the
+      // admin-only `setSovereignBlockAiOnly` mutation below.
+      const { sovereignBlockAiOnly: _guarded, ...safeSettings } = input.settings;
+      const updated = { ...current, ...safeSettings } as OmnecorSettings;
       await writeSettingsFileAsync(updated);
       return { saved: true };
+    }),
+
+  // Admin-only: toggle whether Sovereign mode blocks ONLY cloud AI calls (true)
+  // or all external calls including non-AI services (false). Gated behind
+  // adminProcedure because it weakens the air-gap; never exposed via saveSettings.
+  setSovereignBlockAiOnly: adminProcedure
+    .input(z.object({ enabled: z.boolean() }))
+    .mutation(async ({ input }) => {
+      const current = await readSettingsFileAsync() ?? {};
+      const updated = { ...current, sovereignBlockAiOnly: input.enabled } as OmnecorSettings;
+      await writeSettingsFileAsync(updated);
+      return { enabled: input.enabled };
     }),
 
   saveKeys: adminProcedure

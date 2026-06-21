@@ -12,7 +12,7 @@ Operational Memory Never Escapes. Context Overview Remains.
 4.  [Installation Guide](#4-installation-guide)
     -   4.1. [Linux Packages (.deb / AppImage / Flatpak)](#41-linux-packages)
     -   4.2. [Windows Installer](#42-windows-installer)
-    -   4.3. [Android APK (Thin Client)](#43-android-apk-thin-client)
+    -   4.3. [Android APK (Omnecor HQ Companion App)](#43-android-apk-omnecor-hq-companion-app)
     -   4.4. [Zero-Login & Air-Gapped Operation](#44-zero-login--air-gapped-operation)
 5.  [First Launch & Setup Wizard](#5-first-launch--setup-wizard)
 6.  [User Interface Guide](#6-user-interface-guide)
@@ -70,7 +70,7 @@ Omnecor offers a wide array of capabilities, including:
 
 ### 1.4. Supported Platforms
 
-Omnecor is fully cross-platform with official support for Windows 10/11 (native installer), Linux (Debian 12, Ubuntu 20.04+ recommended via .deb, AppImage, and Flatpak), and has a companion app for Android 9+ (Mobile thin client).
+Omnecor is fully cross-platform with official support for Windows 10/11 (native installer), Linux (Debian 12, Ubuntu 20.04+ recommended via .deb, AppImage, and Flatpak), and has the Omnecor HQ companion app for Android 9+.
 
 ### 1.5. Intended Users
 
@@ -201,7 +201,7 @@ To ensure optimal performance and compatibility, please ensure your system meets
 
 | Component | Minimum Requirement | Recommended for Local LLM Inference |
 |---|---|---|
-| **Operating System** | Windows 10/11 (x64), Debian 12, Ubuntu 20.04+ (LTS), Android 9+ (mobile thin client) | Windows 11, Debian 12, Ubuntu 22.04+ |
+| **Operating System** | Windows 10/11 (x64), Debian 12, Ubuntu 20.04+ (LTS), Android 9+ (Omnecor HQ companion app) | Windows 11, Debian 12, Ubuntu 22.04+ |
 | **CPU** | 4+ physical cores | 8+ physical cores |
 | **RAM** | 8GB | 16GB+ |
 | **Disk Space** | 20GB free space on NVMe SSD | 50GB+ free space on NVMe SSD |
@@ -259,9 +259,9 @@ Cross-compile from Linux: `./packaging/build-all.sh --target win`
 
 Full reference: [INSTALL.md — Windows](../INSTALL.md#45-windows--nsis-installer--portable-exe) · [packaging/windows/BUILD-WINDOWS.md](../packaging/windows/BUILD-WINDOWS.md)
 
-### 4.3. Android APK (Thin Client)
+### 4.3. Android APK (Omnecor HQ Companion App)
 
-The Omnecor Android app is a **thin client** that connects to a running desktop instance over your local Wi-Fi network. It delivers the full workstation UI on a mobile screen.
+The Omnecor Android app is **Omnecor HQ** — a standalone React Native (Expo) companion app (not a wrapped web view) that connects to a running desktop instance over your local Wi-Fi network or Tailscale. It delivers the full workstation UI on a mobile screen and can run on-device GGUF inference.
 
 **Sideload a pre-built APK:**
 
@@ -280,7 +280,7 @@ pnpm apk:debug          # produces app-debug.apk
 
 **Connect to the desktop:** Launch the app → Settings → Omnecor Server → enter your desktop's LAN IP or Tailscale IP. Tap **Test** to verify, then **Save**.
 
-Full reference: [INSTALL.md — Android APK](../INSTALL.md#46-android--thin-client-apk) · [packaging/android/BUILD-ANDROID.md](../packaging/android/BUILD-ANDROID.md) · [BUILD.md (detailed)](../packaging/android/omnecor-hq/BUILD.md)
+Full reference: [INSTALL.md — Android APK](../INSTALL.md#46-android--omnecor-hq-companion-app) · [packaging/android/BUILD-ANDROID.md](../packaging/android/BUILD-ANDROID.md) · [Omnecor HQ README](../packaging/android/omnecor-hq/README.md)
 
 ### 4.4. Beginner Installation Path
 
@@ -301,10 +301,10 @@ For enterprise or high-security environments that prohibit external network call
 1.  **Enable**: Set `ZERO_LOGIN_MODE=true` in your `.env` file.
 2.  **Behavior**:
     -   Skips all OAuth provider checks (Google, Microsoft).
-    -   Generates a synthetic "Local Admin" session on startup with `role = 'owner'`.
-    -   Automatically enforces **Sovereign Mode** (`executionMode = 'sovereign'`) — no cloud procedures can execute.
-    -   No external SDK calls are made during the boot sequence.
-3.  **Limitations**: Multi-user support and cloud-dependent features (Agentic Wallet card issuance, Fal.ai, cloud LLMs) are unavailable.
+    -   Generates a synthetic "Local Admin" session on startup.
+    -   Runs that session under `ZERO_LOGIN_EXECUTION_MODE` — **defaults to `sovereign`** (`executionMode = 'sovereign'`, no cloud procedures can execute). Set it to `scrapper`/`big_spender` to allow spend-tracked cloud calls for local testing; the in-app banner reflects the active mode.
+    -   No external SDK calls are made during the boot sequence (unless you opt into a cloud-enabled mode and then trigger cloud features).
+3.  **Limitations** (in the default sovereign mode): Multi-user support and cloud-dependent features (Agentic Wallet card issuance, Fal.ai, cloud LLMs) are unavailable.
 4.  **Use Case**: Air-gapped workstations, classified environments, offline demos.
 
 ---
@@ -324,7 +324,7 @@ The **Setup Wizard** runs automatically on first launch and guides you through t
 5. **Voice Pipeline** — Configure Whisper STT and XTTS-v2 TTS endpoints.
 6. **Hardware Bridges** — Auto-detect Blender, KiCad, ESPTool paths.
 7. **Appearance** — Choose light or dark theme.
-8. **Local Network** — Set LAN IP for Android thin client connectivity.
+8. **Local Network** — Set LAN IP for the Omnecor HQ Android companion app to connect.
 
 Re-open the wizard at any time: **Settings → System → Re-run Setup Wizard**.
 
@@ -530,7 +530,8 @@ The `.env` file, located in the root of your Omnecor installation, contains crit
 | `OMMESH_MDNS_NAME` | mDNS name for Omnecor node discovery. | `omnecor-node` | Default `omnecor-node`. |
 | `OMMESH_SECURITY_KEY` | Shared secret for mTLS in OMMESH. | `a_strong_secret_key` | Required if `OMMESH_ENABLED=true`. |
 | `LITHIC_API_KEY` | API key for Lithic virtual card issuance. | `lithic_prod_xxxxx` | Optional. Without it, Wallet runs in tracking-only mode. |
-| `ZERO_LOGIN_MODE` | Skips OAuth; creates a synthetic Local Admin session. | `true` or `false` | Default `false`. Forces Sovereign Mode when `true`. |
+| `ZERO_LOGIN_MODE` | Skips OAuth; creates a synthetic Local Admin session. | `true` or `false` | Default `false`. The session's execution mode is set by `ZERO_LOGIN_EXECUTION_MODE` (default `sovereign`). |
+| `ZERO_LOGIN_EXECUTION_MODE` | Execution mode for the zero-login Local Admin session. | `sovereign` \| `scrapper` \| `big_spender` | Default `sovereign` (cloud blocked). `scrapper`/`big_spender` allow spend-tracked cloud calls for testing. |
 | `GOOGLE_CLIENT_ID` | Google OAuth 2.0 Client ID. | `xxxxxxx.apps.googleusercontent.com` | Optional, enables Google login. |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth 2.0 Client Secret. | `GOCSPX-xxxxxxxx` | Required if `GOOGLE_CLIENT_ID` is set. |
 | `MICROSOFT_CLIENT_ID` | Microsoft Entra (Azure AD) Application Client ID. | `xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx` | Optional, enables Microsoft login. |

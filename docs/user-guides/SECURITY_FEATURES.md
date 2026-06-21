@@ -213,7 +213,7 @@ The `sovereignCheck` middleware enforces your chosen Execution Mode at the tRPC 
 | **Scrapper** ⚡ | Fallback only | Cloud used only when no local model satisfies the request |
 | **Big Spender** 🔥 | Preferred | Cloud models selected by default for quality |
 
-**Zero-Login / Air-Gapped Mode:** Set `ZERO_LOGIN_MODE=true` to bypass all OAuth and auto-enforce Sovereign Mode. No external calls are made during boot.
+**Zero-Login / Air-Gapped Mode:** Set `ZERO_LOGIN_MODE=true` to bypass all OAuth and run every request as a local admin. The session defaults to Sovereign Mode (`ZERO_LOGIN_EXECUTION_MODE=sovereign`, cloud blocked); set it to `scrapper`/`big_spender` to allow spend-tracked cloud calls for local testing. No external calls are made during boot.
 
 ---
 

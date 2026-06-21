@@ -2,6 +2,10 @@
 **/node_modules
 .pnpm-store/
 
+# Local dev session seeder — mints owner sessions; never commit (Option B in
+# docs/development/LOCAL_TESTING.md). Recreate from that doc if missing.
+server/scripts/dev-seed-user.ts
+
 # Node.js compile cache (generated at runtime)
 **/node-compile-cache/
 

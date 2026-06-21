@@ -82,6 +82,3 @@ overrides:
   # uuid buffer-bounds advisory (GHSA-w5hq-g745-h8pq) — old uuid only reaches us
   # through Expo build tooling (xcode, @expo/ngrok); scoped so app deps keep uuid 14
   "xcode>uuid": ">=11.1.1"
-
-patchedDependencies:
-  llama.rn: patches/llama.rn.patch

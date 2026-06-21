@@ -4,11 +4,22 @@ import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { hasPermission, type Role } from "../phase2/config/rbac.js";
+import { getSetting } from "../phase2/services/SettingsService.js";
 import { createLogger } from "./logger.js";
 
 const log = createLogger("trpc-audit");
 
-const t = initTRPC.context<TrpcContext>().meta<{ cloud?: boolean }>().create({
+// `cloud` marks a procedure as making an external call subject to Sovereign mode.
+// `cloudKind` splits those calls into:
+//   "ai"      → cloud AI/model inference (OpenAI, Anthropic, Gemini, Fal, voice,
+//               training). ALWAYS blocked in Sovereign — this is the data that
+//               must never reach a cloud AI model.
+//   "service" → non-AI external services (GitHub/Notion/Drive sync, etc.). Blocked
+//               in Sovereign too, UNLESS the operator enables "block AI providers
+//               only" (the `sovereignBlockAiOnly` setting), so research workflows
+//               like repo pulls, email and web search keep working air-gapped from
+//               cloud AI. Defaults to "ai" when unset.
+const t = initTRPC.context<TrpcContext>().meta<{ cloud?: boolean; cloudKind?: "ai" | "service" }>().create({
   transformer: superjson,
 });
 
@@ -71,24 +82,54 @@ export const protectedProcedure = t.procedure.use(requireUser).use(auditMiddlewa
 const sovereignCheck = t.middleware(async (opts) => {
   const { ctx, meta, next, path } = opts;
   if (ctx.user?.executionMode === "sovereign" && meta?.cloud === true) {
+    const kind = meta.cloudKind ?? "ai";
+    // When the operator opts into "block AI providers only", non-AI external
+    // services (GitHub/Notion/Drive sync, etc.) are allowed through in Sovereign
+    // so research can continue — only cloud AI inference stays blocked.
+    if (kind === "service" && getSetting("sovereignBlockAiOnly", false)) {
+      AuditLogService.getInstance().log({
+        eventType: "sovereign_allow",
+        actorId: ctx.user.id,
+        actorType: "user",
+        procedure: path,
+        args: null,
+        result: { allowed: true, reason: "sovereign_block_ai_only", cloudKind: kind },
+        ipAddress: ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? null,
+        sessionId: null,
+      }).catch((err: unknown) => {
+        log.error(`Failed to persist sovereign-allow audit log for procedure "${path}"`, err);
+      });
+      return next();
+    }
     AuditLogService.getInstance().log({
       eventType: "sovereign_block",
       actorId: ctx.user.id,
       actorType: "user",
       procedure: path,
       args: null,
-      result: { blocked: true, reason: "sovereign_mode" },
+      result: { blocked: true, reason: "sovereign_mode", cloudKind: kind },
       ipAddress: ctx.req.ip ?? ctx.req.socket?.remoteAddress ?? null,
       sessionId: null,
     }).catch((err: unknown) => {
       log.error(`Failed to persist sovereign-block audit log for procedure "${path}"`, err);
     });
-    throw new TRPCError({ code: "FORBIDDEN", message: "Sovereign mode: cloud calls are disabled." });
+    const message =
+      kind === "service"
+        ? "Sovereign mode: external service calls are disabled. Enable 'block AI providers only' in Settings to allow non-AI services."
+        : "Sovereign mode: cloud AI calls are disabled.";
+    throw new TRPCError({ code: "FORBIDDEN", message });
   }
   return next();
 });
 
-export const cloudProcedure = protectedProcedure.meta({ cloud: true }).use(sovereignCheck);
+// Cloud AI inference — always blocked in Sovereign mode.
+export const cloudProcedure = protectedProcedure.meta({ cloud: true, cloudKind: "ai" }).use(sovereignCheck);
+
+// Non-AI external service call (GitHub/Notion/Drive sync, etc.). Blocked in
+// Sovereign mode unless `sovereignBlockAiOnly` is enabled. Use this — not
+// cloudProcedure — for procedures that talk to external services but never send
+// data to a cloud AI model.
+export const externalServiceProcedure = protectedProcedure.meta({ cloud: true, cloudKind: "service" }).use(sovereignCheck);
 
 export const adminProcedure = t.procedure.use(
   t.middleware(async opts => {

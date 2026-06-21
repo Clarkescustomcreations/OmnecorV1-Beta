@@ -23,14 +23,22 @@ pnpm build
 # Run production build
 pnpm start
 
-# Database migrations (generate + migrate)
+# Database: regenerate SQL from a schema change, then apply (dev iteration)
 pnpm build:push
+
+# Database: apply pending migrations only, no regenerate (prod/CI, before `pnpm start`)
+pnpm db:migrate
 
 # Format code
 pnpm format
 ```
 
 **Package manager:** pnpm only. All dependency overrides and security pins live in `pnpm-workspace.yaml` — never in `package.json`'s `pnpm` field (pnpm 10 ignores it in workspaces).
+
+**Migrations — three paths, one system.** All three apply the same generated migrations in `drizzle/migrations/`; they differ only in *when* and *whether they also regenerate*:
+- `pnpm build:push` (`drizzle-kit generate && migrate`) — **dev**: after editing `drizzle/schema.ts`, regenerate the SQL files, then apply them.
+- `pnpm db:migrate` (`server/scripts/migrate.ts`) — **prod/CI**: apply already-generated migrations explicitly before `pnpm start`. Does *not* regenerate.
+- `server/db.ts` `init()` auto-`migrate()` — **runtime fallback**: applies pending migrations on first DB connect (non-fatal — a failure logs a warning and boot continues). `db:migrate` is the explicit, fail-loud alternative to relying on this.
 
 ## Architecture
 
@@ -42,7 +50,7 @@ pnpm format
 - Static files / Vite dev server for the frontend
 - Health check at `/health`
 
-All tRPC routers are composed in `server/routers.ts` into a single `appRouter`. Routers live in `server/routers/` (primary) with three legacy routers still in `server/phase2/routers/` (`agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter`). All routers must import from `server/_core/trpc.ts` — they share a single `TrpcContext`.
+All tRPC routers are composed in `server/routers.ts` into a single `appRouter`. Routers all live in `server/routers/` and must import from `server/_core/trpc.ts` — they share a single `TrpcContext`. (Three routers — `agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter` — were relocated here from the now-empty `server/phase2/routers/`; the services they call still live in `server/phase2/services/`.)
 
 **tRPC procedure types** (from `server/_core/trpc.ts`):
 - `publicProcedure` — unauthenticated

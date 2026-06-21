@@ -12,7 +12,8 @@ type ThemeContextValue = {
 const ThemeContext = createContext<ThemeContextValue | null>(null);
 
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
-  const systemScheme = useSystemColorScheme() ?? "light";
+  // RN 0.83 widened ColorSchemeName; narrow explicitly to our ColorScheme union.
+  const systemScheme: ColorScheme = useSystemColorScheme() === "dark" ? "dark" : "light";
   const [colorScheme, setColorSchemeState] = useState<ColorScheme>(systemScheme);
 
   const applyScheme = useCallback((scheme: ColorScheme) => {

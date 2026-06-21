@@ -8,7 +8,7 @@
 # Supported targets:
 #   linux   — AppImage + .deb + .rpm  (via electron-builder)
 #   win     — NSIS .exe + Portable    (via electron-builder, Wine or Windows)
-#   android — Capacitor APK           (requires Android Studio)
+#   android — Omnecor HQ APK          (React Native / Expo, requires Android SDK + NDK)
 #   flatpak — Flatpak bundle          (requires flatpak-builder)
 #   deb     — Standalone .deb package (without Electron wrapper)
 #   appimage— Standalone AppImage     (without Electron wrapper)
@@ -173,32 +173,29 @@ build_win() {
 }
 
 # ---------------------------------------------------------------------------
-# Target: android — Capacitor APK (requires Android Studio)
+# Target: android — Omnecor HQ APK (React Native / Expo)
 # ---------------------------------------------------------------------------
 build_android() {
-  log "Building Android APK (Capacitor thin client)..."
+  log "Building Android APK (Omnecor HQ — React Native / Expo)..."
 
-  if ! command -v npx &>/dev/null; then
-    fail "npx not found — install Node.js first"
+  local HQ_DIR="$SCRIPT_DIR/android/omnecor-hq"
+
+  if ! command -v pnpm &>/dev/null; then
+    fail "pnpm required to build Omnecor HQ — install pnpm first"
   fi
 
-  cd "$ELECTRON_APP"
-  if command -v pnpm &>/dev/null; then
-    pnpm install
-    pnpm build:android
-  else
-    npm install
-    npm run build:android
-  fi
+  cd "$HQ_DIR"
+  pnpm install
+  pnpm prebuild:android   # regenerate the (git-ignored) android/ Gradle project
+  pnpm apk:release
 
-  ok "Android sync complete. Next steps:"
-  echo "  1. Open Android Studio:"
-  echo "       cd $ELECTRON_APP && npx cap open android"
-  echo "  2. In Android Studio: Build → Generate Signed APK"
-  echo "  3. Signed APK → android/app/release/app-release.apk"
+  ok "Android APK built (Omnecor HQ):"
+  echo "       $HQ_DIR/android/app/build/outputs/apk/release/app-release.apk"
   echo ""
-  echo "  To set the backend server IP for LAN mode:"
-  echo "    OMNECOR_SERVER_IP=192.168.1.X pnpm build:android"
+  echo "  • Debug APK instead:         (cd $HQ_DIR && pnpm apk:debug)"
+  echo "  • Build + install over USB:  (cd $HQ_DIR && pnpm apk:install)"
+  echo "  • The release APK is debug-signed — sign it via Android Studio"
+  echo "    (Build → Generate Signed Bundle / APK) for Play Store distribution."
 }
 
 # ---------------------------------------------------------------------------

@@ -10,6 +10,7 @@ import { useColors } from "@/hooks/use-colors";
 import { trpcMutate } from "@/lib/_core/trpc-fetch";
 import { isServerConfigured, getServerBaseUrl } from "@/lib/_core/server-config";
 import { askAi, resolveProviderId } from "@/lib/_core/ai-chat";
+import { resolveDefaultModel } from "@/lib/_core/ai-models";
 import { subscribeChannel } from "@/lib/_core/ws-channels";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 
@@ -37,7 +38,7 @@ export default function PodcastScreen() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [script, setScript] = useState("");
-  const [selectedVoice, setSelectedVoice] = useState("Default");
+  const [selectedVoice, setSelectedVoice] = useState("Standard");
   const [isGenerating, setIsGenerating] = useState(false);
   const [generationProgress, setGenerationProgress] = useState(0);
   const [audioPath, setAudioPath] = useState<string | null>(null);
@@ -65,7 +66,15 @@ export default function PodcastScreen() {
           if (parsed.title) setTitle(parsed.title);
           if (parsed.description) setDescription(parsed.description);
           if (parsed.script) setScript(parsed.script);
-          if (parsed.selectedVoice) setSelectedVoice(parsed.selectedVoice);
+          // Legacy sessions stored cosmetic voice names ("Female" was the only
+          // one that did anything — it enabled RVC); migrate to the real toggle.
+          if (parsed.selectedVoice) {
+            setSelectedVoice(
+              parsed.selectedVoice === "Female" || parsed.selectedVoice === "RVC voice conversion"
+                ? "RVC voice conversion"
+                : "Standard",
+            );
+          }
           if (parsed.podcastLength) setPodcastLength(parsed.podcastLength);
           if (parsed.podcastDuration) setPodcastDuration(parsed.podcastDuration);
           if (parsed.podcastQuality) setPodcastQuality(parsed.podcastQuality);
@@ -103,7 +112,10 @@ export default function PodcastScreen() {
   const player = useAudioPlayer(audioUrl ?? undefined);
   const playerStatus = useAudioPlayerStatus(player);
 
-  const voices = ["Default", "Male", "Female", "Narrator", "Casual"];
+  // The PC's podcast pipeline renders a fixed two-speaker (host/guest) dialogue;
+  // the only real per-render voice control it exposes is RVC voice conversion
+  // on/off (`useRVC`). Offer exactly that — not a list of cosmetic voice names.
+  const voices = ["Standard", "RVC voice conversion"];
 
   const addSource = (kind: SourceKind, label: string, content: string) => {
     if (!content.trim()) return;
@@ -215,8 +227,7 @@ export default function PodcastScreen() {
         turns.unshift({ speakerId: "host", text: description.trim() });
       }
 
-      // Map selectedVoice to useRVC
-      const useRVC = selectedVoice === "Female";
+      const useRVC = selectedVoice === "RVC voice conversion";
 
       const result = await trpcMutate<{
         jobId: string;
@@ -260,7 +271,15 @@ export default function PodcastScreen() {
     try {
       const selectedSources = sources.filter((s) => s.selected);
       const providerId = await resolveProviderId();
-      const modelId = providerId === "openai" ? "gpt-4o" : "llama3.2:latest";
+      const modelId = await resolveDefaultModel(providerId);
+      if (!modelId) {
+        Alert.alert(
+          "No model available",
+          "Install an Ollama model on the PC or configure a cloud provider in Settings.",
+        );
+        setIsScripting(false);
+        return;
+      }
 
       const result = await trpcMutate<{ content: string }>("podcast.generateScript", {
         providerId,

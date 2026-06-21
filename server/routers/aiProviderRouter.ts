@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../../_core/trpc.js";
+import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
-import { AiProviderService } from "../services/AiProviderService.js";
+import { AiProviderService } from "../phase2/services/AiProviderService.js";
 
 const chatInputSchema = z.object({
   providerId: z.enum(["system", "ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),

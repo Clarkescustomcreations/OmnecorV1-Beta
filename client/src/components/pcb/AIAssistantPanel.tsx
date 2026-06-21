@@ -18,6 +18,7 @@ import { Separator } from '@/components/ui/separator';
 import { Send, Loader2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
+import { useDesignerStore } from '@/lib/stores/designerStore';
 
 export interface AIAssistantPanelProps {
   canvasState: {
@@ -93,6 +94,7 @@ export const AIAssistantPanel: React.FC<AIAssistantPanelProps> = ({
   canvasState,
   onClose,
 }) => {
+  const { active3DContext } = useDesignerStore();
   const [messages, setMessages] = useState<Message[]>([
     {
       id: '0',
@@ -163,7 +165,7 @@ What would you like help with?`,
       messages: [
         {
           role: "system",
-          content: buildDesignContext(canvasState),
+          content: buildDesignContext(canvasState) + (active3DContext ? `\n\n--- Shared Cross-System Context ---\n${active3DContext}` : ''),
         },
         ...messages.map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
         { role: "user", content: prompt },
@@ -180,23 +182,23 @@ What would you like help with?`,
   };
 
   return (
-    <div className="w-96 border-l border-gray-200 bg-white flex flex-col min-h-0 shadow-sm">
+    <div className="w-96 border-l border-border bg-card flex flex-col min-h-0 shadow-sm">
       {/* Header */}
-      <div className="p-3 border-b border-gray-200 flex items-center justify-between">
+      <div className="p-3 border-b border-border flex items-center justify-between">
         <div>
-          <h2 className="text-sm font-semibold text-gray-900">AI Assistant</h2>
-          <p className="text-xs text-gray-600 mt-0.5">Context-aware design help</p>
+          <h2 className="text-sm font-semibold text-foreground">AI Assistant</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">Context-aware design help</p>
         </div>
         <button
           onClick={onClose}
-          className="text-gray-500 hover:text-gray-700 text-lg leading-none"
+          className="text-muted-foreground hover:text-foreground text-lg leading-none"
         >
           ×
         </button>
       </div>
 
       {/* Design Context Summary */}
-      <div className="px-3 py-2 bg-blue-50 border-b border-blue-200 text-xs text-blue-900">
+      <div className="px-3 py-2 bg-accent/10 border-b border-accent/20 text-xs text-accent">
         <p className="font-semibold mb-1">Current Design</p>
         <p>
           {canvasState.nodes.length} components • {canvasState.edges.length} connections •{' '}
@@ -217,8 +219,8 @@ What would you like help with?`,
                   max-w-xs rounded-lg p-3 text-sm
                   ${
                     message.role === 'user'
-                      ? 'bg-blue-500 text-white'
-                      : 'bg-gray-100 text-gray-900'
+                      ? 'bg-accent text-accent-foreground'
+                      : 'bg-muted text-foreground'
                   }
                 `}
               >
@@ -226,7 +228,7 @@ What would you like help with?`,
                 <p
                   className={`
                     text-xs mt-1
-                    ${message.role === 'user' ? 'text-blue-100' : 'text-gray-600'}
+                    ${message.role === 'user' ? 'text-accent-foreground/80' : 'text-muted-foreground'}
                   `}
                 >
                   {message.timestamp.toLocaleTimeString([], {
@@ -240,9 +242,9 @@ What would you like help with?`,
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-gray-100 text-gray-900 rounded-lg p-3 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin" />
-                <span className="text-sm">Thinking...</span>
+              <div className="bg-muted text-foreground rounded-lg p-3 flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                <span className="text-sm text-muted-foreground">Thinking...</span>
               </div>
             </div>
           )}
@@ -252,26 +254,26 @@ What would you like help with?`,
       </ScrollArea>
 
       {/* Input */}
-      <div className="p-3 border-t border-gray-200 bg-gray-50">
+      <div className="p-3 border-t border-border bg-card">
         <div className="flex gap-2">
           <Input
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your design..."
-            className="h-9 text-sm"
+            className="h-9 text-sm bg-background border-border focus-visible:ring-1 focus-visible:ring-accent"
             disabled={isLoading}
           />
           <Button
             onClick={handleSendMessage}
             disabled={isLoading || !inputValue.trim()}
             size="sm"
-            className="gap-2"
+            className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
           >
             <Send className="w-4 h-4" />
           </Button>
         </div>
-        <p className="text-xs text-gray-600 mt-2">
+        <p className="text-xs text-muted-foreground mt-2">
           💡 Tip: Ask about components, design review, or netlist analysis
         </p>
       </div>

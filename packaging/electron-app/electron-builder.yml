@@ -145,9 +145,10 @@ deb:
 rpm:
   artifactName: ${productName}-${version}.${arch}.rpm
 
-# ─── Android (Capacitor thin client) ─────────────────────────────────────────
-# Build via: pnpm build:android → npx cap open android → Android Studio APK
-# The capacitor.config.ts controls the server URL for LAN connections.
+# ─── Android ─────────────────────────────────────────────────────────────────
+# The Android app is a standalone React Native / Expo project (Omnecor HQ) at
+# packaging/android/omnecor-hq/ — built with `pnpm apk:release`, not Electron.
+# See packaging/android/BUILD-ANDROID.md.
 
 # ─── Publishing ─────────────────────────────────────────────────────────────
 publish:

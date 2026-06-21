@@ -8,6 +8,7 @@
  * a real error rather than a mock.
  */
 import { trpcQuery, trpcMutate } from "./trpc-fetch";
+import { resolveDefaultModel } from "./ai-models";
 
 let _cachedProviderId: string | null = null;
 
@@ -32,17 +33,23 @@ export interface AskAiOptions {
   context?: string;
   /** Optional system prompt to steer the assistant. */
   systemPrompt?: string;
-  /** Model id; defaults to a broadly-available local model. */
+  /** Model id; resolved from the PC's real available models when omitted. */
   modelId?: string;
 }
 
 /** One-shot chat against the desktop. Returns the assistant's reply text. */
 export async function askAi(opts: AskAiOptions): Promise<string> {
   const providerId = await resolveProviderId();
+  const modelId = opts.modelId ?? (await resolveDefaultModel(providerId));
+  if (!modelId) {
+    throw new Error(
+      `No model available for "${providerId}". Install an Ollama model on the PC or configure a cloud provider in Settings.`,
+    );
+  }
   const content = opts.context ? `${opts.context}\n\n${opts.prompt}` : opts.prompt;
   const res = await trpcMutate<{ content: string }>("ai.chat", {
     providerId,
-    modelId: opts.modelId ?? "llama3.2:latest",
+    modelId,
     messages: [{ role: "user", content }],
     ...(opts.systemPrompt ? { systemPrompt: opts.systemPrompt } : {}),
   });

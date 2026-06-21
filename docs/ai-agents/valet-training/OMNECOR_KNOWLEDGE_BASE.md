@@ -115,9 +115,12 @@ Authoritative, distilled facts about Omnecor. This file has **two jobs**:
 
 - Immutable audit log; PII redaction (`redactSensitiveData()`) before any log write.
 - Prompt-injection defense (`PromptSanitizer`) fires `security:injection_attempt`.
-- Zero-Login / air-gapped: `ZERO_LOGIN_MODE=true` bypasses OAuth and forces Sovereign.
+- Zero-Login / air-gapped: `ZERO_LOGIN_MODE=true` bypasses OAuth and runs as a local admin
+  under `ZERO_LOGIN_EXECUTION_MODE` (defaults to `sovereign`; set `scrapper`/`big_spender`
+  to allow spend-tracked cloud calls for testing).
   In this mode a dismissible **yellow Zero-Login banner** warns that all requests run as
-  local admin with Sovereign enforced and the instance must not be exposed to a network.
+  local admin, states the active execution mode (Sovereign vs cloud-allowed testing), and
+  warns the instance must not be exposed to a network.
 - Extended OAuth providers: Manus, Google, Microsoft.
 
 ## 12. Persistence

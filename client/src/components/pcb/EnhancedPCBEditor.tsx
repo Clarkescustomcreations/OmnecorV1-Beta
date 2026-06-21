@@ -44,6 +44,7 @@ import { AIAssistantPanel } from './AIAssistantPanel';
 import { NetlistPanel } from './NetlistPanel';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
+import { useDesignerStore } from '@/lib/stores/designerStore';
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -54,9 +55,14 @@ interface HistoryState {
 
 // ─── Inner component (requires ReactFlowProvider above) ───────────────────────
 
-const EnhancedPCBEditorInner: React.FC = () => {
+interface EnhancedPCBEditorProps {
+  onAIToggle?: (isOpen: boolean) => void;
+}
+
+const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
+  const { setActivePCBContext } = useDesignerStore();
 
   // Canvas state
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -76,6 +82,16 @@ const EnhancedPCBEditorInner: React.FC = () => {
   const [showProperties, setShowProperties] = useState(true);
   const [showAI, setShowAI] = useState(false);
   const [showNetlist, setShowNetlist] = useState(false);
+
+  useEffect(() => {
+    if (onAIToggle) onAIToggle(showAI);
+  }, [showAI, onAIToggle]);
+
+  // Reset parent state when this component unmounts (e.g. mode switch away from PCB),
+  // so the parent's isAIPanelOpen doesn't linger and hide unrelated UI (3D Ask AI button).
+  useEffect(() => {
+    return () => { onAIToggle?.(false); };
+  }, [onAIToggle]);
 
   // Undo/redo
   const [historyIndex, setHistoryIndex] = useState(-1);
@@ -224,6 +240,35 @@ const EnhancedPCBEditorInner: React.FC = () => {
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, edges]);
+
+  // Compute PCB dimensions/context for the global store
+  useEffect(() => {
+    if (!pcbProjectIdRef.current || nodes.length === 0) {
+      setActivePCBContext(null);
+      return;
+    }
+    
+    let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+    const comps: string[] = [];
+    
+    nodes.forEach(n => {
+      if (n.position.x < minX) minX = n.position.x;
+      if (n.position.x > maxX) maxX = n.position.x;
+      if (n.position.y < minY) minY = n.position.y;
+      if (n.position.y > maxY) maxY = n.position.y;
+      
+      const d = (n.data ?? {}) as Record<string, unknown>;
+      const ref = String(d.reference ?? d.ref ?? d.name ?? d.label ?? n.id);
+      comps.push(ref);
+    });
+    
+    const width = Math.round(maxX - minX + 50); // Approximate padding
+    const height = Math.round(maxY - minY + 50);
+    const projectName = pcbProjects.find(p => p.id === pcbProjectIdRef.current)?.name || "Unknown";
+    
+    const contextStr = `PCB Project: ${projectName}\nDimensions (approx units): ${width}W x ${height}H\nComponents (${comps.length}): ${comps.join(", ")}`;
+    setActivePCBContext(contextStr);
+  }, [nodes, pcbProjects, setActivePCBContext]);
 
   // ── Node types / edge types ───────────────────────────────────────────────
 
@@ -636,9 +681,8 @@ const EnhancedPCBEditorInner: React.FC = () => {
 
       {/* ── Main Editor Area ─────────────────────────────────────────────── */}
       <div className="flex flex-1 overflow-hidden">
-        {/* Component Library */}
         {showLibrary && (
-          <ComponentLibraryPanel onAddComponent={handleAddComponent} mode={mode} />
+          <ComponentLibraryPanel onClose={() => setShowLibrary(false)} onAddComponent={handleAddComponent} mode={mode} />
         )}
 
         {/* React Flow Canvas */}
@@ -721,10 +765,10 @@ const EnhancedPCBEditorInner: React.FC = () => {
 
 // ─── Public export (wraps with ReactFlowProvider) ─────────────────────────────
 
-function EnhancedPCBEditor() {
+function EnhancedPCBEditor({ onAIToggle }: EnhancedPCBEditorProps) {
   return (
     <ReactFlowProvider>
-      <EnhancedPCBEditorInner />
+      <EnhancedPCBEditorInner onAIToggle={onAIToggle} />
     </ReactFlowProvider>
   );
 }

@@ -14,6 +14,7 @@ import { Loader2, Sparkles, X } from "lucide-react";
 import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
+import { useDesignerStore } from "@/lib/stores/designerStore";
 
 // ── User-model scene context builder ───────────────────────────────────────────
 // Walks a loaded GLTF/OBJ hierarchy and produces a human-readable summary of the
@@ -331,6 +332,7 @@ function CanvasBackground({ onDeselect }: { onDeselect: () => void }) {
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
+  const { setActive3DContext, activePCBContext } = useDesignerStore();
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [aiQuery, setAiQuery] = useState("");
   const [loadedObject, setLoadedObject] = useState<THREE.Object3D | null>(null);
@@ -345,6 +347,7 @@ export function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
       setLoadedObject(null);
       setSceneContext(null);
       setLoadError(null);
+      setActive3DContext("Default 3D primitive shapes scene (Cube, Sphere, Cylinder). No physical model loaded.");
       return;
     }
     let cancelled = false;
@@ -357,13 +360,16 @@ export function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
     const onLoad = (obj: THREE.Object3D) => {
       if (cancelled) return;
       setLoadedObject(obj);
-      setSceneContext(buildSceneContext(obj, modelName));
+      const ctx = buildSceneContext(obj, modelName);
+      setSceneContext(ctx);
+      setActive3DContext(ctx.context);
     };
     const onError = () => {
       if (cancelled) return;
       setLoadError(`Failed to load model: ${modelName}`);
       setLoadedObject(null);
       setSceneContext(null);
+      setActive3DContext(null);
     };
 
     if (ext === "obj") {
@@ -403,14 +409,22 @@ export function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
 
   // Build the `code` field for the AI payload. For a real loaded model this is
   // the full scene structure plus the selected mesh; otherwise the demo format.
+  // Also append the PCB context if it exists.
   const buildAiCode = useCallback(
     (name: string) => {
+      let base = "";
       if (sceneContext) {
-        return `${sceneContext.context}\n\nSelected mesh: ${name}`;
+        base = `${sceneContext.context}\n\nSelected mesh: ${name}`;
+      } else {
+        base = `Object: ${name}\nDescription: ${OBJECT_DESCRIPTIONS[name] ?? `3D object: ${name}`}`;
       }
-      return `Object: ${name}\nDescription: ${OBJECT_DESCRIPTIONS[name] ?? `3D object: ${name}`}`;
+      
+      if (activePCBContext) {
+        base += `\n\n--- Shared Cross-System Context ---\n${activePCBContext}`;
+      }
+      return base;
     },
-    [sceneContext],
+    [sceneContext, activePCBContext],
   );
 
   const handleSelect = useCallback((name: string) => {
