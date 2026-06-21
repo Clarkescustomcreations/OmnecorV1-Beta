@@ -12,6 +12,8 @@ The core platform feature set is fully code-complete, packaged, and verified. Pr
 
 ### V1-Beta Remaining Checklist (before stable release)
 
+| Feature | Status |
+|---|---|
 | Valet V2 model artifact integrated + eval passed | ✅ Completed (Option A: Direct GGUF loading / Option B: Ollama support) |
 | Android APK smoke-tested (debug build sideloaded) | ✅ Completed (Standalone release APK compiled successfully) |
 | PodcastStudio output buttons wired | ✅ Done (2026-06-10) — Play/Download/Export |

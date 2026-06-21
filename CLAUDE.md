@@ -42,7 +42,7 @@ pnpm format
 - Static files / Vite dev server for the frontend
 - Health check at `/health`
 
-All tRPC routers are composed in `server/routers.ts` into a single `appRouter`. Routers live in `server/routers/` (primary) with two legacy routers still in `server/phase2/routers/` (`agentRouter`, `aiProviderRouter`). All routers must import from `server/_core/trpc.ts` — they share a single `TrpcContext`.
+All tRPC routers are composed in `server/routers.ts` into a single `appRouter`. Routers live in `server/routers/` (primary) with three legacy routers still in `server/phase2/routers/` (`agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter`). All routers must import from `server/_core/trpc.ts` — they share a single `TrpcContext`.
 
 **tRPC procedure types** (from `server/_core/trpc.ts`):
 - `publicProcedure` — unauthenticated
@@ -98,7 +98,10 @@ These run as separate processes and are proxied by the tRPC routers. All are opt
 
 ### OMMESH
 
-`server/ommesh/` is the distributed LAN node discovery layer. `MeshNode` advertises itself over mDNS/Bonjour. Nodes authenticate with a shared `OMMESH_SECRET`.
+`server/ommesh/` is the distributed LAN node discovery layer. `MeshNode` advertises itself over mDNS/Bonjour. Two authentication layers:
+
+- **Mobile node registration** — guarded by `OMMESH_SECRET` (timing-safe SHA-256 comparison; fails closed when the secret is unset).
+- **Cross-node inference** — `server/ommesh/core/MeshServer.ts` listens on `MESH_PORT` (3001) as a strict-mTLS HTTPS endpoint. Only CA-signed peers connect (`requestCert + rejectUnauthorized + TLSv1.3`). Each peer's certificate fingerprint is pinned at trust-time so a valid CA-signed cert from an unknown peer is still rejected. Sovereign-mode guard prevents cloud providers from tunnelling through mesh routing. Nodes without provisioned certs skip the mTLS listener but can still participate in mDNS discovery.
 
 ### Electron / Desktop
 
@@ -118,6 +121,9 @@ Copy `.env.example` to `.env`. Critical ones for local dev:
 | `OLLAMA_URL` | Local Ollama instance (default: `http://localhost:11434`) |
 | `ANTHROPIC_API_KEY` | Claude API access |
 | `OPENAI_API_KEY` | OpenAI access |
+| `OMMESH_SECRET` | Shared secret for mobile node registration; fail-closed when unset |
+| `VALET_AUTO_START` | Set to `false` to prevent the Valet Router from auto-starting |
+| `SESSION_TTL_MS` | Session JWT + cookie lifetime in ms (default: one year; set `604800000` for 7 days on network installs) |
 
 ## Execution Modes
 

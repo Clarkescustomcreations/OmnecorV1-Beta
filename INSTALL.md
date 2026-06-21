@@ -42,10 +42,10 @@ Before proceeding with the installation, ensure the following are installed:
 
 - **Git** — for cloning the repository.
 - **Node.js v24.15.0** (minimum v22) — download from [nodejs.org](https://nodejs.org/en/download/).
-- **pnpm v10.4.1** (minimum 10.x):
+- **pnpm v10.34.1** (minimum 10.x):
 
   ```bash
-  npm install -g pnpm@10.4.1
+  npm install -g pnpm@10.34.1
   ```
 
 ---
@@ -73,8 +73,7 @@ Create a `.env` file in the project root (copy from `.env.example`):
 
 ```env
 PORT=3000
-# OLLAMA_ENDPOINT=http://localhost:11434
-# DATABASE_URL=mysql://user:pass@localhost:3306/omnecor
+# OLLAMA_URL=http://localhost:11434
 
 # Optional: Enable cross-session memory persistence
 # HONCHO_API_KEY=your_honcho_api_key
@@ -91,7 +90,7 @@ Refer to `server/_core/env.ts` for the complete list of supported environment va
 
 Omnecor uses a unified **SQLite / libSQL** database engine. Relational persistence (chat histories, workspace canvases, budgets, logs) requires zero database infrastructure:
 
-- **Local SQLite (default)** — No configuration required. A local database file is created automatically at `./data/omnecor.db` on first boot.
+- **Local SQLite (default)** — No configuration required. A local database file is created automatically at `~/.omnecor/data/omnecor.db` on first boot. Override the path with `SQLITE_PATH` in your `.env`.
 - **Remote libSQL / Turso (optional)** — For cloud sync or multi-user federation, set `LIBSQL_URL` and `LIBSQL_AUTH_TOKEN` in your `.env` file to connect to a Turso database.
 
 ### Step 5: Build the Application
@@ -109,6 +108,15 @@ pnpm run start
 ```
 
 Omnecor starts on `http://localhost:3000` by default. If the port is occupied it auto-selects the next available port and prints the URL to the terminal.
+
+### First-Run Setup Wizard
+
+On first launch the **Setup Wizard** opens automatically. It:
+
+- Detects installed tools: Ollama, Python 3.10+, llama.cpp, Blender, KiCad CLI, ESPTool, and running bridge servers (Whisper STT on :8001, TTS on :8002, ComfyUI on :8188)
+- Offers a one-click **Install Ollama** button (Windows/Linux) if Ollama is not found
+- Auto-detects your GPU model and VRAM for model size recommendations
+- Guides you through execution mode selection (Sovereign / Scrapper / Big Spender)
 
 ---
 
@@ -226,7 +234,7 @@ sudo journalctl -u omnecor -f    # follow logs
 
 **Service configuration:**
 
-Edit `/etc/omnecor/omnecor.env` to set environment variables (e.g., `PORT`, `OLLAMA_ENDPOINT`) without modifying the unit file.
+Edit `/etc/omnecor/omnecor.env` to set environment variables (e.g., `PORT`, `OLLAMA_URL`) without modifying the unit file.
 
 **Status:**
 
@@ -252,7 +260,7 @@ Omnecor ships a Windows installer built with NSIS via Electron.
 - Installs to `%LOCALAPPDATA%\Programs\Omnecor\` by default.
 - Creates a desktop shortcut and Start Menu entry under `Omnecor HMCI`.
 - Downloads and silently installs **Ollama** if not already present.
-- Checks that Node.js 20+ is available; warns if missing.
+- Checks that Node.js 22+ is available; warns if missing.
 - Writes version and install path to `HKCU\Software\Omnecor\HMCI`.
 
 **System requirements for Windows:**
@@ -306,23 +314,31 @@ The Omnecor Android app is a **thin client** that connects to a running Omnecor 
 
 **Build the APK yourself:**
 
+The Android companion app is a React Native / Expo project at `packaging/android/omnecor-hq/`. Build it from that workspace:
+
 ```bash
-# From the project root
+cd packaging/android/omnecor-hq
 pnpm install
-pnpm build:android          # bundles the Capacitor web assets
-
-# Then compile with Gradle:
-cd packaging/electron-app/android
-./gradlew assembleDebug
-# output: app/build/outputs/apk/debug/app-debug.apk
+pnpm apk:debug
+# output: android/app/build/outputs/apk/debug/app-debug.apk
 ```
 
-**Or build and deploy in one step:**
+**Build and install in one step (device connected via USB):**
 
 ```bash
-cd packaging/electron-app/android
-./gradlew installDebug      # installs directly to a connected device via USB
+cd packaging/android/omnecor-hq
+pnpm apk:install
 ```
+
+**Build a signed release APK:**
+
+```bash
+cd packaging/android/omnecor-hq
+pnpm apk:release
+# output: android/app/build/outputs/apk/release/app-release.apk
+```
+
+Or use Android Studio: **Build → Generate Signed Bundle / APK → APK**, then follow the signing wizard.
 
 **Connect to your desktop brain:**
 
@@ -330,16 +346,6 @@ cd packaging/electron-app/android
 2. Launch Omnecor on Android.
 3. In the **Setup Wizard → Local Network** step, enter the IP address of your desktop workstation.
 4. The app proxies all requests to the desktop backend and delivers the full workstation experience.
-
-**Set the server IP at build time (optional):**
-
-```bash
-OMNECOR_SERVER_IP="192.168.1.100" pnpm build:android
-```
-
-**Build a signed release APK (for distribution):**
-
-In Android Studio: **Build → Generate Signed Bundle / APK → APK**, then follow the signing wizard.
 
 For the full Android build reference, see [packaging/android/BUILD-ANDROID.md](packaging/android/BUILD-ANDROID.md).
 

@@ -14,7 +14,7 @@ Omnecor incorporates several security features to protect your data and system:
 
 -   **Data Encryption**: Sensitive local project data is protected using AES-256-GCM encryption, ensuring confidentiality and integrity.
 
--   **Authentication and Authorization**: Omnecor includes session-based authentication (JWT-signed cookies), OAuth2 login (GitHub, Google, Microsoft), and a full RBAC matrix with four roles: `viewer`, `user`, `admin`, and `owner`. tRPC procedure types enforce role requirements at the router layer (`publicProcedure`, `protectedProcedure`, `adminProcedure`, `ownerProcedure`).
+-   **Authentication and Authorization**: Omnecor includes session-based authentication (JWT-signed cookies), OAuth2 login (Google, Microsoft), and a full RBAC matrix with four roles: `viewer`, `user`, `admin`, and `owner`. tRPC procedure types enforce role requirements at the router layer (`publicProcedure`, `protectedProcedure`, `adminProcedure`, `ownerProcedure`).
 
 -   **Human-in-the-Loop (HITL) Gates**: Dangerous or irreversible operations (firmware flash, virtual card issuance, MCP tool calls marked `dangerous:true`, peer federation approval, multi-agent crew runs with >3 agents) require explicit human approval before execution. Loop detection (action hash tracking, 3-repetition threshold) triggers HITL alerts and logs violations to the audit trail.
 

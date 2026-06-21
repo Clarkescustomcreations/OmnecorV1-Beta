@@ -37,15 +37,15 @@ Follow these steps to launch Omnecor and access its user interface:
 
     ```env
     PORT=3000
-    # OLLAMA_ENDPOINT=http://localhost:11434
+    # OLLAMA_URL=http://localhost:11434
     ```
 
-4.  **Initialize Database Schema**
+4.  **Initialize Database Schema (automatic)**
 
-    Synchronize the database schema:
+    The local SQLite database (`~/.omnecor/data/omnecor.db`) is created and migrated automatically on first launch — no manual step required. If you change `drizzle/schema.ts` and need to regenerate migrations:
 
     ```bash
-    pnpm db:migrate
+    pnpm build:push
     ```
 
 5.  **Start the Application**
@@ -68,9 +68,16 @@ http://localhost:3000/
 
 If port `3000` is in use, Omnecor will automatically select an available port and display the correct URL in the console. Open this URL in your web browser to access the Omnecor UI.
 
-## First Task
+## First Launch — Setup Wizard
 
-Upon first launch, Omnecor will perform an inventory of locally available AI models and initialize its knowledge base. You can then:
+On first launch Omnecor opens the **Setup Wizard**, which:
+
+- Auto-detects installed tools: Ollama, Python 3.10+, llama.cpp, Blender, KiCad CLI, ESPTool, and running bridge servers (Whisper STT on :8001, TTS on :8002, ComfyUI on :8188)
+- Offers a one-click **Install Ollama** button (Windows/Linux) if Ollama is not found
+- Auto-detects your GPU model and VRAM to pre-fill model size recommendations
+- Guides you through execution mode selection (Sovereign / Scrapper / Big Spender)
+
+After completing the wizard you can:
 
 -   **Explore the Dashboard**: Familiarize yourself with the main interface.
 -   **Import a Project Folder**: Begin by importing a folder to leverage Omnecor's semantic indexing capabilities.
