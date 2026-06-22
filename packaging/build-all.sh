@@ -32,7 +32,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 ELECTRON_APP="$SCRIPT_DIR/electron-app"
-VERSION="2.3.0"
+VERSION="2.4.1"
 TARGETS=()
 SKIP_BACKEND=false
 

@@ -4,7 +4,7 @@
 # ==============================================================================
 #
 # Builds omnecor-hmci_VERSION_amd64.deb using the pre-defined control files
-# in packaging/deb/debian/ (version 2.3.0, package name: omnecor-hmci).
+# in packaging/deb/debian/ (version 2.4.1, package name: omnecor-hmci).
 #
 # Usage:
 #   ./packaging/build-deb.sh [version]
@@ -29,7 +29,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 DEBIAN_DIR="$SCRIPT_DIR/deb/debian"
-VERSION="${1:-2.3.0}"
+VERSION="${1:-2.4.1}"
 PACKAGE_NAME="omnecor-hmci"
 ARCH="amd64"
 

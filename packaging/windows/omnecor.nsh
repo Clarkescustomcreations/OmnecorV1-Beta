@@ -88,7 +88,7 @@ SectionEnd
 
 ; --- Install: Write application version to registry ---
 Section "-WriteRegistry" SecRegistry
-  WriteRegStr HKCU "Software\Omnecor\HMCI" "Version" "2.3.0"
+  WriteRegStr HKCU "Software\Omnecor\HMCI" "Version" "2.4.1"
   WriteRegStr HKCU "Software\Omnecor\HMCI" "InstallDir" "$INSTDIR"
 SectionEnd
 

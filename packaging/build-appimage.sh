@@ -26,7 +26,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
-VERSION="${1:-2.3.0}"
+VERSION="${1:-2.4.1}"
 APP_NAME="Omnecor"
 ARCH="x86_64"
 
