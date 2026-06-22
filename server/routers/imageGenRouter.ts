@@ -8,7 +8,7 @@ import { assertImageProviderAllowedInMode } from "../_core/sovereign.js";
 export const imageGenRouter = router({
   providers: protectedProcedure.query(() => ({
     local: true,
-    fal: !!process.env.FAL_KEY,
+    fal: !!ENV.falaiApiKey,
     openart: OpenArtService.getInstance().isConfigured(),
   })),
   generate: protectedProcedure

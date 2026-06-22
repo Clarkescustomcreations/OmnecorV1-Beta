@@ -22,6 +22,7 @@ import { eq } from "drizzle-orm";
 import { AgentMessengerStore } from "../_core/AgentMessengerStore.js";
 import { NotificationService } from "../_core/NotificationService.js";
 import type { AgentConversation } from "../../shared/notifications.js";
+import { assertProviderAllowedInMode } from "../_core/sovereign.js";
 
 type PersonaData = Record<string, unknown>;
 
@@ -90,25 +91,6 @@ function buildSystemPrompt(p: ResolvedPersona): string {
   return custom ? `${base}\n\n${custom}` : base;
 }
 
-const CLOUD_PROVIDER_IDS = new Set([
-  "openai",
-  "anthropic",
-  "gemini",
-  "grok",
-  "huggingface",
-]);
-
-function assertProviderAllowedInMode(
-  providerId: string,
-  executionMode: string | undefined,
-): void {
-  if (executionMode === "sovereign" && CLOUD_PROVIDER_IDS.has(providerId)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `Sovereign mode: cloud provider "${providerId}" is disabled. Use a local provider (ollama, llamacpp, ommesh).`,
-    });
-  }
-}
 
 export const agentMessengerRouter = router({
   /** List messenger threads (one per persona) with last message + unread count. */

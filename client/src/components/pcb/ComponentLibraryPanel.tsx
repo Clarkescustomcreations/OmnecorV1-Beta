@@ -7,6 +7,7 @@
  */
 
 import React, { useState, useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -188,7 +189,7 @@ const ComponentCard: React.FC<ComponentCardProps> = ({
     <div className="flex items-center gap-2 mb-1">
       <div className="w-8 h-8 bg-background border border-border rounded flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">
         <div
-          dangerouslySetInnerHTML={{ __html: component.symbolSvg }}
+          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(component.symbolSvg) }}
           className="w-6 h-6"
         />
       </div>

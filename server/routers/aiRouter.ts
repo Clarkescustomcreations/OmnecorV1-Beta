@@ -26,6 +26,7 @@ import { validatePath } from "../_core/security.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { getWsInstance } from "../phase2/websocket/WebSocketServer.js";
 import { NotificationService } from "../_core/NotificationService.js";
+import { assertProviderAllowedInMode } from "../_core/sovereign.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sovereign-mode enforcement
@@ -33,29 +34,8 @@ import { NotificationService } from "../_core/NotificationService.js";
 // `chat`/`chatStream` are mixed local+cloud entry points: they accept any
 // providerId, so they cannot be `cloudProcedure` (that would block local Ollama
 // chat for sovereign users — the whole point of air-gapped mode). Instead we
-// gate per-provider: a sovereign user may use local providers freely, but any
-// provider that reaches an external cloud API is blocked here, mirroring the
-// `sovereignCheck` middleware behind `cloudProcedure`.
+// gate per-provider via the shared assertProviderAllowedInMode from sovereign.ts.
 // ─────────────────────────────────────────────────────────────────────────────
-const CLOUD_PROVIDER_IDS = new Set([
-  "openai",
-  "anthropic",
-  "gemini",
-  "grok",
-  "huggingface",
-]);
-
-function assertProviderAllowedInMode(
-  providerId: string,
-  executionMode: string | undefined,
-): void {
-  if (executionMode === "sovereign" && CLOUD_PROVIDER_IDS.has(providerId)) {
-    throw new TRPCError({
-      code: "FORBIDDEN",
-      message: `Sovereign mode: cloud provider "${providerId}" is disabled. Use a local provider (ollama, llamacpp, ommesh).`,
-    });
-  }
-}
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas

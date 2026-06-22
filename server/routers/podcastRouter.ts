@@ -8,6 +8,7 @@ import { router, protectedProcedure } from "../_core/trpc.js";
 import { LocalPodcastService } from "../phase2/services/LocalPodcastService.js";
 import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
+import { assertProviderAllowedInMode } from "../_core/sovereign.js";
 
 const dialogueTurnSchema = z.object({
   speakerId: z.string(),
@@ -44,13 +45,6 @@ const generateScriptSchema = z.object({
   })).optional(),
 });
 
-const CLOUD_PROVIDER_IDS = new Set([
-  "openai",
-  "anthropic",
-  "gemini",
-  "grok",
-  "huggingface",
-]);
 
 export const podcastRouter = router({
   /**
@@ -73,12 +67,7 @@ export const podcastRouter = router({
       const providerId = input.providerId ?? "openai";
       const modelId = input.modelId ?? "gpt-4o";
 
-      if (ctx.user?.executionMode === "sovereign" && CLOUD_PROVIDER_IDS.has(providerId)) {
-        throw new TRPCError({
-          code: "FORBIDDEN",
-          message: `Sovereign mode: cloud provider "${providerId}" is disabled. Use a local provider (ollama, llamacpp, ommesh).`,
-        });
-      }
+      assertProviderAllowedInMode(providerId, ctx.user?.executionMode);
 
       const duration = input.durationMinutes ?? 15;
       const turnCount = input.turnsCount ?? Math.max(2, Math.round(duration * 0.8));

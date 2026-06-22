@@ -39,6 +39,12 @@ export type Db = LibSQLDatabase<typeof schema>;
 let _client: Client | null = null;
 let _db: Db | null = null;
 let _initPromise: Promise<Db> | null = null;
+let _migrationFailed = false;
+
+/** Returns whether the auto-migration on first connect succeeded. */
+export function getMigrationStatus(): { ok: boolean } {
+  return { ok: !_migrationFailed };
+}
 
 // MIGRATIONS_DIR is set by the Electron main process as an env var so the
 // absolute path is known before the backend bundle executes. Falls back to
@@ -84,6 +90,7 @@ async function init(): Promise<Db> {
       log.warn(`No migrations folder at ${MIGRATIONS_DIR} — run \`pnpm build:push\``);
     }
   } catch (err) {
+    _migrationFailed = true;
     log.warn("Auto-migration failed — server continuing with existing schema. Run `pnpm db:migrate` to apply pending migrations.", err);
   }
 

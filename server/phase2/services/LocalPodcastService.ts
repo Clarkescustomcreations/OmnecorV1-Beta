@@ -4,7 +4,7 @@
  *
  * Spawns podcast_engine.py, passes the full config via stdin, and resolves
  * with the structured PodcastResult the engine writes to stdout as JSON.
- * Falls back to a stub result if the Python bridge is unavailable.
+ * Throws SERVICE_UNAVAILABLE if the Python bridge is unreachable or crashes.
  */
 
 import { spawn } from "child_process";
@@ -12,6 +12,7 @@ import { v4 as uuidv4 } from "uuid";
 import fs from "fs/promises";
 import path from "path";
 import os from "os";
+import { TRPCError } from "@trpc/server";
 import { createLogger } from "../../_core/logger.js";
 import { PYTHON_SCRIPTS } from "../config/index.js";
 import { getWsInstance } from "../websocket/WebSocketServer.js";
@@ -50,22 +51,6 @@ export interface PodcastResult {
 
 const PODCAST_ENGINE_TIMEOUT_MS = 10 * 60 * 1000; // 10 min max for long podcasts
 
-function _stubResult(jobId: string, tempDir: string, config: PodcastConfig): PodcastResult {
-  return {
-    jobId,
-    audioPath: path.join(tempDir, "podcast.wav"),
-    audioUrl: `/media/podcast/${jobId}`,
-    duration: config.turns.length * 15,
-    segments: config.turns.map((turn, idx) => ({
-      speaker: turn.speakerId,
-      text: turn.text,
-      audioUrl: `/media/podcast/${jobId}/segment/${idx}`,
-    })),
-    description: config.description,
-    durationMinutes: config.durationMinutes,
-    quality: config.quality,
-  };
-}
 
 async function callPodcastEngine(
   jobId: string,
@@ -190,18 +175,12 @@ export class LocalPodcastService {
       // the absolute path the engine reported.
       return { ...result, audioUrl: `/media/podcast/${jobId}`, segments };
     } catch (err) {
-      log.warn("podcast_engine.py unavailable, returning stub", { err: (err as Error).message });
-      const ws = getWsInstance();
-      if (ws) {
-        const channel = `podcast:${jobId}`;
-        ws.broadcastToChannel(channel, {
-          type: "trainingProgress",
-          channel,
-          data: { jobId, percent: 100 },
-          timestamp: new Date().toISOString(),
-        });
-      }
-      return _stubResult(jobId, tempDir, config);
+      const msg = (err as Error).message;
+      log.warn("podcast_engine.py unavailable", { err: msg });
+      throw new TRPCError({
+        code: "SERVICE_UNAVAILABLE",
+        message: `Podcast engine unavailable: ${msg}. Ensure the Python bridge is running.`,
+      });
     }
   }
 

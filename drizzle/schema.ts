@@ -332,6 +332,7 @@ export const curatedPosts = sqliteTable("curatedPosts", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   projectId: text("projectId").references(() => neuralMaps.id, { onDelete: "cascade" }),
   articleId: integer("articleId"),
+  createdByUserId: integer("createdByUserId").references(() => users.id, { onDelete: "cascade" }),
   platform: text("platform").notNull(),
   content: text("content"),
   metadata: text("metadata", { mode: "json" }),
@@ -341,6 +342,7 @@ export const curatedPosts = sqliteTable("curatedPosts", {
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
 }, (t) => [
   index("curated_posts_project_idx").on(t.projectId),
+  index("curated_posts_user_idx").on(t.createdByUserId),
 ]);
 
 export type CuratedPost = typeof curatedPosts.$inferSelect;

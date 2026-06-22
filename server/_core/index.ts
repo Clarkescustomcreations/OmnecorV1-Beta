@@ -26,7 +26,7 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes, registerSocialMediaOAuthRoutes, registerLocalAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { getDb, getUserByOpenId, publicUser } from "../db.factory.js";
+import { getDb, getMigrationStatus, getUserByOpenId, publicUser } from "../db.factory.js";
 import { appRouter } from "../routers";
 import { PairingService } from "./pairing.js";
 import { setBoundPort } from "./runtime-info.js";
@@ -335,7 +335,8 @@ async function startServer() {
       fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false),
       fetch(`${chromaUrl}/api/v1/heartbeat`, { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false),
     ]);
-    const ready = dbOk;
+    const migrationOk = getMigrationStatus().ok;
+    const ready = dbOk && migrationOk;
     res.status(ready ? 200 : 503).json({
       status: ready ? "healthy" : "degraded",
       service: "omnecor",
@@ -343,7 +344,7 @@ async function startServer() {
       architecture: "unified",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      checks: { db: dbOk, ollama: ollamaOk, chromadb: chromaOk },
+      checks: { db: dbOk, migrationOk, ollama: ollamaOk, chromadb: chromaOk },
       nonce: process.env.BACKEND_NONCE ?? "",
     });
   });
@@ -489,7 +490,10 @@ async function startServer() {
     );
   }
 
-  server.listen(port, () => {
+  // ZERO_LOGIN_MODE grants every connection full admin access — restrict to
+  // loopback so it cannot be reached from the LAN even in staging/dev.
+  const bindHost = ENV.zeroLoginMode ? "127.0.0.1" : undefined;
+  server.listen(port, bindHost as string, () => {
     log.info(
       "═══════════════════════════════════════════════════════════════"
     );

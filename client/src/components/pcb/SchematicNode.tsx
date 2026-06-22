@@ -7,6 +7,7 @@
  */
 
 import React, { useMemo } from 'react';
+import DOMPurify from 'dompurify';
 import { Handle, Position, NodeProps } from 'reactflow';
 import { Component } from '@/lib/componentLibrary';
 type ComponentSymbol = Component;
@@ -75,7 +76,7 @@ export const SchematicNode: React.FC<NodeProps<SchematicNodeData>> = ({
       <div
         className="w-full h-full flex items-center justify-center"
         dangerouslySetInnerHTML={{
-          __html: component.symbolSvg,
+          __html: DOMPurify.sanitize(component.symbolSvg),
         }}
       />
 

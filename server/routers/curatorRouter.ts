@@ -50,12 +50,15 @@ export const curatorRouter = router({
       limit: z.number().default(20),
       offset: z.number().default(0),
     }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
 
       const posts = await db.select()
         .from(curatedPosts)
-        .where(eq(curatedPosts.status, input.status))
+        .where(and(
+          eq(curatedPosts.status, input.status),
+          eq(curatedPosts.createdByUserId, ctx.user.id),
+        ))
         .limit(input.limit)
         .offset(input.offset);
 
@@ -63,12 +66,15 @@ export const curatorRouter = router({
     }),
   getPost: protectedProcedure
     .input(z.object({ postId: z.number() }))
-    .query(async ({ input }) => {
+    .query(async ({ input, ctx }) => {
       const db = await getDb();
 
       const result = await db.select()
         .from(curatedPosts)
-        .where(eq(curatedPosts.id, input.postId))
+        .where(and(
+          eq(curatedPosts.id, input.postId),
+          eq(curatedPosts.createdByUserId, ctx.user.id),
+        ))
         .limit(1);
 
       return result[0] || null;
@@ -97,6 +103,7 @@ export const curatorRouter = router({
         platform: input.platform,
         content,
         status: "pending_review",
+        createdByUserId: ctx.user.id,
       });
 
       // Mark the source article as processed so it isn't re-curated.
@@ -110,11 +117,14 @@ export const curatorRouter = router({
     .input(z.object({
       postIds: z.array(z.number()),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       await db.update(curatedPosts)
         .set({ status: "approved" })
-        .where(inArray(curatedPosts.id, input.postIds));
+        .where(and(
+          inArray(curatedPosts.id, input.postIds),
+          eq(curatedPosts.createdByUserId, ctx.user.id),
+        ));
       return { success: true, approvedCount: input.postIds.length };
     }),
   rejectPosts: protectedProcedure
@@ -122,14 +132,17 @@ export const curatorRouter = router({
       postIds: z.array(z.number()),
       rejectionReason: z.string().optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
       await db.update(curatedPosts)
         .set({
           status: "failed",
           approvalNotes: input.rejectionReason || "Rejected by user",
         })
-        .where(inArray(curatedPosts.id, input.postIds));
+        .where(and(
+          inArray(curatedPosts.id, input.postIds),
+          eq(curatedPosts.createdByUserId, ctx.user.id),
+        ));
       return { success: true, rejectedCount: input.postIds.length };
     }),
   updatePost: protectedProcedure
@@ -138,7 +151,7 @@ export const curatorRouter = router({
       content: z.string().optional(),
       status: z.enum(["draft", "pending_review", "approved", "scheduled", "published", "failed"]).optional(),
     }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const db = await getDb();
 
       await db.update(curatedPosts)
@@ -146,7 +159,10 @@ export const curatorRouter = router({
           ...(input.content && { content: input.content }),
           ...(input.status && { status: input.status }),
         })
-        .where(eq(curatedPosts.id, input.postId));
+        .where(and(
+          eq(curatedPosts.id, input.postId),
+          eq(curatedPosts.createdByUserId, ctx.user.id),
+        ));
 
       return { success: true };
     }),

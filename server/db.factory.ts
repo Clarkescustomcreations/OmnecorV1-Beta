@@ -8,11 +8,12 @@
  */
 
 import { eq } from "drizzle-orm";
-import { getDb } from "./db.js";
+import { getDb, getMigrationStatus } from "./db.js";
 import { users } from "../drizzle/schema.js";
 
 export {
   getDb,
+  getMigrationStatus,
   upsertUser,
   getUserByOpenId,
   publicUser,

@@ -163,6 +163,13 @@ export async function createContext(
     }
   }
 
+  // SOVEREIGN_MODE=true is a global operator override — force every user into
+  // sovereign execution regardless of what their DB record says. This lets an
+  // air-gapped deployment block cloud inference for all accounts at once.
+  if (ENV.sovereignMode && user) {
+    user = { ...user, executionMode: "sovereign" };
+  }
+
   return {
     req: opts.req,
     res: opts.res,
