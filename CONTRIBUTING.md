@@ -62,7 +62,7 @@ When submitting a pull request, please adhere to the following guidelines:
 Omnecor uses `prettier` for code formatting. Before submitting your pull request, ensure your code is formatted correctly by running:
 
 ```bash
-pnpm run format
+pnpm format
 ```
 
 ## 5. Testing
@@ -70,7 +70,7 @@ pnpm run format
 Omnecor uses `vitest` for testing. You can run the tests with:
 
 ```bash
-pnpm run test
+pnpm test
 ```
 
 Ensure all tests pass before submitting your pull request.

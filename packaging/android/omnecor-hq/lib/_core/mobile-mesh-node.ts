@@ -179,6 +179,16 @@ export function connect(): void {
       switch (msg.type) {
         case "mobile_node_ack":
           setStatus(msg.accepted ? "registered" : "error");
+          // OMMESH zero-touch auto-pair: if the PC handed back a session token
+          // and we aren't paired yet, store it so HTTP/tRPC calls authenticate.
+          if (msg.accepted && typeof msg.sessionToken === "string" && msg.sessionToken) {
+            void (async () => {
+              try {
+                const { getSessionToken, setSessionToken } = await import("./auth");
+                if (!(await getSessionToken())) await setSessionToken(msg.sessionToken);
+              } catch { /* best-effort */ }
+            })();
+          }
           break;
         case "mobile_inference_request":
           handleInferenceRequest(msg);

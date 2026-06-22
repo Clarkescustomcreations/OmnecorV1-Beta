@@ -1144,9 +1144,43 @@ export function Chat() {
           break;
         }
 
+        case "moe-chain": {
+          // arg is "l" | "c" | undefined (from /MOE-Chain L/C/bare)
+          const chainTypeArg = (arg ?? "").toLowerCase();
+          const chainTypes: Array<"local" | "cloud"> =
+            chainTypeArg === "c" ? ["cloud"] :
+            chainTypeArg === "l" ? ["local"] :
+            ["local", "cloud"];
+
+          toast.info("Setting up MoE Chain…", { duration: 5000 });
+          try {
+            const res = await vanillaTrpc.valet.initMoeChain.mutate({
+              chainType: chainTypes.length === 1 ? chainTypes[0]! : "both",
+            });
+
+            const localMsg = res.localSteps.length > 0
+              ? `Found ${res.localSteps.length} local GGUF model(s).`
+              : "No GGUFs found in models directory — add .gguf files to ~/.omnecor/models/.";
+            const cloudMsg = chainTypes.includes("cloud")
+              ? " Cloud chain template seeded (configure providers in Settings → Valet Router → MoE Chain)."
+              : "";
+
+            injectSystem(
+              `[MoE Chain initialised]\n\n` +
+              `${localMsg}${cloudMsg}\n\n` +
+              `Edit your chain in **Settings → Valet Router → MoE Chain**, then send a message — ` +
+              `Omnecor will automatically route \`moe_chain\` tasks through your specialist models.`
+            );
+            toast.success("MoE Chain ready");
+          } catch (err) {
+            toast.error(`MoE Chain init failed: ${(err as Error).message}`);
+          }
+          break;
+        }
+
         case "help":
           toast.info(
-            "Slash commands: /new · /clear · /compress · /btw <note> · /plan · /skill · /system · /export · /help\nWorkflows: /architect · /remember [save|restore] · /review · /recover · /imprint <file>",
+            "Slash commands: /new · /clear · /compress · /btw <note> · /plan · /skill · /system · /export · /help\nWorkflows: /architect · /remember [save|restore] · /review · /recover · /imprint <file> · /MOE-Chain [L|C]",
             { duration: 10000 }
           );
           break;

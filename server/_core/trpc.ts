@@ -79,6 +79,23 @@ const auditMiddleware = t.middleware(async (opts) => {
 
 export const protectedProcedure = t.procedure.use(requireUser).use(auditMiddleware);
 
+// Rejects paired-device sessions (role === "device"). Use for sensitive
+// account/device-management mutations that a phone must never perform — e.g.
+// minting new pairing codes or revoking devices — even though they aren't
+// admin-only for a desktop operator.
+const rejectDevice = t.middleware(async opts => {
+  const { ctx, next } = opts;
+  if (ctx.user?.role === "device") {
+    throw new TRPCError({
+      code: "FORBIDDEN",
+      message: "This action isn't available from a paired device.",
+    });
+  }
+  return next();
+});
+
+export const nonDeviceProcedure = protectedProcedure.use(rejectDevice);
+
 const sovereignCheck = t.middleware(async (opts) => {
   const { ctx, meta, next, path } = opts;
   if (ctx.user?.executionMode === "sovereign" && meta?.cloud === true) {

@@ -67,6 +67,8 @@ export interface ChatInput {
   sessionId?: string;  // for spend log correlation
   routingMode?: RoutingMode;
   modelPath?: string;
+  userId?: number;        // required for moe_chain DB config lookup
+  executionMode?: string; // required for Sovereign mode enforcement in cloud chain steps
 }
 
 export interface ChatChunk {
@@ -347,7 +349,100 @@ export class AiProviderService {
 
     const promise = (async () => {
       try {
-        // Federated Routing Check
+        // ── MoE Chain execution ─────────────────────────────────────────────
+        // moe_chain / moe_chain_omesh: load the user's chain config from DB
+        // and run steps sequentially through MoeChainService.
+        if (chatInput.routingMode === "moe_chain" || chatInput.routingMode === "moe_chain_omesh") {
+          const userId = chatInput.userId;
+          if (!userId) throw new Error("MoE chain requires userId — ensure the router passes ctx.user.id.");
+
+          // moe_chain_omesh: attempt OMMESH dispatch first; if a peer takes the
+          // task, return immediately. If no peer is available, fall through to
+          // the local MoE chain below.
+          if (chatInput.routingMode === "moe_chain_omesh") {
+            if (await this.shouldOffload(chatInput)) {
+              const peer = await this.selectPeerNode(chatInput);
+              if (peer) {
+                await this.routeToPeer(peer, chatInput, onChunk);
+                return;
+              }
+            }
+          }
+
+          const db = await getDb();
+          const { moeChainConfigs } = await import("../../../drizzle/schema.js") as typeof import("../../../drizzle/schema.js");
+          const { eq, and, inArray } = await import("drizzle-orm");
+
+          // Fetch both chain configs in one query, then pick the chain that has at
+          // least one ENABLED step (preferring local). Selecting on step count
+          // alone would let a scanned-but-disabled local chain shadow a configured
+          // cloud chain and throw "no active steps".
+          const rows = await db
+            .select()
+            .from(moeChainConfigs)
+            .where(and(
+              eq(moeChainConfigs.userId, userId),
+              inArray(moeChainConfigs.chainType, ["local", "cloud"]),
+            ));
+
+          const hasEnabled = (r: typeof moeChainConfigs.$inferSelect | undefined) =>
+            !!r && (r.steps ?? []).some(s => s.enabled);
+          const localRow = rows.find(r => r.chainType === "local");
+          const cloudRow = rows.find(r => r.chainType === "cloud");
+
+          let chainRow: (typeof moeChainConfigs.$inferSelect) | undefined;
+          let chainType: "local" | "cloud" = "local";
+          if (hasEnabled(localRow)) {
+            chainRow = localRow;
+            chainType = "local";
+          } else if (hasEnabled(cloudRow)) {
+            chainRow = cloudRow;
+            chainType = "cloud";
+          }
+
+          if (!chainRow) {
+            throw new Error(
+              "MoE chain not configured. Run /MOE-Chain in chat to set up your chain, " +
+              "or go to Settings → Valet Router → MoE Chain to add models (and enable at least one step)."
+            );
+          }
+
+          const { MoeChainService } = await import("./MoeChainService.js") as typeof import("./MoeChainService.js");
+
+          // Get task category from the Valet's last routing decision (advisory)
+          let taskCategory: string | undefined;
+          try {
+            const valetDecision = await ValetRouterService.getInstance().route({
+              task: chatInput.messages[chatInput.messages.length - 1]?.content?.slice(0, 500) ?? "chat",
+              preferredMode: "moe_chain",
+              availableProviders: [],
+              taskType: "chat",
+            });
+            taskCategory = valetDecision.category;
+          } catch { /* Valet offline — all steps run */ }
+
+          await MoeChainService.getInstance().execute(
+            chainRow.steps,
+            chainType,
+            {
+              messages: chatInput.messages,
+              taskCategory,
+              maxTokensPerStep: chatInput.maxTokens ?? 512,
+              temperature: chatInput.temperature,
+              apiKey: chatInput.apiKey,
+              baseUrl: chatInput.baseUrl,
+              executionMode: chatInput.executionMode,
+              // Threaded so cloud chain steps log spend / enforce budgets per step.
+              projectId: chatInput.projectId,
+              sessionId: chatInput.sessionId,
+              userId: chatInput.userId,
+            },
+            onChunk,
+          );
+          return;
+        }
+
+        // ── Federated Routing Check (OMMESH) ────────────────────────────────
         if (await this.shouldOffload(chatInput)) {
           const peer = await this.selectPeerNode(chatInput);
           if (peer) {

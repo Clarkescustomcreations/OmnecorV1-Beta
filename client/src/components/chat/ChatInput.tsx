@@ -22,7 +22,8 @@ export type SlashCommand =
   | "remember"
   | "review"
   | "recover"
-  | "imprint";
+  | "imprint"
+  | "moe-chain";
 
 interface Attachment {
   name: string;
@@ -74,6 +75,7 @@ const COMMANDS: { cmd: SlashCommand; label: string; description: string }[] = [
   { cmd: "review", label: "/review", description: "Three-layer review of the current changes" },
   { cmd: "recover", label: "/recover", description: "Diagnose a failure before deciding how to respond" },
   { cmd: "imprint", label: "/imprint", description: "Capture a component's UI patterns to the registry" },
+  { cmd: "moe-chain", label: "/MOE-Chain", description: "Activate MoE Chain routing (L = local GGUF, C = cloud)" },
 ];
 
 export function ChatInput({
@@ -253,6 +255,16 @@ export function ChatInput({
     const arglessCmd = /^\/(clear|new|system|export|compress|plan|architect|review|recover|help|skill)$/.exec(trimmed);
     if (arglessCmd) {
       onCommand(arglessCmd[1] as SlashCommand);
+      setValue("");
+      setAttachments([]);
+      if (textareaRef.current) textareaRef.current.style.height = "auto";
+      return;
+    }
+
+    // /MOE-Chain [L|C] — optional chain-type argument
+    const moeCmd = /^\/MOE-Chain\b\s*(L|C)?$/i.exec(trimmed);
+    if (moeCmd) {
+      onCommand("moe-chain", (moeCmd[1] ?? "").toLowerCase() || undefined);
       setValue("");
       setAttachments([]);
       if (textareaRef.current) textareaRef.current.style.height = "auto";

@@ -36,6 +36,20 @@
       "when": 1781957817299,
       "tag": "0004_gorgeous_martin_li",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1782082520331,
+      "tag": "0005_fixed_karen_page",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1782085995728,
+      "tag": "0006_furry_sphinx",
+      "breakpoints": true
     }
   ]
 }

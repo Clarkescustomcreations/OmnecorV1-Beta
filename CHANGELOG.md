@@ -1,22 +1,44 @@
 # Changelog
 
-## [Unreleased] - 2026-06-21 — Android HQ: Expo SDK 55 / RN 0.83 upgrade, LiteRT-LM, mock-data wiring, tech-debt cleanup
+## [Unreleased]
 
-### Changed
+### 2026-06-22 — Device pairing for the mobile app (replaces OAuth)
+
+#### Added
+
+- **Device pairing (Jellyfin Quick-Connect-style) — the phone authenticates to its own PC without OAuth.** The desktop (Settings → **Devices**) shows a one-time **6-digit code** + a **QR** encoding `{host, port, secret}`; the phone scans the QR (one step: sets the PC address *and* pairs) or types the code, redeems it at public `POST /api/pair/redeem`, and receives the same `app_session_id` JWT it already uses as a Bearer token. The QR carries a long high-entropy `secret` (brute-force-proof) while the short code is rate-limited (`authLimiter` on `/api/pair`, 3-min single-use codes). New `server/_core/pairing.ts` (`PairingService`), `server/routers/pairingRouter.ts` (`createCode`/`listDevices`/`revokeDevice`), `client/.../settings/PairDevicePanel.tsx`, and the mobile `lib/_core/pairing.ts` + `components/pair-flow.tsx` (QR scan via `expo-camera` + manual entry).
+- **Persistent paired-devices + revocation.** New `paired_devices` table (survives PC restarts → a paired phone never has to re-pair). The session JWT carries a `deviceId` (`sdk.ts`); revoking a device (desktop list) flips `revokedAt` and an in-memory revoked-set rejects its tokens immediately on the auth hot path — no per-request DB read.
+- **OMMESH zero-touch auto-pair.** On the same LAN with a shared `OMMESH_SECRET`, the existing `mobile_node_register` handshake now also returns a session token in `mobile_node_ack`, so the phone pairs with no code entry.
+
+#### Changed
+
+- **Mobile onboarding now leads with “Pair with my PC”**; the Google/Microsoft OAuth buttons were removed from the app (server OAuth routes stay for the web). This also moots a latent deep-link scheme mismatch (`manus…` vs `omnecor-hq://`) that had broken mobile OAuth. Local-account stays as the offline fallback. APK rebuilt (108 MB; `CAMERA` permission added).
+
+#### Fixed
+
+- `moeChainConfigs.steps` schema default `”[]”` (a string) → `[]` — it was a type error breaking `tsc` for a JSON-mode column typed `MoeChainStep[]`.
+
+**Gates:** root `tsc` 0 · `vitest` 331/331 · mobile `tsc` 0 · `expo prebuild` clean · `assembleDebug` → 108 MB APK ✓
+
+---
+
+### 2026-06-21 — Android HQ: Expo SDK 55 / RN 0.83 upgrade, LiteRT-LM, mock-data wiring, tech-debt cleanup
+
+#### Changed
 
 - **Android HQ upgraded to Expo SDK 55 / React Native 0.83.6 / React 19.2.0.** All `expo-*` packages aligned to the SDK-55 `bundledNativeModules` map; `expo-share-intent`→`^6.1.1`; `react-native-reanimated`→`4.2.1`, `react-native-worklets`→`0.7.4`. Removed `newArchEnabled` (always-on in SDK 55) and `edgeToEdgeEnabled` (removed from `ExpoConfig`). New Architecture is mandatory and enabled. Verified: mobile `tsc` 0 errors, `expo prebuild --clean` clean, **`assembleDebug` produces a working APK**.
-- **On-device LLM engine swapped: `react-native-llm-mediapipe` → `react-native-litert-lm`** (`^0.4.2`, + `react-native-nitro-modules`). Google's MediaPipe LLM Inference API is now maintenance-only; LiteRT-LM is its maintained successor. `lib/_core/mediapipe-inference.ts` rewritten onto `createLLM`/`loadModel`/`sendMessage`/`sendMessageAsync`/`close` with the same exported API (callers unchanged). Models move from `.task` → `.litertlm`. `expo-build-properties` now sets `minSdkVersion 26` + `buildArchs ["arm64-v8a"]` (LiteRT-LM is ARM64-only, API 26+).
+- **On-device LLM engine swapped: `react-native-llm-mediapipe` → `react-native-litert-lm`** (`^0.4.2`, + `react-native-nitro-modules`). Google's MediaPipe LLM Inference API is now maintenance-only; LiteRT-LM is its maintained successor. `lib/_core/mediapipe-inference.ts` rewritten onto `createLLM`/`loadModel`/`sendMessage`/`sendMessageAsync`/`close` with the same exported API (callers unchanged). Models move from `.task` → `.litertlm`. `expo-build-properties` now sets `minSdkVersion 26` + `buildArchs [“arm64-v8a”]` (LiteRT-LM is ARM64-only, API 26+).
 - **`llama.rn` bumped `^0.9.0` → `^0.12.4`** (New Architecture). `react-native-gesture-handler` bumped to `^2.31.2` (resolves `2.32.0`) — `2.30.x` failed to compile against RN 0.83.6 (`ReactRoot.getRootViewTag()` became a function).
-- **Mock data removed from the mobile chat & podcast screens.** Chat now wires real model selection (provider switch + `ollama.listModels` / cloud catalog mirroring the desktop `API_MODEL_CATALOG`) instead of a hardcoded `"llama3.2:latest"`; the fake neural-map (`Project A/B`) and agent (`Creative/Technical/Analyst`) fallback lists are replaced with the real `neuralMaps.list` / `personas.list` data + truthful empty states. Podcast: hardcoded model id replaced with real resolution; the fake 5-item voice list replaced with the only real control (RVC voice-conversion on/off). Shared `askAi` (3D Viewer) uses the same real model resolver.
+- **Mock data removed from the mobile chat & podcast screens.** Chat now wires real model selection (provider switch + `ollama.listModels` / cloud catalog mirroring the desktop `API_MODEL_CATALOG`) instead of a hardcoded `”llama3.2:latest”`; the fake neural-map (`Project A/B`) and agent (`Creative/Technical/Analyst`) fallback lists are replaced with the real `neuralMaps.list` / `personas.list` data + truthful empty states. Podcast: hardcoded model id replaced with real resolution; the fake 5-item voice list replaced with the only real control (RVC voice-conversion on/off). Shared `askAi` (3D Viewer) uses the same real model resolver.
 - **Phase-2 routers relocated:** `agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter` moved from `server/phase2/routers/` to the canonical `server/routers/` (services stay in `phase2/services/`). Import paths and docs (CLAUDE.md, AGENTS.md, ROUTER_INVENTORY.md, TRPC_API.md) updated. tRPC namespaces unchanged → no client impact.
 
-### Fixed
+#### Fixed
 
 - **`apk:debug`/`apk:release`/`apk:install`: removed the `rm -rf app/.cxx app/build/generated/autolinking` workaround** (added 2026-06-16). The autolinking-codegen ordering bug it papered over is resolved by the SDK 55 / RN 0.83 toolchain — a fresh `expo prebuild` + `assembleDebug` builds cleanly through all codegen/NDK/autolinking tasks without it.
 - **Dropped the obsolete `patches/llama.rn.patch`** (forced `hasHexagon=false` to dodge a Snapdragon `libcdsprpc.so` `UnsatisfiedLinkError`). `llama.rn` 0.12.4's `tryLoadLibrary` now catches that error and falls back to the `dotprod_i8mm` CPU variant — the guard is upstreamed. (Revisit if a Snapdragon device crashes on model load.)
 - **`pnpm check` no longer fails on a stray `node_modules_broken/` directory** — deleted the untracked dir and added it to the mobile `tsconfig.json` `exclude` (it had been flooding `tsc` with ~30 errors from a quarantined node_modules snapshot).
 
-### Documentation
+#### Documentation
 
 - Clarified the three migration paths (`pnpm build:push` dev / `pnpm db:migrate` prod-CI / `server/db.ts` runtime fallback) in CLAUDE.md and `server/db.ts` — `db:migrate` is complementary, not legacy.
 - Added an Expo 55 / RN 0.83 upgrade record at the top of `Context/Progress-Tracker.md`.
@@ -25,32 +47,32 @@
 
 ---
 
-## [Unreleased] - 2026-06-19 — Security, Correctness & Design-Token Sweep
+### 2026-06-19 — Security, Correctness & Design-Token Sweep
 
-### Changed
+#### Changed
 
 - **Export-default debt resolved:** All 77 files using default React component exports converted to named exports (matches `AGENTS.md` style rule); all import statements and dynamic lazy-load references updated across 19 importing files.
 - **Real BPE tokenizer, then right-sized:** Added `js-tiktoken` for accurate per-model token counting, then replaced it same-day with a lightweight ~4-chars/token approximation after discovering the BPE rank files bloated the Chat bundle to 3.9 MB and broke module resolution in the browser. Chat chunk: 3.9 MB → 472 kB. `estimateTokens()` API unchanged.
 - **Design-token sweep:** Hardcoded hex literals in `neuralNodeTree.ts`, `MeshTopologyGraph.tsx`, and `AgentNetworking.tsx` legend dots replaced with CSS variable references. Raw Tailwind color classes (`green-*`, `blue-*`, `red-*`, etc.) swept across 14 files to semantic tokens (`accent-success`, `accent-cyan`, `destructive`, etc.).
 - **`AGENTS.md` hex-literal exceptions documented:** `PCBViewer3D` (Three.js integer colors), brand-identity SVGs in `SetupWizard` (Google/Microsoft palettes), `MeshTopologyGraph` (Canvas API), `OAUTH_PLATFORMS` buttons (brand-required platform colors).
 
-### Fixed
+#### Fixed
 
 - Dead `if (!db)` branch removed from `agentMessengerRouter.ts` — `getDb()` never returns null; the branch was unreachable and misleading.
 - Dev-mode rate limiter no longer 429s on cold Vite module fetches (added `skip` for non-`/api` paths).
 
-### Removed
+#### Removed
 
-- Leftover "Manus" AI dev-tooling: browser debug-collector script injected into every dev page, the ~150-line Vite plugin that injected it, and the wildcard `allowedHosts` entries.
+- Leftover “Manus” AI dev-tooling: browser debug-collector script injected into every dev page, the ~150-line Vite plugin that injected it, and the wildcard `allowedHosts` entries.
 - Stale Manus symlink that was blocking Vite production builds.
 
 **Gates:** root `tsc` 0 · `vitest` 353/353
 
 ---
 
-## [Unreleased] - 2026-06-16/17 — OMMESH Live Cross-Node Verification + Documentation Overhaul
+### 2026-06-16/17 — OMMESH Live Cross-Node Verification + Documentation Overhaul
 
-### Added
+#### Added
 
 - **OMMESH cross-node mTLS inference routing (Phase 9 stub → real implementation):** New `server/ommesh/core/MeshServer.ts` — strict-mTLS HTTPS listener on `MESH_PORT` (3001); only CA-signed peers connect (`requestCert` + `rejectUnauthorized` + TLSv1.3). `MeshNode.executeLocal()` runs real inference via `AiProviderService.chat()`; `routeToRemote()` pins the peer's advertised certificate fingerprint (rejects MITM even with a different CA-signed cert). Sovereign-mode guard prevents cloud providers from ever tunneling through mesh routing.
 - **LAN peer discovery fixed:** two real bugs found via live 3-machine testing — peers resolving to IPv6 link-local addresses instead of routable IPv4, and Windows multicast-DNS binding to the WSL/Hyper-V virtual adapter instead of the real LAN. New shared `server/_core/net-utils.ts` fixes both, wired into both `DiscoveryService` and the legacy `MeshDiscoveryService`.
@@ -59,21 +81,21 @@
 - **New user guides:** `docs/setup/OMMESH_SETUP.md`, `docs/user-guides/3D_DESIGNER.md`, `docs/user-guides/ALWAYS_LISTEN.md`, `docs/user-guides/SLASH_COMMANDS.md`, `docs/user-guides/PODCAST_STUDIO.md`, `docs/user-guides/FICTION_MODE.md`, `docs/README.md` (full documentation index).
 - **Android Always-Listen voice mode simplified:** wake-word matching moved from a Picovoice/Porcupine dependency to on-device Whisper-only matching — no third-party account, API key, or external wake-word service required.
 
-### Fixed
+#### Fixed
 
 - `apk:debug` / `apk:release` / `apk:install` build scripts: replaced hardcoded `gradlew clean` with a targeted `rm -rf app/.cxx app/build/generated/autolinking` — the blanket clean was re-running CMake against not-yet-generated autolinking codegen JNI directories (`react-native-voice-processor`, etc.) and failing the build.
 - `packaging/windows/BUILD-WINDOWS.md`: removed stale internal project name reference, updated version strings to match actual build output, corrected the Valet Router GGUF step from a Git LFS reference to the actual GitHub Release download flow (`scripts/fetch-valet-model.sh`).
 - `README.md`: removed inaccurate MySQL/TiDB support claim (the backend has been libSQL/SQLite-only since the Phase 2 database unification); added Windows to the system requirements table.
-- `FAQ.md`: corrected "Linux-only" system requirements answer to reflect native Windows + Linux + Android support.
+- `FAQ.md`: corrected “Linux-only” system requirements answer to reflect native Windows + Linux + Android support.
 - `QUICKSTART.md`, `CONTRIBUTING.md`, `docs/workflows/DEVELOPMENT_WORKFLOWS.md`: `npm run dev` → `pnpm dev` throughout (project has been pnpm-only for the entire beta).
 - `ROADMAP.md`: updated v1.0 blocker status — Valet Router integration and Android APK build are both code-complete (previously marked pending).
 
-### Removed
+#### Removed
 
 - Obsolete planning docs no longer reflecting current architecture: `docs/MULTI-PLATFORM-COMPATIBILITY-AUDIT.md`, `docs/MULTI-PLATFORM-FIX-PLAN.md`, `docs/UPGRADE-PLAN.md`, `docs/june-3-doc-updates.md` (1,231-line dev session note that had been committed as a permanent doc).
 - Duplicate documentation files: `docs/OAUTH_SETUP.md` (superseded by `docs/setup/OAUTH_SETUP.md`), `docs/neural brain map/NEURAL_BRAIN_MAP_UI.md` (superseded by `docs/frontend/NEURAL_BRAIN_MAP_UI.md`).
 
-### Environment Notes (not code bugs, but relevant if reproducing)
+#### Environment Notes (not code bugs, but relevant if reproducing)
 
 - Windows requires the network profile set to **Private** with inbound firewall allowances for TCP 3000/3001 for OMMESH discovery to work.
 - Clock drift on a mesh node (observed: ~61 min fast, NTP disabled) affects the mTLS replay-protection window — keep NTP enabled on all OMMESH nodes.
@@ -82,25 +104,25 @@
 
 ---
 
-## [Unreleased] - 2026-06-15 — Out-of-Band Depth Pass: AI Context & Feature Gaps
+### 2026-06-15 — Out-of-Band Depth Pass: AI Context & Feature Gaps
 
-### Added
+#### Added
 
-- **3D Viewer real model loading:** the `url` prop was previously declared but inert (no loader existed — the viewer only ever showed demo primitives regardless of input). Real GLTF/GLB loading via `GLTFLoader`, OBJ via `OBJLoader`. `buildSceneContext()` walks the loaded scene graph and feeds mesh names, parent hierarchy, vertex counts, and bounding-box dimensions into the AI context when using "Ask AI" or "Suggest Changes" — previously real models fell back to a bare mesh name with no description.
+- **3D Viewer real model loading:** the `url` prop was previously declared but inert (no loader existed — the viewer only ever showed demo primitives regardless of input). Real GLTF/GLB loading via `GLTFLoader`, OBJ via `OBJLoader`. `buildSceneContext()` walks the loaded scene graph and feeds mesh names, parent hierarchy, vertex counts, and bounding-box dimensions into the AI context when using “Ask AI” or “Suggest Changes” — previously real models fell back to a bare mesh name with no description.
 - **PCB AI panel real netlist context:** the AI system prompt previously sent only `{ nodes: N, edges: N, mode }` — node/edge counts with no component or connection detail. `buildDesignContext()` now serializes the actual canvas state into a readable netlist (component refs, types, values, source→target connections), capped at 2000 characters.
 - **Podcast Studio session persistence, per-segment regeneration, and audio download** — see `docs/user-guides/PODCAST_STUDIO.md` for the full feature set.
-- **Social media automation: failed-post visibility and retry** — posts with `status: "failed"` are now surfaced in the Calendar tab with a destructive badge and error message (previously silently invisible); new `scheduling.retryPost` procedure with ownership verification.
+- **Social media automation: failed-post visibility and retry** — posts with `status: “failed”` are now surfaced in the Calendar tab with a destructive badge and error message (previously silently invisible); new `scheduling.retryPost` procedure with ownership verification.
 - **Per-platform character-limit enforcement** for the social post composer (Twitter/X 280, LinkedIn 3000, Instagram 2200, Facebook 63206, YouTube 5000, TikTok 2200) — composer now disables Schedule/Publish and shows a live counter when over limit.
 
-### Changed
+#### Changed
 
 - `AGENTS.md` rewritten with explicit skill trigger conditions, Process/Style/Safety rule categories, a Critical Schema & Import Rules section, and a Known Gotchas table sourced from real session history.
 
 ---
 
-## [Unreleased] - 2026-06-14 — Documentation Consolidation
+### 2026-06-14 — Documentation Consolidation
 
-### Changed
+#### Changed
 
 - **Consolidated all working/planning docs into a single local-only `Context/` folder.** Twelve scattered markdown files were merged into the ten thematic Context documents and then removed: `input-tracker.md` + `ui_audit_report.md` + `APK-input-tracker.md` → `UI-Registry.md`; `master-feature-plan.md` → `Project-Overview.md`; `jun14-review.md` (detailed findings) + `BUILD.md` + `APK-feature-plan.md` + `APK-todo.md` → `Build-Plan.md` (appendices A–D); `master-todo.md` + `FUNCTIONAL-AUDIT.md` + `Beta-Code-Sweep.md` → `Progress-Tracker.md` (archives A–C). No information was lost in the merge.
 - **`Context/` is now git-ignored** (consolidated working docs are local-only), alongside the agent/session files `CHANGELOG.md`, `CLAUDE.md`, `AGENTS.md`, `memory.md`, and `.claude/`.

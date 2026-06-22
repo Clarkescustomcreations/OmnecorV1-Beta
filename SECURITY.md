@@ -52,18 +52,7 @@ To enhance the security of your Omnecor installation, we recommend the following
 
 -   **Monitor Logs**: Periodically review Omnecor logs (located in `server/_core/logs`) for any unusual activity or error messages that might indicate a security concern.
 
-## 3. Code Integrity & Audit Hygiene (2026-06-10)
-
-As part of the V1-Beta finalization sweep, all stale diagnostic comments were removed from the codebase:
-
--   **484 `UI-AUDIT-FINDING/SUGGESTION` comment lines** removed from 6 client-side TSX files. These were injected by an automated scanner in earlier sessions and did not reflect actual code defects — their presence could mislead future auditors.
--   **140 `UI-LOGIC-AUDIT` comment lines** removed from 24 server router files.
--   **Misleading placeholder comments** removed from `discoveryRouter.ts` (which already queries the database), `agentSettingsRouter.ts`, and `brainmapRouter.ts`. *(Update 2026-06-12: the `updateBotTheme`/`updateDiscoveryKeywords` stubs and the `brainmap` router were removed entirely in the production-readiness sweep — they had zero callers and silently dropped data.)*
--   **TypeScript gate**: `pnpm check` passes with 0 errors after all removals.
-
-These removals are purely cosmetic but security-relevant: misleading comments can cause reviewers to trust that a check is performed when it is not (or vice versa). The current comment state now reflects actual behavior.
-
-## 4. Production-Readiness Hardening (2026-06-12)
+## 3. Production-Readiness Hardening (2026-06-12)
 
 The V1-Beta production-readiness sweep (see `Beta-Code-Sweep.md`) added the following protections:
 
@@ -74,10 +63,12 @@ The V1-Beta production-readiness sweep (see `Beta-Code-Sweep.md`) added the foll
 -   **Configurable session lifetime**: `SESSION_TTL_MS` controls the session JWT + cookie lifetime (default one year for local-first installs; network deployments should set e.g. `604800000` = 7 days).
 -   **Dependency floor pins**: `pnpm audit` is clean across all workspaces; security floors live in `pnpm-workspace.yaml` (drizzle-orm ≥0.45.2, @trpc/server ≥11.8.0, shell-quote ≥1.8.4, joi ≥18.2.1, uuid ≥11.1.1, and others).
 
-## 5. Reporting Security Vulnerabilities
+## 4. Reporting Security Vulnerabilities
 
-If you discover a security vulnerability in Omnecor, please report it responsibly by contacting the maintainers directly. Do not disclose the vulnerability publicly until it has been addressed.
+If you discover a security vulnerability in Omnecor, please report it responsibly via one of the following channels. Do not disclose the vulnerability publicly until it has been addressed.
 
-## 6. License
+**Preferred:** [GitHub Security Advisories](https://github.com/Clarkescustomcreations/OmnecorV1-Beta/security/advisories/new) — opens a private draft advisory visible only to maintainers.
 
-This security policy is part of the Omnecor project, which is licensed under the MIT License. See the [LICENSE](LICENSE) file for details.
+**Alternative:** Email **markvx1irondestroyer@gmail.com** with the subject line `[SECURITY] Omnecor — <short description>`.
+
+Please include: affected version(s), reproduction steps, and your assessment of potential impact. We aim to acknowledge reports within 72 hours and to publish a fix and advisory within 14 days of confirmation.

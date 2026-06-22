@@ -10,7 +10,7 @@ The core platform feature set is fully code-complete, packaged, and verified. Pr
 
 ## Future Milestones
 
-### V1-Beta Remaining Checklist (before stable release)
+### V1-Beta Completion Record
 
 | Feature | Status |
 |---|---|

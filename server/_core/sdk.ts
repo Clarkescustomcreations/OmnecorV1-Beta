@@ -15,6 +15,8 @@ import type {
   GetUserInfoWithJwtResponse,
 } from "./types/manusTypes";
 import { createLogger } from "./logger.js";
+import { isDeviceRevoked } from "./device-revocation.js";
+import { touchDevice } from "./device-activity.js";
 const log = createLogger("SDK");
 // Utility function
 const isNonEmptyString = (value: unknown): value is string =>
@@ -24,6 +26,8 @@ export type SessionPayload = {
   openId: string;
   appId: string;
   name: string;
+  /** Present on tokens minted for a paired mobile device; enables revocation. */
+  deviceId?: string;
 };
 
 const EXCHANGE_TOKEN_PATH = `/webdev.v1.WebDevAuthPublicService/ExchangeToken`;
@@ -169,13 +173,14 @@ class SDKServer {
    */
   async createSessionToken(
     openId: string,
-    options: { expiresInMs?: number; name?: string } = {}
+    options: { expiresInMs?: number; name?: string; deviceId?: string } = {}
   ): Promise<string> {
     return this.signSession(
       {
         openId,
         appId: ENV.appId,
         name: options.name || "",
+        deviceId: options.deviceId,
       },
       options
     );
@@ -195,6 +200,7 @@ class SDKServer {
       openId: payload.openId,
       appId: payload.appId,
       name: payload.name,
+      ...(payload.deviceId ? { deviceId: payload.deviceId } : {}),
     })
       .setProtectedHeader({ alg: "HS256", typ: "JWT" })
       .setExpirationTime(expirationSeconds)
@@ -203,7 +209,7 @@ class SDKServer {
 
   async verifySession(
     cookieValue: string | undefined | null
-  ): Promise<{ openId: string; appId: string; name: string } | null> {
+  ): Promise<{ openId: string; appId: string; name: string; deviceId?: string } | null> {
     if (!cookieValue) {
       console.warn("[Auth] Missing session cookie");
       return null;
@@ -214,7 +220,7 @@ class SDKServer {
       const { payload } = await jwtVerify(cookieValue, secretKey, {
         algorithms: ["HS256"],
       });
-      const { openId, appId, name } = payload as Record<string, unknown>;
+      const { openId, appId, name, deviceId } = payload as Record<string, unknown>;
 
       if (
         !isNonEmptyString(openId) ||
@@ -229,6 +235,7 @@ class SDKServer {
         openId,
         appId,
         name,
+        deviceId: typeof deviceId === "string" ? deviceId : undefined,
       };
     } catch (error) {
       console.warn("[Auth] Session verification failed", String(error));
@@ -281,6 +288,11 @@ class SDKServer {
       throw ForbiddenError("Invalid session");
     }
 
+    // A paired-device token whose device has been revoked is no longer valid.
+    if (session.deviceId && isDeviceRevoked(session.deviceId)) {
+      throw ForbiddenError("Device access has been revoked");
+    }
+
     if (session.openId.startsWith(CRON_OPEN_ID_PREFIX)) {
       const userInfo = await this.getUserInfoWithJwt(sessionCookie ?? "");
       const taskUid = userInfo.taskUid ?? null;
@@ -320,6 +332,15 @@ class SDKServer {
       openId: user.openId,
       lastSignedIn: signedInAt,
     });
+
+    // Paired-device tokens carry a `deviceId`. Cap their effective role to
+    // "device" so a phone (whose token resolves to the owner account) cannot
+    // drive admin/owner procedures even though it authenticates as the owner.
+    // The cap is in-memory only — the persisted user row is never modified.
+    if (session.deviceId) {
+      void touchDevice(session.deviceId); // best-effort, throttled last-seen bump
+      return { ...user, role: "device" };
+    }
 
     return user;
   }

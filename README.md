@@ -20,7 +20,7 @@ Omnecor is a powerful, Local-first AI workstation designed for power users who d
 
 <div align="center">
 
-**check out the live demo at.** [https://clarkescustomcreations.github.io/OmnecorV1-Beta/]
+**Check out the live demo at** [clarkescustomcreations.github.io/OmnecorV1-Beta](https://clarkescustomcreations.github.io/OmnecorV1-Beta/).
 
 </div>
 

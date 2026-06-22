@@ -26,8 +26,10 @@ import net from "net";
 import { createExpressMiddleware } from "@trpc/server/adapters/express";
 import { registerOAuthRoutes, registerGoogleOAuthRoutes, registerMicrosoftOAuthRoutes, registerSocialMediaOAuthRoutes, registerLocalAuthRoutes } from "./oauth";
 import { registerStorageProxy } from "./storageProxy";
-import { getDb } from "../db.factory.js";
+import { getDb, getUserByOpenId, publicUser } from "../db.factory.js";
 import { appRouter } from "../routers";
+import { PairingService } from "./pairing.js";
+import { setBoundPort } from "./runtime-info.js";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
 import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
@@ -316,6 +318,9 @@ async function startServer() {
     message: "Too many authentication attempts, please try again later.",
   });
   app.use("/api/oauth", authLimiter);
+  // Pairing-code redemption is an auth flow too — throttle brute-force guessing
+  // of the 6-digit code (combined with its 3-min TTL + single active code).
+  app.use("/api/pair", authLimiter);
 
   // Configure body parser with larger size limit for file uploads
   app.use(express.json({ limit: "50mb" }));
@@ -363,6 +368,38 @@ async function startServer() {
     registerMicrosoftOAuthRoutes(app);
   }
   registerSocialMediaOAuthRoutes(app);
+
+  // POST /api/pair/redeem — the mobile app exchanges a desktop pairing code for a
+  // session token. Public (the phone has no session yet); body-parsed by the
+  // express.json() middleware above and covered by the global rate limiter.
+  // Mirrors /api/oauth/mobile: returns { app_session_id, user }. The `user` is
+  // sanitized via publicUser() — the raw row carries passwordHash, which must
+  // never leave the server.
+  app.post("/api/pair/redeem", async (req, res) => {
+    const { code, secret, deviceName, installId } = (req.body ?? {}) as {
+      code?: string;
+      secret?: string;
+      deviceName?: string;
+      installId?: string;
+    };
+    // The QR carries the strong `secret`; manual entry sends the 6-digit `code`.
+    const value = (typeof secret === "string" && secret) || (typeof code === "string" && code) || "";
+    if (!value) {
+      res.status(400).json({ error: "code or secret required" });
+      return;
+    }
+    const result = await PairingService.redeem(
+      value,
+      typeof deviceName === "string" ? deviceName : "Phone",
+      typeof installId === "string" && installId ? installId : undefined,
+    );
+    if (!result) {
+      res.status(401).json({ error: "Invalid or expired pairing code" });
+      return;
+    }
+    const user = await getUserByOpenId(result.openId);
+    res.json({ app_session_id: result.sessionToken, user: publicUser(user) });
+  });
 
   // ─── Cross-origin request validation (CSRF defense-in-depth) ────────────
   // Cookies are already SameSite=Strict, but we add an explicit Origin/Referer
@@ -443,6 +480,8 @@ async function startServer() {
   // ─── Start Listening ────────────────────────────────────────────────────
   const preferredPort = SERVER_CONFIG.port;
   const port = await findAvailablePort(preferredPort);
+  setBoundPort(port);
+  void PairingService.loadRevoked(); // hydrate the revoked-device set from the DB
 
   if (port !== preferredPort) {
     log.info(

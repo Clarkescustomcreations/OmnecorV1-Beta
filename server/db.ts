@@ -20,6 +20,7 @@ import * as schema from "../drizzle/schema.js";
 import {
   InsertUser,
   users,
+  type User,
   chatSessions,
   chatMessages,
   auditLog,
@@ -135,6 +136,23 @@ export async function getUserByOpenId(openId: string) {
   const db = await getDb();
   const result = await db.select().from(users).where(eq(users.openId, openId)).limit(1);
   return result.length > 0 ? result[0] : undefined;
+}
+
+/**
+ * Project a user row down to the fields that are safe to send to a client over
+ * the network. The full `users` row carries `passwordHash` (and other internal
+ * columns), so callers that return a user in an API response — e.g. the mobile
+ * pairing redeem — MUST sanitize through this rather than shipping the raw row.
+ */
+export function publicUser(user: User | undefined | null) {
+  if (!user) return null;
+  return {
+    id: user.id,
+    openId: user.openId,
+    name: user.name,
+    role: user.role,
+    executionMode: user.executionMode,
+  };
 }
 
 // ─────────────────────────────────────────────────────────────────────────────

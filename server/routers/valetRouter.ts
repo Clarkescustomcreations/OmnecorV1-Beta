@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { execFile } from "child_process";
 import { promisify } from "util";
-import { access, constants } from "fs/promises";
+import { access, constants, readdir, readFile, writeFile, mkdir } from "fs/promises";
 import { homedir } from "os";
 import path from "path";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc.js";
@@ -11,6 +11,10 @@ import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
 import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
 import { ValetServerService } from "../phase2/services/ValetServerService.js";
 import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
+import { getDb } from "../db.factory.js";
+import { moeChainConfigs, type MoeChainStep } from "../../drizzle/schema.js";
+import { eq, and } from "drizzle-orm";
+import { PATHS } from "../_core/paths.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -293,4 +297,216 @@ export const valetRouter = router({
 
     return { reloaded, embeddingJobId };
   }),
+
+  // ── MoE Chain procedures ────────────────────────────────────────────────────
+
+  /** Return the user's chain config for a given chain type. */
+  getMoeChain: protectedProcedure
+    .input(z.object({ chainType: z.enum(["local", "cloud"]) }))
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      const rows = await db
+        .select()
+        .from(moeChainConfigs)
+        .where(and(eq(moeChainConfigs.userId, ctx.user.id), eq(moeChainConfigs.chainType, input.chainType)))
+        .limit(1);
+      return rows[0] ?? null;
+    }),
+
+  /** Upsert the user's chain config and rewrite the corresponding .md file. */
+  saveMoeChain: protectedProcedure
+    .input(z.object({
+      chainType: z.enum(["local", "cloud"]),
+      steps: z.array(z.object({
+        order: z.number().int(),
+        label: z.string().min(1).max(128),
+        taskCategories: z.array(z.string().max(64)).max(20),
+        modelPath: z.string().max(4096).optional(),
+        ggufFile: z.string().max(512).optional(),
+        providerId: z.string().max(64).optional(),
+        modelId: z.string().max(256).optional(),
+        enabled: z.boolean(),
+      })).max(50),
+      projectPath: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      await _upsertMoeChain(
+        db,
+        ctx.user.id,
+        input.chainType,
+        input.steps as MoeChainStep[],
+        input.projectPath ?? null,
+      );
+      return { ok: true };
+    }),
+
+  /**
+   * First-run setup: scan available GGUFs + configured providers, seed the DB
+   * with a default chain, and write MOE-Chain-L.md / MOE-Chain-C.md to the
+   * project directory. Returns the seeded steps so the UI can render them.
+   */
+  initMoeChain: protectedProcedure
+    .input(z.object({
+      projectPath: z.string().optional(),
+      chainType: z.enum(["local", "cloud", "both"]).default("both"),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const wantLocal = input.chainType === "local" || input.chainType === "both";
+      const wantCloud = input.chainType === "cloud" || input.chainType === "both";
+      const projPath = input.projectPath ?? null;
+
+      // Only walk the models directory when a local chain is actually requested;
+      // seed placeholder cloud steps (enabled=false) only when cloud is requested.
+      const localSteps: MoeChainStep[] = wantLocal ? await _scanLocalGgufs() : [];
+      const cloudSteps: MoeChainStep[] = wantCloud ? _defaultCloudSteps() : [];
+
+      // First-run helper, not a destructive reset → preserve any existing config.
+      if (wantLocal) await _upsertMoeChain(db, ctx.user.id, "local", localSteps, projPath, { preserveExisting: true });
+      if (wantCloud) await _upsertMoeChain(db, ctx.user.id, "cloud", cloudSteps, projPath, { preserveExisting: true });
+
+      return { localSteps, cloudSteps, projectPath: input.projectPath ?? null };
+    }),
+
+  /** Scan the models directory for available GGUF files (for the panel picker). */
+  scanLocalModels: protectedProcedure.query(async () => {
+    return _scanLocalGgufs();
+  }),
 });
+
+// ── Helpers ──────────────────────────────────────────────────────────────────
+
+const LOGICAL_TASK_ORDER: string[] = [
+  "knowledge_retrieval",
+  "research",
+  "code_generation",
+  "code_review",
+  "integration",
+  "synthesis",
+  "reporting",
+];
+
+async function _scanLocalGgufs(): Promise<MoeChainStep[]> {
+  const results: MoeChainStep[] = [];
+  const modelsDir = PATHS.models;
+  try {
+    const entries = await readdir(modelsDir, { recursive: true, withFileTypes: true });
+    let order = 0;
+    for (const entry of entries) {
+      if (!entry.isFile()) continue;
+      const name = entry.name;
+      if (!name.toLowerCase().endsWith(".gguf")) continue;
+      const fullPath = path.join(entry.parentPath ?? (entry as { path?: string }).path ?? modelsDir, name);
+      results.push({
+        order: order++,
+        label: name.replace(/\.gguf$/i, ""),
+        taskCategories: [],
+        modelPath: path.dirname(fullPath),
+        ggufFile: name,
+        enabled: false,
+      });
+    }
+  } catch { /* models dir absent or unreadable */ }
+  return results;
+}
+
+function _defaultCloudSteps(): MoeChainStep[] {
+  return LOGICAL_TASK_ORDER.map((category, order) => ({
+    order,
+    label: `${category.replace(/_/g, " ")} specialist`,
+    taskCategories: [category],
+    providerId: "",
+    modelId: "",
+    enabled: false,
+  }));
+}
+
+/**
+ * Upsert a user's MoE chain config and (best-effort) rewrite its .md file. Shared
+ * by saveMoeChain (explicit save) and initMoeChain (first-run seed). When
+ * `preserveExisting` is set, an already-configured chain is left untouched so the
+ * first-run seed never clobbers a user's hand-built chain.
+ */
+async function _upsertMoeChain(
+  db: Awaited<ReturnType<typeof getDb>>,
+  userId: number,
+  chainType: "local" | "cloud",
+  steps: MoeChainStep[],
+  projectPath: string | null,
+  opts: { preserveExisting?: boolean } = {},
+): Promise<void> {
+  const existing = await db
+    .select()
+    .from(moeChainConfigs)
+    .where(and(eq(moeChainConfigs.userId, userId), eq(moeChainConfigs.chainType, chainType)))
+    .limit(1);
+
+  if (opts.preserveExisting && existing[0] && (existing[0].steps ?? []).length > 0) {
+    return;
+  }
+
+  if (existing[0]) {
+    await db
+      .update(moeChainConfigs)
+      .set({ steps, projectPath, updatedAt: new Date() })
+      .where(eq(moeChainConfigs.id, existing[0].id));
+  } else {
+    await db.insert(moeChainConfigs).values({
+      userId, chainType, steps, projectPath,
+      createdAt: new Date(), updatedAt: new Date(),
+    });
+  }
+
+  if (projectPath) {
+    try {
+      const safeProjPath = await validatePath(projectPath);
+      await _writeMoeChainMd(safeProjPath, chainType, steps);
+    } catch { /* Non-fatal — .md write failure doesn't block the upsert */ }
+  }
+}
+
+async function _writeMoeChainMd(
+  projectPath: string,
+  chainType: "local" | "cloud",
+  steps: MoeChainStep[],
+): Promise<void> {
+  const fileName = chainType === "local" ? "MOE-Chain-L.md" : "MOE-Chain-C.md";
+  const title = chainType === "local" ? "MoE Chain — Local (GGUF)" : "MoE Chain — Cloud";
+  const filePath = path.join(projectPath, fileName);
+
+  await mkdir(projectPath, { recursive: true });
+
+  const stepLines = steps
+    .sort((a, b) => a.order - b.order)
+    .map((s, i) => {
+      const categories = s.taskCategories.length > 0 ? s.taskCategories.join(", ") : "all tasks";
+      const target = chainType === "local"
+        ? `${s.modelPath ?? ""}/${s.ggufFile ?? ""}`.replace(/\/+/g, "/")
+        : `${s.providerId ?? ""}/${s.modelId ?? ""}`;
+      const status = s.enabled ? "✅" : "⬜";
+      return `${i + 1}. ${status} **${s.label}** — \`${target}\`\n   *Handles:* ${categories}`;
+    })
+    .join("\n");
+
+  const md = [
+    `# ${title}`,
+    "",
+    "Auto-generated by Omnecor `/MOE-Chain`. Edit model assignments in",
+    "**Settings → Valet Router → MoE Chain** or update this file and re-run `/MOE-Chain` to reload.",
+    "",
+    "## Chain Steps (execution order)",
+    "",
+    stepLines || "_No steps configured yet. Use Settings → Valet Router → MoE Chain to add models._",
+    "",
+    "## Notes",
+    "- Steps run sequentially. Output of each step becomes context for the next.",
+    "- Steps with empty *Handles* categories run on every task.",
+    "- ⬜ = disabled (skipped). ✅ = active.",
+    chainType === "local"
+      ? "- Only one model loads in RAM at a time (explicit unload between steps)."
+      : "- Cloud chain steps are blocked in **Sovereign mode**.",
+  ].join("\n");
+
+  await writeFile(filePath, md, "utf8");
+}

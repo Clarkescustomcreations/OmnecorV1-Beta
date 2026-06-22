@@ -18,7 +18,7 @@ import {
   UserCircle2, CheckCircle, ArrowLeft, Wallet, Settings as SettingsIcon,
   FolderOpen, Settings2, Trash2, Plus, AlertCircle, Upload, Save, Loader2,
   Search, Share2, Mic2, History, FileJson, Server, Globe, Database, ShieldAlert,
-  Eye, Layout, Clock, Coins, Brain, Copy, RefreshCw, Usb, Rocket
+  Eye, Layout, Clock, Coins, Brain, Copy, RefreshCw, Usb, Rocket, Smartphone
 } from "lucide-react";
 import { useTheme, type Theme } from "../contexts/ThemeContext";
 import { CloudComputePanel } from "../components/settings/CloudComputePanel";
@@ -27,6 +27,7 @@ import { useAppStore } from "../lib/store/app.store";
 import { ValetRouterPanel } from "../components/settings/ValetRouterPanel";
 import { AuditRetentionPanel } from "../components/settings/AuditRetentionPanel";
 import { AgenticWalletPanel } from "../components/settings/AgenticWalletPanel";
+import { PairDevicePanel } from "../components/settings/PairDevicePanel";
 import { advancedSettings } from "../lib/advancedSettings";
 import { OmnecorDashboardLayout } from "../components/OmnecorDashboardLayout";
 import { useLocation } from "wouter";
@@ -182,6 +183,7 @@ export const Settings: React.FC = () => {
     { id: "offline_voices", label: "Offline Voices", icon: Download },
     { id: "system", label: "System", icon: Cpu },
     { id: "accounts", label: "Accounts", icon: Users },
+    { id: "devices", label: "Devices", icon: Smartphone },
     { id: "valet", label: "Valet Router", icon: Route },
     { id: "appearance", label: "Appearance", icon: Sun },
     { id: "cloud", label: "Cloud Compute", icon: Cloud },
@@ -594,6 +596,9 @@ export const Settings: React.FC = () => {
 
                 <TabsContent value="ommesh">
                   <OMMESHPanel />
+                </TabsContent>
+                <TabsContent value="devices">
+                  <PairDevicePanel />
                 </TabsContent>
 
                 <TabsContent value="security">

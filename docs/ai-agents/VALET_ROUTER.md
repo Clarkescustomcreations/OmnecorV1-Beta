@@ -137,25 +137,44 @@ The fullest routing mode. Multiple cloud providers handle specialized tasks in p
 
 ### 3.8. MoE Chain — No OMMESH (`moe_chain`)
 
-Designed for users who have built multiple custom fine-tuned models via Omnecor's LLM-Builder. The Valet creates a sequential processing chain: each model handles the specific sub-task it was specialized for, then passes its output to the next model in the chain.
+Designed for users who have multiple specialist GGUF models on their local machine. The Valet creates a sequential processing chain: each model handles the specific sub-task it was specialized for, then passes its output as context to the next model in the chain.
 
-**Key constraint:** Only one model runs at a time to conserve compute. Tasks queue through the chain sequentially.
+**Key constraint:** Only one model runs at a time to conserve RAM. Between each step, the current GGUF model is explicitly unloaded from `llamacpp_bridge.py` before the next model loads. This allows chains of large models to run on 8–16 GB machines.
 
-**Use when:** You have 2+ specialized custom models and want precision routing without parallel GPU load.
+**Logical step order** (hardcoded in `valetRouter.ts`):
+`knowledge_retrieval` → `research` → `code_generation` → `code_review` → `integration` → `synthesis` → `reporting`
+
+**Step skipping:** Steps whose `taskCategories[]` is non-empty are skipped when the Valet's task classification does not match any listed category. Steps with an empty `taskCategories` always run.
+
+**Sovereign mode:** Allowed — all inference stays on-device via `llamacpp_bridge.py` (port 8013).
+
+**Setup:** Run `/MOE-Chain L` in chat to initialize, then configure steps at **Settings → Valet Router → MoE Chain**.
+
+**Use when:** You have 2+ locally-stored GGUF specialist models and want sequential expert-pipeline routing without parallel GPU/RAM load.
+
+> See [`docs/ai-agents/MOE_CHAIN.md`](MOE_CHAIN.md) for the full implementation reference.
 
 ---
 
 ### 3.9. MoE Chain + OMMESH (`moe_chain_omesh`)
 
-Extends the MoE chain across both the main PC and OMMESH network nodes.
+Chains through cloud API providers (Anthropic, OpenAI, or any configured provider) sequentially. Despite the `_omesh` suffix in the mode ID, this chain type in the Settings UI represents cloud-provider chaining rather than a literal OMMESH peer chain. Each step calls the cloud provider assigned to that step; the previous step's output becomes context for the next.
 
 **Critical sequencing rule:** OMMESH tasks **must be dispatched and started first**. This ensures the Valet retains the local compute budget needed for the routing calculation before the local chain begins. Starting the local chain first would starve the routing layer of resources.
 
 **Execution order:**
 1. Valet dispatches all OMMESH node tasks (network inference begins)
-2. Valet starts local MoE chain (Task 1 → Model A → output)
-3. Chain continues (output → Model B → output → Model C...)
+2. Valet starts the cloud MoE chain (Step 1 → cloud provider A → output)
+3. Chain continues (output → provider B → output → provider C…)
 4. OMMESH results return asynchronously and merge with chain output
+
+**Sovereign mode:** **Blocked.** Cloud inference is forbidden in `sovereign` execution mode. Attempting to activate this chain type while sovereign returns a FORBIDDEN error.
+
+**Setup:** Run `/MOE-Chain C` in chat to initialize, then configure steps at **Settings → Valet Router → MoE Chain**.
+
+**Use when:** You want sequential specialist AI pipeline routing via cloud providers on a task that benefits from distinct provider strengths at each stage.
+
+> See [`docs/ai-agents/MOE_CHAIN.md`](MOE_CHAIN.md) for the full implementation reference.
 
 ---
 
@@ -276,6 +295,7 @@ All Valet Router settings are accessible under **Settings → Valet Router**.
 
 ## 8. Related Documentation
 
+- [MOE_CHAIN.md](MOE_CHAIN.md) — Full MoE Chain implementation reference (architecture, RAM conservation, DB schema, setup steps)
 - [EXECUTION_MODES.md](../sovereignty/EXECUTION_MODES.md) — How routing modes interact with Sovereign/Scrapper/Big Spender execution modes
 - [OMMESH Architecture](../architecture/Omnecor%20System%20Design.md) — OMMESH node discovery and VRAM-weighted routing
 - [Multi-Agent Workflows](Omnecor%20Multi-Agent%20Collaboration%20Workflows.md) — Full workflow examples

@@ -69,6 +69,50 @@ Contingency: if the bug survives, keep the workaround + document it inline and f
 
 ---
 
+## ✅ MoE Chain (Mixture-of-Experts Chain) — 2026-06-22
+
+**Status:** Complete. All server, client, and DB work merged to main.
+
+**What was built:**
+
+A sequential multi-model routing pipeline that passes a user's chat message through an ordered chain of specialist models, with each step's output feeding into the next as context. Designed for 8–16 GB hardware where only one model can occupy RAM at a time.
+
+**Two chain types:**
+
+- `moe_chain` — local GGUF specialist models via `llamacpp_bridge.py` (port 8013). `LlamaCppService.unload()` frees the current model between steps; `preWarm()` loads the next. Allowed in Sovereign mode.
+- `moe_chain_omesh` — cloud API provider chain (Anthropic, OpenAI, etc.) called sequentially. Blocked in Sovereign mode.
+
+**Logical step order** (hardcoded in `valetRouter.ts`): `knowledge_retrieval` → `research` → `code_generation` → `code_review` → `integration` → `synthesis` → `reporting`. Steps with a non-empty `taskCategories[]` are skipped when the Valet's classification does not match.
+
+**Slash command:** `/MOE-Chain` (both chains), `/MOE-Chain L` (local only), `/MOE-Chain C` (cloud only). First run triggers `valet.initMoeChain`, which scans `~/.omnecor/models/` for GGUFs and seeds the DB.
+
+**UI:** Settings → Valet Router → MoE Chain (`MoeChainPanel.tsx` wired into `ValetRouterPanel.tsx`). Two-card layout with per-step model picker, task category selector, up/down reorder, add/remove, and save.
+
+**DB:** `moe_chain_configs` table added to `drizzle/schema.ts` (one row per `userId + chainType`). Migration generated and applied.
+
+**Key files changed/created:**
+
+| File | Change |
+|---|---|
+| `drizzle/schema.ts` | New `moeChainConfigs` table + `MoeChainStep` interface |
+| `server/phase2/services/MoeChainService.ts` | NEW — sequential chain executor |
+| `server/phase2/services/LlamaCppService.ts` | Added `unload()` and `preWarm()` |
+| `server/phase2/services/AiProviderService.ts` | `moe_chain` / `moe_chain_omesh` branch in `streamChat()` |
+| `server/routers/valetRouter.ts` | New procedures: `getMoeChain`, `saveMoeChain`, `initMoeChain`, `scanLocalModels` |
+| `server/routers/aiRouter.ts` | Added `routingMode` + `userId` to `chatInputSchema` |
+| `client/src/components/settings/MoeChainPanel.tsx` | NEW — two-card settings UI |
+| `client/src/components/settings/ValetRouterPanel.tsx` | MoeChainPanel wired in |
+| `client/src/components/chat/ChatInput.tsx` | `/MOE-Chain [L\|C]` slash command |
+| `client/src/pages/Chat.tsx` | `moe-chain` case in `handleCommand()` |
+
+**Documentation:**
+
+- `docs/ai-agents/MOE_CHAIN.md` — created (full feature reference)
+- `docs/ai-agents/VALET_ROUTER.md` — §3.8 and §3.9 expanded with implementation details
+- `Context/UI-Registry.md` — `MoeChainPanel` entry added
+
+---
+
 ## 🔪 Ruthless Public-Beta Code-Sweep — 2026-06-20 (Linux)
 
 > `/code-sweep` full 10-domain run. User directive this pass: **assume everything broken/mock/vulnerable until proven**; **nothing may be "deferred" or "known-broken"**; **mock features get implemented, not deleted — unless already replaced/superseded.**

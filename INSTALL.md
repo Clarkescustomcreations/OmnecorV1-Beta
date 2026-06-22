@@ -31,7 +31,7 @@ This guide provides comprehensive instructions for installing and setting up Omn
 | **Disk Space** | 20 GB free (NVMe SSD) | 50 GB+ (NVMe SSD) |
 | **Network** | Stable connection for API provider calls | Stable connection |
 | **Node.js** | 22+ | 24.15.0 (pinned for beta) |
-| **pnpm** | 10.x | 10.4.1 (pinned for beta) |
+| **pnpm** | 10.x | 10.34.1 (pinned for beta) |
 | **GPU** | Optional | NVIDIA 8 GB+ VRAM (RTX 3060 or higher) for local LLMs |
 
 ---
@@ -96,7 +96,7 @@ Omnecor uses a unified **SQLite / libSQL** database engine. Relational persisten
 ### Step 5: Build the Application
 
 ```bash
-pnpm run build
+pnpm build
 ```
 
 Compiles the frontend (Vite) and transpiles the server TypeScript.
@@ -104,7 +104,7 @@ Compiles the frontend (Vite) and transpiles the server TypeScript.
 ### Step 6: Start the Application
 
 ```bash
-pnpm run start
+pnpm start
 ```
 
 Omnecor starts on `http://localhost:3000` by default. If the port is occupied it auto-selects the next available port and prints the URL to the terminal.
@@ -131,7 +131,7 @@ Pre-built packages bundle the application with Electron (desktop GUI) or ship as
 **Install a pre-built .deb:**
 
 ```bash
-sudo dpkg -i omnecor-hmci_2.3.0_amd64.deb
+sudo dpkg -i omnecor-hmci_2.4.1_amd64.deb
 sudo apt-get install -f          # resolve any missing dependencies
 omnecor                          # launch from PATH
 ```
@@ -150,7 +150,7 @@ omnecor                          # launch from PATH
 **Build the .deb yourself:**
 
 ```bash
-./packaging/build-deb.sh           # builds dist/omnecor-hmci_2.3.0_amd64.deb
+./packaging/build-deb.sh           # builds dist/omnecor-hmci_2.4.1_amd64.deb
 ./packaging/build-deb.sh 2.4.0     # override version
 ```
 
@@ -171,14 +171,14 @@ AppImage is a single self-contained executable — no installation or root requi
 **Run a pre-built AppImage:**
 
 ```bash
-chmod +x Omnecor-2.3.0.AppImage
-./Omnecor-2.3.0.AppImage
+chmod +x Omnecor-2.4.1.AppImage
+./Omnecor-2.4.1.AppImage
 ```
 
 **Integrate with your desktop (optional):**
 
 ```bash
-./Omnecor-2.3.0.AppImage --appimage-extract-and-run --install
+./Omnecor-2.4.1.AppImage --appimage-extract-and-run --install
 ```
 
 This places a launcher in `~/.local/share/applications/` and creates a `~/.local/bin/omnecor` symlink.
@@ -187,7 +187,7 @@ This places a launcher in `~/.local/share/applications/` and creates a `~/.local
 
 ```bash
 ./packaging/build-appimage.sh
-# output: dist/Omnecor-2.3.0.AppImage
+# output: dist/Omnecor-2.4.1.AppImage
 ```
 
 Requirements: `appimagetool` or `electron-builder` with `appImage` target.
@@ -252,8 +252,8 @@ Omnecor ships a Windows installer built with NSIS via Electron.
 
 | File | Description |
 |---|---|
-| `Omnecor-Setup-2.3.0.exe` | NSIS installer — recommended. Installs per-user (no UAC required by default). |
-| `Omnecor-2.3.0-portable.exe` | Portable — run anywhere with no install. |
+| `Omnecor-Setup-2.4.1.exe` | NSIS installer — recommended. Installs per-user (no UAC required by default). |
+| `Omnecor-2.4.1-portable.exe` | Portable — run anywhere with no install. |
 
 **What the NSIS installer does:**
 
@@ -280,7 +280,7 @@ Settings → Apps → Omnecor HMCI → Uninstall. Registry entries are removed a
 cd packaging\electron-app
 pnpm install
 pnpm build:win
-# output: packaging\electron-app\dist\Omnecor-Setup-2.3.0.exe
+# output: packaging\electron-app\dist\Omnecor-Setup-2.4.1.exe
 
 # Cross-compile from Linux via Docker (Wine):
 ./packaging/build-all.sh --target win

@@ -53,6 +53,7 @@ import { projectRouter } from "./routers/projectRouter.js";
 import { agentRouter } from "./routers/agentRouter.js";
 import { modelMarketplaceRouter } from "./routers/modelMarketplaceRouter.js";
 import { securityRouter } from "./routers/securityRouter.js";
+import { pairingRouter } from "./routers/pairingRouter.js";
 import { ommeshRouter } from "./routers/ommesh.router.js";
 import { pcbEditorRouter } from "./routers/pcbEditorRouter.js";
 import { falRouter } from "./routers/falRouter.js";
@@ -159,6 +160,7 @@ export const appRouter = router({
 
   // ─── Security (File scanning + Encryption + Backup/Restore) ───────────────
   security: securityRouter,
+  pairing: pairingRouter,
 
   // ─── Audit Log (Immutable event log, admin-only) ──────────────────────────
   audit: auditRouter,

@@ -66,6 +66,8 @@ const config: ExpoConfig = {
       "POST_NOTIFICATIONS",
       "RECORD_AUDIO",
       "INTERNET",
+      "CAMERA", // scan the desktop pairing QR
+
       // Always-Listening voice mode runs a typed foreground service that holds
       // the mic open for wake-word detection while the app is backgrounded.
       "FOREGROUND_SERVICE",
@@ -93,6 +95,12 @@ const config: ExpoConfig = {
   },
   plugins: [
     "expo-router",
+    [
+      "expo-camera",
+      {
+        cameraPermission: "Allow $(PRODUCT_NAME) to use the camera to scan the PC pairing QR code.",
+      },
+    ],
     [
       "expo-audio",
       {

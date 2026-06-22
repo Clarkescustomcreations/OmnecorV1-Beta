@@ -8,6 +8,7 @@ import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
 import { Input } from "@/components/ui/input";
 import { Cpu, Database, GitBranch, Loader2, PackageCheck, Server, Zap, Cloud, CheckCircle2, AlertCircle, Download, RefreshCw, Wand2 } from "lucide-react";
+import { MoeChainPanel } from "./MoeChainPanel";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
 import { ModelSelector } from "@/components/chat/ModelSelector";
@@ -481,6 +482,10 @@ export function ValetRouterPanel() {
       <div className="space-y-4">
         <KaggleTrainingCard />
       </div>
+
+      <Separator />
+
+      <MoeChainPanel />
     </div>
   );
 }

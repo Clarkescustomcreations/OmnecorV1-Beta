@@ -119,6 +119,14 @@ const chatInputSchema = z.object({
     .optional(),
 
   isFictionMode: z.boolean().optional(),
+  routingMode: z.enum([
+    "api_direct", "valet_background", "local_omesh", "main_api",
+    "multi_api", "main_api_omesh", "multi_api_omesh",
+    "moe_chain", "moe_chain_omesh", "multi_task",
+  ]).optional(),
+  projectId: z.string().max(256).optional(),
+  sessionId: z.string().max(256).optional(),
+  modelPath: z.string().max(4096).optional(),
 });
 
 const createSessionSchema = z.object({
@@ -305,7 +313,13 @@ ${transcript}
         return { content };
       }
       assertProviderAllowedInMode(input.providerId, ctx.user?.executionMode);
-      const content = await ctx.services.aiProvider.chat(input);
+      // Pass userId/executionMode like the streaming path so moe_chain routing and
+      // Sovereign enforcement work identically on the blocking endpoint.
+      const content = await ctx.services.aiProvider.chat({
+        ...input,
+        userId: ctx.user?.id,
+        executionMode: ctx.user?.executionMode,
+      });
       // New-chat alert → Notifications feed. Blocking chat() calls are typically
       // background/agent completions the user is waiting on (the live UI streams),
       // so surfacing them here keeps the user informed without flooding.
@@ -350,7 +364,11 @@ ${transcript}
       assertProviderAllowedInMode(input.providerId, ctx.user?.executionMode);
 
       return observable(emit => {
-        const stream = ctx.services.aiProvider.streamChat(input);
+        const stream = ctx.services.aiProvider.streamChat({
+          ...input,
+          userId: ctx.user?.id,
+          executionMode: ctx.user?.executionMode,
+        });
         (async () => {
           for await (const chunk of stream) {
             emit.next(chunk);

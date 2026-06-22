@@ -9,15 +9,15 @@
 import { useState } from "react";
 import { View, Text, TextInput, ActivityIndicator, ScrollView } from "react-native";
 import { Pressable } from "@/components/pressable";
-import * as WebBrowser from "expo-web-browser";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
-import { createLocalAccount, skipOnboarding, getOAuthLoginUrl, setOAuthAccount } from "@/lib/_core/account";
+import { createLocalAccount, skipOnboarding } from "@/lib/_core/account";
 import { isServerConfigured } from "@/lib/_core/server-config";
+import { PairFlow } from "@/components/pair-flow";
 
 export function SetupFlow({ onDone }: { onDone: () => void }) {
   const colors = useColors();
-  const [view, setView] = useState<"choose" | "local">("choose");
+  const [view, setView] = useState<"choose" | "local" | "pair">("choose");
   const [username, setUsername] = useState("");
   const [password, setPassword] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,24 +38,6 @@ export function SetupFlow({ onDone }: { onDone: () => void }) {
     }
   };
 
-  const handleOAuth = async (provider: "google" | "microsoft") => {
-    const url = getOAuthLoginUrl(provider);
-    if (!url) {
-      setNote("Add your PC connection first (you can also create a local account or skip, then set the PC in Settings).");
-      return;
-    }
-    setBusy(true);
-    try {
-      await WebBrowser.openAuthSessionAsync(url, "omnecor-hq://oauth/callback");
-      await setOAuthAccount(provider, provider === "google" ? "Google account" : "Microsoft account");
-      onDone();
-    } catch {
-      setNote("Sign-in was cancelled or failed.");
-    } finally {
-      setBusy(false);
-    }
-  };
-
   const handleSkip = async () => {
     setBusy(true);
     try { await skipOnboarding(); onDone(); } finally { setBusy(false); }
@@ -69,34 +51,37 @@ export function SetupFlow({ onDone }: { onDone: () => void }) {
 
         {view === "choose" && (
           <View className="gap-3">
-            <Pressable disabled={busy} onPress={() => setView("local")}
+            <Pressable disabled={busy} onPress={() => { setView("pair"); setNote(null); }}
               className="bg-primary rounded-xl p-4 active:opacity-80">
-              <Text className="text-background font-semibold text-center">Create a local account</Text>
+              <Text className="text-background font-semibold text-center">Pair with my PC</Text>
+            </Pressable>
+            <Text className="text-xs text-muted text-center -mt-1">
+              Scan the QR (or type the code) from your PC → Settings → Devices. No login needed.
+            </Text>
+
+            <View className="flex-row items-center my-1">
+              <View className="flex-1 h-px bg-border" />
+              <Text className="text-muted text-xs mx-3">or</Text>
+              <View className="flex-1 h-px bg-border" />
+            </View>
+
+            <Pressable disabled={busy} onPress={() => setView("local")}
+              className="bg-surface border border-border rounded-xl p-4 active:opacity-80">
+              <Text className="text-foreground font-semibold text-center">Create a local account</Text>
             </Pressable>
             <Pressable disabled={busy} onPress={handleSkip}
               className="rounded-xl p-3 active:opacity-60">
               <Text className="text-muted text-center text-sm">Skip — explore offline</Text>
             </Pressable>
 
-            <View className="flex-row items-center my-1">
-              <View className="flex-1 h-px bg-border" />
-              <Text className="text-muted text-xs mx-3">optional — cloud sign-in</Text>
-              <View className="flex-1 h-px bg-border" />
-            </View>
-
-            <Pressable disabled={busy} onPress={() => handleOAuth("google")}
-              className="bg-surface border border-border rounded-xl p-4 active:opacity-80">
-              <Text className="text-foreground font-semibold text-center">Continue with Google (optional)</Text>
-            </Pressable>
-            <Pressable disabled={busy} onPress={() => handleOAuth("microsoft")}
-              className="bg-surface border border-border rounded-xl p-4 active:opacity-80">
-              <Text className="text-foreground font-semibold text-center">Continue with Microsoft (optional)</Text>
-            </Pressable>
-
             <Text className="text-xs text-muted text-center mt-2">
-              {configured ? "🟢 PC connected — cloud sign-in available" : "Local account works fully offline with no setup. Google/Microsoft sign-in is optional and requires one-time OAuth setup on your PC (Settings → Social Login)."}
+              {configured ? "🟢 PC connected" : "A local account works fully offline and auto-registers on your PC when it connects."}
             </Text>
           </View>
+        )}
+
+        {view === "pair" && (
+          <PairFlow onDone={onDone} onBack={() => { setView("choose"); setNote(null); }} />
         )}
 
         {view === "local" && (

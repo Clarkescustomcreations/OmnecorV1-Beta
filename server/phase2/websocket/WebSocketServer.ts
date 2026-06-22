@@ -168,7 +168,10 @@ interface ClientMessage {
   nodeId?: string;
   nodeName?: string;
   capabilities?: { modelLoaded: boolean; modelPath?: string; contextLength?: number };
+  // The Omnecor HQ APK sends the shared mesh secret under `secret`; older docs
+  // and some callers use `ommeshSecret`. Accept either (see secret check below).
   ommeshSecret?: string;
+  secret?: string;
   stats?: { totalRequests: number; totalTokens: number; tokensPerSecond: number };
   modelLoaded?: boolean;
   requestId?: string;
@@ -547,9 +550,12 @@ export class OmnecorWebSocketServer {
         // Loopback and zero-login connections are already trusted (set at
         // upgrade); everything else MUST present a matching OMMESH_SECRET.
         const preTrusted = isLoopbackAddress(ws.remoteAddress) || ENV.zeroLoginMode;
+        // The APK sends the secret as `secret`; accept `ommeshSecret` too for
+        // any caller using the older field name.
+        const providedSecret = message.ommeshSecret ?? message.secret;
         if (secret) {
           // Constant-time comparison; rejects when the secret is missing too.
-          if (!message.ommeshSecret || !secretsMatch(message.ommeshSecret, secret)) {
+          if (!providedSecret || !secretsMatch(providedSecret, secret)) {
             ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: false, reason: "Invalid OMMESH_SECRET" }));
             log.warn("Mobile node rejected — bad secret", { id: ws.id });
             break;
@@ -574,17 +580,6 @@ export class OmnecorWebSocketServer {
         ws.mobileNodeId = nodeId;
         
         const defaultOpenId = ENV.zeroLoginMode ? "local-zero-login" : "local:owner";
-        import("../../db.factory.js")
-          .then(({ getUserByOpenId }) => getUserByOpenId(defaultOpenId))
-          .then((dbUser) => {
-            if (dbUser) {
-              ws.userId = dbUser.id;
-              ws.openId = dbUser.openId;
-            }
-          })
-          .catch((err) => {
-            log.error("Failed to resolve user for registered mobile node", err);
-          });
 
         this.mobileNodes.set(nodeId, {
           ws,
@@ -595,7 +590,35 @@ export class OmnecorWebSocketServer {
           stats: { totalRequests: 0, totalTokens: 0, tokensPerSecond: 0 },
         });
 
-        ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: true }));
+        // Resolve the owner user, record the device, and hand back a session
+        // token in the ack so the phone's HTTP/tRPC calls authenticate too —
+        // zero-touch OMMESH auto-pair. Falls back to a plain ack when no owner
+        // account exists yet or minting fails (the phone can still pair by code).
+        void (async () => {
+          try {
+            const { getUserByOpenId } = await import("../../db.factory.js");
+            const dbUser = await getUserByOpenId(defaultOpenId);
+            let sessionToken: string | undefined;
+            if (dbUser) {
+              ws.userId = dbUser.id;
+              ws.openId = dbUser.openId;
+              const { PairingService } = await import("../../_core/pairing.js");
+              sessionToken = await PairingService.pairViaOmmesh(
+                dbUser.openId,
+                nodeId,
+                message.nodeName ?? nodeId,
+              );
+            }
+            ws.send(JSON.stringify({
+              type: "mobile_node_ack",
+              accepted: true,
+              ...(sessionToken ? { sessionToken } : {}),
+            }));
+          } catch (err) {
+            log.error("OMMESH auto-pair token mint failed", err);
+            ws.send(JSON.stringify({ type: "mobile_node_ack", accepted: true }));
+          }
+        })();
         log.info("Mobile OMMESH node registered", { nodeId, nodeName: message.nodeName, capabilities: message.capabilities });
         break;
       }

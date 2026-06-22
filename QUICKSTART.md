@@ -8,7 +8,7 @@ Ensure you have the following installed:
 
 - **Git**
 - **Node.js (v22 or higher)**
-- **pnpm** (install with `npm install -g pnpm`)
+- **pnpm** (install with `npm install -g pnpm@10.34.1`)
 
 ## Quick Start Steps (5-10 Minutes)
 

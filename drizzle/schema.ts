@@ -34,7 +34,11 @@ export const users = sqliteTable("users", {
   email: text("email"),
   loginMethod: text("loginMethod"),
   passwordHash: text("passwordHash"),
-  role: text("role", { enum: ["viewer", "user", "admin", "owner"] }).default("user").notNull(),
+  // "device" is never written to a user row — it is applied at auth time to a
+  // paired-phone token (see sdk.authenticateRequest). It is listed here only so
+  // the inferred User["role"] type accommodates the auth-time cap. SQLite text
+  // enums are a TS-level constraint (no CHECK is emitted), so this is type-only.
+  role: text("role", { enum: ["viewer", "user", "admin", "owner", "device"] }).default("user").notNull(),
   executionMode: text("executionMode", { enum: ["sovereign", "scrapper", "big_spender"] }).notNull().default("scrapper"),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
@@ -43,6 +47,28 @@ export const users = sqliteTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+/**
+ * Paired mobile devices (Omnecor HQ APK) — persistent record of phones paired to
+ * this PC via a one-time pairing code or OMMESH auto-pair. The minted session JWT
+ * carries `deviceId`; setting `revokedAt` invalidates that phone's token. This
+ * survives PC restarts, so a paired phone never has to re-pair.
+ */
+export const pairedDevices = sqliteTable("paired_devices", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  deviceId: text("deviceId").notNull().unique(), // random id minted at pair time, embedded in the JWT
+  openId: text("openId").notNull(),              // the desktop user this device is paired to
+  name: text("name").notNull().default("Phone"), // friendly device name reported by the APK
+  pairMethod: text("pairMethod", { enum: ["code", "ommesh"] }).notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  lastSeenAt: integer("lastSeenAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  revokedAt: integer("revokedAt", { mode: "timestamp" }), // non-null = revoked
+}, (t) => ({
+  openIdIdx: index("paired_devices_openId_idx").on(t.openId),
+}));
+
+export type PairedDevice = typeof pairedDevices.$inferSelect;
+export type InsertPairedDevice = typeof pairedDevices.$inferInsert;
 
 /**
  * Integrations table to store OAuth and API integration data.
@@ -756,13 +782,63 @@ export const agentSessions = sqliteTable("agent_sessions", {
 export type AgentSession = typeof agentSessions.$inferSelect;
 export type InsertAgentSession = typeof agentSessions.$inferInsert;
 
+/**
+ * MoE Chain Step — one specialist in the chain.
+ * taskCategories: if empty the step always runs; otherwise it is skipped when the
+ * Valet's task classification doesn't match any listed category.
+ */
+export interface MoeChainStep {
+  order: number;
+  label: string;
+  taskCategories: string[];
+  // Local chain fields
+  modelPath?: string;
+  ggufFile?: string;
+  // Cloud chain fields
+  providerId?: string;
+  modelId?: string;
+  enabled: boolean;
+}
+
+/**
+ * MoE Chain Configs — stores ordered pipeline configs for /MOE-Chain L (local
+ * GGUF specialists) and /MOE-Chain C (cloud provider specialists) per user.
+ * One row per userId × chainType; upserted on save.
+ */
+export const moeChainConfigs = sqliteTable(
+  "moe_chain_configs",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId").notNull().references(() => users.id, { onDelete: "cascade" }),
+    chainType: text("chainType", { enum: ["local", "cloud"] }).notNull(),
+    steps: text("steps", { mode: "json" }).$type<MoeChainStep[]>().notNull().default([]),
+    projectPath: text("projectPath"),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+    updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+  },
+  (t) => [
+    index("moe_chain_configs_user_type_idx").on(t.userId, t.chainType),
+  ]
+);
+
+export type MoeChainConfig = typeof moeChainConfigs.$inferSelect;
+export type InsertMoeChainConfig = typeof moeChainConfigs.$inferInsert;
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Relational definitions (Drizzle relational query API)
 // ─────────────────────────────────────────────────────────────────────────────
 
+export const moeChainConfigsRelations = relations(moeChainConfigs, ({ one }) => ({
+  user: one(users, {
+    fields: [moeChainConfigs.userId],
+    references: [users.id],
+  }),
+}));
+
 export const usersRelations = relations(users, ({ many }) => ({
   platformAccounts: many(platformAccounts),
   cloudComputeSessions: many(cloudComputeSessions),
+  moeChainConfigs: many(moeChainConfigs),
   cloudComputeSubscriptions: many(cloudComputeSubscriptions),
   postingScheduleConfigs: many(postingScheduleConfig),
   neuralMaps: many(neuralMaps),

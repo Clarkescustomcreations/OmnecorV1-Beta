@@ -15,6 +15,7 @@ export {
   getDb,
   upsertUser,
   getUserByOpenId,
+  publicUser,
   createChatSession,
   getChatSessions,
   getChatSession,

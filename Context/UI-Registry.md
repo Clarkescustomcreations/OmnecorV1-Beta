@@ -2837,3 +2837,59 @@ Last updated: 2026-06-21
 **Pattern notes:**
 - Converted from hardcoded white/blue/gray utility classes to semantic design system tokens to ensure proper dark mode support.
 - User message bubbles use `bg-accent text-accent-foreground` while system messages use `bg-muted text-foreground`.
+
+---
+
+## COMPONENT: MoeChainPanel.tsx
+
+File: `client/src/components/settings/MoeChainPanel.tsx`
+Last updated: 2026-06-22
+Used by: `client/src/components/settings/ValetRouterPanel.tsx` (rendered inside the MoE Chain section of the Valet Router settings tab)
+
+### tRPC Procedures Called
+
+| Procedure | Type | Purpose |
+|---|---|---|
+| `valet.getMoeChain` | query | Loads saved chain configuration for both `moe_chain` (local) and `moe_chain_omesh` (cloud) chain types |
+| `valet.saveMoeChain` | mutation | Persists the edited chain configuration (steps array + enabled flag) for the selected chain type |
+| `valet.initMoeChain` | mutation | First-run initializer — scans `~/.omnecor/models/` for GGUFs, seeds the `moe_chain_configs` DB table, and writes `MOE-Chain-L.md` / `MOE-Chain-C.md` project files |
+
+### What It Renders
+
+The panel renders two `ChainCard` sub-components side by side (or stacked on narrow viewports) — one for the local chain (`moe_chain`) and one for the cloud chain (`moe_chain_omesh`).
+
+Each `ChainCard` contains:
+
+- **Header row** — chain type label ("Local Chain" / "Cloud Chain") and an enable/disable `Switch` toggle. Toggling calls `valet.saveMoeChain` with the updated `enabled` flag.
+- **Step editor rows** — one row per `MoeChainStep` in the chain's `steps[]` array. Each row displays:
+  - Model picker input (text field for GGUF file path or cloud model ID).
+  - Task category selector (multi-select or comma-separated input for `taskCategories[]`; empty = always runs).
+  - Up / Down reorder buttons that shift the step's position in the array via local state before save.
+  - Remove button that deletes the step from local state.
+- **Add Step button** — appends a blank `MoeChainStep` to the local steps array.
+- **Save button** — calls `valet.saveMoeChain` with the current steps array; shows pending state (`disabled` + "Saving…" label) while the mutation is in flight.
+- **Init button** (shown when no steps are configured) — calls `valet.initMoeChain` to run the first-time GGUF scan and seed default steps.
+
+### Token / Visual Notes
+
+| Property | Class |
+|---|---|
+| Panel container | `space-y-4` |
+| Chain card outer | `rounded-lg border border-border bg-card p-4` |
+| Card header row | `flex items-center justify-between mb-3` |
+| Card title | `text-sm font-semibold text-foreground` |
+| Enable switch label | `text-xs text-muted-foreground` |
+| Step row container | `flex items-center gap-2 py-1.5 border-b border-border last:border-0` |
+| Model picker input | `flex-1 bg-background border border-border rounded px-2 py-1 text-xs text-foreground` |
+| Reorder buttons | `text-muted-foreground hover:text-foreground` (icon buttons, `ChevronUp` / `ChevronDown`) |
+| Remove button | `text-destructive hover:text-destructive/80` (icon button, `Trash2`) |
+| Add Step button | `variant="ghost" size="sm" text-xs mt-2` |
+| Save button | `variant="default" size="sm" text-xs` — disabled + "Saving…" while mutation pending |
+| Init button | `variant="outline" size="sm" text-xs` |
+
+**Pattern notes:**
+- Local state manages the steps array while the user edits; only `valet.saveMoeChain` writes to the server. Avoid auto-saving on every keystroke — wait for explicit Save.
+- The enable/disable switch is the exception: it saves immediately on toggle (single-field mutation) rather than waiting for the Save button.
+- Reorder is pure local state manipulation (array splice + index swap). The order is serialized into `steps[]` on Save.
+- The cloud chain card (`moe_chain_omesh`) shows a sovereign-mode warning badge when the user's `executionMode` is `sovereign`, since that chain type is blocked in sovereign mode.
+- Both cards are always rendered (not conditionally hidden) so the user can configure them before activating either routing mode.

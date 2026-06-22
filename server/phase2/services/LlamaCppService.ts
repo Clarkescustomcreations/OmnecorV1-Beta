@@ -65,4 +65,35 @@ export class LlamaCppService {
     const data = await resp.json() as { embedding: number[] };
     return data.embedding;
   }
+
+  // Explicitly evict a model from the bridge's warm cache to free RAM before
+  // loading the next chain step. Silent no-op if model is not loaded.
+  async unload(modelPath: string): Promise<void> {
+    try {
+      await fetch(`${this.bridgeUrl}/unload`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_path: modelPath }),
+        signal: AbortSignal.timeout(5000),
+      });
+    } catch {
+      // Bridge offline or model not cached — not an error for chain execution
+    }
+  }
+
+  // Pre-load a model into the bridge's warm cache so the first generation
+  // request doesn't pay the load latency. Used by MoeChainService to pipeline
+  // the next step's load while the current step is still generating.
+  async preWarm(modelPath: string): Promise<void> {
+    try {
+      await fetch(`${this.bridgeUrl}/load`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ model_path: modelPath, embedding: false }),
+        signal: AbortSignal.timeout(30000),
+      });
+    } catch {
+      // Non-fatal — generate() will load on-demand if this fails
+    }
+  }
 }
