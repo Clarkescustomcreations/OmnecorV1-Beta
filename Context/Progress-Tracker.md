@@ -113,6 +113,36 @@ A sequential multi-model routing pipeline that passes a user's chat message thro
 
 ---
 
+## 🔪 Beta-Readiness Code-Sweep — 2026-06-22 (Linux)
+
+> `/code-sweep` full 10-domain run. Scan = 1 background agent (TS/db/routers, clean) + inline greps covering all 10 domains (the other 2 background agents were Bash-permission-blocked; inline runs covered their domains).
+> Baseline → final gate: `tsc` **0 → 0** · `vitest` **338/338 → 338/338** · `pnpm build` **✓ → ✓ (50.8s)** · `pnpm audit --prod` **0 → 0** ✅.
+
+### FIXED + VERIFIED this pass
+| Sev | Domain | Issue | Fix |
+|---|---|---|---|
+| **MEDIUM** | security/architecture | `server/_core/index.ts` default-voice seed copied from a hardcoded developer path `/home/linux/.steam/.../recording_highlight.wav` — dead on every non-dev machine (deferred-cleanup #5). | Removed the machine-specific branch; first-boot now **always** writes the tiny valid silent WAV (was already the fallback). Portable. |
+| **MEDIUM** | typescript/database | `TrpcContext.db` typed `any` with stale doc comments claiming "null in SQLite mode; routers must null-guard" — actively misleading (the libSQL unification made `getDb()` never-null; `ctx.db = await getDb()`). Risked devs re-adding dead null-guards. | Typed `db: Db` (real Drizzle type, imported from `db.js`); corrected both doc comments to "always live; never null". tsc still 0 → no consumer relied on `any`. |
+| **MEDIUM** | dependencies | `packaging/electron-app/package.json` had a top-level npm-style `"overrides"` block (esbuild/form-data/tar). electron-app is a **workspace member** (root `pnpm-workspace.yaml`) with no own lockfile → pnpm 10 **ignores** it; all 3 pins are already enforced identically by root `pnpm-workspace.yaml`. Dead config that violates the documented "overrides live in pnpm-workspace.yaml" rule (re-added by a later security-pin commit after the 2026-06-20 removal). | Removed the dead block. Verified JSON valid + all 3 floors present in root. Install tree unchanged (it was a no-op). |
+
+### Confirmed CLEAN (verified in-file, not assumed)
+- **Routers:** all cloud-API procedures correctly guarded — `falRouter`/`voiceRouter.synthesizeElevenLabs` = `cloudProcedure`; `aiRouter.chat`, `imageGenRouter.generate`, `podcastRouter.generateScript` = `protectedProcedure` + `assertProviderAllowedInMode()`. No `initTRPC` re-init; all routers import from `_core/trpc.ts`; no silent mutations; no `return []`/"not implemented" stubs.
+- **Database:** zero MySQL-legacy id parsing (`insertId`/`lastInsertRowid`/`as any)[0]`); schema is pure `sqlite-core`; all `getDb()` awaited (the `.then()` ones are intentional fire-and-forget with error logging); no leftover `!db` guards; no raw SQL with user input.
+- **Security:** no `exec`/`execSync` with interpolation in prod (only `bash -n "${scriptPath}"` inside `*.smoke.test.ts`, excluded + constant path); no hardcoded secrets; CORS not `*`; every `dangerouslySetInnerHTML` is static or `DOMPurify.sanitize()`'d (SchematicNode/PCBNode render **static** `componentLibrary.ts` SVG + sanitize); `rvc_server.py` `.eval()` = PyTorch, not JS.
+- **Frontend:** no component imports `drizzle/schema`/`server/`/`getDb` (client→server is `import type { AppRouter }` only); zero default exports in components/pages; no raw `fetch`/`axios` to the API; no `console.log`/`debugger`.
+- **Architecture:** no `react`/JSX in `server/`; single `express()` entry point; `../../../` in client = only the root-`assets/` logo import (intentional, no alias) + type-only `AppRouter`.
+- **Mobile:** no `oklch()` in RN; AsyncStorage holds only non-sensitive IP/port/name + the **encrypted** audit ring buffer (secret lives in SecureStore); no plaintext creds.
+- **TypeScript:** server `as any` casts remain at 0; the ~57 `: any` annotations are justified (dynamic `bonjour`/`ChromaClient` libs, canvas-callback nodes in exempt `MeshTopologyGraph`, React `isComposing` event, error handlers).
+
+### Outstanding / deferred (reconciled — NOT new bugs; carried forward)
+- **~774 raw Tailwind color occurrences across 64 files** — the tracked design-token backlog (grew vs the ~506 prior count as the regex now includes amber/orange/sky/etc.). Needs a **visually-verified** pass (dark theme can't be validated headless). Exempt files (three.js/reactflow/xterm/canvas/brand logos) documented in AGENTS.md + memory `beta-sweep-followups`. **Decision for user: schedule the visual token pass?**
+- **Neural-map dropbox/onedrive "Coming soon"** (`MapManager.tsx`) — only `neuralMapSupported:false` types (dropbox, onedrive) show it; gmail/outlook/google-drive/github are real. This is the tracked deferred connect+ingest adapter work, honestly gated. **Decision for user: build the dropbox/onedrive ingest adapters?**
+- **Mobile `.task`/"MediaPipe" text** in `model-download.ts` comments + `settings.tsx` — stale post-LiteRT-LM-swap labels; part of the IN-PROGRESS Expo SDK 55 finishing items (left untouched to avoid colliding with that planned change).
+- **Security-review deferred cleanups (memory `security-review-deferred-cleanups`):** #1 `CLOUD_PROVIDER_IDS` duplicated in 6 files (extract to `shared/const.ts` — a 6-file refactor, out of sweep scope; drift risk only). #2 `podcastRouter.generateScript` → `cloudProcedure`: **do NOT** blindly convert — it's `protectedProcedure` + per-provider check *by design* so a LOCAL (ollama) generation isn't wrongly blocked in Sovereign mode; `cloudProcedure` would over-block. #3 N+1 in `agentMessengerRouter.listConversations`. #4 `ommesh.router` re-implements settings JSON I/O. All sequenced, not regressions.
+- **`getInstance()` → `ctx.services.*`** broader migration (75 call sites) — pure convention; blocked on first exposing VirtualCard/Valet/PCBWay/ModelManagement/AuditLog singletons on `ctx.services`. Tracked task, no bug.
+
+---
+
 ## 🔪 Ruthless Public-Beta Code-Sweep — 2026-06-20 (Linux)
 
 > `/code-sweep` full 10-domain run. User directive this pass: **assume everything broken/mock/vulnerable until proven**; **nothing may be "deferred" or "known-broken"**; **mock features get implemented, not deleted — unless already replaced/superseded.**

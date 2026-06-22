@@ -25,6 +25,7 @@ import type { User } from "../../drizzle/schema";
 import { sdk } from "./sdk";
 import { ENV } from "./env.js";
 import { getUserByOpenId, upsertUser, getDb } from "../db.factory.js";
+import type { Db } from "../db.js";
 
 // ─── Phase 2 Service Imports ────────────────────────────────────────────────
 // These are the singleton services from the Phase 2 backend.
@@ -62,19 +63,19 @@ import { PipelineEngineService } from "../phase2/services/PipelineEngineService.
  *
  * - `req` / `res`: Express HTTP objects (for cookies, headers, auth)
  * - `user`: Authenticated user or null (resolved from session cookie)
- * - `db`: Drizzle ORM instance (null in SQLite mode; routers must null-guard)
+ * - `db`: Drizzle ORM instance (always a live connection; never null)
  * - `services`: Omnecor backend service singletons (Phase 2+)
  *
  * Routers that only need auth can use `ctx.user`.
  * Routers that need backend services use `ctx.services.*`.
- * Routers that need database access use `ctx.db` (with null-guard).
+ * Routers that need database access use `ctx.db` (always live).
  * All are always available on every request.
  */
 export type TrpcContext = {
   req: CreateExpressContextOptions["req"];
   res: CreateExpressContextOptions["res"];
   user: User | null;
-  db: any; // Drizzle ORM instance (null in SQLite mode)
+  db: Db; // Drizzle ORM instance (always live; never null)
   services: {
     fileWatcher: FileSystemWatcherService;
     hashTracker: HashTrackerService;

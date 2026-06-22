@@ -180,33 +180,27 @@ async function startServer() {
     const defaultWavPath = path.join(PATHS.data, "default.wav");
     const exists = await fs.access(defaultWavPath).then(() => true).catch(() => false);
     if (!exists) {
-      const sourceWav = "/home/linux/.steam/debian-installation/steamui/sounds/recording_highlight.wav";
-      const sourceExists = await fs.access(sourceWav).then(() => true).catch(() => false);
-      if (sourceExists) {
-        await fs.mkdir(path.dirname(defaultWavPath), { recursive: true });
-        await fs.copyFile(sourceWav, defaultWavPath);
-        log.info("[Omnecor] Seeded data/default.wav from steam sounds");
-      } else {
-        const dummyWav = Buffer.from([
-          0x52, 0x49, 0x46, 0x46, // "RIFF"
-          0x24, 0x08, 0x00, 0x00, // file size - 8
-          0x57, 0x41, 0x56, 0x45, // "WAVE"
-          0x66, 0x6d, 0x74, 0x20, // "fmt "
-          0x10, 0x00, 0x00, 0x00, // chunk size (16)
-          0x01, 0x00,             // format (1 = PCM)
-          0x01, 0x00,             // channels (1)
-          0x40, 0x1f, 0x00, 0x00, // sample rate (8000)
-          0x40, 0x1f, 0x00, 0x00, // byte rate (8000)
-          0x01, 0x00,             // block align (1)
-          0x08, 0x00,             // bits per sample (8)
-          0x64, 0x61, 0x74, 0x61, // "data"
-          0x00, 0x08, 0x00, 0x00, // chunk size
-          ...Array(2048).fill(128)
-        ]);
-        await fs.mkdir(path.dirname(defaultWavPath), { recursive: true });
-        await fs.writeFile(defaultWavPath, dummyWav);
-        log.info("[Omnecor] Seeded dummy data/default.wav silence");
-      }
+      // Seed a tiny valid silent WAV so voice features have a default reference
+      // sample on first boot. No machine-specific source paths — always portable.
+      const silentWav = Buffer.from([
+        0x52, 0x49, 0x46, 0x46, // "RIFF"
+        0x24, 0x08, 0x00, 0x00, // file size - 8
+        0x57, 0x41, 0x56, 0x45, // "WAVE"
+        0x66, 0x6d, 0x74, 0x20, // "fmt "
+        0x10, 0x00, 0x00, 0x00, // chunk size (16)
+        0x01, 0x00,             // format (1 = PCM)
+        0x01, 0x00,             // channels (1)
+        0x40, 0x1f, 0x00, 0x00, // sample rate (8000)
+        0x40, 0x1f, 0x00, 0x00, // byte rate (8000)
+        0x01, 0x00,             // block align (1)
+        0x08, 0x00,             // bits per sample (8)
+        0x64, 0x61, 0x74, 0x61, // "data"
+        0x00, 0x08, 0x00, 0x00, // chunk size
+        ...Array(2048).fill(128)
+      ]);
+      await fs.mkdir(path.dirname(defaultWavPath), { recursive: true });
+      await fs.writeFile(defaultWavPath, silentWav);
+      log.info("[Omnecor] Seeded data/default.wav silence");
     }
   } catch (err) {
     log.warn("[Omnecor] Failed to seed default.wav:", (err as Error).message);
