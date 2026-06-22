@@ -29,6 +29,10 @@ import {
 import { ENV } from "../_core/env.js";
 import { createLogger } from "../_core/logger.js";
 import type { FileTreeNode } from "./projectRouter.js";
+import { getDb } from "../db.factory.js";
+import { platformAccounts } from "../../drizzle/schema.js";
+import { and, desc, eq } from "drizzle-orm";
+import { refreshOAuthToken } from "../oauth/oauthClients.js";
 
 const log = createLogger("integrations");
 
@@ -219,6 +223,119 @@ function getUserToken(userId: string, type: string): string {
   return readToken(entry);
 }
 
+// ---------------------------------------------------------------------------
+// OAuth-based integrations (Dropbox / OneDrive)
+// Their tokens live in `platformAccounts` (populated by the one-click OAuth
+// flow), NOT the paste-token store above. The map reads through to that store
+// so OAuth refresh stays the single source of truth.
+// ---------------------------------------------------------------------------
+
+/** Integration types connected via the OAuth flow rather than a pasted token. */
+const OAUTH_INTEGRATION_TYPES = new Set<string>(["dropbox", "onedrive"]);
+
+/** Most-recent active `platformAccounts` row for (user, platform), or null. */
+async function getOAuthAccount(userId: number, platform: string) {
+  const db = await getDb();
+  const rows = await db
+    .select()
+    .from(platformAccounts)
+    .where(and(
+      eq(platformAccounts.userId, userId),
+      eq(platformAccounts.platform, platform),
+      eq(platformAccounts.isActive, 1),
+    ))
+    .orderBy(desc(platformAccounts.id))
+    .limit(1);
+  return rows[0] ?? null;
+}
+
+/** List the Dropbox account root (shallow). Surfaces a 401 status so the caller
+ *  can refresh + retry, mirroring the gmailRouter pattern. */
+async function listDropbox(token: string): Promise<{ status: number; nodes: FileTreeNode[] }> {
+  const res = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
+    method: "POST",
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
+    body: JSON.stringify({ path: "", limit: 100 }),
+    signal: AbortSignal.timeout(10_000),
+  });
+  if (res.status === 401) return { status: 401, nodes: [] };
+  if (!res.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: `Dropbox list failed (${res.status})` });
+  const data = await res.json() as {
+    entries?: Array<{ [".tag"]: string; name: string; id: string; size?: number; server_modified?: string }>;
+  };
+  const nodes: FileTreeNode[] = (data.entries ?? []).map(e => {
+    const isFolder = e[".tag"] === "folder";
+    return {
+      name: e.name,
+      path: `dropbox/${e.id}`,
+      relativePath: e.id,
+      type: isFolder ? ("directory" as const) : ("file" as const),
+      size: e.size,
+      modifiedAt: e.server_modified,
+      ...(isFolder ? { children: [] } : {}),
+    };
+  });
+  return { status: res.status, nodes };
+}
+
+/** List the OneDrive account root (shallow). */
+async function listOnedrive(token: string): Promise<{ status: number; nodes: FileTreeNode[] }> {
+  const res = await fetch(
+    "https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,size,folder,file,lastModifiedDateTime&$top=100",
+    { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
+  );
+  if (res.status === 401) return { status: 401, nodes: [] };
+  if (!res.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: `OneDrive list failed (${res.status})` });
+  const data = await res.json() as {
+    value?: Array<{ id: string; name: string; size?: number; folder?: unknown; file?: unknown; lastModifiedDateTime?: string }>;
+  };
+  const nodes: FileTreeNode[] = (data.value ?? []).map(e => {
+    const isFolder = !!e.folder;
+    return {
+      name: e.name,
+      path: `onedrive/${e.id}`,
+      relativePath: e.id,
+      type: isFolder ? ("directory" as const) : ("file" as const),
+      size: e.size,
+      modifiedAt: e.lastModifiedDateTime,
+      ...(isFolder ? { children: [] } : {}),
+    };
+  });
+  return { status: res.status, nodes };
+}
+
+/** Resolve an OAuth integration's content with one refresh-on-401 retry,
+ *  persisting the rotated token (same pattern as gmailRouter). */
+async function fetchOAuthIntegrationItems(userId: number, platform: string): Promise<FileTreeNode[]> {
+  const account = await getOAuthAccount(userId, platform);
+  if (!account) {
+    throw new TRPCError({ code: "NOT_FOUND", message: `${platform} is not connected. Connect it via OAuth in Settings → Integrations.` });
+  }
+  const lister = platform === "dropbox" ? listDropbox : listOnedrive;
+  let result = await lister(account.oauthToken);
+
+  if (result.status === 401 && account.oauthRefreshToken) {
+    log.info(`${platform} token expired, refreshing`);
+    const refreshed = await refreshOAuthToken(platform, account.oauthRefreshToken);
+    if (refreshed.access_token) {
+      const db = await getDb();
+      await db.update(platformAccounts).set({
+        oauthToken: refreshed.access_token,
+        oauthRefreshToken: refreshed.refresh_token || account.oauthRefreshToken,
+        tokenExpiresAt: refreshed.expires_in
+          ? new Date(Date.now() + refreshed.expires_in * 1000)
+          : account.tokenExpiresAt,
+      }).where(eq(platformAccounts.id, account.id));
+      result = await lister(refreshed.access_token);
+    }
+  }
+
+  if (result.status === 401) {
+    throw new TRPCError({ code: "UNAUTHORIZED", message: `${platform} token expired — reconnect it in Settings → Integrations.` });
+  }
+  return result.nodes;
+}
+
 /** Build a nested FileTreeNode[] from GitHub's flat recursive git-tree. */
 function buildGithubFileTree(
   entries: Array<{ path: string; type: "blob" | "tree"; size?: number }>,
@@ -364,11 +481,30 @@ export const integrationsRouter = router({
   /** Return all configured integration statuses (no raw tokens ever leave the server). */
   // Pure local read — must stay protectedProcedure so sovereign-mode users can still
   // view connection status (a cloud/externalService procedure would throw FORBIDDEN here).
-  getIntegrations: protectedProcedure.query(({ ctx }) => {
+  getIntegrations: protectedProcedure.query(async ({ ctx }) => {
     if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
     const store = readStore();
     const bucket = getBucket(store, String(ctx.user.id));
+
+    // dropbox/onedrive connect via the OAuth flow → their connected state lives
+    // in platformAccounts, not the paste-token store.
+    const oauthConnected = new Map<string, { connectedAt: string | null; metadata: unknown }>();
+    for (const platform of OAUTH_INTEGRATION_TYPES) {
+      const account = await getOAuthAccount(Number(ctx.user.id), platform);
+      if (account) {
+        oauthConnected.set(platform, {
+          connectedAt: account.createdAt ? account.createdAt.toISOString() : null,
+          metadata: account.accountMetadata
+            ?? (account.accountName ? { username: account.accountName } : null),
+        });
+      }
+    }
+
     return INTEGRATION_TYPES.map(type => {
+      if (OAUTH_INTEGRATION_TYPES.has(type)) {
+        const oc = oauthConnected.get(type);
+        return { type, isConnected: !!oc, connectedAt: oc?.connectedAt ?? null, metadata: oc?.metadata ?? null };
+      }
       const entry = bucket[type];
       return {
         type,
@@ -388,6 +524,12 @@ export const integrationsRouter = router({
     .mutation(({ input, ctx }) =>
       withLock(async () => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        if (OAUTH_INTEGRATION_TYPES.has(input.type)) {
+          throw new TRPCError({
+            code: "BAD_REQUEST",
+            message: `${input.type} connects via OAuth — use the Connect button in Settings → Integrations, not a pasted token.`,
+          });
+        }
         let metadata: Record<string, unknown> = {};
 
         if (input.type === "github") {
@@ -459,6 +601,19 @@ export const integrationsRouter = router({
     .mutation(({ input, ctx }) =>
       withLock(async () => {
         if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+        if (OAUTH_INTEGRATION_TYPES.has(input.type)) {
+          // OAuth-based: deactivate the platformAccounts row instead of the
+          // paste-token store (which never holds these).
+          const db = await getDb();
+          await db.update(platformAccounts)
+            .set({ isActive: 0 })
+            .where(and(
+              eq(platformAccounts.userId, Number(ctx.user.id)),
+              eq(platformAccounts.platform, input.type),
+            ));
+          log.info(`Disconnected ${input.type} (OAuth)`);
+          return { success: true };
+        }
         const store = readStore();
         const bucket = getBucket(store, String(ctx.user.id));
         delete bucket[input.type];
@@ -638,6 +793,9 @@ export const integrationsRouter = router({
 
       if (input.uri.startsWith("integration://")) {
         const type = input.uri.slice("integration://".length);
+        if (OAUTH_INTEGRATION_TYPES.has(type)) {
+          return fetchOAuthIntegrationItems(Number(ctx.user.id), type);
+        }
         return fetchIntegrationItems(type, getUserToken(userId, type));
       }
 

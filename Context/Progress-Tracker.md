@@ -113,6 +113,28 @@ A sequential multi-model routing pipeline that passes a user's chat message thro
 
 ---
 
+## ✅ Neural-Map Dropbox / OneDrive Adapters — 2026-06-22
+
+**Status:** Complete (visualization parity with Google Drive). Closes the tracked deferred adapter work from the 2026-06-20 sweep / memory `neural-map-remote-ingestion`.
+
+**What was built:** one-click-OAuth Dropbox + OneDrive sources for the Neural Brain Map. The user connects each via the existing OAuth flow (already wired to `platformAccounts`); the map lists the account's **shallow top-level** files/folders as expandable `FileTreeNode`s — same render path as Google Drive.
+
+**Decisions:** connect via one-click OAuth (not paste-token); token **read-through from `platformAccounts`** (single source of truth, refresh-on-401, no token duplication); shallow listing (folders shown, no recursion); scope = **visualization only** — the VectorDB/RAG feed is a separate next-session task for *all* remote sources (user: "half the point").
+
+| File | Change |
+|---|---|
+| `server/routers/integrationsRouter.ts` | `OAUTH_INTEGRATION_TYPES`; `getOAuthAccount`, `listDropbox`, `listOnedrive`, `fetchOAuthIntegrationItems` (refresh-on-401, mirrors gmailRouter); `fetchSourceTree` `integration://` branch routes dropbox/onedrive to platformAccounts; `getIntegrations` reflects active platformAccounts row; `connect` rejects OAuth-only types; `disconnect` deactivates the row |
+| `client/src/components/IntegrationsHub.tsx` | `OAUTH_CONNECT_TYPES`; Connect button → `oauth.getAuthorizationUrl` for dropbox/onedrive (was paste-token dialog) |
+| `client/src/components/neural/MapManager.tsx` | dropbox/onedrive `neuralMapSupported: true` (Coming-soon badge + toast auto-removed) |
+
+**Operator action to go live:** set `DROPBOX_CLIENT_ID/SECRET` + `ONEDRIVE_CLIENT_ID/SECRET`; register redirect URI `${PUBLIC_URL||http://localhost:PORT}/api/oauth/callback/{dropbox|onedrive}` (`:3000` dev, `:37291` packaged desktop). Per the `oauth` skill: Microsoft/OneDrive + Dropbox both accept `http://localhost` redirect URIs for dev — no portless `.dev` TLD required (that's only for Google/Apple). Stays honestly "Not connected" until creds are set.
+
+**⭐ Next session (user-flagged):** wire `fetchSourceTree` output → `VectorDBService.addDocuments` (gated by `indexingEnabled`) for **all** remote source types generically (github + every `integration://`), so map RAG over remote sources becomes real.
+
+**Gates (2026-06-22):** root `tsc` **0** · `vitest` **338/338** · `pnpm build` ✓ · changes uncommitted.
+
+---
+
 ## 🔪 Beta-Readiness Code-Sweep — 2026-06-22 (Linux)
 
 > `/code-sweep` full 10-domain run. Scan = 1 background agent (TS/db/routers, clean) + inline greps covering all 10 domains (the other 2 background agents were Bash-permission-blocked; inline runs covered their domains).

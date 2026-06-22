@@ -86,6 +86,10 @@ const TOKEN_HINTS: Record<string, { label: string; placeholder: string; helpUrl:
   },
 };
 
+/** Integration types connected via the one-click OAuth flow (server stores the
+ *  token in platformAccounts), rather than a pasted token. */
+const OAUTH_CONNECT_TYPES = new Set<string>(["dropbox", "onedrive"]);
+
 interface IntegrationsHubProps {
   className?: string;
 }
@@ -283,6 +287,15 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                   <Unlink2 className="w-3 h-3 mr-1" /> {isDisconnecting ? "..." : "Disconnect"}
                 </Button>
               </>
+            ) : OAUTH_CONNECT_TYPES.has(item.type) ? (
+              <Button
+                size="sm"
+                className="w-full"
+                onClick={() => getAuthUrlMutation.mutate({ platform: item.type as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] })}
+                disabled={getAuthUrlMutation.isPending}
+              >
+                <Link2 className="w-3 h-3 mr-2" /> Connect with OAuth
+              </Button>
             ) : (
               <Button size="sm" className="w-full" onClick={() => setConnectType(item.type as IntegrationType)}>
                 <Link2 className="w-3 h-3 mr-2" /> Connect Account
