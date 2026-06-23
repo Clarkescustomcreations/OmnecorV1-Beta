@@ -10,7 +10,7 @@
 import { getDb } from "../../db.factory.js";
 import { scheduledPosts, curatedPosts, platformAccounts } from "../../../drizzle/schema.js";
 import { eq, inArray, and, lte } from "drizzle-orm";
-import { PublishingService, type PublishAccount } from "./PublishingService.js";
+import { PublishingService, RateLimitError, type PublishAccount } from "./PublishingService.js";
 import { createLogger } from "../../_core/logger.js";
 
 const log = createLogger("publishExecutor");
@@ -21,6 +21,10 @@ export interface PublishOutcome {
   platformPostId?: string;
   url?: string;
   error?: string;
+  /** True when the post was rate-limited and auto-rescheduled (not a hard failure). */
+  rateLimited?: boolean;
+  /** ISO time the post was rescheduled to, when rateLimited. */
+  retryAt?: string;
 }
 
 /** Extract media URLs from a curatedPosts.metadata blob, if present. */
@@ -95,6 +99,23 @@ async function publishOne(
     log.info(`Published scheduled post ${row.id} to ${account.platform}`, { url: result.url });
     return { scheduledPostId: row.id, ok: true, platformPostId: result.platformPostId, url: result.url };
   } catch (err) {
+    // Rate limit → reschedule (don't burn the post). The publish worker
+    // (publishDuePosts) will retry it once the reset window passes; true
+    // quota/permission problems surface as other 4xx → the failed path below.
+    if (err instanceof RateLimitError) {
+      const retryAt = new Date(Date.now() + err.retryAfterSec * 1000);
+      await db
+        .update(scheduledPosts)
+        .set({
+          status: "scheduled",
+          scheduledAt: retryAt,
+          errorMessage: `Rate limited by ${err.platform}; auto-retry at ${retryAt.toISOString()}`,
+        })
+        .where(eq(scheduledPosts.id, row.id));
+      log.warn(`Rate limited publishing post ${row.id} to ${account.platform} — rescheduled for ${retryAt.toISOString()}`);
+      return { scheduledPostId: row.id, ok: false, rateLimited: true, retryAt: retryAt.toISOString(), error: err.message };
+    }
+
     const error = err instanceof Error ? err.message : String(err);
     await db.update(scheduledPosts).set({ status: "failed", errorMessage: error.slice(0, 1000) }).where(eq(scheduledPosts.id, row.id));
     log.warn(`Failed to publish scheduled post ${row.id} to ${account.platform}`, error);

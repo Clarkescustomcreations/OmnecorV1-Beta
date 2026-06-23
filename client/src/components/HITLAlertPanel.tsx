@@ -104,7 +104,7 @@ export function HITLAlertPanel({
     return (
       <>
         {walletSpend && (
-          <div className="rounded-lg border border-accent-warning/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+          <div className="rounded-lg border border-accent-warning/30 bg-accent-warning/10 backdrop-blur-sm p-3 shadow-lg">
             <div className="flex items-center gap-2 text-accent-warning text-sm font-medium mb-1">
               <AlertTriangle className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">Budget Spend Event</span>
@@ -124,7 +124,7 @@ export function HITLAlertPanel({
       case "critical":
         return <AlertTriangle className="w-6 h-6 text-destructive" />;
       case "warning":
-        return <AlertCircle className="w-6 h-6 text-yellow-500" />;
+        return <AlertCircle className="w-6 h-6 text-accent-warning" />;
       default:
         return <AlertCircle className="w-6 h-6 text-primary" />;
     }
@@ -135,7 +135,7 @@ export function HITLAlertPanel({
       case "critical":
         return "bg-destructive/10 border-destructive/30";
       case "warning":
-        return "bg-yellow-500/10 border-yellow-500/30";
+        return "bg-accent-warning/10 border-accent-warning/30";
       default:
         return "bg-primary/10 border-primary/30";
     }
@@ -168,7 +168,7 @@ export function HITLAlertPanel({
   return (
     <>
       {walletSpend && (
-        <div className="mb-2 rounded-lg border border-accent-warning/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+        <div className="mb-2 rounded-lg border border-accent-warning/30 bg-accent-warning/10 backdrop-blur-sm p-3 shadow-lg">
           <div className="flex items-center gap-2 text-accent-warning text-sm font-medium mb-1">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">Budget Spend Event</span>

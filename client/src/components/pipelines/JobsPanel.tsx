@@ -34,7 +34,7 @@ const stateColors: Record<string, string> = {
   running: "bg-primary text-white animate-pulse",
   completed: "bg-accent-success text-white",
   failed: "bg-destructive text-white",
-  cancelled: "bg-slate-500 text-white",
+  cancelled: "bg-muted text-muted-foreground",
 };
 
 export function JobsPanel() {

@@ -72,7 +72,7 @@ export function PhaseOutputPanel({ pipelineId }: { pipelineId: string }) {
           const isActive = pipeline.currentPhase === phaseName;
 
           return (
-            <div key={phaseName} className={`rounded-lg border p-4 ${isActive ? "border-primary bg-blue-950/30" : "border-border bg-card/50"}`}>
+            <div key={phaseName} className={`rounded-lg border p-4 ${isActive ? "border-primary bg-primary/10" : "border-border bg-card/50"}`}>
               <div className="flex items-center justify-between mb-2">
                 <span className="text-white font-medium text-sm">{phaseName}</span>
                 {phaseData && (

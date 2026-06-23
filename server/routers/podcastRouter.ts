@@ -4,11 +4,18 @@
  */
 
 import { z } from "zod";
+import { randomUUID } from "crypto";
+import { and, desc, eq } from "drizzle-orm";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { LocalPodcastService } from "../phase2/services/LocalPodcastService.js";
 import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
 import { assertProviderAllowedInMode } from "../_core/sovereign.js";
+import { getDb } from "../db.factory.js";
+import { podcastEpisodes } from "../../drizzle/schema.js";
+import { createLogger } from "../_core/logger.js";
+
+const log = createLogger("podcastRouter");
 
 const dialogueTurnSchema = z.object({
   speakerId: z.string(),
@@ -53,9 +60,61 @@ export const podcastRouter = router({
    */
   generate: protectedProcedure
     .input(podcastConfigSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ input, ctx }) => {
       const service = LocalPodcastService.getInstance();
-      return await service.generatePodcast(input);
+      const result = await service.generatePodcast(input);
+
+      // Server-backed episode history (TD-026): persist on a successful master
+      // mix so History survives a cache clear and follows the user across
+      // browsers/devices. Keyed by jobId → idempotent upsert (re-generating the
+      // same job updates rather than duplicates). A persistence failure must not
+      // fail generation — log and return the result regardless.
+      if (result?.audioUrl) {
+        try {
+          const db = await getDb();
+          const episodeId = result.jobId || input.jobId || randomUUID();
+          const title = (input.title?.trim() || "Podcast Episode").slice(0, 200);
+          const segmentCount = Array.isArray(result.segments) ? result.segments.length : 0;
+          const durationSeconds = Math.max(0, Math.round(result.duration ?? 0));
+          await db
+            .insert(podcastEpisodes)
+            .values({ id: episodeId, userId: ctx.user!.id, title, audioUrl: result.audioUrl, segmentCount, durationSeconds })
+            .onConflictDoUpdate({
+              target: podcastEpisodes.id,
+              set: { title, audioUrl: result.audioUrl, segmentCount, durationSeconds },
+            });
+        } catch (err) {
+          log.warn("[podcast] failed to persist episode history", err);
+        }
+      }
+
+      return result;
+    }),
+
+  /** Server-backed episode history for the current user (newest first, capped at 100). */
+  listEpisodes: protectedProcedure.query(async ({ ctx }) => {
+    const db = await getDb();
+    return db
+      .select()
+      .from(podcastEpisodes)
+      .where(eq(podcastEpisodes.userId, ctx.user!.id))
+      .orderBy(desc(podcastEpisodes.createdAt))
+      .limit(100);
+  }),
+
+  /** Remove one episode from the current user's history. Scoped by userId (IDOR-safe). */
+  deleteEpisode: protectedProcedure
+    .input(z.object({ id: z.string().min(1) }))
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+      const deleted = await db
+        .delete(podcastEpisodes)
+        .where(and(eq(podcastEpisodes.id, input.id), eq(podcastEpisodes.userId, ctx.user!.id)))
+        .returning({ id: podcastEpisodes.id });
+      if (deleted.length === 0) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Episode not found." });
+      }
+      return { id: deleted[0].id };
     }),
 
   /**

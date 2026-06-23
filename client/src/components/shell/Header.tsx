@@ -15,7 +15,7 @@ export function ConnectionStatusBadge() {
   const statusConfig = {
     connecting: {
       label: "Connecting",
-      color: "bg-yellow-500",
+      color: "bg-accent-warning",
       pulse: false,
     },
     connected: {
@@ -25,7 +25,7 @@ export function ConnectionStatusBadge() {
     },
     reconnecting: {
       label: "Reconnecting...",
-      color: "bg-yellow-500",
+      color: "bg-accent-warning",
       pulse: true,
     },
     offline: {

@@ -4,12 +4,14 @@ import { createHmac } from 'crypto';
 import { readFileSync, existsSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
-import { NodeIdentity } from '../../../shared/types/ommesh.types.js';
+import { NodeIdentity, NodeCapabilities } from '../../../shared/types/ommesh.types.js';
 import { DiscoveryService, type PeerInfo } from './DiscoveryService.js';
 import { securityManager, SecurityManager } from './SecurityManager.js';
 import { RoutingEngine } from './RoutingEngine.js';
+import { collectHostTelemetry } from './HostTelemetry.js';
 import { MeshServer, MESH_PORT } from './MeshServer.js';
 import { createLogger } from "../../_core/logger.js";
+import { CLOUD_PROVIDER_IDS } from "../../_core/sovereign.js";
 const log = createLogger("OMMESH:MeshNode");
 
 const SETTINGS_PATH = join(homedir(), '.omnecor', 'settings.json');
@@ -19,9 +21,8 @@ const SETTINGS_PATH = join(homedir(), '.omnecor', 'settings.json');
 // billed external call on a `protectedProcedure` (and on inbound peer requests),
 // silently bypassing the Sovereign-mode enforcement that lives in aiRouter's
 // `cloudProcedure`/`assertProviderAllowedInMode` gate. Cloud calls must go
-// through the proper aiRouter path — never through the mesh. Mirrors the set in
-// server/routers/aiRouter.ts.
-const CLOUD_PROVIDER_IDS = new Set(["openai", "anthropic", "gemini", "grok", "huggingface"]);
+// through the proper aiRouter path — never through the mesh. CLOUD_PROVIDER_IDS
+// is the shared set from _core/sovereign.ts (single source of truth).
 
 export interface InferenceResult {
   content: string;
@@ -66,6 +67,12 @@ export class MeshNode {
   /** Interval handle for the sync heartbeat. */
   private syncHeartbeatTimer: ReturnType<typeof setInterval> | null = null;
 
+  /** Interval handle for the GPU/host telemetry refresh. */
+  private telemetryTimer: ReturnType<typeof setInterval> | null = null;
+
+  /** Last advertised dynamic telemetry — gates re-advertise to avoid mDNS churn. */
+  private lastAdvertisedGpu: { vram: number; utilization: number } | null = null;
+
   constructor() {
     this.security = securityManager;
     this.identity = this.security.getIdentity();
@@ -93,9 +100,88 @@ export class MeshNode {
   }
 
   async start() {
+    // Collect real host telemetry BEFORE the first beacon so the node's very
+    // first mDNS advertisement already carries true VRAM/CPU/RAM figures (no
+    // initial vram:0 → immediate re-advertise churn).
+    await this.primeTelemetry();
     await this.discovery.startMdnsBeacon();
     await this.server.start();
+    this.startTelemetryPush();
     log.info("OMMESH node started", { nodeId: this.identity.id });
+  }
+
+  // ─── Host Telemetry (feeds VRAM-weighted routing — TD-018) ────────────────
+
+  /**
+   * Mutate the local identity's dynamic capabilities in place. The capabilities
+   * object is shared by reference with DiscoveryService (passed at construction)
+   * and the RoutingEngine (reads `getIdentity()`), so an in-place update is seen
+   * everywhere; the mDNS TXT record is refreshed separately via the discovery
+   * service when the change is material.
+   */
+  private applyTelemetry(telemetry: Pick<NodeCapabilities, "gpu" | "cpu" | "ram">): void {
+    const caps = this.identity.capabilities;
+    caps.gpu = telemetry.gpu;
+    caps.cpu = telemetry.cpu;
+    caps.ram = telemetry.ram;
+  }
+
+  /** One-shot telemetry collection used to seed capabilities before the first beacon. */
+  private async primeTelemetry(): Promise<void> {
+    try {
+      const telemetry = await collectHostTelemetry();
+      this.applyTelemetry(telemetry);
+      this.lastAdvertisedGpu = { vram: telemetry.gpu.vram, utilization: telemetry.gpu.utilization };
+      log.info("OMMESH telemetry primed", {
+        vramFreeMb: telemetry.gpu.vram,
+        gpuUtil: telemetry.gpu.utilization,
+        cpuCores: telemetry.cpu,
+        ramFreeMb: telemetry.ram,
+      });
+    } catch (err) {
+      log.warn("OMMESH telemetry prime failed — advertising zero capabilities", {
+        error: (err as Error).message,
+      });
+    }
+  }
+
+  /** Start the periodic telemetry refresh (30 s). Idempotent. */
+  private startTelemetryPush(): void {
+    if (this.telemetryTimer) return;
+    this.telemetryTimer = setInterval(() => {
+      void this.refreshTelemetry();
+    }, 30_000);
+    log.info("OMMESH telemetry push started (30 s refresh)");
+  }
+
+  /**
+   * Re-collect telemetry and, when free VRAM or utilization has moved
+   * materially, re-advertise so peers route on fresh headroom. The change-guard
+   * means a steady-state node re-advertises only when load actually shifts —
+   * avoiding constant mDNS up/down flapping.
+   */
+  private async refreshTelemetry(): Promise<void> {
+    try {
+      const telemetry = await collectHostTelemetry();
+      this.applyTelemetry(telemetry);
+
+      const last = this.lastAdvertisedGpu;
+      const materiallyChanged =
+        !last ||
+        Math.abs(telemetry.gpu.vram - last.vram) > 512 || // > 512 MB free-VRAM delta
+        Math.abs(telemetry.gpu.utilization - last.utilization) > 15; // > 15% util delta
+
+      if (materiallyChanged) {
+        this.lastAdvertisedGpu = { vram: telemetry.gpu.vram, utilization: telemetry.gpu.utilization };
+        this.discovery.refreshAdvertisement();
+        log.info("OMMESH re-advertised capabilities", {
+          vramFreeMb: telemetry.gpu.vram,
+          gpuUtil: telemetry.gpu.utilization,
+        });
+      }
+    } catch (err) {
+      log.warn("OMMESH telemetry refresh failed", { error: (err as Error).message });
+    }
   }
 
   // Expose components

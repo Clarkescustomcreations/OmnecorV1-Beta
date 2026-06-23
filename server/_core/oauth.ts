@@ -583,12 +583,8 @@ export function registerSocialMediaOAuthRoutes(app: Express) {
       // Fetch user profile
       const profile = await fetchUserProfile(platform, tokenResponse.access_token);
 
-      // Save to database
+      // Save to database (getDb() always returns a live connection)
       const dbInstance = await getDb();
-      if (!dbInstance) {
-        res.status(500).json({ error: "Database connection failed" });
-        return;
-      }
 
       const accountName = (
         profile.name ||

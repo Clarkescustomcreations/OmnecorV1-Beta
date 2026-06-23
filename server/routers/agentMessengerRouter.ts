@@ -97,23 +97,24 @@ export const agentMessengerRouter = router({
   listConversations: protectedProcedure.query(async ({ ctx }) => {
     const store = AgentMessengerStore.getInstance();
     const people = await loadPersonas(ctx.user?.id);
-    const conversations: AgentConversation[] = await Promise.all(
-      people.map(async p => {
-        const [last, unread] = await Promise.all([
-          store.lastMessage(ctx.user.id, p.id),
-          store.unreadCount(ctx.user.id, p.id),
-        ]);
-        return {
-          personaId: p.id,
-          name: p.name,
-          type: p.type,
-          alwaysOn: p.alwaysOn,
-          lastMessage: last?.content,
-          lastMessageAt: last?.createdAt,
-          unread,
-        };
-      })
-    );
+    const personaIds = people.map(p => p.id);
+    // Batched: 3 queries total instead of 2 per persona (was an N+1).
+    const [lastMap, unreadMap] = await Promise.all([
+      store.lastMessagesByPersona(ctx.user.id, personaIds),
+      store.unreadCountsByPersona(ctx.user.id, personaIds),
+    ]);
+    const conversations: AgentConversation[] = people.map(p => {
+      const last = lastMap.get(p.id);
+      return {
+        personaId: p.id,
+        name: p.name,
+        type: p.type,
+        alwaysOn: p.alwaysOn,
+        lastMessage: last?.content,
+        lastMessageAt: last?.createdAt,
+        unread: unreadMap.get(p.id) ?? 0,
+      };
+    });
     return { conversations };
   }),
 

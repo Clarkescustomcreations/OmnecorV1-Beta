@@ -60,7 +60,7 @@ export const UnslothPanel: React.FC = () => {
     <div className="p-6 space-y-8">
       <div>
         <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Zap className="w-6 h-6 text-yellow-500" /> Unsloth LLM Builder
+          <Zap className="w-6 h-6 text-accent-warning" /> Unsloth LLM Builder
         </h2>
         <p className="text-sm text-muted-foreground">High-performance local LoRA fine-tuning powered by Unsloth FastLanguageModel.</p>
       </div>
@@ -139,7 +139,7 @@ export const UnslothPanel: React.FC = () => {
             </div>
 
             <div className="flex gap-2">
-               <Button className="flex-1 bg-yellow-600 hover:bg-yellow-700" onClick={() => startFineTuning.mutate({
+               <Button className="flex-1 bg-accent-warning hover:bg-accent-warning/90" onClick={() => startFineTuning.mutate({
                  datasetPath: datasetPath || "/path/to/dataset.jsonl",
                  r: loraRank,
                  loraAlpha: 32,

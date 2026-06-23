@@ -274,6 +274,11 @@ function getProviderExtraAuthParams(platform: string): Record<string, string> {
     case "youtube":
     case "gmail":
       return { access_type: "offline", prompt: "consent" };
+    // Dropbox issues a refresh token ONLY when token_access_type=offline.
+    // Without it the access token is short-lived (~4h) with no refresh token,
+    // so the integration would silently break after expiry.
+    case "dropbox":
+      return { token_access_type: "offline" };
     default:
       return {};
   }
@@ -313,7 +318,11 @@ function getPlatformScopes(platform: string): string[] {
     ],
     // ---- Cloud storage providers ----
     google_drive: ["https://www.googleapis.com/auth/drive.file"],
-    dropbox: ["files.content.read"],
+    // files.metadata.read is REQUIRED for /2/files/list_folder (the neural-map
+    // listing); files.content.read is for downloading file bodies (future
+    // VectorDB ingestion). Listing fails with a missing-scope 401 without the
+    // metadata scope.
+    dropbox: ["files.metadata.read", "files.content.read"],
     // offline_access is required to receive a refresh token from Microsoft.
     onedrive: ["Files.Read.All", "offline_access"],
   };

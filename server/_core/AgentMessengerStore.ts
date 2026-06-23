@@ -12,7 +12,7 @@ import { randomUUID } from "node:crypto";
 import type { AgentMessage, AgentMessageRole } from "../../shared/notifications.js";
 import { getDb } from "../db.factory.js";
 import { messengerMessages } from "../../drizzle/schema.js";
-import { eq, and, desc, sql } from "drizzle-orm";
+import { eq, and, sql, inArray } from "drizzle-orm";
 
 export class AgentMessengerStore {
   private static instance: AgentMessengerStore | null = null;
@@ -71,47 +71,55 @@ export class AgentMessengerStore {
     }));
   }
 
-  /** Last message in a persona thread, if any. */
-  async lastMessage(userId: number, personaId: string): Promise<AgentMessage | undefined> {
+  /**
+   * Batched latest-message lookup for many personas in 2 queries (vs. one per
+   * persona). `id` is autoincrement → monotonic with insert order, so MAX(id)
+   * per persona is the latest row. Returns a personaId → message map.
+   */
+  async lastMessagesByPersona(userId: number, personaIds: string[]): Promise<Map<string, AgentMessage>> {
+    const result = new Map<string, AgentMessage>();
+    if (personaIds.length === 0) return result;
     const db = await getDb();
-    const rows = await db
-      .select()
+    const latest = await db
+      .select({ personaId: messengerMessages.personaId, maxId: sql<number>`max(${messengerMessages.id})` })
       .from(messengerMessages)
-      .where(
-        and(
-          eq(messengerMessages.userId, userId),
-          eq(messengerMessages.personaId, personaId)
-        )
-      )
-      .orderBy(desc(messengerMessages.createdAt))
-      .limit(1);
-
-    if (rows.length === 0) return undefined;
-    const r = rows[0];
-    return {
-      id: String(r.id),
-      personaId: r.personaId,
-      role: r.sender === "agent" ? "agent" : "user",
-      content: r.content,
-      createdAt: r.createdAt.toISOString(),
-    };
+      .where(and(
+        eq(messengerMessages.userId, userId),
+        inArray(messengerMessages.personaId, personaIds),
+      ))
+      .groupBy(messengerMessages.personaId);
+    const ids = latest.map(r => r.maxId).filter((n): n is number => n != null);
+    if (ids.length === 0) return result;
+    const rows = await db.select().from(messengerMessages).where(inArray(messengerMessages.id, ids));
+    for (const r of rows) {
+      result.set(r.personaId, {
+        id: String(r.id),
+        personaId: r.personaId,
+        role: r.sender === "agent" ? "agent" : "user",
+        content: r.content,
+        createdAt: r.createdAt.toISOString(),
+      });
+    }
+    return result;
   }
 
-  /** Unread agent-message count for a persona (persisted; survives restarts). */
-  async unreadCount(userId: number, personaId: string): Promise<number> {
+  /** Batched unread agent-message counts for many personas in one grouped query. */
+  async unreadCountsByPersona(userId: number, personaIds: string[]): Promise<Map<string, number>> {
+    const result = new Map<string, number>();
+    if (personaIds.length === 0) return result;
     const db = await getDb();
     const rows = await db
-      .select({ count: sql<number>`count(*)` })
+      .select({ personaId: messengerMessages.personaId, count: sql<number>`count(*)` })
       .from(messengerMessages)
-      .where(
-        and(
-          eq(messengerMessages.userId, userId),
-          eq(messengerMessages.personaId, personaId),
-          eq(messengerMessages.sender, "agent"),
-          eq(messengerMessages.read, false)
-        )
-      );
-    return Number(rows[0]?.count ?? 0);
+      .where(and(
+        eq(messengerMessages.userId, userId),
+        inArray(messengerMessages.personaId, personaIds),
+        eq(messengerMessages.sender, "agent"),
+        eq(messengerMessages.read, false),
+      ))
+      .groupBy(messengerMessages.personaId);
+    for (const r of rows) result.set(r.personaId, Number(r.count));
+    return result;
   }
 
   /** Mark a persona thread's agent messages as read by the user. */

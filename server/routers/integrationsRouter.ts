@@ -251,21 +251,18 @@ async function getOAuthAccount(userId: number, platform: string) {
   return rows[0] ?? null;
 }
 
-/** List the Dropbox account root (shallow). Surfaces a 401 status so the caller
- *  can refresh + retry, mirroring the gmailRouter pattern. */
+/** Safety bound on a shallow root listing — paginated up to this many entries so
+ *  a huge account can't produce an unbounded graph (mirrors the github 1500 cap).
+ *  Generous enough that real accounts return complete; not a silent 1-page cut. */
+const REMOTE_LIST_CAP = 1000;
+
+/** List the Dropbox account root (shallow, fully paginated via cursor). Surfaces a
+ *  401 status so the caller can refresh + retry, mirroring the gmailRouter pattern. */
 async function listDropbox(token: string): Promise<{ status: number; nodes: FileTreeNode[] }> {
-  const res = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ path: "", limit: 100 }),
-    signal: AbortSignal.timeout(10_000),
-  });
-  if (res.status === 401) return { status: 401, nodes: [] };
-  if (!res.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: `Dropbox list failed (${res.status})` });
-  const data = await res.json() as {
-    entries?: Array<{ [".tag"]: string; name: string; id: string; size?: number; server_modified?: string }>;
-  };
-  const nodes: FileTreeNode[] = (data.entries ?? []).map(e => {
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  type DbxEntry = { [".tag"]: string; name: string; id: string; size?: number; server_modified?: string };
+  type DbxPage = { entries?: DbxEntry[]; cursor?: string; has_more?: boolean };
+  const toNode = (e: DbxEntry): FileTreeNode => {
     const isFolder = e[".tag"] === "folder";
     return {
       name: e.name,
@@ -276,22 +273,38 @@ async function listDropbox(token: string): Promise<{ status: number; nodes: File
       modifiedAt: e.server_modified,
       ...(isFolder ? { children: [] } : {}),
     };
+  };
+
+  let res = await fetch("https://api.dropboxapi.com/2/files/list_folder", {
+    method: "POST", headers,
+    body: JSON.stringify({ path: "", limit: 1000 }),
+    signal: AbortSignal.timeout(10_000),
   });
-  return { status: res.status, nodes };
+  if (res.status === 401) return { status: 401, nodes: [] };
+  if (!res.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: `Dropbox list failed (${res.status})` });
+  let page = await res.json() as DbxPage;
+  const nodes: FileTreeNode[] = (page.entries ?? []).map(toNode);
+
+  while (page.has_more && page.cursor && nodes.length < REMOTE_LIST_CAP) {
+    res = await fetch("https://api.dropboxapi.com/2/files/list_folder/continue", {
+      method: "POST", headers,
+      body: JSON.stringify({ cursor: page.cursor }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    if (res.status === 401) return { status: 401, nodes: [] };
+    if (!res.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: `Dropbox list (continue) failed (${res.status})` });
+    page = await res.json() as DbxPage;
+    for (const e of page.entries ?? []) nodes.push(toNode(e));
+  }
+  return { status: 200, nodes: nodes.slice(0, REMOTE_LIST_CAP) };
 }
 
-/** List the OneDrive account root (shallow). */
+/** List the OneDrive account root (shallow, fully paginated via @odata.nextLink). */
 async function listOnedrive(token: string): Promise<{ status: number; nodes: FileTreeNode[] }> {
-  const res = await fetch(
-    "https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,size,folder,file,lastModifiedDateTime&$top=100",
-    { headers: { Authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(10_000) },
-  );
-  if (res.status === 401) return { status: 401, nodes: [] };
-  if (!res.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: `OneDrive list failed (${res.status})` });
-  const data = await res.json() as {
-    value?: Array<{ id: string; name: string; size?: number; folder?: unknown; file?: unknown; lastModifiedDateTime?: string }>;
-  };
-  const nodes: FileTreeNode[] = (data.value ?? []).map(e => {
+  const headers = { Authorization: `Bearer ${token}` };
+  type GraphEntry = { id: string; name: string; size?: number; folder?: unknown; file?: unknown; lastModifiedDateTime?: string };
+  type GraphPage = { value?: GraphEntry[]; "@odata.nextLink"?: string };
+  const toNode = (e: GraphEntry): FileTreeNode => {
     const isFolder = !!e.folder;
     return {
       name: e.name,
@@ -302,8 +315,20 @@ async function listOnedrive(token: string): Promise<{ status: number; nodes: Fil
       modifiedAt: e.lastModifiedDateTime,
       ...(isFolder ? { children: [] } : {}),
     };
-  });
-  return { status: res.status, nodes };
+  };
+
+  let url: string | undefined =
+    "https://graph.microsoft.com/v1.0/me/drive/root/children?$select=id,name,size,folder,file,lastModifiedDateTime&$top=200";
+  const nodes: FileTreeNode[] = [];
+  while (url && nodes.length < REMOTE_LIST_CAP) {
+    const res: Response = await fetch(url, { headers, signal: AbortSignal.timeout(10_000) });
+    if (res.status === 401) return { status: 401, nodes: [] };
+    if (!res.ok) throw new TRPCError({ code: "BAD_GATEWAY", message: `OneDrive list failed (${res.status})` });
+    const page = await res.json() as GraphPage;
+    for (const e of page.value ?? []) nodes.push(toNode(e));
+    url = page["@odata.nextLink"];
+  }
+  return { status: 200, nodes: nodes.slice(0, REMOTE_LIST_CAP) };
 }
 
 /** Resolve an OAuth integration's content with one refresh-on-401 retry,

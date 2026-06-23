@@ -177,7 +177,7 @@ export const ModelHubPanel: React.FC = () => {
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Star className="w-5 h-5 text-yellow-500" aria-hidden="true" /> Featured Models
+                  <Star className="w-5 h-5 text-accent-warning" aria-hidden="true" /> Featured Models
                 </CardTitle>
                 <CardDescription>Popular models curated for easy discovery</CardDescription>
               </CardHeader>

@@ -82,7 +82,7 @@ export const TTSPanel: React.FC = () => {
       </Card>
 
       {audioUrl && (
-        <Card className="bg-blue-50/50 border-primary dark:bg-blue-950/20 dark:border-primary">
+        <Card className="bg-accent-info/10 border-primary">
           <CardContent className="p-4 flex items-center gap-4">
             <div className="p-3 bg-primary rounded-full text-white">
               <Music className="w-6 h-6" />

@@ -641,7 +641,7 @@ export function Designer3D() {
               
               {matchingTip ? (
                 <div
-                  className="bg-card border border-dashed border-primary/40 hover:border-primary/30 hover:text-primary text-slate-305 text-[11px] px-2.5 py-1 rounded cursor-pointer transition-all flex items-center gap-1.5 font-mono select-none"
+                  className="bg-card border border-dashed border-primary/40 hover:border-primary/30 hover:text-primary text-muted-foreground text-[11px] px-2.5 py-1 rounded cursor-pointer transition-all flex items-center gap-1.5 font-mono select-none"
                   onClick={() => handleInsertSyntax(matchingTip.syntax)}
                   title="Click to insert at cursor"
                 >

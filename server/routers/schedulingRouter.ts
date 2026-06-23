@@ -135,7 +135,12 @@ export const schedulingRouter = router({
 
       const [outcome] = await publishScheduledPostIds([input.scheduledPostId]);
       const ok = !!outcome?.ok;
-      return { success: ok, status: ok ? "published" : "failed" };
+      const rescheduled = !ok && !!outcome?.rateLimited;
+      return {
+        success: ok || rescheduled,
+        status: ok ? "published" : rescheduled ? "rescheduled" : "failed",
+        retryAt: outcome?.retryAt,
+      };
     }),
   publishNow: protectedProcedure
     .input(z.object({ postIds: z.array(z.number()) }))
@@ -144,10 +149,13 @@ export const schedulingRouter = router({
       // writing real outcomes (published/failed + platformPostId/errorMessage).
       const outcomes = await publishScheduledPostIds(input.postIds);
       const published = outcomes.filter((o) => o.ok);
-      const failed = outcomes.filter((o) => !o.ok);
+      const rescheduled = outcomes.filter((o) => !o.ok && o.rateLimited);
+      const failed = outcomes.filter((o) => !o.ok && !o.rateLimited);
       return {
+        // Rate-limited posts are auto-rescheduled, not failures.
         success: failed.length === 0,
         publishedCount: published.length,
+        rescheduledCount: rescheduled.length,
         failedCount: failed.length,
         results: outcomes,
       };

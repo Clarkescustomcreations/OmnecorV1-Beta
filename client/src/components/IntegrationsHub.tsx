@@ -192,9 +192,9 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
   const getStatusColor = (status: string): string => {
     switch (status) {
       case "connected": return "bg-accent-success";
-      case "disconnected": return "bg-gray-400";
+      case "disconnected": return "bg-muted-foreground";
       case "error": return "bg-destructive";
-      case "checking": return "bg-yellow-500";
+      case "checking": return "bg-accent-warning";
       default: return "bg-muted";
     }
   };
@@ -272,9 +272,14 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
           <div className="flex gap-2 pt-2">
             {item.isConnected ? (
               <>
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => syncMutation.mutate({ type: item.type as IntegrationType })} disabled={isSyncing}>
-                  <RefreshCw className={cn("w-3 h-3 mr-1", isSyncing && "animate-spin")} /> {isSyncing ? "Syncing..." : "Sync"}
-                </Button>
+                {/* Sync re-fetches metadata into the paste-token store; OAuth
+                    types (dropbox/onedrive) have no such store and fetch their
+                    content on-demand in the map, so Sync doesn't apply. */}
+                {!OAUTH_CONNECT_TYPES.has(item.type) && (
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => syncMutation.mutate({ type: item.type as IntegrationType })} disabled={isSyncing}>
+                    <RefreshCw className={cn("w-3 h-3 mr-1", isSyncing && "animate-spin")} /> {isSyncing ? "Syncing..." : "Sync"}
+                  </Button>
+                )}
                 {healthStatus?.status === "error" && (
                   <Button size="sm" variant="outline" className="flex-1" onClick={() => refreshTokenMutation.mutate({ integrationId: item.type as string })} disabled={isRefreshing}>
                     <RefreshCw className={cn("w-3 h-3 mr-1", isRefreshing && "animate-spin")} /> {isRefreshing ? "..." : "Refresh"}

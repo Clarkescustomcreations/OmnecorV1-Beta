@@ -57,6 +57,13 @@
       "when": 1782154934542,
       "tag": "0007_many_colonel_america",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1782251247821,
+      "tag": "0008_solid_mentor",
+      "breakpoints": true
     }
   ]
 }

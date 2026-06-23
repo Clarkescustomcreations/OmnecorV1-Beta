@@ -37,7 +37,7 @@ export function ContextTransparencyIndicator({
     if (transparency.usedPercentage >= 90) {
       return <AlertCircle className="w-5 h-5 text-destructive" />;
     } else if (transparency.usedPercentage >= 70) {
-      return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
+      return <AlertTriangle className="w-5 h-5 text-accent-warning" />;
     } else {
       return <CheckCircle className="w-5 h-5 text-accent-success" />;
     }
@@ -59,7 +59,7 @@ export function ContextTransparencyIndicator({
     if (transparency.usedPercentage >= 90) {
       return "bg-destructive";
     } else if (transparency.usedPercentage >= 70) {
-      return "bg-yellow-500";
+      return "bg-accent-warning";
     } else {
       return "bg-accent-success";
     }
@@ -130,8 +130,8 @@ export function ContextTransparencyIndicator({
 
         {/* Warnings */}
         {transparency.usedPercentage >= 70 && (
-          <div className="p-3 rounded-lg bg-yellow-500/10 border border-yellow-500/30">
-            <p className="text-xs text-yellow-700 dark:text-yellow-400">
+          <div className="p-3 rounded-lg bg-accent-warning/10 border border-accent-warning/30">
+            <p className="text-xs text-accent-warning">
               ⚠️ High context usage. Consider removing files or starting a new
               conversation.
             </p>

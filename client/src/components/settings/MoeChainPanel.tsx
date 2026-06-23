@@ -279,7 +279,7 @@ function ChainCard({ chainType }: { chainType: "local" | "cloud" }) {
             </Badge>
           ) : (
             <Badge variant="outline" className="flex items-center gap-1 text-xs">
-              <AlertCircle className="h-3 w-3 text-yellow-500" />
+              <AlertCircle className="h-3 w-3 text-accent-warning" />
               Not set up
             </Badge>
           )}

@@ -9,13 +9,18 @@
  * Set VALET_AUTO_START=false to opt-out of auto-start without removing the artifact.
  */
 
-import { spawn, ChildProcess } from "child_process";
+import { spawn, execFile, ChildProcess } from "child_process";
+import { promisify } from "util";
+import { existsSync } from "fs";
+import os from "os";
 import path from "path";
 import { fileURLToPath } from "url";
 import { ValetArtifactRegistry } from "./ValetArtifactRegistry.js";
 import { ENV } from "../../_core/env.js";
 import { PYTHON_SCRIPTS } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
+
+const execFileAsync = promisify(execFile);
 
 const log = createLogger("ValetServer");
 
@@ -36,6 +41,8 @@ export class ValetServerService {
   private readonly _maxRestarts = 5;
   private _started = false;
   private _stopping = false;
+  /** Python interpreter validated by the runtime preflight; reused across restarts. */
+  private _pythonBin: string | null = null;
 
   static getInstance(): ValetServerService {
     if (!ValetServerService.instance) {
@@ -77,11 +84,73 @@ export class ValetServerService {
       return;
     }
 
+    // Preflight: confirm a usable Python runtime + the minimal FastAPI deps
+    // exist BEFORE spawning. On a fresh machine without Python/deps this lets us
+    // degrade to rule-based keyword routing with a single actionable log line,
+    // instead of thrashing the spawn → ENOENT → crash → backoff loop 5× (~30 s).
+    const pythonBin = await this._checkRuntime();
+    if (!pythonBin) return;
+    this._pythonBin = pythonBin;
+
     log.info(
       `[ValetServer] Artifact registered (format=${artifact.format ?? "unknown"}) — ` +
-        "starting Valet Router inference server"
+        `starting Valet Router inference server (python=${pythonBin})`
     );
     await this._spawn();
+  }
+
+  /**
+   * Resolve the Python interpreter to use: prefer a provisioned Valet/ML venv
+   * (created by packaging/scripts/setup-valet-python) so a bundled installer can
+   * ship deps in an isolated env, otherwise fall back to PYTHON_BIN / the system
+   * `python`/`python3`.
+   */
+  private _resolvePythonBin(): string {
+    const isWin = process.platform === "win32";
+    const venvCandidates = [
+      path.join(os.homedir(), ".omnecor", "valet-venv"),
+      path.join(os.homedir(), ".omnecor", "ml-venv"),
+    ];
+    for (const venv of venvCandidates) {
+      const bin = isWin
+        ? path.join(venv, "Scripts", "python.exe")
+        : path.join(venv, "bin", "python");
+      if (existsSync(bin)) return bin;
+    }
+    return PYTHON_SCRIPTS.pythonBin;
+  }
+
+  /**
+   * Verify the Valet inference server can actually run before spawning it.
+   * Checks that the resolved Python interpreter exists and that the minimal
+   * hard dependencies import (`fastapi`, `uvicorn`, `pydantic` — the GGUF
+   * `llama_cpp` / `transformers` backends are optional and loaded lazily by the
+   * bridge). Returns the resolved python bin when ready, or null to keep the
+   * server disabled (rule-based keyword fallback stays active).
+   */
+  private async _checkRuntime(): Promise<string | null> {
+    const pythonBin = this._resolvePythonBin();
+    try {
+      await execFileAsync(pythonBin, ["-c", "import fastapi, uvicorn, pydantic"], { timeout: 8000 });
+      return pythonBin;
+    } catch (err) {
+      const e = err as NodeJS.ErrnoException;
+      if (e.code === "ENOENT") {
+        log.warn(
+          `[ValetServer] Python interpreter not found ('${pythonBin}') — Valet inference ` +
+            "server disabled; rule-based keyword routing remains active. Install Python 3.10+ " +
+            "or run packaging/scripts/setup-valet-python, then restart to enable local Valet inference."
+        );
+      } else {
+        log.warn(
+          "[ValetServer] Python is present but the Valet inference dependencies are missing " +
+            "(need: fastapi, uvicorn, pydantic) — server disabled; rule-based keyword routing " +
+            "remains active. Provision them with packaging/scripts/setup-valet-python " +
+            `(creates ~/.omnecor/valet-venv). Detail: ${e.message}`
+        );
+      }
+      return null;
+    }
   }
 
   /**
@@ -140,7 +209,7 @@ export class ValetServerService {
       port = new URL(ENV.valetRouterUrl).port || "8010";
     } catch { /* ENV.valetRouterUrl malformed — use default */ }
 
-    this._proc = spawn(PYTHON_SCRIPTS.pythonBin, [INFERENCE_SCRIPT], {
+    this._proc = spawn(this._pythonBin ?? PYTHON_SCRIPTS.pythonBin, [INFERENCE_SCRIPT], {
       env: {
         ...(process.env as Record<string, string>),
         PYTHONUNBUFFERED: "1",

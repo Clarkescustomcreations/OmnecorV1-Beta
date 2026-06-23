@@ -66,6 +66,11 @@ export const ENV = {
   agenticOsApiKey: process.env.AGENTICOS_API_KEY ?? "",
   pcbwayApiKey: process.env.PCBWAY_API_KEY ?? "",
   pcbwayPartnerId: process.env.PCBWAY_PARTNER_ID ?? "",
+  // PCBWay partner API base (https://api-partner.pcbway.com). Overridable for a
+  // sandbox/proxy. The exact auth header is confirmed at partner onboarding —
+  // PCBWAY_API_AUTH_HEADER lets the operator set it without a code change.
+  pcbwayApiBase: process.env.PCBWAY_API_BASE ?? "https://api-partner.pcbway.com",
+  pcbwayApiAuthHeader: process.env.PCBWAY_API_AUTH_HEADER ?? "Authorization",
   openArtApiKey: process.env.OPENART_API_KEY ?? "",
   updateCheckRepo: process.env.UPDATE_CHECK_REPO ?? "Omnecor/omnecor-hmci",
   honchoApiKey: process.env.HONCHO_API_KEY ?? "",

@@ -152,7 +152,7 @@ export function ModelHubPanel({
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "available": return <Check className="w-4 h-4 text-accent-success" />;
-      case "loading":   return <Zap className="w-4 h-4 text-yellow-500 animate-pulse" />;
+      case "loading":   return <Zap className="w-4 h-4 text-accent-warning animate-pulse" />;
       case "error":     return <AlertCircle className="w-4 h-4 text-destructive" />;
       default:          return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
     }

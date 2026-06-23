@@ -192,7 +192,21 @@ A sequential multi-model routing pipeline that passes a user's chat message thro
 
 **⭐ Next session (user-flagged): ✅ DONE 2026-06-23** — wired `fetchSourceTree` → real content → VectorDB (gated by `indexingEnabled`) for all remote source types generically, plus the chat read path. See "✅ Map RAG over Remote Sources (VectorDB feed, end-to-end) — 2026-06-23" at the top.
 
-**Gates (2026-06-22):** root `tsc` **0** · `vitest` **338/338** · `pnpm build` ✓ · changes uncommitted.
+**🔬 Critical hardening pass (2026-06-23, user asked "is this actually built well or just good-enough-to-say-done"):** found + fixed real gaps that would've surfaced only at runtime/testing:
+- **Dropbox scope was wrong** — requested only `files.content.read`; `/2/files/list_folder` needs **`files.metadata.read`** → listing would 401 on missing scope. Added it (`oauthClients.ts`).
+- **Dropbox issued no refresh token** — `getProviderExtraAuthParams` lacked `token_access_type=offline` for Dropbox → ~4h token, no refresh → integration silently dies after expiry. Added it.
+- **Inaccurate scopes/descriptions** in `lib/integrations.ts` — dropbox/onedrive claimed write scopes (`files.content.write` / `Files.ReadWrite.All`) never requested, and "Sync files" wording; corrected to actual read-only scopes + Neural-Map descriptions; `INTEGRATION_FEATURES` now lists `neural-map` for the 3 storage providers (was missing on google-drive too).
+- **Broken Sync button** — connected dropbox/onedrive showed a Sync action that hit the paste-token store → `NOT_FOUND`; hidden for OAuth types (health/Refresh/Settings/Disconnect all verified to work via platformAccounts).
+- **Silent 100-item truncation** — `listDropbox`/`listOnedrive` capped at one page; now **fully paginated** (Dropbox `list_folder/continue` cursor, OneDrive `@odata.nextLink`) up to a documented `REMOTE_LIST_CAP = 1000`.
+- Verified end-to-end: the generic `/api/oauth/callback/:platform` exchanges + stores token/refresh/expiry in `platformAccounts` (both providers have complete OAuth client configs + profile branches).
+
+**Adjacent fixes same pass (deferred items that shouldn't have been):**
+- **`CLOUD_PROVIDER_IDS` consolidated** — removed the 3 remaining inline copies (`aiProviderRouter`, `WebSocketServer`, `MeshNode`) onto the single `server/_core/sovereign.ts` source (drift = silent sovereign-mode leak). aiRouter/podcast/agentMessenger were already migrated.
+- **N+1 eliminated** — `agentMessengerRouter.listConversations` did 2 queries/persona; added batched `lastMessagesByPersona`/`unreadCountsByPersona` (3 queries total) and removed the now-orphaned single methods.
+- **Dead `if (!dbInstance)` guard removed** in `oauth.ts` (getDb never returns null — same class as the context.ts fix).
+- **Sovereign ≠ Fiction Mode (investigated per user):** confirmed independent — `isFictionMode` is driven only by the active map's `mode === "fiction"` (`BrainMap.tsx:400`) or the manual toggle; nothing reads `executionMode`. Default off. So sovereign users are not pushed into fiction mode's feature lockout (Agent Networking + Wallet).
+
+**Gates (2026-06-23, full hardening pass):** root `tsc` **0** · `vitest` **371/371** · `pnpm build` ✓ (51s) · `pnpm audit --prod` **0** · changes uncommitted.
 
 ---
 

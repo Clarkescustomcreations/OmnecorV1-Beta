@@ -41,6 +41,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { ENV } from "../../_core/env.js";
 import { sdk } from "../../_core/sdk.js";
+import { CLOUD_PROVIDER_IDS } from "../../_core/sovereign.js";
 import { COOKIE_NAME } from "../../../shared/const.js";
 import {
   FileSystemWatcherService,
@@ -96,14 +97,6 @@ function secretsMatch(a: string, b: string): boolean {
   const hb = createHash("sha256").update(b).digest();
   return timingSafeEqual(ha, hb);
 }
-
-const CLOUD_PROVIDER_IDS = new Set([
-  "openai",
-  "anthropic",
-  "gemini",
-  "grok",
-  "huggingface",
-]);
 
 function resolveBackend(data: Record<string, unknown>): { providerId: string; modelId: string } {
   const mc = (data?.modelConfig ?? {}) as Record<string, unknown>;

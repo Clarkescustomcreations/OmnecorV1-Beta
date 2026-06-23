@@ -17,6 +17,7 @@
     "valet:fetch": "bash scripts/fetch-valet-model.sh",
     "valet:build": "node scripts/run-python.mjs server/python_bridges/valet_pipeline.py",
     "valet:setup-ml": "bash scripts/setup-valet-ml.sh",
+    "valet:setup-python": "bash packaging/scripts/setup-valet-python.sh",
     "valet:repro": "node scripts/run-python.mjs scripts/check_valet_reproducibility.py"
   },
   "dependencies": {

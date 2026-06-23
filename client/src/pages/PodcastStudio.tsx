@@ -427,27 +427,9 @@ function loadPodcastSession(): Partial<PodcastSessionState> | null {
   }
 }
 
-// Persistent episode history — every successfully generated episode is recorded
-// so the History button can replay/download past episodes (capped at 50).
-const HISTORY_KEY = "omnecor:podcast_history";
-
-interface PodcastEpisode {
-  id: string;
-  title: string;
-  date: string;
-  audioUrl: string;
-  segmentCount: number;
-  duration: number;
-}
-
-function loadPodcastHistory(): PodcastEpisode[] {
-  try {
-    const raw = localStorage.getItem(HISTORY_KEY);
-    return raw ? (JSON.parse(raw) as PodcastEpisode[]) : [];
-  } catch {
-    return [];
-  }
-}
+// Episode history is now server-backed via `trpc.podcast.listEpisodes`
+// (TD-026); see the in-component query. The row shape is inferred from the
+// `podcast_episodes` table, so no local interface/loader is needed here.
 
 export function PodcastStudio() {
   const [turns, setTurns] = useState<DialogueTurn[]>(() => loadPodcastSession()?.turns ?? DEFAULT_TURNS);
@@ -459,7 +441,14 @@ export function PodcastStudio() {
   const activeSegmentAudioRef = useRef<HTMLAudioElement | null>(null);
   const [podcastLength, setPodcastLength] = useState<PodcastLength>(() => loadPodcastSession()?.podcastLength ?? "medium");
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
-  const [history, setHistory] = useState<PodcastEpisode[]>(() => loadPodcastHistory());
+  // Server-backed episode history (TD-026) — replaces the prior localStorage
+  // store so episodes survive a cache clear and follow the user across devices.
+  const utils = trpc.useUtils();
+  const { data: history = [] } = trpc.podcast.listEpisodes.useQuery();
+  const deleteEpisodeMutation = trpc.podcast.deleteEpisode.useMutation({
+    onSuccess: () => { utils.podcast.listEpisodes.invalidate(); },
+    onError: (e) => toast.error(`Could not remove episode: ${e.message}`),
+  });
   const [showHistory, setShowHistory] = useState(false);
 
   const [podcastDescription, setPodcastDescription] = useState(() => loadPodcastSession()?.podcastDescription ?? "");
@@ -481,22 +470,6 @@ export function PodcastStudio() {
     const minutes = value === "short" ? 5 : value === "medium" ? 15 : value === "long" ? 30 : 60;
     setPodcastDuration(minutes);
   };
-
-  const addEpisodeToHistory = useCallback((episode: PodcastEpisode) => {
-    setHistory((prev) => {
-      const next = [episode, ...prev].slice(0, 50);
-      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch { /* quota — non-fatal */ }
-      return next;
-    });
-  }, []);
-
-  const removeEpisodeFromHistory = useCallback((id: string) => {
-    setHistory((prev) => {
-      const next = prev.filter((e) => e.id !== id);
-      try { localStorage.setItem(HISTORY_KEY, JSON.stringify(next)); } catch { /* ignore */ }
-      return next;
-    });
-  }, []);
 
   // Persist the editable session whenever it changes.
   useEffect(() => {
@@ -623,14 +596,9 @@ export function PodcastStudio() {
       // Wire the master-mix player to the range-capable server URL (same-origin).
       setAudioUrl(d.audioUrl ?? null);
       if (d.audioUrl) {
-        addEpisodeToHistory({
-          id: d.jobId ?? crypto.randomUUID(),
-          title: turns[0]?.text?.slice(0, 60) || "Podcast Episode",
-          date: new Date().toISOString(),
-          audioUrl: d.audioUrl,
-          segmentCount: d.segments?.length ?? 0,
-          duration: d.duration ?? 0,
-        });
+        // The server persists the episode during generate (TD-026); refresh the
+        // server-backed history list so the new episode appears.
+        utils.podcast.listEpisodes.invalidate();
       }
       toast.success("Podcast generated successfully using local mesh!");
     },
@@ -1121,7 +1089,7 @@ export function PodcastStudio() {
                   <div className="flex-1 min-w-0">
                     <p className="text-xs font-semibold truncate">{ep.title}</p>
                     <p className="text-[10px] text-muted-foreground">
-                      {new Date(ep.date).toLocaleString()} · {ep.segmentCount} segment{ep.segmentCount === 1 ? "" : "s"}
+                      {new Date(ep.createdAt).toLocaleString()} · {ep.segmentCount} segment{ep.segmentCount === 1 ? "" : "s"}
                     </p>
                   </div>
                   <Button
@@ -1147,7 +1115,8 @@ export function PodcastStudio() {
                     variant="ghost"
                     className="h-7 w-7 text-muted-foreground"
                     title="Remove from history"
-                    onClick={() => removeEpisodeFromHistory(ep.id)}
+                    disabled={deleteEpisodeMutation.isPending}
+                    onClick={() => deleteEpisodeMutation.mutate({ id: ep.id })}
                   >
                     <Trash2 className="w-3.5 h-3.5" />
                   </Button>

@@ -27,8 +27,11 @@
 import { EventEmitter } from "events";
 import { ChildProcess, spawn } from "child_process";
 import path from "path";
+import os from "os";
+import { randomUUID } from "crypto";
 import fs from "fs/promises";
 import { ProcessManagerService } from "./ProcessManagerService.js";
+import { createZipFromDir } from "./zipArchive.js";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -254,6 +257,40 @@ export class KiCadBridge extends EventEmitter {
     }
 
     return this.runCommand(args, "Export Gerbers");
+  }
+
+  /**
+   * Build a manufacturing package: export Gerbers + drill files for a board to
+   * a fresh temp directory, then bundle them into a single ZIP archive (the
+   * format fab houses like PCBWay expect for an order). Returns the archive as a
+   * Buffer plus the on-disk directory (for optional download/preview). Throws if
+   * either export step fails so callers never upload an empty/partial package.
+   */
+  async buildFabricationPackage(pcbPath: string): Promise<{
+    zip: Buffer;
+    outputDir: string;
+    fileCount: number;
+  }> {
+    await this.validateKiCadFile(pcbPath, [".kicad_pcb"]);
+    const outputDir = path.join(os.tmpdir(), `omnecor_fab_${randomUUID()}`);
+    await fs.mkdir(outputDir, { recursive: true });
+
+    const gerbers = await this.exportGerbers({ inputFile: pcbPath, outputDir });
+    if (!gerbers.success) {
+      throw new Error(`Gerber export failed: ${gerbers.stderr || gerbers.stdout || "kicad-cli error"}`);
+    }
+    const drills = await this.exportDrills({ inputFile: pcbPath, outputDir, format: "excellon" });
+    if (!drills.success) {
+      throw new Error(`Drill export failed: ${drills.stderr || drills.stdout || "kicad-cli error"}`);
+    }
+
+    const files = await fs.readdir(outputDir);
+    if (files.length === 0) {
+      throw new Error("Fabrication export produced no files — is this a valid PCB layout?");
+    }
+
+    const zip = await createZipFromDir(outputDir);
+    return { zip, outputDir, fileCount: files.length };
   }
 
   /**

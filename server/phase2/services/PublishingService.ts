@@ -15,6 +15,24 @@ import { refreshOAuthToken } from "../../oauth/oauthClients.js";
 
 const log = createLogger("PublishingService");
 
+/**
+ * Thrown when a platform rate-limits the request (HTTP 429, or a Graph API
+ * rate-limit error code). Carries the number of seconds to wait before
+ * retrying (parsed from `Retry-After` / `x-rate-limit-reset`, clamped to a sane
+ * window) so the publish executor can reschedule rather than hard-fail — rate
+ * limits are transient and self-resolving, unlike a 4xx auth/permission error.
+ */
+export class RateLimitError extends Error {
+  constructor(
+    public readonly platform: string,
+    public readonly retryAfterSec: number,
+    message: string,
+  ) {
+    super(message);
+    this.name = "RateLimitError";
+  }
+}
+
 export interface PublishAccount {
   id: number;
   platform: string;
@@ -101,9 +119,45 @@ export class PublishingService {
     try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
     if (!res.ok) {
       const detail = JSON.stringify(body).slice(0, 500);
+      // Treat HTTP 429 — and Meta Graph API rate-limit error codes (4 = app
+      // rate limit, 17 = user rate limit, 32 = page rate limit, 613 = custom
+      // rate limit), which Graph returns as HTTP 400 — as a transient rate
+      // limit so the executor reschedules instead of marking the post failed.
+      const graphCode = ((body.error as Json | undefined)?.code);
+      const isGraphRateLimit = typeof graphCode === "number" && [4, 17, 32, 613].includes(graphCode);
+      if (res.status === 429 || isGraphRateLimit) {
+        throw new RateLimitError(platform, this.parseRetryAfter(res), `${platform} API rate limited (${res.status}): ${detail}`);
+      }
       throw new Error(`${platform} API ${res.status}: ${detail}`);
     }
     return body;
+  }
+
+  /**
+   * Seconds to wait before retrying a rate-limited request. Honors `Retry-After`
+   * (delta-seconds or an HTTP date), then Twitter's `x-rate-limit-reset` (epoch
+   * seconds), defaulting to 15 min. Clamped to [30 s, 6 h] so a bogus header
+   * can't park a post for days or hammer the API instantly.
+   */
+  private parseRetryAfter(res: Response): number {
+    const DEFAULT_SEC = 15 * 60;
+    const clamp = (n: number): number => Math.min(6 * 60 * 60, Math.max(30, Math.round(n)));
+
+    const retryAfter = res.headers.get("retry-after");
+    if (retryAfter) {
+      const asSeconds = Number(retryAfter);
+      if (Number.isFinite(asSeconds)) return clamp(asSeconds);
+      const asDate = Date.parse(retryAfter);
+      if (Number.isFinite(asDate)) return clamp((asDate - Date.now()) / 1000);
+    }
+
+    const reset = res.headers.get("x-rate-limit-reset"); // Twitter v2 — epoch seconds
+    if (reset) {
+      const epoch = Number(reset);
+      if (Number.isFinite(epoch)) return clamp(epoch - Date.now() / 1000);
+    }
+
+    return DEFAULT_SEC;
   }
 
   // ── X / Twitter ──────────────────────────────────────────────────────────

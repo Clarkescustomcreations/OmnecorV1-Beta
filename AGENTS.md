@@ -12,6 +12,18 @@ never-ending TODO list and forces rediscovery of known gaps during slow (~40-min
 builds and testing — a waste of time. "Out of scope / follow-on / later" is **not** an
 acceptable resolution for anything the feature genuinely needs, nor for any defect you
 have already found. Surface trade-offs, then build it fully.
+## Operational Memory Never Escapes Context Overview Remains
+** this is the literal meaning of Omnecor keep this in mind when deciding 
+- should this Feature/Function have Persistence 
+- what will happen if the server system or Omnecor restarts
+- can or will the user lose there work or data easily
+- can all of the systems functions and features in omnecor connect to one Project/Neural Map
+  there should be a shared project workspace across all pages features and functions meaning
+  everything done and changed all of the users work happens in the same selected Project/Neural Map
+  unless that feature functions global setting is selected this allows it to work independently
+  or across multiple Projects/Neural Maps the user is working on
+- Does Omnecor Require Honcho and other services or Can it Do it without the subscriptions  
+  Answer should be it can do both but does not require Honcho or any subscription to work fully
 
 ---
 
@@ -146,14 +158,17 @@ These are absolute. No exceptions, no "just this once."
 - **Never use raw Tailwind color classes** (e.g. `text-blue-500`, `bg-gray-900`).
   Use semantic token classes only (e.g. `text-foreground`, `bg-card`, `text-accent`).
   The only legitimate exceptions are: `EmbeddedTerminal` (xterm theme), `ThreeViewer`
-  and `SchematicEditor`, `EnhancedPCBEditor`, `PCBSchematicEditor` (Three.js/ReactFlow require direct values), `WebPreview`
+  and `SchematicEditor`, `EnhancedPCBEditor`, `PCBSchematicEditor`, `SchematicNode`, `PCBNode`,
+  `NeuralWorkspaceCanvas`, `NeuralGraphView` (Three.js/ReactFlow canvases require direct values), `WebPreview`
   (sandboxed iframe), `PCBViewer3D` (Three.js material hex integer — CSS vars cannot
   be injected into a `0xRRGGBB` integer), `MeshTopologyGraph` (Canvas API — `ctx.fillStyle`
-  cannot read CSS vars; values documented to match UI-Tokens.md equivalents), and brand-identity
+  cannot read CSS vars; values documented to match UI-Tokens.md equivalents), brand-identity
   SVG logos in `SetupWizard` (Google/Microsoft official brand palettes are legally required to
-  be exact), and social-media OAuth platform buttons (`OAUTH_PLATFORMS` in `AgentNetworking` —
-  Twitter/X black, LinkedIn blue, YouTube red, Instagram pink are brand-required).
-  All other hex literals are violations.
+  be exact), social-media OAuth platform buttons (`OAUTH_PLATFORMS` in `AgentNetworking` —
+  Twitter/X black, LinkedIn blue, YouTube red, Instagram pink are brand-required), the
+  `integrations.ts` brand badge colors, and the skeuomorphic payment-card visuals in
+  `VirtualCardPanel` / `AgenticWalletPanel` (a credit-card mockup must read as a dark physical
+  card regardless of app theme). All other hex/raw-color literals are violations.
 - **Named exports only** for React components. Never `export default function`.
 - **Explicit prop interfaces** on every component. Never `any` or implicit typing.
 

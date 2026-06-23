@@ -45,7 +45,7 @@ export const ImageStudioPanel: React.FC = () => {
               />
             </div>
             <Button 
-              className="h-12 px-8 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 transition-all shadow-lg"
+              className="h-12 px-8 bg-gradient-to-r from-accent-purple to-accent-info hover:opacity-90 transition-all shadow-lg"
               onClick={() => generateMutation.mutate({ prompt })}
               disabled={!prompt || generateMutation.isPending}
             >

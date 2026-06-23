@@ -48,7 +48,7 @@ export function ImageGeneratorPanel() {
                 ? "bg-primary text-white"
                 : isDisabled(p)
                 ? "bg-card text-muted-foreground cursor-not-allowed"
-                : "bg-muted text-foreground hover:bg-gray-600"
+                : "bg-muted text-foreground hover:bg-accent"
             }`}
           >
             {PROVIDER_LABELS[p]}

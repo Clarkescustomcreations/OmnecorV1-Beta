@@ -37,14 +37,19 @@ interface ManufacturingPanelProps {
 }
 
 interface PCBQuote {
-  totalPrice: number;
-  leadTimeDays: number;
-  id: string;
+  totalCost: number;
+  currency: string;
+  estimatedDays: number;
+  layers: number;
+  lengthMm: number;
+  widthMm: number;
+  qty: number;
 }
 
 export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps) {
   const [activeTab, setActiveTab] = useState(mode);
   const [quote, setQuote] = useState<PCBQuote | null>(null);
+  const [qty, setQty] = useState(5);
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
 
   const { jobLifecycle } = useOmnecorSocket({ jobId: activeJobId ?? undefined });
@@ -97,8 +102,23 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
   });
 
   const orderMutation = trpc.kicad.placeOrder.useMutation({
-    onSuccess: () => toast.success("PCB order placed successfully! Check your wallet for transaction details."),
+    onSuccess: (data) => toast.success(`PCB order placed (#${data.orderId}). Check your wallet for transaction details.`),
     onError: (e) => toast.error(`Order failed: ${e.message}`)
+  });
+
+  // Build + download the Gerber/drill fabrication package (.zip).
+  const exportFabMutation = trpc.kicad.exportForManufacturing.useMutation({
+    onSuccess: (data) => {
+      const bytes = Uint8Array.from(atob(data.base64), (c) => c.charCodeAt(0));
+      const url = URL.createObjectURL(new Blob([bytes], { type: "application/zip" }));
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = data.filename;
+      a.click();
+      URL.revokeObjectURL(url);
+      toast.success(`Fabrication package ready — ${data.fileCount} files`);
+    },
+    onError: (e) => toast.error("Fabrication export failed: " + e.message),
   });
 
   const stlExportMutation = trpc.blender.export.useMutation({
@@ -213,6 +233,16 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                   {drcMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
                   Run Design Rules Check
                 </Button>
+
+                <Button
+                  variant="outline"
+                  className="w-full gap-2 h-9 border-border bg-card hover:bg-card"
+                  disabled={!kicadStatus?.isInstalled || exportFabMutation.isPending}
+                  onClick={() => exportFabMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
+                >
+                  {exportFabMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                  Download Fabrication Files (.zip)
+                </Button>
               </CardContent>
             </Card>
 
@@ -225,22 +255,38 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-4">
                 {!quote ? (
-                  <Button 
-                    className="w-full gap-2 h-10 bg-primary hover:bg-primary text-white border-none"
-                    onClick={() => quoteMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
-                    disabled={quoteMutation.isPending}
-                  >
-                    {quoteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-                    Get Manufacturing Quote
-                  </Button>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between gap-2">
+                      <Label htmlFor="pcb-qty" className="text-[10px] text-muted-foreground uppercase font-bold">Quantity</Label>
+                      <Input
+                        id="pcb-qty"
+                        type="number"
+                        min={5}
+                        max={10000}
+                        value={qty}
+                        onChange={(e) => setQty(Math.max(5, Math.min(10000, Number(e.target.value) || 5)))}
+                        className="h-8 w-24 text-[10px] bg-card border-border"
+                      />
+                    </div>
+                    <Button
+                      className="w-full gap-2 h-10 bg-primary hover:bg-primary text-white border-none"
+                      onClick={() => quoteMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb", qty })}
+                      disabled={quoteMutation.isPending}
+                    >
+                      {quoteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+                      Get Manufacturing Quote
+                    </Button>
+                  </div>
                 ) : (
                   <div className="space-y-4">
                     <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold uppercase text-primary">Total Price</span>
-                        <span className="text-lg font-bold">${quote.totalPrice}</span>
+                        <span className="text-[10px] font-bold uppercase text-primary">Total ({quote.qty} pcs)</span>
+                        <span className="text-lg font-bold">{quote.currency === "USD" ? "$" : ""}{quote.totalCost} {quote.currency !== "USD" ? quote.currency : ""}</span>
                       </div>
-                      <p className="text-[10px] text-primary/70">Estimated Lead Time: {quote.leadTimeDays} days</p>
+                      <p className="text-[10px] text-primary/70">
+                        {quote.lengthMm}×{quote.widthMm}mm · {quote.layers}-layer · Est. lead time: {quote.estimatedDays} days
+                      </p>
                     </div>
 
                     <div className="space-y-3 pt-2 border-t border-border">
@@ -261,7 +307,7 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
 
                     <Button 
                       className="w-full h-11 gap-2 bg-accent-success hover:bg-accent-success text-white border-none font-bold"
-                      onClick={() => orderMutation.mutate({ quoteId: quote.id, shippingAddress: address })}
+                      onClick={() => orderMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb", qty, shippingAddress: address })}
                       disabled={orderMutation.isPending}
                     >
                       {orderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}

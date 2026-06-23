@@ -9,11 +9,11 @@ import { z } from "zod";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { PCBWayService } from "../phase2/services/PCBWayService.js";
+import { extractBoardSpecs } from "../phase2/services/kicadBoardSpecs.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { validatePath } from "../_core/security.js";
 import { createLogger } from "../_core/logger.js";
-import os from "os";
 const log = createLogger("kicadRouter");
 import path from "path";
 import { spawn } from "child_process";
@@ -223,46 +223,83 @@ export const kicadRouter = router({
         return { content: null as string | null, filename: path.basename(input.outputFile) };
       }
     }),
+  /**
+   * Parametric manufacturing quote. PCBWay prices a board from its dimensions +
+   * layer count (Gerbers are only needed at order time), so we extract the board
+   * outline size and copper-layer count from the .kicad_pcb and request a real
+   * quote against the PCBWay partner API.
+   */
   getQuote: protectedProcedure
-    .input(z.object({ pcbPath: z.string().min(1) }))
-    .mutation(async ({ ctx, input }) => {
+    .input(z.object({ pcbPath: z.string().min(1), qty: z.number().int().min(5).max(10000).default(5) }))
+    .mutation(async ({ input }) => {
       const validatedPcb = await validatePath(input.pcbPath);
-      return PCBWayService.getInstance().getQuote(validatedPcb);
+      const specs = await extractBoardSpecs(validatedPcb);
+      return PCBWayService.getInstance().getQuote(specs, input.qty);
     }),
+
+  /**
+   * Build the fabrication package (Gerbers + drills → ZIP) and return it for
+   * download. This is the artifact submitted to a fab house; exposing it lets a
+   * user verify/keep the exact files or upload them manually.
+   */
   exportForManufacturing: protectedProcedure
     .input(z.object({ pcbPath: z.string().min(1) }))
     .mutation(async ({ ctx, input }) => {
       const validatedPcb = await validatePath(input.pcbPath);
-      const gerberDir = path.join(os.tmpdir(), "omnecor_gerbers");
-      return ctx.services.kicad.exportGerbers({ inputFile: validatedPcb, outputDir: gerberDir });
+      const pkg = await ctx.services.kicad.buildFabricationPackage(validatedPcb);
+      return {
+        filename: `${path.basename(validatedPcb, ".kicad_pcb")}-fabrication.zip`,
+        fileCount: pkg.fileCount,
+        sizeBytes: pkg.zip.length,
+        base64: pkg.zip.toString("base64"),
+      };
     }),
+
+  /**
+   * Place a real fabrication order: HITL-approved, audited, then Gerbers+drills
+   * are zipped and multipart-uploaded to PCBWay with the board spec + shipping.
+   */
   placeOrder: protectedProcedure
     .input(z.object({
-      quoteId: z.string().min(1),
+      pcbPath: z.string().min(1),
+      qty: z.number().int().min(5).max(10000).default(5),
       shippingAddress: z.object({
-        name: z.string(),
-        address: z.string(),
-        city: z.string(),
-        country: z.string(),
-        zipCode: z.string(),
+        name: z.string().min(1),
+        address: z.string().min(1),
+        city: z.string().min(1),
+        country: z.string().min(1),
+        zipCode: z.string().min(1),
       }),
     }))
     .mutation(async ({ ctx, input }) => {
+      const validatedPcb = await validatePath(input.pcbPath);
+
       const approved = await HITLApprovalService.getInstance().requestApproval("kicad.placeOrder", {
-        quoteId: input.quoteId,
+        pcbPath: validatedPcb,
+        qty: input.qty,
         riskLevel: "high",
       }, "financial");
       if (!approved) throw new TRPCError({ code: "FORBIDDEN", message: "HITL approval denied for PCBWay order." });
+
+      const specs = await extractBoardSpecs(validatedPcb);
+      const pkg = await ctx.services.kicad.buildFabricationPackage(validatedPcb);
+
       AuditLogService.getInstance().log({
         eventType: "pcbway_order_placed",
         actorId: ctx.user!.id,
         actorType: "user",
         procedure: "kicad.placeOrder",
-        args: { quoteId: input.quoteId },
+        args: { qty: input.qty, layers: specs.layers, lengthMm: specs.lengthMm, widthMm: specs.widthMm },
         result: null,
         ipAddress: ctx.req.ip ?? null,
         sessionId: null,
       }).catch((err) => log.error("[AuditLog] write failed — event lost", err));
-      return PCBWayService.getInstance().placeOrder(input.quoteId, input.shippingAddress);
+
+      return PCBWayService.getInstance().submitOrder({
+        specs,
+        qty: input.qty,
+        shippingAddress: input.shippingAddress,
+        zip: pkg.zip,
+      });
     }),
 });

@@ -503,9 +503,9 @@ export function SetupWizard() {
           <div className="space-y-6 py-4">
             <div className="grid gap-4">
               {[
-                { id: "sovereign", label: "Sovereign", icon: Lock, color: "text-red-500", desc: "AI-inference lockdown. External AI API calls (OpenAI, Anthropic, etc.) are blocked server-side. OAuth, email, and other cloud services still work." },
-                { id: "scrapper", label: "Scrapper", icon: Zap, color: "text-green-500", desc: "Local-preferred. Ollama runs first; cloud providers available if keys are provided." },
-                { id: "big_spender", label: "Big Spender", icon: Flame, color: "text-amber-500", desc: "Cloud-first. Prioritizes the highest-capability cloud models regardless of cost." },
+                { id: "sovereign", label: "Sovereign", icon: Lock, color: "text-accent-danger", desc: "AI-inference lockdown. External AI API calls (OpenAI, Anthropic, etc.) are blocked server-side. OAuth, email, and other cloud services still work." },
+                { id: "scrapper", label: "Scrapper", icon: Zap, color: "text-accent-success", desc: "Local-preferred. Ollama runs first; cloud providers available if keys are provided." },
+                { id: "big_spender", label: "Big Spender", icon: Flame, color: "text-accent-warning", desc: "Cloud-first. Prioritizes the highest-capability cloud models regardless of cost." },
               ].map((mode) => (
                 <div 
                   key={mode.id}
@@ -534,9 +534,9 @@ export function SetupWizard() {
       case "providers":
         return (
           <div className="space-y-5 py-4">
-            <div className="p-4 border rounded-xl bg-blue-500/5 border-blue-500/20 flex gap-3">
-              <Shield className="w-5 h-5 text-blue-500 flex-shrink-0 mt-0.5" />
-              <p className="text-xs text-blue-400">
+            <div className="p-4 border rounded-xl bg-accent-info/5 border-accent-info/20 flex gap-3">
+              <Shield className="w-5 h-5 text-accent-info flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-accent-info">
                 Omnecor is local-first. Cloud keys are optional — leave any field blank to configure later in <strong>Settings → AI Providers</strong>. Keys are stored locally, never sent to our servers.
               </p>
             </div>
@@ -547,8 +547,8 @@ export function SetupWizard() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label className="flex items-center gap-2 text-sm">🖥️ Ollama Base URL</Label>
-                  <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-none h-5 px-2 text-[10px] gap-1">
-                    <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Local
+                  <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-none h-5 px-2 text-[10px] gap-1">
+                    <div className="w-1.5 h-1.5 rounded-full bg-accent-success" /> Local
                   </Badge>
                 </div>
                 <p className="text-[10px] text-muted-foreground">
@@ -585,7 +585,7 @@ export function SetupWizard() {
                       <span className="text-[10px] text-muted-foreground font-normal">{p.desc}</span>
                     </Label>
                     {!!(aiProviders as Record<string, unknown>)?.[p.id] && (
-                      <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-none h-5 px-2 text-[10px] gap-1">
+                      <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-none h-5 px-2 text-[10px] gap-1">
                         <CheckCircle className="w-3 h-3" /> Configured
                       </Badge>
                     )}
@@ -609,7 +609,7 @@ export function SetupWizard() {
               <div className="flex items-center justify-between">
                 <p className="text-[10px] font-bold uppercase tracking-widest text-muted-foreground">Kaggle GPU Training (Free)</p>
                 {kaggleStatusQuery.data?.connected && (
-                  <Badge variant="secondary" className="bg-green-500/10 text-green-500 border-none h-5 px-2 text-[10px] gap-1">
+                  <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-none h-5 px-2 text-[10px] gap-1">
                     <CheckCircle className="w-3 h-3" /> Connected as {kaggleStatusQuery.data.username}
                   </Badge>
                 )}

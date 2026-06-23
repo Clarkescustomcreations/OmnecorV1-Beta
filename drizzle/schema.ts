@@ -1055,3 +1055,29 @@ export const messengerMessagesRelations = relations(messengerMessages, ({ one })
   }),
 }));
 
+/**
+ * Podcast Episodes — server-backed history of generated podcast episodes (TD-026).
+ * Replaces the prior `localStorage`-only history so episodes survive a cache
+ * clear and follow the user across browsers/devices. The audio itself is written
+ * to disk under `~/.omnecor/podcasts/<id>/` and served by a range-capable URL
+ * stored in `audioUrl`; this table holds only the episode metadata. `id` matches
+ * the generation `jobId` (a UUID), so re-recording the same job is an idempotent
+ * upsert rather than a duplicate.
+ */
+export const podcastEpisodes = sqliteTable("podcast_episodes", {
+  id: text("id").primaryKey(), // UUID — matches the generation jobId
+  userId: integer("userId")
+    .notNull()
+    .references(() => users.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  audioUrl: text("audioUrl").notNull(),
+  segmentCount: integer("segmentCount").notNull().default(0),
+  durationSeconds: integer("durationSeconds").notNull().default(0),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+}, (t) => [
+  index("podcast_episodes_user_idx").on(t.userId),
+]);
+
+export type PodcastEpisode = typeof podcastEpisodes.$inferSelect;
+export type InsertPodcastEpisode = typeof podcastEpisodes.$inferInsert;
+
