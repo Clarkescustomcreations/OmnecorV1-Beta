@@ -276,7 +276,7 @@ export function Designer3D() {
         return (
           <div key={node.path} className="space-y-0.5">
             <div 
-              className="flex items-center gap-1.5 px-2 py-1 text-slate-300 text-[11px] hover:bg-slate-800/40 rounded cursor-pointer font-sans"
+              className="flex items-center gap-1.5 px-2 py-1 text-foreground text-[11px] hover:bg-card/40 rounded cursor-pointer font-sans"
               style={{ paddingLeft: `${depth * 8 + 8}px` }}
             >
               <Folder className="w-3.5 h-3.5 text-accent-danger opacity-80" />
@@ -293,8 +293,8 @@ export function Designer3D() {
             className={cn(
               "flex items-center justify-between group px-2 py-1 rounded cursor-pointer text-[11px] font-sans transition-colors",
               isActive
-                ? "bg-accent/20 text-accent font-semibold"
-                : "text-slate-400 hover:bg-slate-800/50 hover:text-slate-200"
+                ? "bg-primary/20 text-primary font-semibold"
+                : "text-muted-foreground hover:bg-card/50 hover:text-foreground"
             )}
             style={{ paddingLeft: `${depth * 8 + 8}px` }}
             onClick={() => handleOpenLocalFile(node.path, node.name)}
@@ -516,7 +516,7 @@ export function Designer3D() {
   const renderDiff = (original: string, modified: string) => {
     const changes = diffLines(original, modified);
     return (
-      <div className="font-mono text-xs leading-6 overflow-auto h-full p-4 bg-slate-950 text-slate-300 select-text">
+      <div className="font-mono text-xs leading-6 overflow-auto h-full p-4 bg-background text-foreground select-text">
         {changes.map((change, idx) => {
           const lines = change.value.split("\n");
           if (lines[lines.length - 1] === "") {
@@ -563,9 +563,9 @@ export function Designer3D() {
         />
       )}
       {mode === "code" && (
-        <div className="w-full h-full flex flex-col overflow-hidden bg-slate-950 select-none">
+        <div className="w-full h-full flex flex-col overflow-hidden bg-background select-none">
           {/* Virtual File Tabs Bar */}
-          <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-2 text-xs flex-shrink-0">
+          <div className="flex items-center justify-between border-b border-border bg-card px-4 py-2 text-xs flex-shrink-0">
             <div className="flex items-center gap-1 overflow-x-auto max-w-[40%] pr-4 no-scrollbar flex-shrink-0">
               {files.map((file, idx) => (
                 <div
@@ -573,8 +573,8 @@ export function Designer3D() {
                   className={cn(
                     "group flex items-center gap-1.5 px-3 py-1.5 rounded-t-md border-t-2 transition-all cursor-pointer",
                     activeFileIndex === idx
-                      ? "bg-slate-950 border-accent text-slate-100 font-semibold"
-                      : "border-transparent text-slate-400 hover:bg-slate-950/50 hover:text-slate-200"
+                      ? "bg-background border-primary/30 text-foreground font-semibold"
+                      : "border-transparent text-muted-foreground hover:bg-background/50 hover:text-foreground"
                   )}
                   onClick={() => {
                     setActiveFileIndex(idx);
@@ -584,7 +584,7 @@ export function Designer3D() {
                   <FileText className="w-3.5 h-3.5 opacity-70" />
                   <span>{file.name}</span>
                   <button
-                    className="opacity-0 group-hover:opacity-100 hover:bg-slate-800 rounded-full p-0.5 transition-opacity"
+                    className="opacity-0 group-hover:opacity-100 hover:bg-card rounded-full p-0.5 transition-opacity"
                     onClick={(e) => {
                       e.stopPropagation();
                       handleCloseFile(idx);
@@ -596,10 +596,10 @@ export function Designer3D() {
               ))}
 
               {isCreatingFile ? (
-                <div className="flex items-center gap-1 bg-slate-950 border border-slate-800 rounded px-2 py-1">
+                <div className="flex items-center gap-1 bg-background border border-border rounded px-2 py-1">
                   <input
                     type="text"
-                    className="bg-transparent text-slate-100 text-xs outline-none w-24 border-none"
+                    className="bg-transparent text-foreground text-xs outline-none w-24 border-none"
                     placeholder="filename.md"
                     value={newFileName}
                     onChange={(e) => setNewFileName(e.target.value)}
@@ -620,7 +620,7 @@ export function Designer3D() {
                 <Button
                   variant="ghost"
                   size="icon"
-                  className="h-6 w-6 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-md"
+                  className="h-6 w-6 text-muted-foreground hover:text-foreground hover:bg-card rounded-md"
                   onClick={() => setIsCreatingFile(true)}
                   title="Create new file"
                 >
@@ -633,7 +633,7 @@ export function Designer3D() {
             <div className="flex items-center gap-2 max-w-[45%] flex-1 justify-center px-4">
               <input
                 type="text"
-                className="bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2.5 py-1 outline-none focus:border-accent w-36 font-sans"
+                className="bg-background border border-border text-[11px] text-foreground rounded px-2.5 py-1 outline-none focus:border-primary/30 w-36 font-sans"
                 placeholder="Search markdown... (e.g. divide)"
                 value={mdSearchText}
                 onChange={(e) => setMdSearchText(e.target.value)}
@@ -641,20 +641,20 @@ export function Designer3D() {
               
               {matchingTip ? (
                 <div
-                  className="bg-slate-900 border border-dashed border-accent/40 hover:border-accent hover:text-accent text-slate-305 text-[11px] px-2.5 py-1 rounded cursor-pointer transition-all flex items-center gap-1.5 font-mono select-none"
+                  className="bg-card border border-dashed border-primary/40 hover:border-primary/30 hover:text-primary text-slate-305 text-[11px] px-2.5 py-1 rounded cursor-pointer transition-all flex items-center gap-1.5 font-mono select-none"
                   onClick={() => handleInsertSyntax(matchingTip.syntax)}
                   title="Click to insert at cursor"
                 >
-                  <Sparkles className="w-3 h-3 text-accent animate-pulse" />
+                  <Sparkles className="w-3 h-3 text-primary animate-pulse" />
                   <span className="opacity-80 text-[10px]">{matchingTip.name}:</span>
-                  <span className="font-semibold text-slate-100">{matchingTip.syntax}</span>
+                  <span className="font-semibold text-foreground">{matchingTip.syntax}</span>
                 </div>
               ) : mdSearchText.trim() ? (
-                <div className="text-slate-500 text-[11px] px-2 py-1 select-none font-sans">
+                <div className="text-muted-foreground text-[11px] px-2 py-1 select-none font-sans">
                   No match
                 </div>
               ) : (
-                <div className="text-slate-500 text-[10px] select-none font-sans italic opacity-70 truncate">
+                <div className="text-muted-foreground text-[10px] select-none font-sans italic opacity-70 truncate">
                   💡 Try 'center', 'divide', or 'bold'
                 </div>
               )}
@@ -668,7 +668,7 @@ export function Designer3D() {
                 <span className="text-destructive font-bold">-{diffStats.deletions}</span>
               </div>
 
-              <Badge variant="secondary" className="bg-slate-800 text-slate-300 border-none font-mono text-[10px]">
+              <Badge variant="secondary" className="bg-card text-foreground border-none font-mono text-[10px]">
                 {files[activeFileIndex]?.name?.endsWith(".md") ? "Markdown" : "Code"} File
               </Badge>
             </div>
@@ -678,17 +678,17 @@ export function Designer3D() {
           <div className="flex-1 flex overflow-hidden relative">
             
             {/* Left Workspace Panel: Local Project Files Explorer — hidden on mobile */}
-            <div className="hidden md:flex w-44 lg:w-56 h-full bg-slate-900 border-r border-slate-800 flex-col flex-shrink-0">
-              <div className="p-3 border-b border-slate-800 flex-shrink-0 flex items-center justify-between">
-                <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Local Workspace</span>
-                <span className="text-[9px] text-accent font-semibold bg-accent/10 px-1 rounded">Beta</span>
+            <div className="hidden md:flex w-44 lg:w-56 h-full bg-card border-r border-border flex-col flex-shrink-0">
+              <div className="p-3 border-b border-border flex-shrink-0 flex items-center justify-between">
+                <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider">Local Workspace</span>
+                <span className="text-[9px] text-primary font-semibold bg-primary/10 px-1 rounded">Beta</span>
               </div>
 
               {/* Project Dropdown Selector */}
-              <div className="p-3 border-b border-slate-800 space-y-1.5 flex-shrink-0 font-sans">
-                <label className="text-[10px] text-slate-500">Active Project Watcher</label>
+              <div className="p-3 border-b border-border space-y-1.5 flex-shrink-0 font-sans">
+                <label className="text-[10px] text-muted-foreground">Active Project Watcher</label>
                 <select
-                  className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent"
+                  className="w-full bg-background border border-border text-[11px] text-foreground rounded px-2 py-1 outline-none focus:border-primary/30"
                   value={selectedProjectId}
                   onChange={(e) => setSelectedProjectId(e.target.value)}
                 >
@@ -707,12 +707,12 @@ export function Designer3D() {
                   fileTree && fileTree.length > 0 ? (
                     renderFileTreeItems(fileTree)
                   ) : (
-                    <div className="text-slate-500 text-[10px] p-2 text-center italic">
+                    <div className="text-muted-foreground text-[10px] p-2 text-center italic">
                       No files found or indexing...
                     </div>
                   )
                 ) : (
-                  <div className="text-slate-500 text-[10px] p-3 text-center italic leading-relaxed">
+                  <div className="text-muted-foreground text-[10px] p-3 text-center italic leading-relaxed">
                     Select a project watcher from the dropdown above to load local files.
                   </div>
                 )}
@@ -721,14 +721,14 @@ export function Designer3D() {
 
             {/* Left pane: Code Editor */}
             <div className={cn(
-              "h-full flex flex-col bg-slate-950 transition-all duration-300 relative",
-              splitView ? "w-1/2 border-r border-slate-800/60" : "w-full"
+              "h-full flex flex-col bg-background transition-all duration-300 relative",
+              splitView ? "w-1/2 border-r border-border/60" : "w-full"
             )}>
               <div className="flex-1 flex overflow-hidden relative">
                 {/* Line Numbers Sidebar */}
                 <div 
                   ref={lineNumbersRef}
-                  className="select-none text-right pr-2 pl-4 py-4 text-slate-600 bg-slate-950 border-r border-slate-900 text-[11px] leading-6 font-mono min-w-[3.5rem] overflow-hidden"
+                  className="select-none text-right pr-2 pl-4 py-4 text-muted-foreground bg-background border-r border-border text-[11px] leading-6 font-mono min-w-[3.5rem] overflow-hidden"
                 >
                   {(files[activeFileIndex]?.content || "").split("\n").map((_, i) => (
                     <div key={i} className="h-6">{i + 1}</div>
@@ -738,7 +738,7 @@ export function Designer3D() {
                 {/* Actual Editor Textarea */}
                 <textarea
                   ref={textareaRef}
-                  className="flex-1 p-4 bg-transparent text-slate-100 outline-none resize-none border-none leading-6 font-mono text-xs h-full overflow-auto selection:bg-accent/30 selection:text-white"
+                  className="flex-1 p-4 bg-transparent text-foreground outline-none resize-none border-none leading-6 font-mono text-xs h-full overflow-auto selection:bg-primary/30 selection:text-white"
                   value={files[activeFileIndex]?.content || ""}
                   onChange={(e) => updateActiveFileContent(e.target.value)}
                   onScroll={handleScroll}
@@ -751,17 +751,17 @@ export function Designer3D() {
 
             {/* Right Pane: Split view (Live Preview OR Diff Checker) */}
             {splitView && (
-              <div className="w-1/2 h-full flex flex-col bg-slate-900 border-l border-slate-800 overflow-hidden">
+              <div className="w-1/2 h-full flex flex-col bg-card border-l border-border overflow-hidden">
                 {/* Header Toggle bar */}
-                <div className="flex items-center justify-between border-b border-slate-800 bg-slate-950 px-4 py-2 flex-shrink-0 text-xs">
-                  <div className="flex bg-slate-900 rounded p-0.5">
+                <div className="flex items-center justify-between border-b border-border bg-background px-4 py-2 flex-shrink-0 text-xs">
+                  <div className="flex bg-card rounded p-0.5">
                     {files[activeFileIndex]?.name?.endsWith(".md") && (
                       <button
                         className={cn(
                           "px-3 py-1 rounded transition-all",
                           previewTab === "preview" 
-                            ? "bg-slate-800 text-slate-100 font-semibold" 
-                            : "text-slate-400 hover:text-slate-200"
+                            ? "bg-card text-foreground font-semibold" 
+                            : "text-muted-foreground hover:text-foreground"
                         )}
                         onClick={() => setPreviewTab("preview")}
                       >
@@ -772,8 +772,8 @@ export function Designer3D() {
                       className={cn(
                         "px-3 py-1 rounded transition-all",
                         previewTab === "diff" || !files[activeFileIndex]?.name?.endsWith(".md")
-                          ? "bg-slate-800 text-slate-100 font-semibold" 
-                          : "text-slate-400 hover:text-slate-200"
+                          ? "bg-card text-foreground font-semibold" 
+                          : "text-muted-foreground hover:text-foreground"
                       )}
                       onClick={() => setPreviewTab("diff")}
                     >
@@ -788,7 +788,7 @@ export function Designer3D() {
                         <Button
                           size="sm"
                           variant="default"
-                          className="bg-sky-600 hover:bg-sky-700 text-white h-6 px-2.5 text-[10px]"
+                          className="bg-accent-cyan hover:bg-accent-cyan text-white h-6 px-2.5 text-[10px]"
                           onClick={handleSaveLocalFile}
                           title="Save changes to local disk"
                         >
@@ -798,7 +798,7 @@ export function Designer3D() {
                       <Button
                         size="sm"
                         variant="default"
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white h-6 px-2.5 text-[10px]"
+                        className="bg-accent-success hover:bg-accent-success text-white h-6 px-2.5 text-[10px]"
                         onClick={handleAcceptChanges}
                         title="Accept these changes, committing them as the new base"
                       >
@@ -807,7 +807,7 @@ export function Designer3D() {
                       <Button
                         size="sm"
                         variant="destructive"
-                        className="bg-rose-600 hover:bg-rose-700 text-white h-6 px-2.5 text-[10px]"
+                        className="bg-destructive hover:bg-destructive text-white h-6 px-2.5 text-[10px]"
                         onClick={handleRejectChanges}
                         title="Revert back to the original version"
                       >
@@ -816,23 +816,23 @@ export function Designer3D() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="border-slate-700 hover:bg-slate-800 text-slate-300 h-6 px-2.5 text-[10px]"
+                        className="border-border hover:bg-card text-foreground h-6 px-2.5 text-[10px]"
                         onClick={() => {
                           setSelectedText(`Diff of ${files[activeFileIndex]?.name || "file"}:\n\n${files[activeFileIndex]?.content || ""}`);
                           setAiInstructions(`Review the differences and improve it.`);
                         }}
                         title="Request AI changes on this file"
                       >
-                        <Sparkles className="w-3 h-3 mr-1 text-accent" /> Suggest Changes
+                        <Sparkles className="w-3 h-3 mr-1 text-primary" /> Suggest Changes
                       </Button>
                     </div>
                   )}
                 </div>
 
                 {/* Content View */}
-                <div className="min-h-0 flex-1 overflow-auto bg-slate-950">
+                <div className="min-h-0 flex-1 overflow-auto bg-background">
                   {previewTab === "preview" && files[activeFileIndex]?.name?.endsWith(".md") ? (
-                    <div className="p-8 text-foreground prose dark:prose-invert max-w-none text-slate-200 selection:bg-accent/30 bg-slate-950 min-h-full">
+                    <div className="p-8 text-foreground prose dark:prose-invert max-w-none text-foreground selection:bg-primary/30 bg-background min-h-full">
                       <Streamdown>{files[activeFileIndex]?.content || ""}</Streamdown>
                     </div>
                   ) : (
@@ -853,7 +853,7 @@ export function Designer3D() {
       {/* Floating "Ask AI" button for 3D and PCB modes (no text selection in those views) */}
       {(mode === "3d" || mode === "pcb") && !isAIPanelOpen && selectedText.trim().length === 0 && !threeDSelectionName && (
         <button
-          className="absolute bottom-5 right-5 flex items-center gap-2 bg-slate-900 border border-accent/40 hover:border-accent text-accent text-[11px] font-semibold px-3 py-2 rounded-xl shadow-xl z-30 transition-all hover:bg-slate-800 font-sans"
+          className="absolute bottom-5 right-5 flex items-center gap-2 bg-card border border-primary/40 hover:border-primary/30 text-primary text-[11px] font-semibold px-3 py-2 rounded-xl shadow-xl z-30 transition-all hover:bg-card font-sans"
           onClick={() => {
             setSelectedText(
               mode === "3d"
@@ -870,25 +870,25 @@ export function Designer3D() {
 
       {/* AI Selection Helper Popover — shown for all modes when text is selected */}
       {selectedText.trim().length > 0 && (
-        <div className="absolute bottom-4 right-4 bg-slate-900 border-2 border-accent/40 rounded-xl shadow-2xl p-4 w-80 z-30 animate-in fade-in slide-in-from-bottom-2 duration-250 select-text">
+        <div className="absolute bottom-4 right-4 bg-card border-2 border-primary/40 rounded-xl shadow-2xl p-4 w-80 z-30 animate-in fade-in slide-in-from-bottom-2 duration-250 select-text">
           <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-semibold text-accent flex items-center gap-1.5 font-sans">
+            <span className="text-xs font-semibold text-primary flex items-center gap-1.5 font-sans">
               <Sparkles className="w-3.5 h-3.5 animate-pulse" /> AI Selection Helper
             </span>
             <button
-              className="text-slate-400 hover:text-slate-200"
+              className="text-muted-foreground hover:text-foreground"
               onClick={() => setSelectedText("")}
             >
               <X className="w-3.5 h-3.5" />
             </button>
           </div>
 
-          <div className="bg-slate-950 p-2 rounded text-[10px] font-mono text-slate-300 mb-3 max-h-16 overflow-y-auto whitespace-pre-wrap break-words border border-slate-800">
+          <div className="bg-background p-2 rounded text-[10px] font-mono text-foreground mb-3 max-h-16 overflow-y-auto whitespace-pre-wrap break-words border border-border">
             {selectedText.length > 100 ? `${selectedText.substring(0, 100)}...` : selectedText}
           </div>
 
           <textarea
-            className="w-full bg-slate-950 text-slate-200 text-xs rounded border border-slate-800 p-2 outline-none focus:border-accent resize-none h-16 mb-3 font-sans"
+            className="w-full bg-background text-foreground text-xs rounded border border-border p-2 outline-none focus:border-primary/30 resize-none h-16 mb-3 font-sans"
             placeholder="Describe the needed changes, fix, or ask a question..."
             value={aiInstructions}
             onChange={(e) => setAiInstructions(e.target.value)}
@@ -899,7 +899,7 @@ export function Designer3D() {
               <Button
                 size="sm"
                 variant="default"
-                className="flex-1 text-[11px] h-7 bg-accent text-accent-foreground hover:bg-accent/90"
+                className="flex-1 text-[11px] h-7 bg-primary/10 text-accent-foreground hover:bg-primary/90"
                 onClick={() => handleSendToAi("suggest")}
               >
                 Suggest Changes
@@ -907,7 +907,7 @@ export function Designer3D() {
               <Button
                 size="sm"
                 variant="secondary"
-                className="flex-1 text-[11px] h-7 bg-emerald-600 hover:bg-emerald-700 text-white"
+                className="flex-1 text-[11px] h-7 bg-accent-success hover:bg-accent-success text-white"
                 onClick={() => handleSendToAi("fix")}
               >
                 Fix Code
@@ -916,7 +916,7 @@ export function Designer3D() {
             <Button
               size="sm"
               variant="outline"
-              className="w-full text-[11px] h-7 border-slate-700 hover:bg-slate-800 text-slate-300"
+              className="w-full text-[11px] h-7 border-border hover:bg-card text-foreground"
               onClick={() => handleSendToAi("ask")}
             >
               Ask AI About This
@@ -929,16 +929,16 @@ export function Designer3D() {
 
   if (isExternalRoute) {
     return (
-      <div className="w-screen h-screen flex flex-col bg-slate-950 text-slate-100">
-        <div className="flex items-center justify-between px-6 py-2 border-b border-slate-800 bg-slate-900 flex-shrink-0">
+      <div className="w-screen h-screen flex flex-col bg-background text-foreground">
+        <div className="flex items-center justify-between px-6 py-2 border-b border-border bg-card flex-shrink-0">
           <div className="flex items-center gap-3">
-            <Box className="w-5 h-5 text-accent animate-pulse" />
+            <Box className="w-5 h-5 text-primary animate-pulse" />
             <span className="font-semibold text-xs tracking-wider uppercase">Omnecor 3D Designer — Detached Window</span>
           </div>
           <Button 
             variant="outline" 
             size="sm" 
-            className="border-accent/30 hover:bg-accent/10 text-accent font-medium text-xs h-7"
+            className="border-primary/30 hover:bg-primary/10 text-primary font-medium text-xs h-7"
             onClick={handleRedockFromExternal}
           >
             Re-dock to Workspace
@@ -964,20 +964,20 @@ export function Designer3D() {
           initialPosition={windowPosition}
           initialSize={windowSize}
         >
-          <div className="w-full h-full bg-slate-900">
+          <div className="w-full h-full bg-card">
             {renderDesignerContent()}
           </div>
         </FloatingWindow>
 
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
-            <div className="w-8 h-8 rounded-lg bg-accent/20 flex items-center justify-center flex-shrink-0">
-              <Box className="w-5 h-5 text-accent" />
+            <div className="w-8 h-8 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <Box className="w-5 h-5 text-primary" />
             </div>
             <div className="min-w-0">
               <h1 className="text-xl font-bold flex flex-wrap items-center gap-2">
                 Multi-Modal Designer
-                <Badge variant="outline" className="text-[10px] py-0 text-accent border-accent">Beta</Badge>
+                <Badge variant="outline" className="text-[10px] py-0 text-primary border-primary/30">Beta</Badge>
               </h1>
               <p className="text-sm text-muted-foreground truncate">View and interact with generated models, circuits, and UI.</p>
             </div>
@@ -1012,7 +1012,7 @@ export function Designer3D() {
                 <Button
                   size="sm"
                   variant="outline"
-                  className="h-8 px-3 text-xs mr-2 border-orange-500/40 text-orange-400 hover:bg-orange-500/10 hover:border-orange-400"
+                  className="h-8 px-3 text-xs mr-2 border-accent-warning/40 text-accent-warning hover:bg-accent-warning/10 hover:border-accent-warning"
                   onClick={handleOpenInBlender}
                   disabled={openInBlenderMutation.isPending}
                 >
@@ -1104,8 +1104,8 @@ export function Designer3D() {
                renderDesignerContent()
             ) : (
               <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-muted/20 h-full">
-                <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center mb-4">
-                  <Anchor className="h-6 w-6 text-accent animate-pulse" />
+                <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                  <Anchor className="h-6 w-6 text-primary animate-pulse" />
                 </div>
                 <h3 className="text-lg font-semibold mb-2">Designer Detached</h3>
                 <p className="text-sm text-muted-foreground max-w-md">
@@ -1114,7 +1114,7 @@ export function Designer3D() {
                 </p>
                 <Button 
                   variant="outline" 
-                  className="mt-6 border-accent/30 hover:bg-accent/10"
+                  className="mt-6 border-primary/30 hover:bg-primary/10"
                   onClick={() => setWindowMode("embedded")}
                 >
                   Re-dock to Workspace

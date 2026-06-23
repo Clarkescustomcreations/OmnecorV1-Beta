@@ -46,7 +46,7 @@ const log = createLogger("core");
 import { OmnecorWebSocketServer, setWsInstance } from "../phase2/websocket/WebSocketServer";
 import { ProcessManagerService } from "../phase2/services/ProcessManagerService";
 import { SecurityService } from "../phase2/services/SecurityService";
-import { VectorDBService } from "../phase2/services/VectorDBService";
+import { VectorDBService, sanitizeCollectionName } from "../phase2/services/VectorDBService";
 import { FileSystemWatcherService } from "../phase2/services/FileSystemWatcherService";
 import { startBackupScheduler } from "./backupScheduler";
 import { startPublishWorker } from "./publishWorker";
@@ -136,7 +136,11 @@ async function startServer() {
     const vectorDB = VectorDBService.getInstance();
     const fsp = await import("fs/promises");
     fileWatcher.on("fileEvent", (event: { projectId: string; filePath: string; eventType: string }) => {
-      const collection = `omnecor_${event.projectId}`;
+      // Use the SHARED collection name so local-file ingestion lands in the
+      // exact collection MemoryArchitect (the RAG reader) queries — a raw
+      // `omnecor_${projectId}` diverged from the reader's sanitized name for
+      // hyphenated ids (e.g. map UUIDs), silently emptying RAG.
+      const collection = sanitizeCollectionName(event.projectId);
       if (event.eventType === "unlink" || event.eventType === "unlinkDir") {
         vectorDB.removeDocument(collection, event.filePath).catch(() => {});
       } else {

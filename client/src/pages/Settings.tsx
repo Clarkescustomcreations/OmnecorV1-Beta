@@ -219,7 +219,7 @@ export const Settings: React.FC = () => {
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-6 border-b bg-muted/30">
           <div className="flex items-center gap-4 min-w-0">
-            <SettingsIcon className="w-6 h-6 text-accent flex-shrink-0" />
+            <SettingsIcon className="w-6 h-6 text-primary flex-shrink-0" />
             <div className="min-w-0">
               <h1 className="text-xl sm:text-2xl font-bold tracking-tight truncate">Settings</h1>
               <p className="text-sm text-muted-foreground truncate">Manage your workstation and AI behavior.</p>
@@ -259,7 +259,7 @@ export const Settings: React.FC = () => {
                         className={cn(
                           "flex items-center gap-2 md:gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap md:whitespace-normal md:w-full",
                           activeTab === tab.id
-                            ? "bg-accent text-accent-foreground shadow-sm"
+                            ? "bg-primary/10 text-accent-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         )}
                       >
@@ -297,7 +297,7 @@ export const Settings: React.FC = () => {
                               Ollama — Base URL
                             </Label>
                             <Badge variant="secondary" className="bg-accent-success/10 text-accent-success border-accent-success/20 gap-1.5 py-0.5 text-[10px]">
-                              <div className="w-1.5 h-1.5 rounded-full bg-green-500" /> Local
+                              <div className="w-1.5 h-1.5 rounded-full bg-accent-success" /> Local
                             </Badge>
                           </div>
                           <p className="text-[11px] text-muted-foreground">
@@ -452,7 +452,7 @@ export const Settings: React.FC = () => {
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <Zap className="w-4 h-4 text-amber-500" /> Specialty & Media Services
+                          <Zap className="w-4 h-4 text-accent-warning" /> Specialty & Media Services
                         </CardTitle>
                         <CardDescription>
                           Voice synthesis, image generation, and automation integrations.
@@ -535,7 +535,7 @@ export const Settings: React.FC = () => {
                     <Card>
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
-                          <Globe className="w-4 h-4 text-purple-500" /> Local Service Endpoints
+                          <Globe className="w-4 h-4 text-accent-purple" /> Local Service Endpoints
                         </CardTitle>
                         <CardDescription>
                           URLs for local services running on your machine or LAN. No API key required.
@@ -637,7 +637,7 @@ export const Settings: React.FC = () => {
                             <RadioGroupItem value="big_spender" id="mode-big-spender" className="mt-0.5" />
                             <div>
                               <Label htmlFor="mode-big-spender" className="font-medium cursor-pointer flex items-center gap-1.5">
-                                <Flame className="h-3.5 w-3.5 text-amber-500" /> Big Spender
+                                <Flame className="h-3.5 w-3.5 text-accent-warning" /> Big Spender
                               </Label>
                               <p className="text-xs text-muted-foreground">Cloud-first. Prioritizes the highest-capability cloud models regardless of cost.</p>
                             </div>
@@ -886,7 +886,7 @@ const OMMESHPanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-base">
-            <Shield className="w-4 h-4 text-accent" /> Local Node Identity
+            <Shield className="w-4 h-4 text-primary" /> Local Node Identity
           </CardTitle>
           <CardDescription>Your node's unique signature on the Neural Mesh.</CardDescription>
         </CardHeader>
@@ -957,10 +957,10 @@ const OMMESHPanel: React.FC = () => {
               </div>
             ) : (
               (peers as unknown as DisplayPeer[]).map((peer) => (
-                <div key={peer.id} className="flex items-center justify-between p-4 rounded-xl border bg-card/50 transition-all hover:border-accent/30">
+                <div key={peer.id} className="flex items-center justify-between p-4 rounded-xl border bg-card/50 transition-all hover:border-primary/30">
                   <div className="flex items-center gap-4 min-w-0">
-                    <div className="p-2 rounded-full bg-accent/10 flex-shrink-0">
-                      <Server className="w-5 h-5 text-accent" />
+                    <div className="p-2 rounded-full bg-primary/10 flex-shrink-0">
+                      <Server className="w-5 h-5 text-primary" />
                     </div>
                     <div className="min-w-0">
                       <div className="flex items-center gap-2">
@@ -978,7 +978,7 @@ const OMMESHPanel: React.FC = () => {
                     {!peer.isApproved ? (
                       <Button 
                         size="sm" 
-                        className="bg-accent text-accent-foreground hover:bg-accent/90 gap-1.5 h-8"
+                        className="bg-primary/10 text-accent-foreground hover:bg-primary/90 gap-1.5 h-8"
                         onClick={() => approveMutation.mutate({ fingerprint: peer.fingerprint })}
                         disabled={approveMutation.isPending}
                       >
@@ -1162,13 +1162,13 @@ const OfflineVoicesPanel: React.FC = () => {
               {offlineVoices.map((v, idx) => (
                 <div key={idx} className="flex items-center justify-between p-3 rounded-lg border bg-muted/30">
                   <div className="flex items-center gap-2">
-                    <Mic2 className="w-4 h-4 text-accent" />
+                    <Mic2 className="w-4 h-4 text-primary" />
                     <div>
                       <p className="text-sm font-semibold">{v.name}</p>
                       <p className="text-xs text-muted-foreground truncate max-w-lg">{v.path}</p>
                     </div>
                   </div>
-                  <Badge className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20">Active</Badge>
+                  <Badge className="bg-accent-success/10 text-accent-success border-accent-success/20">Active</Badge>
                 </div>
               ))}
             </div>
@@ -1192,7 +1192,7 @@ const OfflineVoicesPanel: React.FC = () => {
             const isDownloaded = offlineVoices?.some(ov => ov.name === filename || ov.name === `${filename}.wav`);
 
             return (
-              <div key={v.id} className="flex items-center justify-between p-4 rounded-xl border bg-card hover:border-accent/30 transition-all">
+              <div key={v.id} className="flex items-center justify-between p-4 rounded-xl border bg-card hover:border-primary/30 transition-all">
                 <div className="space-y-1">
                   <p className="text-sm font-semibold">{v.name}</p>
                   <p className="text-xs text-muted-foreground">{v.desc}</p>
@@ -1210,7 +1210,7 @@ const OfflineVoicesPanel: React.FC = () => {
                     </>
                   ) : isDownloaded ? (
                     <>
-                      <CheckCircle2 className="w-3.5 h-3.5 text-green-400" />
+                      <CheckCircle2 className="w-3.5 h-3.5 text-accent-success" />
                       Installed
                     </>
                   ) : (
@@ -1257,7 +1257,7 @@ function KaggleKeyCard() {
           <Download className="w-4 h-4 text-primary" />
           Kaggle — Free GPU Training
           {isConnected
-            ? <Badge className="ml-auto bg-green-600 text-white border-transparent text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Connected as {connectedAs}</Badge>
+            ? <Badge className="ml-auto bg-accent-success text-white border-transparent text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Connected as {connectedAs}</Badge>
             : <Badge variant="secondary" className="ml-auto text-xs"><AlertCircle className="w-3 h-3 mr-1" />Not connected</Badge>
           }
         </CardTitle>
@@ -1418,7 +1418,7 @@ const WorkstationOptimizationPanel: React.FC = () => {
 
   return (
     <Card>
-      <CardHeader><CardTitle className="flex items-center gap-2"><Zap className="w-4 h-4 text-amber-500" /> Optimization</CardTitle></CardHeader>
+      <CardHeader><CardTitle className="flex items-center gap-2"><Zap className="w-4 h-4 text-accent-warning" /> Optimization</CardTitle></CardHeader>
       <CardContent className="space-y-6">
         <div className="flex items-center justify-between">
           <Label>GPU Bypass</Label>
@@ -1548,7 +1548,7 @@ const HardwarePanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Zap className="w-5 h-5 text-amber-500" /> GPU Acceleration
+            <Zap className="w-5 h-5 text-accent-warning" /> GPU Acceleration
           </CardTitle>
           <CardDescription>Detected hardware and environment status for local inference.</CardDescription>
         </CardHeader>
@@ -1653,7 +1653,7 @@ const HardwarePanel: React.FC = () => {
               <Trash2 className="w-4 h-4" /> Erase Flash
             </Button>
             <Button 
-              className="gap-2 bg-blue-600 hover:bg-blue-700 text-white border-none"
+              className="gap-2 bg-primary hover:bg-primary text-white border-none"
               onClick={() => flashMutation.mutate({ port: selectedPort, firmwarePath: "bin/neural_link_v1.bin" })}
               disabled={!selectedPort || flashMutation.isPending}
             >
@@ -1758,7 +1758,7 @@ const ServiceConnectionsCard: React.FC = () => {
     <Card>
       <CardHeader>
         <CardTitle className="flex items-center gap-2 text-base">
-          <Share2 className="w-4 h-4 text-accent" /> Service Connections
+          <Share2 className="w-4 h-4 text-primary" /> Service Connections
         </CardTitle>
         <CardDescription>
           Optional. To connect Drive / OneDrive / Dropbox, post to social platforms, upload to YouTube,
@@ -1803,7 +1803,7 @@ const ServiceConnectionsCard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <p className="text-sm font-semibold">{p.label}</p>
                   {configured ? (
-                    <Badge variant="secondary" className="gap-1.5 py-0.5 px-2 text-accent">
+                    <Badge variant="secondary" className="gap-1.5 py-0.5 px-2 text-primary">
                       <CheckCircle className="w-3 h-3" /> Configured
                     </Badge>
                   ) : (
@@ -1995,7 +1995,7 @@ const SocialLoginCard: React.FC = () => {
         {/* Microsoft credentials */}
         <div className="space-y-3">
           <p className="text-sm font-semibold flex items-center gap-1.5">
-            <span className="inline-block w-4 h-4 rounded-full bg-sky-500/20 text-sky-500 text-[9px] font-bold flex items-center justify-center">M</span>
+            <span className="inline-block w-4 h-4 rounded-full bg-accent-cyan/20 text-accent-cyan text-[9px] font-bold flex items-center justify-center">M</span>
             Microsoft OAuth
           </p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -2234,7 +2234,7 @@ const GeneralPanel: React.FC = () => {
             <p className="text-xs text-muted-foreground">Re-run the initial configuration sequence to re-calibrate your workstation.</p>
             <Button
               variant="outline"
-              className="w-full gap-2 border-accent/30 hover:bg-accent/10 hover:text-accent"
+              className="w-full gap-2 border-primary/30 hover:bg-primary/10 hover:text-primary"
               onClick={() => {
                 localStorage.removeItem("omnecor:setup_complete");
                 window.location.href = "/setup";

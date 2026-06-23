@@ -229,8 +229,8 @@ export function RecursiveMASPanel() {
             <div className="flex items-center gap-2">
               {isRunning && (
                 <>
-                  <Spinner className="h-4 w-4 text-blue-500" />
-                  <Badge variant="outline" className="text-blue-600 border-blue-400">
+                  <Spinner className="h-4 w-4 text-primary" />
+                  <Badge variant="outline" className="text-primary border-primary">
                     Running
                   </Badge>
                   <Button size="sm" variant="destructive" onClick={handleStop}>
@@ -239,7 +239,7 @@ export function RecursiveMASPanel() {
                 </>
               )}
               {isComplete && (
-                <Badge className="bg-green-600 text-white">
+                <Badge className="bg-accent-success text-white">
                   ✓ Complete
                 </Badge>
               )}

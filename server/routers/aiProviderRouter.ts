@@ -3,6 +3,7 @@ import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
 import { AiProviderService } from "../phase2/services/AiProviderService.js";
+import { injectMapRagContext } from "../_core/ragContext.js";
 
 const chatInputSchema = z.object({
   providerId: z.enum(["system", "ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),
@@ -17,6 +18,9 @@ const chatInputSchema = z.object({
   ),
   systemPrompt: z.string().optional(),
   maxTokens: z.number().int().min(1).max(32000).optional(),
+  /** Active neural map — when set (and its enableAIContext is on), the map's
+   *  indexed knowledge is retrieved and injected as system context. */
+  ragMapId: z.string().optional(),
 });
 
 // Sovereign-mode gate: cloud providers are blocked for air-gapped users.
@@ -52,10 +56,18 @@ export const aiProviderRouter = router({
         emit => {
           const svc = AiProviderService.getInstance();
           (async () => {
+            // Read-side map RAG: inject the active map's indexed knowledge before
+            // streaming. Local retrieval, so it runs even in Sovereign mode.
+            const rag = await injectMapRagContext({
+              mapId: input.ragMapId,
+              userId: ctx.user?.id,
+              messages: input.messages,
+              systemPrompt: input.systemPrompt,
+            });
             for await (const chunk of svc.streamChat(
               input,
-              input.messages,
-              input.systemPrompt
+              rag.messages,
+              rag.systemPrompt
             )) {
               emit.next(chunk);
               if (chunk.done) {

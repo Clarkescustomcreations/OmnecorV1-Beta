@@ -43,7 +43,7 @@ export const ComfyPanel: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Layers className="w-6 h-6 text-orange-500" /> ComfyUI Node Bridge
+            <Layers className="w-6 h-6 text-accent-warning" /> ComfyUI Node Bridge
           </h2>
           <p className="text-sm text-muted-foreground">Orchestrate complex image and video workflows via local ComfyUI API.</p>
         </div>

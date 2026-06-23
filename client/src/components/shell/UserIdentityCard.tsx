@@ -52,7 +52,7 @@ export function UserIdentityCard({ collapsed = false }: Props) {
             className={cn(
               "w-10 h-10 rounded-full flex items-center justify-center border text-xs font-bold transition-colors",
               hasIdentity
-                ? "bg-accent text-accent-foreground border-accent/50"
+                ? "bg-primary/10 text-accent-foreground border-primary/50"
                 : "bg-sidebar-hover border-sidebar-border/30 text-muted-foreground"
             )}
             title="Your Identity Card"
@@ -61,14 +61,14 @@ export function UserIdentityCard({ collapsed = false }: Props) {
           </button>
         ) : (
           <button
-            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-sidebar-hover border border-sidebar-border/30 hover:border-accent/30 transition-colors text-left group"
+            className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg bg-sidebar-hover border border-sidebar-border/30 hover:border-primary/30 transition-colors text-left group"
             title="Edit your identity card"
           >
             <div
               className={cn(
                 "w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold shrink-0 border",
                 hasIdentity
-                  ? "bg-accent text-accent-foreground border-accent/40"
+                  ? "bg-primary/10 text-accent-foreground border-primary/40"
                   : "bg-background border-sidebar-border/30 text-muted-foreground"
               )}
             >

@@ -101,7 +101,7 @@ export function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }:
         initialPosition={{ x: 80, y: 80 }}
         initialSize={{ width: 640, height: 380 }}
       >
-        <div className="flex flex-col h-full bg-slate-950">
+        <div className="flex flex-col h-full bg-background">
           <ScrollArea className="min-h-0 flex-1 p-3 font-mono text-xs">
             <div className="space-y-1">
               {logs.map((log, i) => (
@@ -109,10 +109,10 @@ export function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }:
                   key={i}
                   className={cn(
                     "break-words leading-relaxed whitespace-pre-wrap",
-                    log.startsWith("[ERROR]") ? "text-rose-500" :
-                    log.startsWith("[CLI OUTPUT]") ? "text-emerald-400" :
-                    log.startsWith("[CLI]") ? "text-sky-400" :
-                    "text-slate-400"
+                    log.startsWith("[ERROR]") ? "text-destructive" :
+                    log.startsWith("[CLI OUTPUT]") ? "text-accent-success" :
+                    log.startsWith("[CLI]") ? "text-accent-cyan" :
+                    "text-muted-foreground"
                   )}
                 >
                   {log}
@@ -124,19 +124,19 @@ export function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }:
 
           <form
             onSubmit={e => { e.preventDefault(); handleLaunch(); }}
-            className="p-2 bg-slate-900 border-t border-slate-800 flex items-center gap-2"
+            className="p-2 bg-card border-t border-border flex items-center gap-2"
           >
-            <span className="text-blue-400 font-bold font-mono ml-2">$</span>
+            <span className="text-primary font-bold font-mono ml-2">$</span>
             <input
               value={command}
               onChange={e => setCommand(e.target.value)}
               placeholder="Optional prompt to send to CLI on launch…"
-              className="flex-1 bg-transparent border-none outline-none text-xs font-mono text-slate-200 placeholder:text-slate-600"
+              className="flex-1 bg-transparent border-none outline-none text-xs font-mono text-foreground placeholder:text-muted-foreground"
             />
             <Button
               size="sm"
               type="submit"
-              className="h-7 gap-1.5 text-[10px] bg-blue-600 hover:bg-blue-700 text-white"
+              className="h-7 gap-1.5 text-[10px] bg-primary hover:bg-primary text-white"
               disabled={openTerminalMutation.isPending}
             >
               {openTerminalMutation.isPending
@@ -151,7 +151,7 @@ export function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }:
       <Dialog open={showWslDialog} onOpenChange={setShowWslDialog}>
         <DialogContent className="sm:max-w-md">
           <DialogHeader>
-            <DialogTitle className="flex items-center gap-2 text-blue-500 font-bold">
+            <DialogTitle className="flex items-center gap-2 text-primary font-bold">
               Install WSL Ubuntu Required
             </DialogTitle>
           </DialogHeader>
@@ -159,7 +159,7 @@ export function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }:
             <p className="text-sm text-muted-foreground leading-relaxed">
               WSL (Windows Subsystem for Linux) Ubuntu is required for terminal with shell access on Windows.
             </p>
-            <p className="text-xs bg-slate-950 p-3 rounded font-mono text-blue-400 select-all border border-blue-900/50">
+            <p className="text-xs bg-background p-3 rounded font-mono text-primary select-all border border-primary/50">
               wsl --install -d Ubuntu
             </p>
             <p className="text-[11px] text-muted-foreground">

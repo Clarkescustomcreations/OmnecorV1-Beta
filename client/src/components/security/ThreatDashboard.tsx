@@ -26,7 +26,7 @@ export function ThreatDashboard() {
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 rounded text-sm transition-colors ${activeTab === tab ? "bg-blue-600 text-white" : "text-gray-400 hover:text-white"}`}
+            className={`px-3 py-1.5 rounded text-sm transition-colors ${activeTab === tab ? "bg-primary text-white" : "text-muted-foreground hover:text-white"}`}
           >
             {tab === "scan" ? "Vulnerability Scan" : "IoC Feed"}
           </button>
@@ -52,14 +52,14 @@ export function ThreatDashboard() {
           </div>
 
           {scanMut.isError && (
-            <p className="text-red-400 text-sm">{scanMut.error?.message}</p>
+            <p className="text-destructive text-sm">{scanMut.error?.message}</p>
           )}
 
           {findings.length > 0 && (
             <div className="overflow-x-auto">
-              <table className="w-full text-xs text-gray-300">
+              <table className="w-full text-xs text-foreground">
                 <thead>
-                  <tr className="border-b border-gray-700 text-gray-500 uppercase">
+                  <tr className="border-b border-border text-muted-foreground uppercase">
                     <th className="text-left py-1 pr-3">Tool</th>
                     <th className="text-left py-1 pr-3">Rule</th>
                     <th className="text-left py-1 pr-3">File</th>
@@ -69,12 +69,12 @@ export function ThreatDashboard() {
                 </thead>
                 <tbody>
                   {findings.map((f, i) => (
-                    <tr key={i} className="border-b border-gray-800">
+                    <tr key={i} className="border-b border-border">
                       <td className="py-1 pr-3"><Badge className="text-xs">{f.tool}</Badge></td>
                       <td className="py-1 pr-3 font-mono">{f.rule}</td>
                       <td className="py-1 pr-3 font-mono truncate max-w-[200px]" title={f.file}>{f.file}</td>
                       <td className="py-1 pr-3">{f.line}</td>
-                      <td className="py-1 text-gray-400">{f.message}</td>
+                      <td className="py-1 text-muted-foreground">{f.message}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -83,16 +83,16 @@ export function ThreatDashboard() {
           )}
 
           {scanMut.isSuccess && findings.length === 0 && (
-            <p className="text-green-400 text-sm">No findings.</p>
+            <p className="text-accent-success text-sm">No findings.</p>
           )}
         </div>
       )}
 
       {activeTab === "ioc" && (
         <div className="space-y-3">
-          {iocQuery.isLoading && <p className="text-gray-400 text-sm">Loading IoC feed...</p>}
+          {iocQuery.isLoading && <p className="text-muted-foreground text-sm">Loading IoC feed...</p>}
           {!iocQuery.isLoading && iocEntries.length === 0 && (
-            <div className="text-gray-500 text-sm p-4 rounded border border-gray-700 bg-gray-900">
+            <div className="text-muted-foreground text-sm p-4 rounded border border-border bg-card">
               {process.env.NODE_ENV !== "production"
                 ? "Configure MISP_URL environment variable to enable the IoC feed."
                 : "No IoC entries. Configure MISP_URL to enable the IoC feed."}
@@ -101,11 +101,11 @@ export function ThreatDashboard() {
           {iocEntries.length > 0 && (
             <div className="space-y-2">
               {iocEntries.map((entry, i) => (
-                <div key={i} className="flex items-center gap-3 p-2 rounded bg-gray-900 border border-gray-800 text-xs">
+                <div key={i} className="flex items-center gap-3 p-2 rounded bg-card border border-border text-xs">
                   <Badge className="text-xs shrink-0">{entry.type}</Badge>
-                  <span className="font-mono text-gray-200 flex-1 truncate">{entry.value}</span>
-                  <span className="text-gray-500 shrink-0">{entry.category}</span>
-                  <span className="text-gray-600 shrink-0">{entry.timestamp}</span>
+                  <span className="font-mono text-foreground flex-1 truncate">{entry.value}</span>
+                  <span className="text-muted-foreground shrink-0">{entry.category}</span>
+                  <span className="text-muted-foreground shrink-0">{entry.timestamp}</span>
                 </div>
               ))}
             </div>

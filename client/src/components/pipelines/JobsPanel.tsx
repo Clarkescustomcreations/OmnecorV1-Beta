@@ -23,17 +23,17 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 
 const jobTypeConfig: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
-  lora_training: { label: "LoRA Training", icon: Activity, color: "text-amber-500" },
-  blender: { label: "3D Render", icon: Activity, color: "text-blue-500" },
-  esp_flash: { label: "Hardware Flash", icon: Activity, color: "text-emerald-500" },
-  custom: { label: "Custom Task", icon: Terminal, color: "text-slate-400" },
+  lora_training: { label: "LoRA Training", icon: Activity, color: "text-accent-warning" },
+  blender: { label: "3D Render", icon: Activity, color: "text-primary" },
+  esp_flash: { label: "Hardware Flash", icon: Activity, color: "text-accent-success" },
+  custom: { label: "Custom Task", icon: Terminal, color: "text-muted-foreground" },
 };
 
 const stateColors: Record<string, string> = {
-  queued: "bg-slate-700 text-slate-300",
-  running: "bg-blue-600 text-white animate-pulse",
-  completed: "bg-green-600 text-white",
-  failed: "bg-red-600 text-white",
+  queued: "bg-muted text-foreground",
+  running: "bg-primary text-white animate-pulse",
+  completed: "bg-accent-success text-white",
+  failed: "bg-destructive text-white",
   cancelled: "bg-slate-500 text-white",
 };
 
@@ -62,11 +62,11 @@ export function JobsPanel() {
   const jobs = jobData?.jobs || [];
 
   return (
-    <Card className="bg-slate-950 border-slate-800">
+    <Card className="bg-background border-border">
       <CardHeader className="flex flex-row items-center justify-between pb-2">
         <div>
           <CardTitle className="text-sm font-bold flex items-center gap-2">
-            <Activity className="w-4 h-4 text-accent" /> Background Jobs
+            <Activity className="w-4 h-4 text-primary" /> Background Jobs
           </CardTitle>
           <CardDescription className="text-[10px]">Real-time status of asynchronous tasks</CardDescription>
         </div>
@@ -77,9 +77,9 @@ export function JobsPanel() {
       <CardContent>
         <div className="space-y-3">
           {isLoading ? (
-            <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-accent" /></div>
+            <div className="flex justify-center p-8"><Loader2 className="w-6 h-6 animate-spin text-primary" /></div>
           ) : jobs.length === 0 ? (
-            <div className="p-8 text-center border border-dashed rounded-xl bg-slate-900/50">
+            <div className="p-8 text-center border border-dashed rounded-xl bg-card/50">
               <Clock className="w-8 h-8 mx-auto mb-2 opacity-20" />
               <p className="text-xs text-muted-foreground">No recent job activity.</p>
             </div>
@@ -88,9 +88,9 @@ export function JobsPanel() {
               const config = jobTypeConfig[job.type] || jobTypeConfig.custom;
               const Icon = config.icon;
               return (
-                <div key={job.jobId} className="p-3 rounded-lg border bg-slate-900 border-slate-800 flex items-center justify-between group">
+                <div key={job.jobId} className="p-3 rounded-lg border bg-card border-border flex items-center justify-between group">
                   <div className="flex items-center gap-3">
-                    <div className={cn("p-1.5 rounded-md bg-slate-950", config.color)}>
+                    <div className={cn("p-1.5 rounded-md bg-background", config.color)}>
                       <Icon className="w-3.5 h-3.5" />
                     </div>
                     <div>
@@ -108,14 +108,14 @@ export function JobsPanel() {
                       <Button 
                         size="icon" 
                         variant="ghost" 
-                        className="h-7 w-7 text-rose-500 hover:bg-rose-500/10"
+                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
                         onClick={() => cancelMutation.mutate({ jobId: job.jobId })}
                       >
                         <StopCircle className="w-4 h-4" />
                       </Button>
                     )}
-                    {job.state === "completed" && <CheckCircle2 className="w-4 h-4 text-emerald-500" />}
-                    {job.state === "failed" && <XCircle className="w-4 h-4 text-rose-500" />}
+                    {job.state === "completed" && <CheckCircle2 className="w-4 h-4 text-accent-success" />}
+                    {job.state === "failed" && <XCircle className="w-4 h-4 text-destructive" />}
                   </div>
                 </div>
               );

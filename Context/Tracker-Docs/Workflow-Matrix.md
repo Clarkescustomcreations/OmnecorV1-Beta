@@ -46,7 +46,9 @@
 
 - [x] Create map — `trpc.neuralMaps.create` inserts row; UI renders new empty canvas
 - [x] Index folder — `trpc.knowledgeBase.ingestDirectory` triggers `FileSystemWatcherService` + ChromaDB embedding
-- [x] Source types tested: local directory path; `github://owner/repo` (pending), `integration://provider` (pending)
+- [x] Source types: local directory path (real); `github://owner/repo` (real, **live-verified** 2026-06-20); `integration://provider` (real — notion/slack/gmail/outlook/google-drive/dropbox/onedrive)
+- [x] Index **remote** sources → VectorDB — `integrations.indexMapSources` (detached job, gated by `settings.indexingEnabled`) fetches real content for all remote roots and embeds into `omnecor_{mapId}`; `integrations.getMapIndexStatus` polled for progress; `BrainMap` header **Index** button + auto-trigger once per map open (2026-06-23). *Runtime proof pending live ChromaDB + tokens.*
+- [x] Chat grounded in map (RAG) — `Chat.tsx` passes `ragMapId`; `ragContext.injectMapRagContext` retrieves from the map collection and injects into `aiProvider.chatStream` / `ai.chat`, gated by `settings.enableAIContext` (local retrieval → works in Sovereign mode) (2026-06-23)
 - [x] `fileTreeToNetwork.ts` converts file tree to ReactFlow nodes + edges
 - [x] Layout engine selection (Force-Directed / Hierarchical / Mind-Map / Circular) persists to `neural_maps.settings`
 - [x] Node sizes (20–50 px), animation speed, GPU acceleration, auto-clustering all saved and restored from DB

@@ -74,7 +74,7 @@ export const UnslothPanel: React.FC = () => {
             {/* Model output scope */}
             <div className="flex items-center justify-between rounded-lg border bg-muted/20 px-4 py-3">
               <div className="flex items-center gap-2">
-                {modelScope === "project" ? <Brain className="w-4 h-4 text-accent" /> : <FolderOpen className="w-4 h-4 text-muted-foreground" />}
+                {modelScope === "project" ? <Brain className="w-4 h-4 text-primary" /> : <FolderOpen className="w-4 h-4 text-muted-foreground" />}
                 <div>
                   <p className="text-xs font-semibold">{modelScope === "project" ? "Project Model" : "Global Models Folder"}</p>
                   <p className="text-[10px] text-muted-foreground font-mono">{effectiveOutputPath}</p>
@@ -161,10 +161,10 @@ export const UnslothPanel: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="p-3 bg-muted rounded-md text-[10px] font-mono space-y-1">
-               <div className="flex justify-between"><span>Status:</span> <span className="text-green-500 uppercase">Ready</span></div>
+               <div className="flex justify-between"><span>Status:</span> <span className="text-accent-success uppercase">Ready</span></div>
                <div className="flex justify-between"><span>VRAM Available:</span> <span>16.0 GB</span></div>
                <div className="flex justify-between"><span>Est. Required:</span> <span>4.2 GB</span></div>
-               <div className="flex justify-between"><span>Optimization:</span> <span className="text-blue-500">4-bit BNB</span></div>
+               <div className="flex justify-between"><span>Optimization:</span> <span className="text-primary">4-bit BNB</span></div>
             </div>
             <div className="text-xs text-muted-foreground p-2 border border-dashed rounded italic">
                Unsloth reduces memory usage by up to 60% compared to standard fine-tuning.
@@ -177,14 +177,14 @@ export const UnslothPanel: React.FC = () => {
       <Card>
         <CardHeader>
           <CardTitle className="text-sm font-medium flex items-center gap-2">
-            <Route className="w-4 h-4 text-blue-500" aria-hidden="true" />
+            <Route className="w-4 h-4 text-primary" aria-hidden="true" />
             Valet Router
           </CardTitle>
           <CardDescription className="text-xs">1.5B local routing model for intelligent multi-API task distribution.</CardDescription>
         </CardHeader>
         <CardContent className="space-y-3">
           <div className="flex items-center gap-2">
-            <div className={`w-2 h-2 rounded-full ${valetStatus?.data?.available ? "bg-green-500" : "bg-red-400"}`} aria-hidden="true" />
+            <div className={`w-2 h-2 rounded-full ${valetStatus?.data?.available ? "bg-accent-success" : "bg-destructive"}`} aria-hidden="true" />
             <span className="text-sm font-medium">
               {valetStatus?.isLoading ? "Checking…" : valetStatus?.data?.available ? "Online" : "Offline"}
             </span>
@@ -249,7 +249,7 @@ export const UnslothPanel: React.FC = () => {
             )}
           </div>
           {generateValetDataset.isSuccess && (
-            <p className="text-xs text-green-500">
+            <p className="text-xs text-accent-success">
               Dataset generation started — monitor in Jobs panel (job: {generateValetDataset.data.jobId})
             </p>
           )}

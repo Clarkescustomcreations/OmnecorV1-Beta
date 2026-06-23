@@ -198,7 +198,7 @@ What would you like help with?`,
       </div>
 
       {/* Design Context Summary */}
-      <div className="px-3 py-2 bg-accent/10 border-b border-accent/20 text-xs text-accent">
+      <div className="px-3 py-2 bg-primary/10 border-b border-primary/20 text-xs text-primary">
         <p className="font-semibold mb-1">Current Design</p>
         <p>
           {canvasState.nodes.length} components • {canvasState.edges.length} connections •{' '}
@@ -219,7 +219,7 @@ What would you like help with?`,
                   max-w-xs rounded-lg p-3 text-sm
                   ${
                     message.role === 'user'
-                      ? 'bg-accent text-accent-foreground'
+                      ? 'bg-primary/10 text-accent-foreground'
                       : 'bg-muted text-foreground'
                   }
                 `}
@@ -261,14 +261,14 @@ What would you like help with?`,
             onChange={(e) => setInputValue(e.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Ask about your design..."
-            className="h-9 text-sm bg-background border-border focus-visible:ring-1 focus-visible:ring-accent"
+            className="h-9 text-sm bg-background border-border focus-visible:ring-1 focus-visible:ring-primary/30"
             disabled={isLoading}
           />
           <Button
             onClick={handleSendMessage}
             disabled={isLoading || !inputValue.trim()}
             size="sm"
-            className="gap-2 bg-accent hover:bg-accent/90 text-accent-foreground"
+            className="gap-2 bg-primary/10 hover:bg-primary/90 text-accent-foreground"
           >
             <Send className="w-4 h-4" />
           </Button>

@@ -44,8 +44,8 @@ export function ExternalBrainMapWindow() {
       {/* Custom Title Bar for External Window */}
       <div className="flex items-center justify-between border-b border-border bg-card/80 px-6 py-3 backdrop-blur-md">
         <div className="flex items-center gap-3">
-          <div className="h-8 w-8 rounded-lg bg-accent/10 flex items-center justify-center border border-accent/20">
-            <Brain className="w-5 h-5 text-accent" />
+          <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center border border-primary/20">
+            <Brain className="w-5 h-5 text-primary" />
           </div>
           <div>
             <h1 className="text-sm font-bold tracking-tight uppercase">Neural Brain Map</h1>
@@ -57,15 +57,15 @@ export function ExternalBrainMapWindow() {
           <Button 
             variant="outline" 
             size="sm" 
-            className="h-8 gap-2 text-xs border-accent/30 hover:bg-accent/10"
+            className="h-8 gap-2 text-xs border-primary/30 hover:bg-primary/10"
             onClick={handleRedock}
           >
             <Anchor className="h-3.5 w-3.5" /> Redock to Workspace
           </Button>
           <div className="h-4 w-px bg-border mx-2" />
           <div className="flex gap-1.5">
-            <div className="h-2.5 w-2.5 rounded-full bg-orange-500/50 border border-orange-500/20" />
-            <div className="h-2.5 w-2.5 rounded-full bg-green-500/50 border border-green-500/20" />
+            <div className="h-2.5 w-2.5 rounded-full bg-accent-warning/50 border border-accent-warning/20" />
+            <div className="h-2.5 w-2.5 rounded-full bg-accent-success/50 border border-accent-success/20" />
           </div>
         </div>
       </div>
@@ -76,8 +76,8 @@ export function ExternalBrainMapWindow() {
         
         {/* Floating Status Badge */}
         <div className="absolute top-6 right-6 px-3 py-1.5 rounded-full bg-background/80 border border-border backdrop-blur-md flex items-center gap-2 z-10 shadow-xl">
-          <div className="h-1.5 w-1.5 rounded-full bg-accent animate-pulse" />
-          <span className="text-[10px] font-mono font-bold text-accent uppercase tracking-widest">Live Sync Active</span>
+          <div className="h-1.5 w-1.5 rounded-full bg-primary/10 animate-pulse" />
+          <span className="text-[10px] font-mono font-bold text-primary uppercase tracking-widest">Live Sync Active</span>
         </div>
       </div>
 

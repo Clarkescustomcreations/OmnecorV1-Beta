@@ -118,7 +118,7 @@ export const ComponentLibraryPanel: React.FC<ComponentLibraryPanelProps> = ({
                 <TabsTrigger
                   key={category}
                   value={category}
-                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-accent text-[10px] shrink-0"
+                  className="rounded-none border-b-2 border-transparent data-[state=active]:border-primary/30 text-[10px] shrink-0"
                 >
                   {category.split(' ')[0]}
                 </TabsTrigger>
@@ -181,8 +181,8 @@ const ComponentCard: React.FC<ComponentCardProps> = ({
       p-2 rounded border cursor-pointer transition-all select-none
       ${
         isDragging
-          ? 'bg-accent/20 border-accent opacity-50'
-          : 'bg-muted/40 border-border hover:bg-accent/10 hover:border-accent/50 active:bg-accent/30'
+          ? 'bg-primary/20 border-primary/30 opacity-50'
+          : 'bg-muted/40 border-border hover:bg-primary/10 hover:border-primary/50 active:bg-primary/30'
       }
     `}
   >

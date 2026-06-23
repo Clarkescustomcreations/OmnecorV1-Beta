@@ -28,7 +28,7 @@ export const ImageStudioPanel: React.FC = () => {
       <div className="p-6 border-b bg-muted/30">
         <div className="max-w-4xl mx-auto space-y-4">
           <div className="flex items-center gap-2">
-            <ImageIcon className="w-6 h-6 text-purple-500" />
+            <ImageIcon className="w-6 h-6 text-accent-purple" />
             <h1 className="text-xl font-bold tracking-tight">Neural Image Studio</h1>
           </div>
           <div className="flex gap-2">
@@ -63,7 +63,7 @@ export const ImageStudioPanel: React.FC = () => {
                       onClick={() => setDefaultStyle(style)}
                       className={`px-3 py-1.5 rounded text-xs font-medium transition-colors ${
                         defaultStyle === style
-                          ? "bg-purple-600 text-white"
+                          ? "bg-accent-purple text-white"
                           : "bg-muted border hover:bg-muted/80"
                       }`}
                     >
@@ -86,7 +86,7 @@ export const ImageStudioPanel: React.FC = () => {
               </div>
               <Button
                 size="sm"
-                className="w-full bg-purple-600 hover:bg-purple-700"
+                className="w-full bg-accent-purple hover:bg-accent-purple"
                 onClick={() => {
                   toast.success("Settings saved");
                   setShowSettings(false);
@@ -120,7 +120,7 @@ export const ImageStudioPanel: React.FC = () => {
             {(imagesQuery.data as unknown as Array<{ id: string; url: string; prompt: string }>)
               ?.filter(img => !gallerySearch || img.prompt?.toLowerCase().includes(gallerySearch.toLowerCase()))
               .map((img) => (
-              <Card key={img.id} className="group relative overflow-hidden aspect-square border-none bg-muted rounded-xl transition-all hover:ring-2 hover:ring-purple-500 shadow-sm">
+              <Card key={img.id} className="group relative overflow-hidden aspect-square border-none bg-muted rounded-xl transition-all hover:ring-2 hover:ring-accent-purple shadow-sm">
                 <img src={img.url} alt={img.prompt} className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
                   <p className="text-[10px] text-white/90 line-clamp-2 leading-relaxed mb-3">{img.prompt}</p>

@@ -176,7 +176,7 @@ export function OmnecorDashboardLayout({
             sidebarOpen ? "justify-between px-6" : "justify-center px-0"
           )}>
             <Link href="/" className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
-              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors", isFictionMode ? "bg-accent-purple/20" : "bg-accent")}>
+              <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors", isFictionMode ? "bg-accent-purple/20" : "bg-primary/10")}>
                 <Brain className={cn("w-5 h-5", isFictionMode ? "text-accent-purple" : "text-accent-foreground")} />
               </div>
               {sidebarOpen && (
@@ -232,11 +232,11 @@ export function OmnecorDashboardLayout({
                           <span className="font-medium text-sm whitespace-nowrap animate-in fade-in slide-in-from-left-1 duration-300">{item.label}</span>
                         )}
                         {sidebarOpen && (
-                          <Lock className="w-3 h-3 ml-auto text-purple-400/70" />
+                          <Lock className="w-3 h-3 ml-auto text-accent-purple/70" />
                         )}
                         {!sidebarOpen && (
-                          <div className="absolute -right-0.5 -top-0.5 w-3.5 h-3.5 bg-purple-900 rounded-full flex items-center justify-center border border-purple-500/40">
-                            <Lock className="w-2 h-2 text-purple-400" />
+                          <div className="absolute -right-0.5 -top-0.5 w-3.5 h-3.5 bg-accent-purple rounded-full flex items-center justify-center border border-accent-purple/40">
+                            <Lock className="w-2 h-2 text-accent-purple" />
                           </div>
                         )}
                       </div>
@@ -252,7 +252,7 @@ export function OmnecorDashboardLayout({
                             ? "gap-3 px-4 py-3 rounded-lg"
                             : "justify-center w-10 h-10 rounded-full",
                           active
-                            ? "bg-accent text-accent-foreground shadow-md"
+                            ? "bg-primary/10 text-accent-foreground shadow-md"
                             : "text-sidebar-foreground hover:bg-surface-hover"
                         )}
                       >
@@ -265,11 +265,11 @@ export function OmnecorDashboardLayout({
                           if (badge <= 0) return null;
                           const label = badge > 99 ? "99+" : String(badge);
                           return sidebarOpen ? (
-                            <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-red-500 text-white text-[10px] font-bold flex items-center justify-center">
+                            <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-destructive text-white text-[10px] font-bold flex items-center justify-center">
                               {label}
                             </span>
                           ) : (
-                            <span className="absolute -right-0.5 -top-0.5 min-w-4 h-4 px-1 rounded-full bg-red-500 text-white text-[9px] font-bold flex items-center justify-center border border-sidebar">
+                            <span className="absolute -right-0.5 -top-0.5 min-w-4 h-4 px-1 rounded-full bg-destructive text-white text-[9px] font-bold flex items-center justify-center border border-sidebar">
                               {label}
                             </span>
                           );
@@ -278,7 +278,7 @@ export function OmnecorDashboardLayout({
                           <ChevronRight className="w-4 h-4 ml-auto opacity-0 group-hover:opacity-100 transition-opacity" />
                         )}
                         {!sidebarOpen && active && (
-                          <div className="absolute -left-1 w-1 h-6 bg-accent rounded-full shadow-[0_0_8px_theme(colors.accent.DEFAULT)]" />
+                          <div className="absolute -left-1 w-1 h-6 bg-primary/10 rounded-full shadow-[0_0_8px_theme(colors.accent.DEFAULT)]" />
                         )}
                       </Link>
                     )}
@@ -304,7 +304,7 @@ export function OmnecorDashboardLayout({
                   sidebarOpen 
                     ? "w-full justify-start gap-3 h-11 px-4 rounded-lg border-sidebar-border/50 hover:bg-sidebar-hover" 
                     : "w-10 h-10 rounded-full border-sidebar-border/50",
-                  isFictionMode && "bg-accent text-accent-foreground border-transparent"
+                  isFictionMode && "bg-primary/10 text-accent-foreground border-transparent"
                 )}
                 title={sidebarOpen ? "Toggle Fiction Mode" : (isFictionMode ? "Fiction Mode Active" : "Standard Mode")}
               >
@@ -357,7 +357,7 @@ export function OmnecorDashboardLayout({
               <div className={cn("transition-all duration-300", sidebarOpen ? "w-full" : "w-10 h-10 flex items-center justify-center")}>
                 {sidebarOpen ? <PeerCard /> : (
                   <div className="w-10 h-10 rounded-full bg-sidebar-hover flex items-center justify-center border border-sidebar-border/30 cursor-pointer">
-                    <Network className="w-5 h-5 text-accent" />
+                    <Network className="w-5 h-5 text-primary" />
                   </div>
                 )}
               </div>
@@ -407,7 +407,7 @@ export function OmnecorDashboardLayout({
           {/* Global Floating Alerts — pinned inside viewport on all screen sizes */}
           <div className="fixed bottom-4 right-4 left-4 sm:left-auto sm:w-full sm:max-w-md z-[100] pointer-events-none">
             <div className="pointer-events-auto">
-              <HITLAlertPanel className="shadow-2xl border-accent/20" />
+              <HITLAlertPanel className="shadow-2xl border-primary/20" />
             </div>
           </div>
         </main>

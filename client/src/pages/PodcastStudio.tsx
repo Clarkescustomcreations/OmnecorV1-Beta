@@ -96,7 +96,7 @@ const KIND_COLOR: Record<SourceKind, string> = {
   text: "text-accent-success",
   website: "text-accent-danger",
   cloud: "text-accent-cyan",
-  discovery: "text-accent",
+  discovery: "text-primary",
 };
 
 // ─── Sources Sidebar ──────────────────────────────────────────────────────────
@@ -218,7 +218,7 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
               key={src.id}
               className={cn(
                 "flex items-start gap-2 p-2 rounded-lg border text-[11px] group transition-colors",
-                src.selected ? "bg-accent/10 border-accent/30" : "bg-muted/10 border-border hover:border-border/80"
+                src.selected ? "bg-primary/10 border-primary/30" : "bg-muted/10 border-border hover:border-border/80"
               )}
             >
               <Checkbox
@@ -270,8 +270,8 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
               className={cn(
                 "flex flex-col items-center gap-0.5 p-1.5 rounded border text-[9px] font-bold uppercase tracking-wider transition-colors",
                 addMode === btn.kind
-                  ? "bg-accent/20 border-accent/40 text-accent"
-                  : "border-border text-muted-foreground hover:border-accent/30 hover:text-foreground"
+                  ? "bg-primary/20 border-primary/40 text-primary"
+                  : "border-border text-muted-foreground hover:border-primary/30 hover:text-foreground"
               )}
             >
               {btn.icon}
@@ -375,7 +375,7 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
                     <button
                       key={article.id}
                       onClick={() => handleAddDiscoveryArticle(article)}
-                      className="w-full text-left p-1.5 rounded border border-border text-[10px] hover:bg-accent/10 hover:border-accent/30 transition-colors leading-snug"
+                      className="w-full text-left p-1.5 rounded border border-border text-[10px] hover:bg-primary/10 hover:border-primary/30 transition-colors leading-snug"
                     >
                       <span className="font-medium line-clamp-2">{article.title || "Untitled"}</span>
                       <span className="text-muted-foreground block">{article.source}</span>
@@ -726,7 +726,7 @@ export function PodcastStudio() {
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between shrink-0 flex-wrap gap-3">
           <div>
             <h1 className="text-xl font-bold flex items-center gap-2">
-              <Mic2 className="w-5 h-5 text-accent" /> Podcast Studio
+              <Mic2 className="w-5 h-5 text-primary" /> Podcast Studio
             </h1>
             <p className="text-muted-foreground text-xs mt-0.5">Multi-speaker dialogue orchestration using local XTTS-v2 & RVC.</p>
           </div>
@@ -734,7 +734,7 @@ export function PodcastStudio() {
             {/* Link To Neural Map toggle */}
             <div className={cn(
               "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
-              linkedToMap ? "bg-accent/10 border-accent/40 text-accent" : "border-border text-muted-foreground"
+              linkedToMap ? "bg-primary/10 border-primary/40 text-primary" : "border-border text-muted-foreground"
             )}>
               <Brain className="w-3.5 h-3.5 flex-shrink-0" />
               <span className="text-xs font-medium whitespace-nowrap">
@@ -759,7 +759,7 @@ export function PodcastStudio() {
               Add from Map
             </Button>
             {selectedSources.length > 0 && (
-              <Badge className="bg-accent/10 text-accent border-accent/20 text-xs gap-1">
+              <Badge className="bg-primary/10 text-primary border-primary/20 text-xs gap-1">
                 <HardDrive className="w-3 h-3" />
                 {selectedSources.length} source{selectedSources.length !== 1 ? "s" : ""} active
               </Badge>
@@ -803,7 +803,7 @@ export function PodcastStudio() {
 
           {/* Center: Script Editor */}
           <div className="overflow-auto p-6">
-            <Card className="border-accent/10 shadow-xl bg-card/50 backdrop-blur-sm">
+            <Card className="border-primary/10 shadow-xl bg-card/50 backdrop-blur-sm">
               <CardHeader className="flex flex-row items-center justify-between border-b pb-4">
                 <div>
                   <CardTitle className="text-lg">Dialogue Script</CardTitle>
@@ -836,7 +836,7 @@ export function PodcastStudio() {
                         <Badge variant="outline" className="text-[9px] h-4 uppercase tracking-tighter opacity-50">Local Clone</Badge>
                         <div className="flex-1" />
                         <select
-                          className="text-[10px] bg-muted/50 rounded px-1.5 py-0.5 border-none focus:ring-1 focus:ring-accent"
+                          className="text-[10px] bg-muted/50 rounded px-1.5 py-0.5 border-none focus:ring-1 focus:ring-primary/30"
                           value={turn.emotion}
                           onChange={(e) => updateTurn(turn.id, "emotion", e.target.value)}
                         >
@@ -853,7 +853,7 @@ export function PodcastStudio() {
                         placeholder="Type dialogue here..."
                         value={turn.text}
                         onChange={(e) => updateTurn(turn.id, "text", e.target.value)}
-                        className="resize-none min-h-[60px] bg-muted/20 border-accent/5 focus:border-accent/40"
+                        className="resize-none min-h-[60px] bg-muted/20 border-primary/5 focus:border-primary/40"
                       />
                       {index < turns.length - 1 && (
                         <div className="absolute -bottom-4 left-4 w-px h-4 bg-muted-foreground/10" />
@@ -862,11 +862,11 @@ export function PodcastStudio() {
                   ))}
                   <Button
                     variant="outline"
-                    className="w-full border-dashed border-2 py-8 hover:bg-accent/5 transition-all group"
+                    className="w-full border-dashed border-2 py-8 hover:bg-primary/5 transition-all group"
                     onClick={addTurn}
                   >
-                    <Plus className="w-5 h-5 mr-2 text-muted-foreground group-hover:text-accent" />
-                    <span className="text-muted-foreground group-hover:text-accent">Add Dialogue Turn</span>
+                    <Plus className="w-5 h-5 mr-2 text-muted-foreground group-hover:text-primary" />
+                    <span className="text-muted-foreground group-hover:text-primary">Add Dialogue Turn</span>
                   </Button>
                 </div>
               </CardContent>
@@ -878,7 +878,7 @@ export function PodcastStudio() {
             <Card className="bg-muted/10 border-dashed">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <Settings2 className="w-4 h-4 text-accent" /> Orchestration Rules
+                  <Settings2 className="w-4 h-4 text-primary" /> Orchestration Rules
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-4">
@@ -904,7 +904,7 @@ export function PodcastStudio() {
                         className={cn(
                           "p-2 rounded border text-left transition-colors",
                           podcastLength === opt.value
-                            ? "bg-accent/20 border-accent/50 text-accent"
+                            ? "bg-primary/20 border-primary/50 text-primary"
                             : "border-border text-muted-foreground hover:border-border/80 hover:text-foreground"
                         )}
                       >
@@ -919,7 +919,7 @@ export function PodcastStudio() {
                     <Label htmlFor="input-podcast-duration" className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">
                       Duration
                     </Label>
-                    <span className="text-[11px] font-bold text-accent">{podcastDuration} min</span>
+                    <span className="text-[11px] font-bold text-primary">{podcastDuration} min</span>
                   </div>
                   <input
                     id="input-podcast-duration"
@@ -942,7 +942,7 @@ export function PodcastStudio() {
                         className={cn(
                           "py-1 px-1.5 rounded border text-[10px] font-semibold text-center transition-colors uppercase",
                           podcastQuality === q
-                            ? "bg-accent/20 border-accent/50 text-accent"
+                            ? "bg-primary/20 border-primary/50 text-primary"
                             : "border-border text-muted-foreground hover:border-border/80 hover:text-foreground"
                         )}
                       >
@@ -955,7 +955,7 @@ export function PodcastStudio() {
                   <p className="text-[10px] text-muted-foreground uppercase font-bold tracking-widest">Model Pipeline</p>
                   <div className="p-3 rounded-lg bg-background border flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <Zap className="w-4 h-4 text-amber-500" />
+                      <Zap className="w-4 h-4 text-accent-warning" />
                       <span className="text-xs font-semibold">XTTS-v2 + RVC Post</span>
                     </div>
                     <Badge variant="outline" className="text-[9px] h-4">Sovereign</Badge>
@@ -973,8 +973,8 @@ export function PodcastStudio() {
             </Card>
 
             <Card className={cn(
-              "border-accent/20 transition-all duration-500",
-              result ? "bg-accent/5" : "bg-muted/5 opacity-50"
+              "border-primary/20 transition-all duration-500",
+              result ? "bg-primary/5" : "bg-muted/5 opacity-50"
             )}>
               <CardHeader className="p-4">
                 <CardTitle className="text-sm">Output Stream</CardTitle>
@@ -996,7 +996,7 @@ export function PodcastStudio() {
                       {result.segments.map((seg, i) => (
                         <div key={i} className="flex items-center justify-between p-2 rounded bg-background border text-[10px]">
                           <div className="flex items-center gap-2">
-                            <User className="w-3 h-3 text-accent" />
+                            <User className="w-3 h-3 text-primary" />
                             <span className="font-bold">{seg.speaker}</span>
                           </div>
                           <div className="flex items-center gap-1">

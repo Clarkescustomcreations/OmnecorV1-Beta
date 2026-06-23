@@ -20,7 +20,7 @@ export function ConnectionStatusBadge() {
     },
     connected: {
       label: "Connected",
-      color: "bg-green-500",
+      color: "bg-accent-success",
       pulse: false,
     },
     reconnecting: {
@@ -30,7 +30,7 @@ export function ConnectionStatusBadge() {
     },
     offline: {
       label: "Offline",
-      color: "bg-red-500",
+      color: "bg-destructive",
       pulse: false,
     },
   };

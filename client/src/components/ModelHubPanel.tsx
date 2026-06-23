@@ -151,10 +151,10 @@ export function ModelHubPanel({
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case "available": return <Check className="w-4 h-4 text-green-500" />;
+      case "available": return <Check className="w-4 h-4 text-accent-success" />;
       case "loading":   return <Zap className="w-4 h-4 text-yellow-500 animate-pulse" />;
-      case "error":     return <AlertCircle className="w-4 h-4 text-red-500" />;
-      default:          return <AlertCircle className="w-4 h-4 text-gray-500" />;
+      case "error":     return <AlertCircle className="w-4 h-4 text-destructive" />;
+      default:          return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
     }
   };
 
@@ -217,7 +217,7 @@ export function ModelHubPanel({
           className={cn(
             "px-4 py-2 font-medium text-sm border-b-2 transition-colors",
             activeTab === "models"
-              ? "border-accent text-accent"
+              ? "border-primary/30 text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
@@ -229,7 +229,7 @@ export function ModelHubPanel({
           className={cn(
             "px-4 py-2 font-medium text-sm border-b-2 transition-colors",
             activeTab === "marketplace"
-              ? "border-accent text-accent"
+              ? "border-primary/30 text-primary"
               : "border-transparent text-muted-foreground hover:text-foreground"
           )}
         >
@@ -257,8 +257,8 @@ export function ModelHubPanel({
                   key={model.id}
                   role="listitem"
                   className={cn(
-                    "cursor-pointer transition-all hover:border-accent",
-                    selectedModelId === model.id && "border-accent bg-accent/5"
+                    "cursor-pointer transition-all hover:border-primary/30",
+                    selectedModelId === model.id && "border-primary/30 bg-primary/5"
                   )}
                   onClick={() => handleModelSelect(model)}
                 >
@@ -271,7 +271,7 @@ export function ModelHubPanel({
                             {model.type === "local" ? "Local" : "API"}
                           </Badge>
                           {model.isSelected && (
-                            <Badge className="text-xs bg-green-500/20 text-green-500 border-green-500/30">
+                            <Badge className="text-xs bg-accent-success/20 text-accent-success border-accent-success/30">
                               Selected
                             </Badge>
                           )}
@@ -332,7 +332,7 @@ export function ModelHubPanel({
               </div>
             ) : marketplaceQuery.isError ? (
               <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2">
-                <AlertCircle className="w-6 h-6 text-red-400" />
+                <AlertCircle className="w-6 h-6 text-destructive" />
                 <p className="text-sm">Failed to load marketplace</p>
                 <p className="text-xs">{marketplaceQuery.error.message}</p>
                 <Button size="sm" variant="outline" onClick={() => marketplaceQuery.refetch()}>
@@ -345,7 +345,7 @@ export function ModelHubPanel({
               </div>
             ) : (
               (marketplaceQuery.data?.models ?? []).map(item => (
-                <Card key={item.id} role="listitem" className="cursor-pointer transition-all hover:border-accent">
+                <Card key={item.id} role="listitem" className="cursor-pointer transition-all hover:border-primary/30">
                   <CardContent className="pt-4">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">

@@ -4,7 +4,7 @@ import {
   convertNetworkToTreeStructure,
   NeuralNetwork,
 } from "@/lib/neuralNodeTree";
-import { ChevronRight, ChevronDown, Folder, File, Brain } from "lucide-react";
+import { ChevronRight, ChevronDown, Folder, FolderPlus, File, Brain } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   Tooltip,
@@ -17,6 +17,8 @@ interface NeuralTreeViewProps {
   network: NeuralNetwork;
   onNodeClick?: (nodeId: string) => void;
   onNodeDoubleClick?: (nodeId: string) => void;
+  /** Lazily fetch + merge a truncated folder's subtree (its absolute path). */
+  onRequestExpand?: (path: string) => void;
   readOnly?: boolean;
 }
 
@@ -24,6 +26,7 @@ export function NeuralTreeView({
   network,
   onNodeClick,
   onNodeDoubleClick,
+  onRequestExpand,
   readOnly = false,
 }: NeuralTreeViewProps) {
   const treeStructure = convertNetworkToTreeStructure(network);
@@ -49,6 +52,7 @@ export function NeuralTreeView({
     const isExpanded = expandedNodes.has(node.id);
     const hasChildren = node.children && node.children.length > 0;
     const isProject = node.type === "project";
+    const isTruncated = !!node.truncated;
     const description = (node.metadata?.description as string) || (node.type === 'folder' ? 'Project directory' : 'Source file');
 
     return (
@@ -59,12 +63,13 @@ export function NeuralTreeView({
               <div
                 className={cn(
                   "flex items-center gap-2 px-3 py-1.5 rounded-md hover:bg-muted/50 transition-colors cursor-pointer group",
-                  isProject && "bg-accent/5 mb-1"
+                  isProject && "bg-primary/5 mb-1"
                 )}
                 style={{ paddingLeft: `${12 + depth * 12}px` }}
                 onClick={() => {
                   onNodeClick?.(node.id);
                   if (hasChildren) toggleExpanded(node.id);
+                  else if (isTruncated) onRequestExpand?.(node.path);
                 }}
                 onDoubleClick={() => onNodeDoubleClick?.(node.id)}
               >
@@ -74,7 +79,7 @@ export function NeuralTreeView({
                       e.stopPropagation();
                       toggleExpanded(node.id);
                     }}
-                    className="p-0.5 hover:bg-accent/20 rounded transition-colors"
+                    className="p-0.5 hover:bg-primary/20 rounded transition-colors"
                   >
                     {isExpanded ? (
                       <ChevronDown className="w-3.5 h-3.5 text-muted-foreground" />
@@ -82,25 +87,39 @@ export function NeuralTreeView({
                       <ChevronRight className="w-3.5 h-3.5 text-muted-foreground" />
                     )}
                   </button>
+                ) : isTruncated ? (
+                  <button
+                    onClick={e => {
+                      e.stopPropagation();
+                      onRequestExpand?.(node.path);
+                    }}
+                    className="p-0.5 hover:bg-primary/20 rounded transition-colors"
+                    title="Load this folder"
+                  >
+                    <FolderPlus className="w-3.5 h-3.5 text-primary" />
+                  </button>
                 ) : (
                   <div className="w-4" />
                 )}
 
                 {isProject ? (
-                  <Brain className="w-4 h-4 text-accent fill-accent/10 flex-shrink-0" />
+                  <Brain className="w-4 h-4 text-primary fill-accent/10 flex-shrink-0" />
                 ) : node.type === "folder" ? (
-                  <Folder className="w-4 h-4 text-accent/70 flex-shrink-0 group-hover:text-accent" />
+                  <Folder className="w-4 h-4 text-primary/70 flex-shrink-0 group-hover:text-primary" />
                 ) : (
                   <File className="w-4 h-4 text-muted-foreground/70 flex-shrink-0 group-hover:text-foreground" />
                 )}
 
                 <span className={cn(
                   "flex-1 truncate text-xs",
-                  isProject ? "font-bold text-accent" : "font-medium text-foreground/80 group-hover:text-foreground"
+                  isProject ? "font-bold text-primary" : "font-medium text-foreground/80 group-hover:text-foreground"
                 )}>
                   {node.label}
                 </span>
 
+                {isTruncated && node.childCount !== undefined && (
+                  <span className="text-[10px] text-primary/70 tabular-nums">+{node.childCount}</span>
+                )}
                 {hasChildren && isExpanded && (
                   <span className="text-[10px] text-muted-foreground/50 tabular-nums">
                     {node.children!.length}
@@ -108,11 +127,16 @@ export function NeuralTreeView({
                 )}
               </div>
             </TooltipTrigger>
-            <TooltipContent side="right" className="max-w-[200px] p-3 bg-card/95 border-accent/20 shadow-2xl backdrop-blur-md z-[100]">
+            <TooltipContent side="right" className="max-w-[200px] p-3 bg-card/95 border-primary/20 shadow-2xl backdrop-blur-md z-[100]">
               <div className="space-y-1">
-                <p className="text-[10px] font-bold uppercase tracking-widest text-accent">{node.type}</p>
+                <p className="text-[10px] font-bold uppercase tracking-widest text-primary">{node.type}</p>
                 <p className="text-xs leading-relaxed text-foreground/90">{description}</p>
                 <p className="text-[9px] text-muted-foreground font-mono truncate">{node.path}</p>
+                {isTruncated && (
+                  <p className="text-[10px] text-primary mt-1">
+                    {node.childCount !== undefined ? `${node.childCount} items — ` : ""}click to load this folder
+                  </p>
+                )}
               </div>
             </TooltipContent>
           </Tooltip>

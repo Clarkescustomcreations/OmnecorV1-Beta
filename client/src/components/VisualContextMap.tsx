@@ -72,7 +72,7 @@ export function VisualContextMap({
         className={cn(
           "rounded-lg border transition-all",
           file.included
-            ? "bg-accent/5 border-accent/30 hover:border-accent/50"
+            ? "bg-primary/5 border-primary/30 hover:border-primary/50"
             : "bg-muted/30 border-muted/50 opacity-60"
         )}
       >
@@ -137,7 +137,7 @@ export function VisualContextMap({
             <>
               <button
                 onClick={() => setExpandedFileId(isExpanded ? null : file.id)}
-                className="text-xs text-accent hover:underline"
+                className="text-xs text-primary hover:underline"
               >
                 {isExpanded ? "Hide preview" : "Show preview"}
               </button>
@@ -178,9 +178,9 @@ export function VisualContextMap({
             <p className="text-muted-foreground mb-1">Total Files</p>
             <p className="font-mono font-medium">{files.length}</p>
           </div>
-          <div className="p-2 rounded-lg bg-accent/10 border border-accent/30">
+          <div className="p-2 rounded-lg bg-primary/10 border border-primary/30">
             <p className="text-muted-foreground mb-1">Active</p>
-            <p className="font-mono font-medium text-accent">
+            <p className="font-mono font-medium text-primary">
               {includedFiles.length}
             </p>
           </div>

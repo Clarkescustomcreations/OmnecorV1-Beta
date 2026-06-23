@@ -120,9 +120,9 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           size="sm"
           onClick={onSnapToggle}
           title={snapToGrid ? 'Disable Snap' : 'Enable Snap'}
-          className={snapToGrid ? 'bg-accent/10' : ''}
+          className={snapToGrid ? 'bg-primary/10' : ''}
         >
-          <Magnet className={`w-4 h-4 ${snapToGrid ? 'text-accent' : ''}`} />
+          <Magnet className={`w-4 h-4 ${snapToGrid ? 'text-primary' : ''}`} />
         </Button>
 
         <Separator orientation="vertical" className="h-6" />
@@ -154,7 +154,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           size="sm"
           onClick={onDelete}
           title="Delete Selected (Del)"
-          className="gap-2 text-red-600 hover:text-red-700"
+          className="gap-2 text-destructive hover:text-destructive"
         >
           <Trash2 className="w-4 h-4" />
           Delete
@@ -216,7 +216,7 @@ export const EditorToolbar: React.FC<EditorToolbarProps> = ({
           onClick={onMiniMapToggle}
           title={showMiniMap ? 'Hide Mini Map' : 'Show Mini Map'}
           className={`h-8 px-3 text-xs gap-1.5 transition-colors ${
-            showMiniMap ? 'bg-accent/10 border-accent/40 text-accent hover:bg-accent/20' : ''
+            showMiniMap ? 'bg-primary/10 border-primary/40 text-primary hover:bg-primary/20' : ''
           }`}
           id="btn-toggle-minimap"
         >

@@ -82,7 +82,7 @@
 - **File**: `client/src/components/neural/MapManager.tsx`, `server/routers/integrationsRouter.ts`, `client/src/pages/BrainMap.tsx`
 - **Reason**: Neural Maps remote sources (`github://`, `integration://`) were decorative-label shells — stored + drawn as a single dot, never ingested. `settings.indexingEnabled` was stored-but-unconsumed.
 - **Risk**: Low
-- **Status**: **Largely Resolved (2026-06-20, Session 23).** New `integrations.fetchSourceTree` (cloudProcedure) resolves `github://owner/repo` → real recursive file tree and `integration://<type>` → real listings (notion/slack/gmail/outlook/google-drive); `BrainMap` renders them through the same `fileTreeToNetwork` as local roots, gated by `settings.indexingEnabled`; google-drive flipped supported. **GitHub path live-verified** (1500-node real tree). **Remaining:** (a) push ingested content into VectorDB so map RAG/AI-context is real; (b) dropbox/onedrive need connect+ingest adapters (still "coming soon" — honest). See TD-038.
+- **Status**: **RESOLVED (2026-06-23).** Session 23 (2026-06-20) made the trees real (`integrations.fetchSourceTree` → recursive github tree + `integration://` listings, rendered via `fileTreeToNetwork`, gated by `indexingEnabled`; **GitHub live-verified**, 1500-node tree). The two follow-ons are now also done: (a) **content → VectorDB + chat RAG (2026-06-23)** and (b) **dropbox/onedrive adapters (2026-06-22)**. `indexingEnabled` is now consumed for real (the write-gate). See TD-038 (resolved) and the Progress-Tracker "Map RAG over Remote Sources" entry. Only live end-to-end runtime proof remains (needs ChromaDB + tokens).
 
 ### TD-014: `template-brand "Manus"` Leftover Comments in Server Core
 - **File**: `server/_core/notification.ts`, `server/_core/map.ts`, `server/_core/sdk.ts`, `server/_core/storage.ts`
@@ -229,11 +229,29 @@
 - **Risk**: Low (cosmetic)
 - **Status**: Open — needs a **visually-verified** pass (dark theme can't be validated headless). Mapping table + exempt-file list in memory `beta-sweep-followups`. Exempt: three.js/PCBViewer3D, reactflow canvases, xterm, WebPreview iframe, MeshTopologyGraph canvas, brand OAuth colors.
 
-### TD-038: Neural-map ingested content not fed to VectorDB; dropbox/onedrive no adapters (Open)
-- **File**: `server/routers/integrationsRouter.ts`, `client/src/pages/BrainMap.tsx`
-- **Reason**: Remote map sources now render as real trees (TD-013) but their content is **not** pushed into `VectorDBService`, so map RAG/AI-context over remote sources isn't real yet. Dropbox/onedrive can't even connect (`integrationsRouter.connect` has no branch) → no ingestion.
+### TD-038: Neural-map ingested content not fed to VectorDB; dropbox/onedrive no adapters (RESOLVED 2026-06-23)
+- **File**: `server/routers/integrationsRouter.ts`, `client/src/pages/BrainMap.tsx`, `server/phase2/services/{VectorDBService,MemoryArchitectService}.ts`, `server/_core/ragContext.ts`, `server/routers/{aiProviderRouter,aiRouter,neuralMapsRouter}.ts`, `client/src/pages/Chat.tsx`
+- **Reason**: Remote map sources rendered as real trees (TD-013) but their content was **not** pushed into `VectorDBService`, so map RAG over remote sources wasn't real. Dropbox/onedrive also couldn't connect.
 - **Risk**: Low
-- **Status**: Open — wire `fetchSourceTree` output → `VectorDBService.addDocuments` when `indexingEnabled`; add dropbox/onedrive connect+list adapters.
+- **Status**: **RESOLVED.** Built end-to-end (no deferrals): per-adapter **content** resolvers for all 8 source types → generic `MemoryArchitectService.reindexRemoteSource` (chunk/sanitize/redact) into `omnecor_{mapId}`; `integrations.indexMapSources` detached job (gated by `indexingEnabled`) + `getMapIndexStatus` polling + `BrainMap` Index button/auto-trigger; **read path** `ragContext.injectMapRagContext` wired into `aiProvider.chatStream` + `ai.chat` (gated by `enableAIContext`, Sovereign-safe), `Chat.tsx` passes `ragMapId`. Dropbox/onedrive adapters landed 2026-06-22. **Latent bug fixed in the same pass:** the local file watcher wrote a *raw* `omnecor_${projectId}` collection while the reader queried a *sanitized* one (divergent for hyphenated map UUIDs → RAG silently empty) — unified on exported `VectorDBService.sanitizeCollectionName`. Gates: tsc 0 · vitest 371/371 · build ✓. Outstanding: live runtime proof only (ChromaDB + real tokens).
+
+### TD-039: Neural-map overlapping local roots → multi-parent nodes (Open)
+- **File**: `client/src/pages/BrainMap.tsx` (`neuralNetwork` merge), `client/src/lib/fileTreeToNetwork.ts`
+- **Reason**: Node ids are `node-${absolutePath}`. If a map has two local roots where one is an ancestor of the other (or they otherwise overlap), the same absolute path produces the same node id under both roots. The lazy-expansion merge dedupes the **node** by id but can still append a second parent **edge**, so a node can end up with two incoming edges — hierarchical layout in-degree and tree-view parent grouping then treat it as having multiple parents.
+- **Risk**: Low — rare (requires deliberately mapping overlapping directories); the map still renders, the node just appears under both parents.
+- **Status**: Open — **pre-existing** (predates the 2026-06-22 off-thread/bounded-loading work; surfaced during its `/review`, not introduced by it). Fix: dedupe edges by `target` (enforce one parent per node) or reject/merge overlapping roots at map-config time.
+
+### TD-040: Neural-map layout Web Worker — first Web Worker in `client/src` (By design — recorded)
+- **File**: `client/src/lib/neuralLayout.worker.ts`, `client/src/lib/neuralLayoutClient.ts`
+- **Reason**: The 2026-06-22 off-thread layout fix introduces the **first Web Worker** in the client (Vite `new Worker(new URL(…), { type: "module" })`, bundled as its own chunk; synchronous main-thread fallback when `Worker` is unavailable). New build/runtime surface worth tracking.
+- **Risk**: None — intentional and verified (worker chunk builds clean; fallback covers SSR / locked-down envs).
+- **Status**: **By design — no action.** Recorded because `/review` flagged the new pattern as deserving a conscious decision (acknowledged). Reuse `neuralLayoutClient` for any future off-thread compute rather than spawning ad-hoc workers.
+
+### TD-041: Neural-map tree-view drill-in — deliberate scope addition (By design — recorded)
+- **File**: `client/src/components/neural/NeuralTreeView.tsx`
+- **Reason**: Bounded-loading lazy expansion (graph view) was also wired into the **tree view**, slightly beyond the literal request. Without it, truncated folders would render as misleading empty leaves in tree view.
+- **Risk**: None — intentional, keeps the two views consistent.
+- **Status**: **By design — no action.** Recorded for the record.
 
 ---
 

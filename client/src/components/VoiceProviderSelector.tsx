@@ -68,7 +68,7 @@ export const VoiceProviderSelector: React.FC = () => {
         </div>
 
         {provider === "elevenlabs" && !elevenLabsStatus.data?.configured && (
-          <p className="text-xs text-muted-foreground rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2">
+          <p className="text-xs text-muted-foreground rounded-md border border-accent-warning/30 bg-accent-warning/10 px-3 py-2">
             Add <code className="font-mono bg-muted px-1 rounded">ELEVENLABS_API_KEY</code> to your <code className="font-mono bg-muted px-1 rounded">.env</code> and restart the server.
           </p>
         )}

@@ -34,6 +34,9 @@ export interface NeuralNode {
     depth: number;
     isExpanded?: boolean;
     isRemote?: boolean;
+    /** Directory whose children weren't loaded (server budget/depth limit).
+     *  Double-clicking it lazily fetches and merges its subtree. */
+    truncated?: boolean;
     metadata?: Record<string, unknown>;
   };
   position: {
@@ -234,6 +237,8 @@ export function convertNetworkToTreeStructure(
       path: node.data.path,
       children: [],
       expanded: node.data.isExpanded !== false,
+      truncated: node.data.truncated,
+      childCount: node.data.fileCount,
       metadata: node.data.metadata as Record<string, unknown>,
     };
     nodeMap.set(node.id, treeNode);
@@ -275,6 +280,9 @@ export interface TreeNode {
   path: string;
   children?: TreeNode[];
   expanded?: boolean;
+  /** Directory not yet loaded (server budget/depth limit) — drill in to fetch. */
+  truncated?: boolean;
+  childCount?: number;
   metadata?: Record<string, unknown>;
 }
 

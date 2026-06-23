@@ -104,12 +104,12 @@ export function HITLAlertPanel({
     return (
       <>
         {walletSpend && (
-          <div className="rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
-            <div className="flex items-center gap-2 text-amber-400 text-sm font-medium mb-1">
+          <div className="rounded-lg border border-accent-warning/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+            <div className="flex items-center gap-2 text-accent-warning text-sm font-medium mb-1">
               <AlertTriangle className="h-4 w-4 flex-shrink-0" />
               <span className="truncate">Budget Spend Event</span>
             </div>
-            <div className="text-xs text-amber-200/80 space-y-0.5">
+            <div className="text-xs text-accent-warning/80 space-y-0.5">
               <div className="truncate">Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
               <div>Cost: <span className="font-mono">${(walletSpend.costMicrocents / 100_000_000).toFixed(6)}</span></div>
             </div>
@@ -122,22 +122,22 @@ export function HITLAlertPanel({
   const getSeverityIcon = () => {
     switch (activeAlert.severity) {
       case "critical":
-        return <AlertTriangle className="w-6 h-6 text-red-500" />;
+        return <AlertTriangle className="w-6 h-6 text-destructive" />;
       case "warning":
         return <AlertCircle className="w-6 h-6 text-yellow-500" />;
       default:
-        return <AlertCircle className="w-6 h-6 text-blue-500" />;
+        return <AlertCircle className="w-6 h-6 text-primary" />;
     }
   };
 
   const getSeverityColor = () => {
     switch (activeAlert.severity) {
       case "critical":
-        return "bg-red-500/10 border-red-500/30";
+        return "bg-destructive/10 border-destructive/30";
       case "warning":
         return "bg-yellow-500/10 border-yellow-500/30";
       default:
-        return "bg-blue-500/10 border-blue-500/30";
+        return "bg-primary/10 border-primary/30";
     }
   };
 
@@ -168,12 +168,12 @@ export function HITLAlertPanel({
   return (
     <>
       {walletSpend && (
-        <div className="mb-2 rounded-lg border border-amber-500/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
-          <div className="flex items-center gap-2 text-amber-400 text-sm font-medium mb-1">
+        <div className="mb-2 rounded-lg border border-accent-warning/30 bg-amber-950/80 backdrop-blur-sm p-3 shadow-lg">
+          <div className="flex items-center gap-2 text-accent-warning text-sm font-medium mb-1">
             <AlertTriangle className="h-4 w-4 flex-shrink-0" />
             <span className="truncate">Budget Spend Event</span>
           </div>
-          <div className="text-xs text-amber-200/80 space-y-0.5">
+          <div className="text-xs text-accent-warning/80 space-y-0.5">
             <div className="truncate">Provider: <span className="font-mono">{walletSpend.provider}/{walletSpend.modelId}</span></div>
             <div>Cost: <span className="font-mono">${(walletSpend.costMicrocents / 100_000_000).toFixed(6)}</span></div>
           </div>
@@ -230,7 +230,7 @@ export function HITLAlertPanel({
                 key={`${action.hash}-${index}`}
                 className="text-xs font-mono text-muted-foreground"
               >
-                <span className="text-accent">#{index + 1}</span> {action.tool}{" "}
+                <span className="text-primary">#{index + 1}</span> {action.tool}{" "}
                 •{" "}
                 <span className="text-foreground">
                   {action.hash.substring(0, 8)}...

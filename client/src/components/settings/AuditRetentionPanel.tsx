@@ -55,7 +55,7 @@ export function AuditRetentionPanel() {
   return (
     <div className="pt-6 border-t space-y-6">
       <h3 className="text-lg font-semibold flex items-center gap-2">
-        <Archive className="w-5 h-5 text-blue-400" /> Audit Log Retention
+        <Archive className="w-5 h-5 text-primary" /> Audit Log Retention
       </h3>
       <p className="text-xs text-muted-foreground">
         The audit log is append-only. To keep it from consuming unbounded storage, entries outside the
@@ -97,9 +97,9 @@ export function AuditRetentionPanel() {
       </RadioGroup>
 
       {current === 0 && (
-        <div className="flex items-start gap-2 rounded-md border border-amber-500/40 bg-amber-500/10 p-3">
-          <AlertTriangle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
-          <p className="text-xs text-amber-600 dark:text-amber-400 break-words">
+        <div className="flex items-start gap-2 rounded-md border border-accent-warning/40 bg-accent-warning/10 p-3">
+          <AlertTriangle className="w-4 h-4 text-accent-warning mt-0.5 shrink-0" />
+          <p className="text-xs text-accent-warning dark:text-accent-warning break-words">
             <span className="font-semibold">Storage warning:</span> with permanent retention the audit log is
             never pruned and can grow very large over time
             {data?.dbActive ? ` (currently ${data.entries.toLocaleString()} entries, ~${formatBytes(data.approxBytes)})` : ""}.

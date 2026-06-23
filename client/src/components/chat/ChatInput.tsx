@@ -358,12 +358,12 @@ export function ChatInput({
             <button
               key={c.cmd}
               className={cn(
-                "w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-accent/40 transition-colors",
-                i === slashIdx && "bg-accent/50"
+                "w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-primary/40 transition-colors",
+                i === slashIdx && "bg-primary/50"
               )}
               onMouseDown={e => { e.preventDefault(); execCommand(c.cmd); }}
             >
-              <span className="font-mono font-semibold text-accent w-20 flex-shrink-0">{c.label}</span>
+              <span className="font-mono font-semibold text-primary w-20 flex-shrink-0">{c.label}</span>
               <span className="text-muted-foreground">{c.description}</span>
             </button>
           ))}
@@ -380,8 +380,8 @@ export function ChatInput({
             <button
               key={file.id}
               className={cn(
-                "w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-accent/40 transition-colors",
-                i === mentionIdx && "bg-accent/50"
+                "w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-primary/40 transition-colors",
+                i === mentionIdx && "bg-primary/50"
               )}
               onMouseDown={e => { e.preventDefault(); insertMention(file); }}
             >
@@ -401,7 +401,7 @@ export function ChatInput({
           {attachments.map((att, i) => (
             <div
               key={i}
-              className="flex items-center gap-1 px-2 py-0.5 bg-accent/20 rounded-full text-xs border border-border"
+              className="flex items-center gap-1 px-2 py-0.5 bg-primary/20 rounded-full text-xs border border-border"
             >
               {att.kind === "image" ? (
                 <Image className="w-3 h-3 flex-shrink-0" />

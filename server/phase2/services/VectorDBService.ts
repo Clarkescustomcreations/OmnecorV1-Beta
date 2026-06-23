@@ -23,6 +23,31 @@ import { createLogger } from "../../_core/logger.js";
 const log = createLogger("VectorDB");
 
 // ---------------------------------------------------------------------------
+// Collection naming — the single source of truth shared by every writer AND
+// reader of the vector store. ChromaDB collection names must be 3-63 chars,
+// start/end alphanumeric, and contain only [a-zA-Z0-9._-]. Historically the
+// local file watcher wrote a RAW `omnecor_{projectId}` name while the reader
+// (MemoryArchitectService) queried a SANITIZED one — so a map keyed by a
+// hyphenated UUID was written to one collection and read from another, leaving
+// RAG silently empty. Everyone now derives the name here so writes and reads
+// always land in the same place.
+// ---------------------------------------------------------------------------
+
+/**
+ * Deterministic ChromaDB collection name for a logical project / map id.
+ * Lower-cases, replaces every non-alphanumeric run with a single underscore,
+ * and caps length so the `omnecor_` prefix keeps the total ≤ 63 chars.
+ */
+export function sanitizeCollectionName(projectId: string): string {
+  const sanitized = projectId
+    .toLowerCase()
+    .replace(/[^a-z0-9]/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 50);
+  return `omnecor_${sanitized}`;
+}
+
+// ---------------------------------------------------------------------------
 // Types (ChromaDB client types — defined here to avoid hard dependency at import)
 // ---------------------------------------------------------------------------
 
@@ -301,6 +326,34 @@ export class VectorDBService {
     } catch (error) {
       console.warn(
         `[Omnecor VectorDB] Failed to remove doc '${documentId}' from '${collectionName}': ${(error as Error).message}`
+      );
+    }
+  }
+
+  /**
+   * Remove every document in a collection matching a metadata filter.
+   * Used to reconcile a single remote source on re-index (delete the source's
+   * stale chunks, then re-add) so deletions and renames propagate instead of
+   * accumulating orphaned vectors.
+   *
+   * @param collectionName - Target collection name
+   * @param where          - ChromaDB metadata equality filter, e.g. { sourceUri }
+   */
+  public async removeDocumentsWhere(
+    collectionName: string,
+    where: Record<string, string | number | boolean>
+  ): Promise<void> {
+    if (!this.isInitialized) return;
+    if (Object.keys(where).length === 0) return;
+
+    const collection = await this.getOrCreateCollection(collectionName);
+
+    try {
+      await collection.delete({ where });
+    } catch (error) {
+      console.warn(
+        `[Omnecor VectorDB] Failed to remove documents from '${collectionName}' ` +
+          `where ${JSON.stringify(where)}: ${(error as Error).message}`
       );
     }
   }

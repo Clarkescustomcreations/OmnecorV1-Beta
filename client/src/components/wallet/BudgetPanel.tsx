@@ -39,7 +39,7 @@ export function BudgetPanel({ projectId, className }: BudgetPanelProps) {
         </CardTitle>
         <div className="flex items-center gap-2">
           {isWarning && !isExhausted && (
-            <Badge variant="outline" className="text-amber-500 border-amber-500 text-xs">
+            <Badge variant="outline" className="text-accent-warning border-accent-warning text-xs">
               <AlertTriangle className="h-3 w-3 mr-1" /> {Math.round(percentUsed)}%
             </Badge>
           )}
@@ -72,7 +72,7 @@ export function BudgetPanel({ projectId, className }: BudgetPanelProps) {
                 </RadialBarChart>
               </ResponsiveContainer>
             </div>
-            <p className="text-xs font-bold font-mono text-accent tracking-tighter">
+            <p className="text-xs font-bold font-mono text-primary tracking-tighter">
               %{percentUsed.toFixed(1)}
             </p>
           </div>

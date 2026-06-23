@@ -192,14 +192,14 @@ function ActiveSessionsPanel() {
       {sessions.map(s => (
         <div key={s.id} className="flex items-center justify-between rounded-lg border px-4 py-3 gap-4">
           <div className="flex items-center gap-3">
-            <CircleDot className="w-4 h-4 text-green-500 animate-pulse" />
+            <CircleDot className="w-4 h-4 text-accent-success animate-pulse" />
             <div>
               <p className="text-sm font-medium">{s.instanceLabel}</p>
               <p className="text-xs text-muted-foreground capitalize">{s.provider} · {s.projectId} · {s.elapsedMinutes} min</p>
             </div>
           </div>
           <div className="flex items-center gap-3">
-            <span className="text-sm font-mono text-amber-500">${s.currentCostDollars.toFixed(4)}</span>
+            <span className="text-sm font-mono text-accent-warning">${s.currentCostDollars.toFixed(4)}</span>
             <Button
               size="sm"
               variant="destructive"
@@ -379,7 +379,7 @@ export const CloudComputePanel: React.FC = () => {
       </div>
 
       <div className="rounded-md bg-muted/40 border px-4 py-3 text-sm flex items-start gap-2">
-        <AlertCircle className="w-4 h-4 text-amber-500 mt-0.5 shrink-0" />
+        <AlertCircle className="w-4 h-4 text-accent-warning mt-0.5 shrink-0" />
         <div>
           <p className="font-medium">API Keys Required for Live Provisioning</p>
           <p className="text-muted-foreground text-xs mt-0.5">

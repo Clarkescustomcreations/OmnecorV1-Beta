@@ -1,5 +1,14 @@
 # CLAUDE.md
 
+> ## ⛔ Build Complete, Fix Now — standing directive (2026-06-22)
+> **No half-built features. No deferred scope.** Build every feature to be the best it
+> can be, end-to-end, the first time. If while working you find a problem or security
+> risk — however small — **fix it now**; do not save it for a "later pass." Deferring
+> scope grows a never-ending TODO list and forces rediscovery of known gaps during slow
+> (~40-min) package builds and testing — a waste of time. "Out of scope / follow-on /
+> later" is **not** an acceptable resolution for anything the feature genuinely needs,
+> nor for any defect you have already found. Surface trade-offs, then build it fully.
+
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
 ## Commands

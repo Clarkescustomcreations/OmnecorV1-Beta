@@ -160,13 +160,13 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
         initialPosition={{ x: 260, y: 120 }}
         initialSize={{ width: 700, height: 460 }}
       >
-        <div className="flex flex-col h-full bg-slate-950">
+        <div className="flex flex-col h-full bg-background">
           {/* Status bar */}
-          <div className="flex items-center gap-3 px-3 py-1.5 border-b border-slate-800 bg-slate-900/60 flex-shrink-0">
-            <Terminal className="w-3.5 h-3.5 text-emerald-500 flex-shrink-0" />
+          <div className="flex items-center gap-3 px-3 py-1.5 border-b border-border bg-card/60 flex-shrink-0">
+            <Terminal className="w-3.5 h-3.5 text-accent-success flex-shrink-0" />
             <div className="flex items-center gap-1.5">
-              <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
-              <span className="text-[9px] text-emerald-500/70 font-mono uppercase tracking-widest">
+              <div className="w-1.5 h-1.5 rounded-full bg-accent-success animate-pulse" />
+              <span className="text-[9px] text-accent-success/70 font-mono uppercase tracking-widest">
                 SANDBOX READY
               </span>
             </div>
@@ -178,8 +178,8 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
                 className={cn(
                   "flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border transition-colors font-mono font-bold",
                   secretMode
-                    ? "border-amber-500/50 text-amber-400 bg-amber-500/10"
-                    : "border-slate-700 text-slate-500 hover:text-slate-300"
+                    ? "border-accent-warning/50 text-accent-warning bg-accent-warning/10"
+                    : "border-border text-muted-foreground hover:text-foreground"
                 )}
               >
                 {secretMode ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
@@ -188,14 +188,14 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
               <button
                 onClick={handleCopyLogs}
                 title="Copy logs to clipboard"
-                className="p-1 rounded text-slate-500 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
               >
                 <Copy className="w-3.5 h-3.5" />
               </button>
               <button
                 onClick={handleClearLogs}
                 title="Clear logs"
-                className="p-1 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-card transition-colors"
               >
                 <Trash2 className="w-3.5 h-3.5" />
               </button>
@@ -210,12 +210,12 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
                   key={log.id}
                   className={cn(
                     "break-words leading-5 whitespace-pre-wrap",
-                    log.kind === "user"    && "text-slate-100",
-                    log.kind === "output"  && "text-emerald-400",
-                    log.kind === "error"   && "text-rose-500",
-                    log.kind === "system"  && "text-sky-400/80",
-                    log.kind === "ai"      && "text-purple-400",
-                    log.kind === "redacted" && "text-amber-500/60 italic select-none",
+                    log.kind === "user"    && "text-foreground",
+                    log.kind === "output"  && "text-accent-success",
+                    log.kind === "error"   && "text-destructive",
+                    log.kind === "system"  && "text-accent-cyan/80",
+                    log.kind === "ai"      && "text-accent-purple",
+                    log.kind === "redacted" && "text-accent-warning/60 italic select-none",
                   )}
                 >
                   {log.text}
@@ -228,16 +228,16 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
           {/* HITL badge + input */}
           <form
             onSubmit={handleRun}
-            className="p-2 bg-slate-900 border-t border-slate-800 flex items-center gap-2 flex-shrink-0"
+            className="p-2 bg-card border-t border-border flex items-center gap-2 flex-shrink-0"
           >
-            <Shield className="w-3.5 h-3.5 text-amber-500 flex-shrink-0 ml-1" />
+            <Shield className="w-3.5 h-3.5 text-accent-warning flex-shrink-0 ml-1" />
             <input
               ref={inputRef}
               value={command}
               onChange={e => setCommand(e.target.value)}
               placeholder={secretMode ? "Secret input (hidden from logs)…" : "Type sandbox command — HITL gated"}
               type={secretMode ? "password" : "text"}
-              className="flex-1 bg-transparent border-none outline-none text-xs font-mono text-slate-200 placeholder:text-slate-600"
+              className="flex-1 bg-transparent border-none outline-none text-xs font-mono text-foreground placeholder:text-muted-foreground"
               autoComplete="off"
               spellCheck={false}
             />
@@ -245,7 +245,7 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
               size="sm"
               type="submit"
               variant="ghost"
-              className="h-7 gap-1 text-[10px] text-slate-400 hover:text-white flex-shrink-0"
+              className="h-7 gap-1 text-[10px] text-muted-foreground hover:text-white flex-shrink-0"
               disabled={isRunning || !command.trim()}
             >
               {isRunning
@@ -256,8 +256,8 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
           </form>
 
           {/* HITL legend */}
-          <div className="px-3 pb-2 flex items-center gap-2 text-[9px] text-slate-600 font-mono">
-            <ShieldAlert className="w-3 h-3 text-amber-600/50" />
+          <div className="px-3 pb-2 flex items-center gap-2 text-[9px] text-muted-foreground font-mono">
+            <ShieldAlert className="w-3 h-3 text-accent-warning/50" />
             Every command requires HITL approval · AI-initiated commands appear in purple
           </div>
         </div>

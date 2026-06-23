@@ -26,6 +26,7 @@
 
 import {
   VectorDBService,
+  sanitizeCollectionName,
   type VectorDocument,
   type SearchResult,
 } from "./VectorDBService.js";
@@ -190,17 +191,13 @@ export class MemoryArchitectService {
   // ─────────────────────────────────────────────────────────────────────────
 
   /**
-   * Generate a deterministic collection name from a project ID.
-   * ChromaDB collection names must be 3-63 chars, alphanumeric + underscores.
+   * Generate a deterministic collection name from a project / map id.
+   * Delegates to the shared {@link sanitizeCollectionName} so every writer
+   * (local file watcher, remote-source indexer) and this reader agree on the
+   * exact collection name. See VectorDBService for the seam this closes.
    */
   private collectionName(projectId: string): string {
-    // Sanitize: replace non-alphanumeric with underscore, truncate
-    const sanitized = projectId
-      .toLowerCase()
-      .replace(/[^a-z0-9]/g, "_")
-      .replace(/_+/g, "_")
-      .slice(0, 50);
-    return `omnecor_${sanitized}`;
+    return sanitizeCollectionName(projectId);
   }
 
   /**
@@ -364,6 +361,97 @@ export class MemoryArchitectService {
     }));
 
     await this.vectorDB.addDocuments(collectionName, documents);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────────
+  // Remote-Source Ingestion (Neural-Map RAG over github:// / integration://)
+  //
+  // A neural map IS the "project" here — its id keys the same collection the
+  // local file watcher writes to and that retrieveContext() reads, so remote
+  // content becomes searchable alongside local files in one map "brain".
+  // ─────────────────────────────────────────────────────────────────────────
+
+  /**
+   * Re-index a single remote source into a map's collection. Reconciles first:
+   * every prior chunk tagged with this `sourceUri` is dropped, then the freshly
+   * fetched documents are chunked, sanitized, redacted, and stored. Stable ids
+   * (hash of map+uri+path) keep re-indexing idempotent; the reconcile makes
+   * deletions and renames within the source propagate instead of accumulating.
+   *
+   * @returns counts of source items and total chunks stored.
+   */
+  async reindexRemoteSource(
+    mapId: string,
+    sourceUri: string,
+    sourceType: string,
+    documents: Array<{ path: string; text: string; type?: string }>
+  ): Promise<{ items: number; chunks: number }> {
+    if (!this.initialized) return { items: 0, chunks: 0 };
+
+    const collectionName = this.collectionName(mapId);
+    await this.vectorDB.getOrCreateCollection(collectionName);
+    // Reconcile: drop this source's prior chunks before re-adding.
+    await this.vectorDB.removeDocumentsWhere(collectionName, { sourceUri });
+
+    const sanitizer = PromptSanitizer.getInstance();
+    const vectorDocs: VectorDocument[] = [];
+    let items = 0;
+
+    for (const doc of documents) {
+      if (!doc.text || !doc.text.trim()) continue;
+      const sanitized = sanitizer.sanitize(doc.text);
+      if (sanitized.flagged) {
+        log.warn("Injection attempt detected in remote source", {
+          sourceUri,
+          path: doc.path,
+          violations: sanitized.violations,
+        });
+      }
+      const safeText = this.redactSensitiveData(sanitized.clean);
+      const chunks = this.chunkText(safeText);
+      if (chunks.length === 0) continue;
+
+      const baseId = crypto
+        .createHash("sha256")
+        .update(`${mapId}:${sourceUri}:${doc.path}`)
+        .digest("hex")
+        .slice(0, 16);
+
+      chunks.forEach((chunk, idx) => {
+        vectorDocs.push({
+          id: `remote_${baseId}_${idx}`,
+          text: chunk,
+          metadata: {
+            mapId,
+            sourceUri,
+            sourceType,
+            sourcePath: doc.path,
+            nodeType: doc.type ?? "file",
+            chunkIndex: idx,
+            totalChunks: chunks.length,
+            ingestedAt: new Date().toISOString(),
+          },
+        });
+      });
+      items++;
+    }
+
+    if (vectorDocs.length > 0) {
+      await this.vectorDB.addDocuments(collectionName, vectorDocs);
+    }
+    return { items, chunks: vectorDocs.length };
+  }
+
+  /**
+   * Drop every chunk for a remote source from a map's collection — used when a
+   * source is removed from the map so its vectors don't linger. Local-file
+   * documents in the same collection are untagged with `sourceUri` and so are
+   * left untouched.
+   */
+  async deleteRemoteSource(mapId: string, sourceUri: string): Promise<void> {
+    if (!this.initialized) return;
+    const collectionName = this.collectionName(mapId);
+    await this.vectorDB.removeDocumentsWhere(collectionName, { sourceUri });
   }
 
   // ─────────────────────────────────────────────────────────────────────────

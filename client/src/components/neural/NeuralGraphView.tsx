@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useMemo, useEffect, useCallback, useRef, useState } from "react";
-import { GripVertical, FolderOpen, FolderClosed, ExternalLink, Link2, FileCode, RotateCw } from "lucide-react";
+import { GripVertical, FolderOpen, FolderClosed, FolderPlus, ExternalLink, Link2, FileCode, RotateCw } from "lucide-react";
 import { useNeuralContextStore, makeEntry, NEURAL_DRAG_KEY, type NeuralContextEntry } from "@/lib/neuralContextStore";
 import ReactFlow, {
   Node,
@@ -20,7 +20,9 @@ import "reactflow/dist/style.css";
 import { NeuralNetwork } from "@/lib/neuralNodeTree";
 import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
 import { useBrainMapStore } from "@/lib/stores/brainMapStore";
-import { useVisualControlStore, type LayoutEngine } from "@/lib/stores/visualControlStore";
+import { useVisualControlStore } from "@/lib/stores/visualControlStore";
+import { runLayout } from "@/lib/neuralLayoutClient";
+import type { LayoutNode as EngineNode, LayoutEdge as EngineEdge, LayoutPosition } from "@/lib/neuralLayout";
 import {
   Tooltip,
   TooltipContent,
@@ -32,388 +34,57 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 
 // ---------------------------------------------------------------------------
-// Layout algorithm helpers
+// Layout engine glue
+//
+// The heavy layout math now runs off the render thread in a Web Worker (see
+// neuralLayout.ts / neuralLayout.worker.ts). These helpers convert reactflow
+// nodes/edges to the worker's slim shape and apply the computed positions back.
 // ---------------------------------------------------------------------------
 
-const NODE_W = 180;
-const NODE_H = 60;
+// Above this visible-node count React Flow virtualization is forced on (renders
+// only on-screen nodes) regardless of the GPU toggle, so large maps don't mount
+// thousands of DOM subtrees at once.
+const VIRTUALIZE_THRESHOLD = 300;
 
-function applyHierarchicalLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
-  if (!nodes.length) return nodes;
-
-  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
-  const scale = nodeSize / 10;
-  const scaledW = NODE_W * scale;
-  const scaledH = NODE_H * scale;
-
-  const H_GAP = autoClustering ? 120 * scale : 800;
-  const V_GAP = autoClustering ? 180 * scale : 1200;
-
-  const children = new Map<string, string[]>();
-  const inDegree = new Map<string, number>();
-  nodes.forEach(n => { children.set(n.id, []); inDegree.set(n.id, 0); });
-  edges.forEach(e => {
-    children.get(e.source)?.push(e.target);
-    inDegree.set(e.target, (inDegree.get(e.target) ?? 0) + 1);
-  });
-
-  const roots = nodes.filter(n => (inDegree.get(n.id) ?? 0) === 0).map(n => n.id);
-  if (!roots.length) roots.push(nodes[0].id);
-
-  const depthMap = new Map<string, number>();
-  const queue = [...roots];
-  roots.forEach(r => depthMap.set(r, 0));
-  while (queue.length) {
-    const id = queue.shift()!;
-    const d = depthMap.get(id)!;
-    for (const c of children.get(id) ?? []) {
-      if (!depthMap.has(c)) { depthMap.set(c, d + 1); queue.push(c); }
-    }
-  }
-  nodes.forEach(n => { if (!depthMap.has(n.id)) depthMap.set(n.id, 0); });
-
-  const byDepth = new Map<number, string[]>();
-  depthMap.forEach((d, id) => {
-    if (!byDepth.has(d)) byDepth.set(d, []);
-    byDepth.get(d)!.push(id);
-  });
-
-  const posMap = new Map<string, { x: number; y: number }>();
-  byDepth.forEach((ids, depth) => {
-    const totalW = ids.length * (scaledW + H_GAP) - H_GAP;
-    ids.forEach((id, i) => {
-      posMap.set(id, { x: i * (scaledW + H_GAP) - totalW / 2, y: depth * (scaledH + V_GAP) });
-    });
-  });
-
-  return nodes.map(n => ({ ...n, position: posMap.get(n.id) ?? n.position }));
-}
-
-function applyCircularLayout(nodes: Node[], autoClustering: boolean): Node[] {
-  if (!nodes.length) return nodes;
-  
-  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
-  const scale = nodeSize / 10;
-  const S_x = autoClustering ? (NODE_W * scale + 24 * scale) : (NODE_W * scale * 2.8);
-  
-  const minR = (nodes.length * S_x) / (2 * Math.PI);
-  const factor = autoClustering ? 80 : 350;
-  const baseR = Math.max(autoClustering ? 300 : 800, nodes.length * factor);
-  const R = Math.max(baseR, minR);
-
-  return nodes.map((n, i) => ({
-    ...n,
-    position: {
-      x: R * Math.cos((i * 2 * Math.PI) / nodes.length),
-      y: R * Math.sin((i * 2 * Math.PI) / nodes.length),
-    },
-  }));
-}
-
-function applyMindMapLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
-  if (!nodes.length) return nodes;
-  const STEP = autoClustering ? 380 : 1200;
-
-  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
-  const scale = nodeSize / 10;
-  const S_y = autoClustering ? (NODE_H * scale + 36 * scale) : (NODE_H * scale * 3.5);
-
-  const degree = new Map<string, number>();
-  nodes.forEach(n => degree.set(n.id, 0));
-  edges.forEach(e => {
-    degree.set(e.source, (degree.get(e.source) ?? 0) + 1);
-    degree.set(e.target, (degree.get(e.target) ?? 0) + 1);
-  });
-  const center = nodes.reduce((best, n) => {
-    if (n.data?.type === "project") return n;
-    return (degree.get(n.id) ?? 0) > (degree.get(best.id) ?? 0) ? n : best;
-  }, nodes[0]);
-
-  const adj = new Map<string, string[]>();
-  nodes.forEach(n => adj.set(n.id, []));
-  edges.forEach(e => {
-    adj.get(e.source)?.push(e.target);
-    adj.get(e.target)?.push(e.source);
-  });
-
-  const posMap = new Map<string, { x: number; y: number }>();
-  posMap.set(center.id, { x: 0, y: 0 });
-  const visited = new Set<string>([center.id]);
-
-  type BfsItem = { id: string; depth: number; aStart: number; aEnd: number };
-  const bfsQ: BfsItem[] = [{ id: center.id, depth: 0, aStart: 0, aEnd: 2 * Math.PI }];
-
-  while (bfsQ.length) {
-    const { id, depth, aStart, aEnd } = bfsQ.shift()!;
-    const unvisited = (adj.get(id) ?? []).filter(c => !visited.has(c));
-    if (!unvisited.length) continue;
-
-    const minR = (unvisited.length * S_y) / (aEnd - aStart);
-    const r = Math.max((depth + 1) * STEP, minR);
-
-    const aStep = (aEnd - aStart) / unvisited.length;
-    unvisited.forEach((cid, i) => {
-      visited.add(cid);
-      const angle = aStart + (i + 0.5) * aStep;
-      posMap.set(cid, { x: r * Math.cos(angle), y: r * Math.sin(angle) });
-      bfsQ.push({ id: cid, depth: depth + 1, aStart: aStart + i * aStep, aEnd: aStart + (i + 1) * aStep });
-    });
-  }
-
-  const orphans = nodes.filter(n => !posMap.has(n.id));
-  const R2 = (Math.max(...Array.from(posMap.values()).map(p => Math.hypot(p.x, p.y)), 0) || STEP) + STEP;
-  
-  const minOrphanR = (orphans.length * S_y) / (2 * Math.PI);
-  const finalR2 = Math.max(R2, minOrphanR);
-
-  orphans.forEach((n, i) => {
-    posMap.set(n.id, {
-      x: finalR2 * Math.cos((i * 2 * Math.PI) / Math.max(orphans.length, 1)),
-      y: finalR2 * Math.sin((i * 2 * Math.PI) / Math.max(orphans.length, 1)),
-    });
-  });
-
-  return nodes.map(n => ({ ...n, position: posMap.get(n.id) ?? n.position }));
-}
-
-function applyForceLayout(nodes: Node[], edges: Edge[], autoClustering: boolean): Node[] {
-  if (!nodes.length) return nodes;
-
-  const layoutNodes = nodes.map(n => ({
-    id: n.id,
-    x: typeof n.position.x === "number" ? n.position.x : (Math.random() * 100 - 50),
-    y: typeof n.position.y === "number" ? n.position.y : (Math.random() * 100 - 50),
-    type: n.data?.type || "file",
-  }));
-
-  const nodeMap = new Map(layoutNodes.map(n => [n.id, n]));
-
-  const idealLength = autoClustering ? 220 : 700;
-  const repelForce = autoClustering ? 350000 : 2500000;
-  const springCoeff = 0.04;
-  const gravity = 0.05;
-  const iterations = 80;
-
-  // Read sizes for collision resolution within simulation
-  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
-  const scale = nodeSize / 10;
-  const nodeWidth = NODE_W * scale;
-  const nodeHeight = NODE_H * scale;
-  const S_x = autoClustering ? (nodeWidth + 24 * scale) : (nodeWidth * 2.8);
-  const S_y = autoClustering ? (nodeHeight + 36 * scale) : (nodeHeight * 3.5);
-
-  for (let iter = 0; iter < iterations; iter++) {
-    const fx = new Map<string, number>();
-    const fy = new Map<string, number>();
-    layoutNodes.forEach(n => { fx.set(n.id, 0); fy.set(n.id, 0); });
-
-    for (let i = 0; i < layoutNodes.length; i++) {
-      const n1 = layoutNodes[i];
-      for (let j = i + 1; j < layoutNodes.length; j++) {
-        const n2 = layoutNodes[j];
-        let dx = n1.x - n2.x;
-        let dy = n1.y - n2.y;
-        if (dx === 0 && dy === 0) { dx = Math.random() * 2 - 1; dy = Math.random() * 2 - 1; }
-        const distSq = dx * dx + dy * dy;
-        const dist = Math.sqrt(distSq);
-        const force = repelForce / (distSq + 100);
-        
-        const fx1 = fx.get(n1.id)! + (dx / (dist + 0.1)) * force;
-        const fy1 = fy.get(n1.id)! + (dy / (dist + 0.1)) * force;
-        const fx2 = fx.get(n2.id)! - (dx / (dist + 0.1)) * force;
-        const fy2 = fy.get(n2.id)! - (dy / (dist + 0.1)) * force;
-
-        fx.set(n1.id, fx1);
-        fy.set(n1.id, fy1);
-        fx.set(n2.id, fx2);
-        fy.set(n2.id, fy2);
-      }
-    }
-
-    edges.forEach(e => {
-      const n1 = nodeMap.get(e.source);
-      const n2 = nodeMap.get(e.target);
-      if (!n1 || !n2) return;
-
-      const dx = n1.x - n2.x;
-      const dy = n1.y - n2.y;
-      const dist = Math.sqrt(dx * dx + dy * dy) || 0.1;
-      const force = springCoeff * (dist - idealLength);
-
-      const fx1 = fx.get(n1.id)! - (dx / dist) * force;
-      const fy1 = fy.get(n1.id)! - (dy / dist) * force;
-      const fx2 = fx.get(n2.id)! + (dx / dist) * force;
-      const fy2 = fy.get(n2.id)! + (dy / dist) * force;
-
-      fx.set(n1.id, fx1);
-      fy.set(n1.id, fy1);
-      fx.set(n2.id, fx2);
-      fy.set(n2.id, fy2);
-    });
-
-    layoutNodes.forEach(n => {
-      let targetX = 0;
-      let targetY = 0;
-
-      if (autoClustering) {
-        if (n.type === "project") { targetX = -300; targetY = -300; }
-        else if (n.type === "folder") { targetX = 300; targetY = -300; }
-        else if (n.type === "file") { targetX = -300; targetY = 300; }
-        else { targetX = 300; targetY = 300; }
-      }
-
-      const dx = n.x - targetX;
-      const dy = n.y - targetY;
-      
-      const fxVal = fx.get(n.id)! - dx * gravity;
-      const fyVal = fy.get(n.id)! - dy * gravity;
-      
-      fx.set(n.id, fxVal);
-      fy.set(n.id, fyVal);
-    });
-
-    const temp = Math.max(1, 20 * (1 - iter / iterations));
-    layoutNodes.forEach(n => {
-      let dx = fx.get(n.id)!;
-      let dy = fy.get(n.id)!;
-      const forceDist = Math.sqrt(dx * dx + dy * dy);
-      if (forceDist > temp) {
-        dx = (dx / forceDist) * temp;
-        dy = (dy / forceDist) * temp;
-      }
-      n.x += dx;
-      n.y += dy;
-    });
-
-    // Enforce node separation pass during simulation iterations to guide convergence
-    for (let cIter = 0; cIter < 3; cIter++) {
-      for (let i = 0; i < layoutNodes.length; i++) {
-        const n1 = layoutNodes[i];
-        for (let j = i + 1; j < layoutNodes.length; j++) {
-          const n2 = layoutNodes[j];
-          let dx = n2.x - n1.x;
-          let dy = n2.y - n1.y;
-          if (dx === 0 && dy === 0) {
-            dx = Math.random() * 2 - 1;
-            dy = Math.random() * 2 - 1;
-          }
-          const absDx = Math.abs(dx);
-          const absDy = Math.abs(dy);
-          if (absDx < S_x && absDy < S_y) {
-            const overlapX = S_x - absDx;
-            const overlapY = S_y - absDy;
-            if (overlapX < overlapY) {
-              const pushX = (overlapX / 2) * 1.02;
-              const sign = dx >= 0 ? 1 : -1;
-              n1.x -= sign * pushX;
-              n2.x += sign * pushX;
-            } else {
-              const pushY = (overlapY / 2) * 1.02;
-              const sign = dy >= 0 ? 1 : -1;
-              n1.y -= sign * pushY;
-              n2.y += sign * pushY;
-            }
-          }
-        }
-      }
-    }
-  }
-
-  return nodes.map(n => {
-    const layoutNode = nodeMap.get(n.id);
-    return {
-      ...n,
-      position: layoutNode ? { x: Math.round(layoutNode.x), y: Math.round(layoutNode.y) } : n.position,
-    };
-  });
-}
-
-function resolveOverlaps(nodes: Node[], autoClustering: boolean): Node[] {
-  if (!nodes.length) return nodes;
-
-  const nodeSize = useVisualControlStore.getState().nodeSize ?? 40;
-  const scale = nodeSize / 10;
-
-  const nodeWidth = NODE_W * scale;
-  const nodeHeight = NODE_H * scale;
-
-  // When autoClustering is ON, keep them compact but never overlap.
-  // When autoClustering is OFF, spread them widely.
-  const S_x = autoClustering ? (nodeWidth + 24 * scale) : (nodeWidth * 2.8);
-  const S_y = autoClustering ? (nodeHeight + 36 * scale) : (nodeHeight * 3.5);
-
-  const layoutNodes = nodes.map(n => ({
+function toEngineNodes(nodes: Node[]): EngineNode[] {
+  return nodes.map(n => ({
     id: n.id,
     x: n.position.x,
     y: n.position.y,
-  }));
-
-  const iterations = 80;
-  for (let iter = 0; iter < iterations; iter++) {
-    let hasOverlap = false;
-
-    for (let i = 0; i < layoutNodes.length; i++) {
-      const n1 = layoutNodes[i];
-      for (let j = i + 1; j < layoutNodes.length; j++) {
-        const n2 = layoutNodes[j];
-        
-        let dx = n2.x - n1.x;
-        let dy = n2.y - n1.y;
-
-        if (dx === 0 && dy === 0) {
-          dx = Math.random() * 2 - 1;
-          dy = Math.random() * 2 - 1;
-        }
-
-        const absDx = Math.abs(dx);
-        const absDy = Math.abs(dy);
-
-        if (absDx < S_x && absDy < S_y) {
-          hasOverlap = true;
-
-          const overlapX = S_x - absDx;
-          const overlapY = S_y - absDy;
-
-          if (overlapX < overlapY) {
-            const pushX = (overlapX / 2) * 1.05;
-            const sign = dx >= 0 ? 1 : -1;
-            n1.x -= sign * pushX;
-            n2.x += sign * pushX;
-          } else {
-            const pushY = (overlapY / 2) * 1.05;
-            const sign = dy >= 0 ? 1 : -1;
-            n1.y -= sign * pushY;
-            n2.y += sign * pushY;
-          }
-        }
-      }
-    }
-
-    if (!hasOverlap) {
-      break;
-    }
-  }
-
-  const posMap = new Map(layoutNodes.map(n => [n.id, { x: Math.round(n.x), y: Math.round(n.y) }]));
-  return nodes.map(n => ({
-    ...n,
-    position: posMap.get(n.id) ?? n.position,
+    type: (n.data?.type as string) ?? "file",
   }));
 }
 
-function computeLayout(layout: LayoutEngine, autoClustering: boolean, nodes: Node[], edges: Edge[]): Node[] {
-  let laidNodes: Node[];
-  if (layout === "hierarchical") {
-    laidNodes = applyHierarchicalLayout(nodes, edges, autoClustering);
-  } else if (layout === "circular") {
-    laidNodes = applyCircularLayout(nodes, autoClustering);
-  } else if (layout === "mindmap") {
-    laidNodes = applyMindMapLayout(nodes, edges, autoClustering);
-  } else {
-    laidNodes = applyForceLayout(nodes, edges, autoClustering);
-    laidNodes = resolveOverlaps(laidNodes, autoClustering);
-  }
-  return laidNodes;
+function toEngineEdges(edges: Edge[]): EngineEdge[] {
+  return edges.map(e => ({ source: e.source, target: e.target }));
+}
+
+/** Apply computed positions back onto reactflow nodes, matched by id. Nodes with
+ *  no computed position (added after the request was sent) keep their position. */
+function applyPositions(nodes: Node[], positions: LayoutPosition[]): Node[] {
+  const posMap = new Map(positions.map(p => [p.id, p]));
+  return nodes.map(n => {
+    const p = posMap.get(n.id);
+    return p ? { ...n, position: { x: p.x, y: p.y } } : n;
+  });
+}
+
+/**
+ * Resolve a CSS color expression (e.g. `var(--color-primary)`) to a concrete
+ * computed color string. React Flow's MiniMap and Background paint via SVG
+ * presentation attributes, which do NOT resolve `var()` — so they need resolved
+ * values. Doing it this way keeps the colors driven by design tokens (still
+ * theme-following) instead of hardcoded hex.
+ */
+function resolveCssColor(expr: string, fallback: string): string {
+  if (typeof document === "undefined" || !document.body) return fallback;
+  const probe = document.createElement("span");
+  probe.style.color = expr;
+  probe.style.display = "none";
+  document.body.appendChild(probe);
+  const resolved = getComputedStyle(probe).color;
+  document.body.removeChild(probe);
+  return resolved || fallback;
 }
 
 // ---------------------------------------------------------------------------
@@ -450,6 +121,8 @@ const CustomNeuralNode = ({ data, selected }: NodeProps) => {
   const label = (data.label as string) ?? "";
   const isFolder = data.type === "folder" || data.type === "project";
   const isCollapsed = collapsedFolderIds.includes(data.id as string);
+  const isTruncated = !!data.truncated;
+  const childCount = data.fileCount as number | undefined;
 
   const inContext = has(`nctx_${Math.abs(
     Array.from(path).reduce((h, c) => (Math.imul(31, h) + c.charCodeAt(0)) | 0, 0)
@@ -474,11 +147,11 @@ const CustomNeuralNode = ({ data, selected }: NodeProps) => {
       style={{ paddingLeft: paddingX, paddingRight: paddingX, paddingTop: paddingY, paddingBottom: paddingY }}
       className={cn(
         "rounded-lg border-2 bg-background/95 backdrop-blur-md transition-all duration-300",
-        selected ? "border-accent shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)] scale-105" : "border-border shadow-md",
-        data.type === "project" && "border-accent bg-accent/5",
-        inContext && "border-emerald-500/70 bg-emerald-500/5",
+        selected ? "border-primary/30 shadow-[0_0_15px_rgba(var(--accent-rgb),0.3)] scale-105" : "border-border shadow-md",
+        data.type === "project" && "border-primary/30 bg-primary/5",
+        inContext && "border-accent-success/70 bg-accent-success/5",
         dragging && "opacity-60",
-        "hover:border-accent group/node"
+        "hover:border-primary/30 group/node"
       )}
     >
       <Handle type="target" position={Position.Top} className="opacity-0" />
@@ -490,7 +163,7 @@ const CustomNeuralNode = ({ data, selected }: NodeProps) => {
           onDragEnd={handleDragEnd}
           onMouseDown={(e) => e.stopPropagation()}
           className={cn(
-            "cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-accent/70 transition-colors flex-shrink-0",
+            "cursor-grab active:cursor-grabbing text-muted-foreground/30 hover:text-primary/70 transition-colors flex-shrink-0",
             "opacity-0 group-hover/node:opacity-100"
           )}
           title="Drag to add to context"
@@ -502,21 +175,31 @@ const CustomNeuralNode = ({ data, selected }: NodeProps) => {
           <div className="flex items-center gap-1.5">
             <div className={cn(
               "rounded-full flex-shrink-0",
-              data.type === "folder" ? "bg-blue-500" : "bg-green-500",
-              data.type === "project" && "bg-purple-500",
-              inContext && "bg-emerald-400",
+              data.type === "folder" ? "bg-primary" : "bg-accent-success",
+              data.type === "project" && "bg-accent-purple",
+              inContext && "bg-accent-success",
               "group-hover/node:animate-pulse"
             )} style={{ width: Math.max(4, Math.round(6 * scale)), height: Math.max(4, Math.round(6 * scale)) }} />
             <span className="font-bold font-mono tracking-tight whitespace-nowrap" style={{ fontSize }}>
               {label}
             </span>
-            {isFolder && (
+            {isFolder && !isTruncated && (
               <span style={{ fontSize: Math.max(8, fontSize - 3) }} className="text-muted-foreground flex-shrink-0 opacity-60">
                 {isCollapsed ? <FolderClosed style={{ width: fontSize - 3, height: fontSize - 3 }} /> : <FolderOpen style={{ width: fontSize - 3, height: fontSize - 3 }} />}
               </span>
             )}
+            {isTruncated && (
+              <span
+                className="flex items-center gap-0.5 bg-primary/15 text-primary px-1 rounded leading-none flex-shrink-0"
+                style={{ fontSize: Math.max(8, fontSize - 3), paddingTop: 1, paddingBottom: 1 }}
+                title="Folder not loaded — double-click to expand"
+              >
+                <FolderPlus style={{ width: fontSize - 3, height: fontSize - 3 }} />
+                {childCount !== undefined && childCount > 0 && <span>+{childCount}</span>}
+              </span>
+            )}
             {inContext && (
-              <span style={{ fontSize: Math.max(8, fontSize - 3) }} className="bg-emerald-500/20 text-emerald-400 px-1 rounded leading-none py-0.5 flex-shrink-0">
+              <span style={{ fontSize: Math.max(8, fontSize - 3) }} className="bg-accent-success/20 text-accent-success px-1 rounded leading-none py-0.5 flex-shrink-0">
                 ctx
               </span>
             )}
@@ -537,22 +220,26 @@ const CustomNeuralNode = ({ data, selected }: NodeProps) => {
     <TooltipProvider delayDuration={100}>
       <Tooltip>
         <TooltipTrigger asChild>{nodeContent}</TooltipTrigger>
-        <TooltipContent side="top" className="max-w-[220px] p-3 bg-card/95 border-accent/20 shadow-2xl backdrop-blur-md z-[100]">
+        <TooltipContent side="top" className="max-w-[220px] p-3 bg-card/95 border-primary/20 shadow-2xl backdrop-blur-md z-[100]">
           <div className="space-y-1.5">
             <div className="flex items-center justify-between gap-4 border-b border-border/50 pb-1">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-accent">{data.type}</span>
+              <span className="text-[10px] font-bold uppercase tracking-widest text-primary">{data.type}</span>
               {data.fileCount !== undefined && (
                 <span className="text-[9px] text-muted-foreground">{data.fileCount} items</span>
               )}
             </div>
             <p className="text-xs leading-relaxed text-foreground/90">{description}</p>
-            {isFolder && (
-              <p className="text-[10px] text-blue-400 mt-1">⊞ Double-click to {isCollapsed ? "expand" : "collapse"} children</p>
+            {isTruncated ? (
+              <p className="text-[10px] text-primary mt-1">
+                ⊞ {childCount !== undefined ? `${childCount} items — ` : ""}double-click to load this folder
+              </p>
+            ) : isFolder && (
+              <p className="text-[10px] text-primary mt-1">⊞ Double-click to {isCollapsed ? "expand" : "collapse"} children</p>
             )}
             {!inContext && nodeType !== "project" && !isFolder && (
               <p className="text-[10px] text-muted-foreground mt-1">⋮⋮ Drag the grip to add to context</p>
             )}
-            {inContext && <p className="text-[10px] text-emerald-400 mt-1">✓ In active context</p>}
+            {inContext && <p className="text-[10px] text-accent-success mt-1">✓ In active context</p>}
           </div>
         </TooltipContent>
       </Tooltip>
@@ -569,6 +256,8 @@ interface NeuralGraphViewProps {
   onNodeDoubleClick?: (nodeId: string) => void;
   onEdgeClick?: (edgeId: string) => void;
   onOpenFile?: (path: string, label: string) => void;
+  /** Lazily fetch + merge a truncated folder's subtree (its absolute path). */
+  onRequestExpand?: (path: string) => void;
   readOnly?: boolean;
 }
 
@@ -619,30 +308,30 @@ function NodeContextMenu({
       style={{ left: menu.x, top: menu.y }}
     >
       <div className="px-3 py-1.5 border-b border-border/50 mb-1">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-accent">{menu.nodeType}</p>
+        <p className="text-[10px] font-bold uppercase tracking-widest text-primary">{menu.nodeType}</p>
         <p className="text-xs font-mono truncate max-w-[160px] text-foreground">{menu.nodeLabel}</p>
       </div>
       <button
-        className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-accent/10 transition-colors"
+        className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
         onClick={() => { onOpenInLocation(menu.nodePath); onClose(); }}
       >
-        <FolderOpen className="w-3.5 h-3.5 text-blue-400" />
+        <FolderOpen className="w-3.5 h-3.5 text-primary" />
         Open in File Explorer
       </button>
       {menu.nodeType === "file" && (
         <button
-          className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-accent/10 transition-colors"
+          className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
           onClick={() => { onOpenInEditor(menu.nodePath, menu.nodeLabel); onClose(); }}
         >
-          <FileCode className="w-3.5 h-3.5 text-green-400" />
+          <FileCode className="w-3.5 h-3.5 text-accent-success" />
           Open in Editor / Code Tab
         </button>
       )}
       <button
-        className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-accent/10 transition-colors"
+        className="w-full text-left px-3 py-2 text-xs flex items-center gap-2 hover:bg-primary/10 transition-colors"
         onClick={() => { onAddSymlink(menu.nodePath, menu.nodeLabel); onClose(); }}
       >
-        <Link2 className="w-3.5 h-3.5 text-purple-400" />
+        <Link2 className="w-3.5 h-3.5 text-accent-purple" />
         Symlink to Neural Map
       </button>
     </div>
@@ -657,9 +346,11 @@ function BrainMapViewportInner({
   onNodeDoubleClick,
   onEdgeClick,
   onOpenFile,
+  onRequestExpand,
 }: Partial<NeuralGraphViewProps>) {
-  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, projectId, collapsedFolderIds, toggleFolderCollapse } = useBrainMapStore();
+  const { nodes, edges, onNodesChange, onEdgesChange, onConnect, projectId, collapsedFolderIds, toggleFolderCollapse, layoutComputing } = useBrainMapStore();
   const setStoreNodes = useBrainMapStore(s => s.setNodes);
+  const setLayoutComputing = useBrainMapStore(s => s.setLayoutComputing);
   const { has } = useNeuralContextStore();
 
   const {
@@ -689,12 +380,13 @@ function BrainMapViewportInner({
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [nodes, isLocked, lockKey]);
 
-  // Re-layout whenever layout engine, clustering, or loaded project changes
+  // Re-layout whenever layout engine, clustering, or loaded project changes.
+  // The heavy compute runs in a Web Worker so this never blocks the render thread.
   useEffect(() => {
     const { nodes: current, edges: currentEdges } = useBrainMapStore.getState();
     if (!current.length) return;
 
-    // If this layout is locked for this project, restore saved positions
+    // If this layout is locked for this project, restore saved positions (cheap, O(n)).
     const savedPositions = getLockedPositions(lockKey);
     if (savedPositions) {
       const posMap = new Map(savedPositions.map(p => [p.id, p.position]));
@@ -707,9 +399,19 @@ function BrainMapViewportInner({
       return;
     }
 
-    const recomputed = computeLayout(layout, autoClustering, current, currentEdges);
-    setStoreNodes(recomputed);
-    requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
+    let cancelled = false;
+    const nodeSize = useVisualControlStore.getState().nodeSize;
+    setLayoutComputing(true);
+    runLayout({ layout, autoClustering, nodeSize }, toEngineNodes(current), toEngineEdges(currentEdges))
+      .then(positions => {
+        if (cancelled) return;
+        // Apply onto the latest store nodes by id so a concurrent network update
+        // (e.g. an incremental file event) isn't clobbered with a stale snapshot.
+        setStoreNodes(applyPositions(useBrainMapStore.getState().nodes, positions));
+        setLayoutComputing(false);
+        requestAnimationFrame(() => fitView({ duration: 400, padding: 0.2 }));
+      });
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [layout, autoClustering, projectId]);
 
@@ -770,13 +472,32 @@ function BrainMapViewportInner({
 
   const edgeAnimDuration = `${(1 / simSpeed).toFixed(2)}s`;
 
+  // Resolve MiniMap/Background colors from design tokens (see resolveCssColor).
+  // Computed once per mount; fallbacks mirror the UI-Tokens palette.
+  const themeColors = useMemo(() => {
+    const bg = resolveCssColor("var(--color-background)", "rgb(0, 0, 0)");
+    return {
+      project: resolveCssColor("var(--color-accent-purple)", "rgb(139, 92, 246)"),
+      folder: resolveCssColor("var(--color-primary)", "rgb(59, 130, 246)"),
+      file: resolveCssColor("var(--color-accent-success)", "rgb(16, 185, 129)"),
+      dot: resolveCssColor("var(--color-border)", "rgb(51, 51, 51)"),
+      mask: bg.startsWith("rgb(") ? bg.replace("rgb(", "rgba(").replace(")", ", 0.45)") : "rgba(0, 0, 0, 0.45)",
+    };
+  }, []);
+
   const handleNodeDoubleClick = useCallback((_e: React.MouseEvent, n: Node) => {
     const isFolder = n.data?.type === "folder" || n.data?.type === "project";
     if (isFolder) {
-      toggleFolderCollapse(n.id);
+      // A truncated folder wasn't loaded server-side — fetch + merge its subtree.
+      // Once loaded it behaves like any folder (double-click toggles collapse).
+      if (n.data?.truncated && onRequestExpand) {
+        onRequestExpand(n.data.path as string);
+      } else {
+        toggleFolderCollapse(n.id);
+      }
     }
     onNodeDoubleClick?.(n.id);
-  }, [toggleFolderCollapse, onNodeDoubleClick]);
+  }, [toggleFolderCollapse, onNodeDoubleClick, onRequestExpand]);
 
   const handleNodeContextMenu = useCallback((e: React.MouseEvent, n: Node) => {
     e.preventDefault();
@@ -858,14 +579,14 @@ function BrainMapViewportInner({
         fitViewOptions={{ padding: 0.2 }}
         minZoom={0.02}
         maxZoom={20}
-        onlyRenderVisibleElements={!gpuEnabled}
+        onlyRenderVisibleElements={!gpuEnabled || visibleNodes.length > VIRTUALIZE_THRESHOLD}
         className="bg-background/50"
         proOptions={{ hideAttribution: true }}
         selectionKeyCode="Shift"
         multiSelectionKeyCode="Shift"
         elementsSelectable={true}
       >
-        <Background color="#333" gap={20} />
+        <Background color={themeColors.dot} gap={20} />
         <Controls>
           <ControlButton onClick={handleRotateCanvas} title="Rotate 90°">
             <RotateCw className="w-3.5 h-3.5" />
@@ -874,11 +595,11 @@ function BrainMapViewportInner({
         {showMiniMap && (
           <MiniMap
             nodeColor={(n) => {
-              if (n.data?.type === "project") return "#8b5cf6";
-              if (n.data?.type === "folder") return "#3b82f6";
-              return "#10b981";
+              if (n.data?.type === "project") return themeColors.project;
+              if (n.data?.type === "folder") return themeColors.folder;
+              return themeColors.file;
             }}
-            maskColor="rgba(0, 0, 0, 0.4)"
+            maskColor={themeColors.mask}
           />
         )}
       </ReactFlow>
@@ -891,6 +612,15 @@ function BrainMapViewportInner({
           onOpenInEditor={handleOpenInEditor}
           onAddSymlink={handleAddSymlink}
         />
+      )}
+
+      {layoutComputing && (
+        <div className="absolute inset-0 z-30 flex items-center justify-center bg-background/60 backdrop-blur-sm pointer-events-none">
+          <div className="flex items-center gap-2 rounded-md border border-primary/20 bg-card/90 px-4 py-2 text-sm text-muted-foreground shadow-lg">
+            <RotateCw className="w-4 h-4 animate-spin text-primary" />
+            Computing layout…
+          </div>
+        </div>
       )}
 
       <style>{`
@@ -937,6 +667,7 @@ export function NeuralGraphView(props: NeuralGraphViewProps) {
   const setNodes = useBrainMapStore(s => s.setNodes);
   const setEdges = useBrainMapStore(s => s.setEdges);
   const setProjectId = useBrainMapStore(s => s.setProjectId);
+  const setLayoutComputing = useBrainMapStore(s => s.setLayoutComputing);
   const { layout, autoClustering } = useVisualControlStore();
 
   const initialNodes: Node[] = useMemo(
@@ -949,11 +680,12 @@ export function NeuralGraphView(props: NeuralGraphViewProps) {
           type: neuralNode.type,
           path: neuralNode.data.path,
           fileCount: neuralNode.data.fileCount,
+          truncated: neuralNode.data.truncated,
           metadata: neuralNode.data.metadata,
           id: neuralNode.id,
         },
         position: neuralNode.position,
-        className: neuralNode.type === "project" ? "border-accent border-2" : "",
+        className: neuralNode.type === "project" ? "border-primary/30 border-2" : "",
       })),
     [network.nodes]
   );
@@ -970,12 +702,31 @@ export function NeuralGraphView(props: NeuralGraphViewProps) {
     [network.edges]
   );
 
-  // Load network into store, then apply active layout
+  // Load network into store, then apply active layout. Layout runs in a Web
+  // Worker (off the render thread) so indexing a large map never freezes the UI.
   useEffect(() => {
     setProjectId(projectId || null);
-    const laid = computeLayout(layout, autoClustering, initialNodes, initialEdges);
-    setNodes(laid);
     setEdges(initialEdges);
+
+    // Seed the engine from nodes already on screen (same id) so expanding a
+    // folder or a live file event nudges the new nodes into place instead of
+    // reshuffling the whole map. Brand-new nodes keep their radial seed.
+    const prevPos = new Map(useBrainMapStore.getState().nodes.map(n => [n.id, n.position]));
+    const seeded = initialNodes.map(n => {
+      const p = prevPos.get(n.id);
+      return p ? { ...n, position: p } : n;
+    });
+
+    let cancelled = false;
+    const nodeSize = useVisualControlStore.getState().nodeSize;
+    setLayoutComputing(true);
+    runLayout({ layout, autoClustering, nodeSize }, toEngineNodes(seeded), toEngineEdges(initialEdges))
+      .then(positions => {
+        if (cancelled) return;
+        setNodes(applyPositions(initialNodes, positions));
+        setLayoutComputing(false);
+      });
+    return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialNodes, initialEdges, projectId, setNodes, setEdges, setProjectId]);
 
@@ -985,7 +736,11 @@ export function NeuralGraphView(props: NeuralGraphViewProps) {
   useEffect(() => {
     if (!projectId || !fileEvents.length) return;
     const latest = fileEvents[fileEvents.length - 1];
-    const nodeId = `node-${latest.relativePath}`;
+    // Node ids are keyed on the absolute path (`node-${absolutePath}`), so the
+    // incremental update must use filePath too — otherwise it creates orphan
+    // nodes that never dedupe against or link to the indexed tree.
+    const absPath = latest.filePath ?? latest.relativePath;
+    const nodeId = `node-${absPath}`;
 
     if (latest.eventType === "add" || latest.eventType === "addDir") {
       setNodes(prev => {
@@ -994,9 +749,9 @@ export function NeuralGraphView(props: NeuralGraphViewProps) {
           id: nodeId,
           type: "neural",
           data: {
-            label: latest.relativePath.split("/").pop() ?? latest.relativePath,
+            label: absPath.split("/").pop() ?? absPath,
             type: latest.eventType === "addDir" ? "folder" : "file",
-            path: latest.relativePath,
+            path: absPath,
             id: nodeId,
           },
           position: { x: Math.random() * 200 - 100, y: Math.random() * 200 - 100 },
@@ -1005,7 +760,7 @@ export function NeuralGraphView(props: NeuralGraphViewProps) {
         return [...prev, newNode];
       });
 
-      const pathParts = latest.relativePath.split("/");
+      const pathParts = absPath.split("/");
       if (pathParts.length > 1) {
         pathParts.pop();
         const parentPath = pathParts.join("/");
@@ -1026,6 +781,10 @@ export function NeuralGraphView(props: NeuralGraphViewProps) {
       }, 1500);
     }
   }, [fileEvents, projectId, setNodes, setEdges]);
+
+  // Clear the (store-global) computing flag on unmount so a layout in flight when
+  // the user navigates away can't leave a stale overlay for the next mount.
+  useEffect(() => () => setLayoutComputing(false), [setLayoutComputing]);
 
   return (
     <ReactFlowProvider>

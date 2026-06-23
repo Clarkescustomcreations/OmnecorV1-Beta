@@ -49,7 +49,7 @@ export const KiCadPanel: React.FC = () => {
     <div className="p-4 space-y-4">
       <div className="flex justify-between items-center bg-muted/50 p-4 rounded-lg border border-dashed">
         <div className="flex items-center gap-3">
-          <CircuitBoard className="w-8 h-8 text-blue-500" />
+          <CircuitBoard className="w-8 h-8 text-primary" />
           <div>
             <h3 className="font-bold">KiCad EDA Integration</h3>
             <p className="text-xs text-muted-foreground">
@@ -107,8 +107,8 @@ export const KiCadPanel: React.FC = () => {
               </Button>
             </div>
             {bomMutation.isSuccess ? (
-                <div className="p-8 text-center bg-green-500/5 border border-green-500/20 rounded-lg">
-                    <p className="text-sm font-medium text-green-600">BOM generated successfully!</p>
+                <div className="p-8 text-center bg-accent-success/5 border border-accent-success/20 rounded-lg">
+                    <p className="text-sm font-medium text-accent-success">BOM generated successfully!</p>
                     <Button
                       variant="link"
                       className="text-xs"
@@ -124,7 +124,7 @@ export const KiCadPanel: React.FC = () => {
           </TabsContent>
 
           <TabsContent value="export" className="p-6 flex flex-col items-center gap-4">
-            <div className="w-full max-w-2xl aspect-video bg-zinc-100 dark:bg-zinc-900 rounded-lg border flex items-center justify-center relative overflow-hidden">
+            <div className="w-full max-w-2xl aspect-video bg-muted dark:bg-card rounded-lg border flex items-center justify-center relative overflow-hidden">
                <CircuitBoard className="w-12 h-12 text-muted-foreground opacity-20" />
             </div>
             <div className="flex gap-2">

@@ -167,8 +167,8 @@ export function Dashboard() {
           <div className="max-w-5xl mx-auto px-6 sm:px-12 py-10 md:py-20 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">
             <div className="max-w-2xl">
               <div className="flex items-center gap-2 mb-4">
-                <Sparkles className="w-5 h-5 text-accent" />
-                <span className="text-sm font-medium text-accent">
+                <Sparkles className="w-5 h-5 text-primary" />
+                <span className="text-sm font-medium text-primary">
                   Welcome to Omnecor
                 </span>
               </div>
@@ -178,7 +178,7 @@ export function Dashboard() {
               <p className="text-lg text-muted-foreground whitespace-pre-line">
                 A powerful, local-first AI workstation designed for Creativity
                 <br />
-                <span className="text-sm font-medium text-accent/80 tracking-tight">
+                <span className="text-sm font-medium text-primary/80 tracking-tight">
                   Operational Memory Never Escapes Context Overview Remains
                 </span>
               </p>
@@ -209,10 +209,10 @@ export function Dashboard() {
             className="mb-6 p-4 rounded-xl border border-border bg-card/50 backdrop-blur-sm"
           >
             <div className="flex items-center gap-2 mb-3">
-              <Activity className="w-4 h-4 text-accent" />
+              <Activity className="w-4 h-4 text-primary" />
               <span className="text-sm font-semibold">System Monitor</span>
               <div
-                className={`ml-auto h-1.5 w-1.5 rounded-full ${systemMetrics ? "bg-accent animate-pulse" : "bg-muted"}`}
+                className={`ml-auto h-1.5 w-1.5 rounded-full ${systemMetrics ? "bg-primary/10 animate-pulse" : "bg-muted"}`}
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
@@ -269,13 +269,13 @@ export function Dashboard() {
             description="A real-time financial monitor for your AI agents. Set hard/soft budgets, track spending by provider, and manage virtual Lithic cards."
           >
             <Link href="/wallet" className="block mb-6">
-              <Card className="hover:border-accent/50 hover:shadow-lg transition-all duration-300 cursor-pointer group overflow-hidden">
+              <Card className="hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer group overflow-hidden">
                 <div className="flex flex-col md:flex-row">
                   <div className="flex-1">
                     <CardHeader>
                       <div className="flex items-start justify-between mb-2">
-                        <div className="p-2 rounded-lg bg-accent/10 group-hover:bg-accent/20 transition-colors">
-                          <Wallet className="w-6 h-6 text-accent" />
+                        <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                          <Wallet className="w-6 h-6 text-primary" />
                         </div>
                         <Badge className="bg-accent-success/10 text-accent-success border-accent-success/20">Live Monitoring</Badge>
                       </div>
@@ -313,11 +313,11 @@ export function Dashboard() {
                   description={feature.description}
                 >
                   <Link href={feature.href} className="block">
-                    <Card className="h-full hover:border-accent/50 hover:shadow-lg transition-all duration-300 cursor-pointer group">
+                    <Card className="h-full hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer group">
                       <CardHeader>
                         <div className="flex items-start justify-between mb-2">
-                          <div className="p-2 rounded-lg bg-accent/10 group-hover:bg-accent/20 transition-colors">
-                            <Icon className="w-6 h-6 text-accent" />
+                          <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">
+                            <Icon className="w-6 h-6 text-primary" />
                           </div>
                           <Badge variant="secondary" className="text-xs">
                             {feature.badge}

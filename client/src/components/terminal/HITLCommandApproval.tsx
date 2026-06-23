@@ -39,9 +39,9 @@ export function HITLCommandApproval() {
     <div className="fixed inset-0 z-[300] flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-150">
       <div className="w-full max-w-lg mx-4 bg-card border border-border rounded-xl shadow-2xl overflow-hidden">
         {/* Header */}
-        <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-amber-500/5">
-          <div className="w-8 h-8 rounded-full bg-amber-500/20 flex items-center justify-center flex-shrink-0">
-            <Shield className="w-4 h-4 text-amber-400" />
+        <div className="flex items-center gap-3 px-5 py-4 border-b border-border bg-accent-warning/5">
+          <div className="w-8 h-8 rounded-full bg-accent-warning/20 flex items-center justify-center flex-shrink-0">
+            <Shield className="w-4 h-4 text-accent-warning" />
           </div>
           <div>
             <p className="text-sm font-semibold text-foreground">Command Approval Required</p>
@@ -51,9 +51,9 @@ export function HITLCommandApproval() {
 
         {/* Command preview */}
         <div className="px-5 py-4 space-y-3">
-          <div className="flex items-start gap-2 rounded-lg bg-slate-950 border border-border p-3">
-            <Terminal className="w-4 h-4 text-emerald-400 mt-0.5 flex-shrink-0" />
-            <pre className="text-xs font-mono text-emerald-300 whitespace-pre-wrap break-all leading-relaxed flex-1 min-w-0 max-h-40 overflow-y-auto">
+          <div className="flex items-start gap-2 rounded-lg bg-background border border-border p-3">
+            <Terminal className="w-4 h-4 text-accent-success mt-0.5 flex-shrink-0" />
+            <pre className="text-xs font-mono text-accent-success whitespace-pre-wrap break-all leading-relaxed flex-1 min-w-0 max-h-40 overflow-y-auto">
               {pending.fullCommand}
             </pre>
           </div>
@@ -80,7 +80,7 @@ export function HITLCommandApproval() {
               icon={<CheckCircle2 className="w-3.5 h-3.5" />}
               variant="outline"
               onClick={() => _resolvePending("once")}
-              className="border-emerald-500/30 hover:border-emerald-500/60 hover:bg-emerald-500/5 text-emerald-400"
+              className="border-accent-success/30 hover:border-accent-success/60 hover:bg-accent-success/5 text-accent-success"
             />
             <ApproveButton
               label="Allow for Project"
@@ -88,7 +88,7 @@ export function HITLCommandApproval() {
               icon={<FolderOpen className="w-3.5 h-3.5" />}
               variant="outline"
               onClick={() => _resolvePending("project")}
-              className="border-blue-500/30 hover:border-blue-500/60 hover:bg-blue-500/5 text-blue-400"
+              className="border-primary/30 hover:border-primary/60 hover:bg-primary/5 text-primary"
             />
           </div>
           <div className="grid grid-cols-2 gap-2">
@@ -98,17 +98,17 @@ export function HITLCommandApproval() {
               icon={<Globe className="w-3.5 h-3.5" />}
               variant="outline"
               onClick={() => _resolvePending("global")}
-              className="border-purple-500/30 hover:border-purple-500/60 hover:bg-purple-500/5 text-purple-400"
+              className="border-accent-purple/30 hover:border-accent-purple/60 hover:bg-accent-purple/5 text-accent-purple"
             />
             <button
               ref={denyRef}
               className={cn(
-                "flex flex-col items-start gap-0.5 rounded-lg border border-red-500/30 px-3 py-2.5",
-                "hover:border-red-500/60 hover:bg-red-500/5 transition-colors text-left"
+                "flex flex-col items-start gap-0.5 rounded-lg border border-destructive/30 px-3 py-2.5",
+                "hover:border-destructive/60 hover:bg-destructive/5 transition-colors text-left"
               )}
               onClick={() => _resolvePending(null)}
             >
-              <span className="flex items-center gap-1.5 text-xs font-semibold text-red-400">
+              <span className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
                 <X className="w-3.5 h-3.5" />
                 Deny
               </span>

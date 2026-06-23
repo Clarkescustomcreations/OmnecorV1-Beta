@@ -153,7 +153,7 @@ export function ModelSelector({
               return (
                 <DropdownMenuItem
                   key={m.id}
-                  className={cn("text-xs", isActive && "bg-accent/30")}
+                  className={cn("text-xs", isActive && "bg-primary/30")}
                   onClick={() => onSelect({ providerId, modelId: m.id })}
                 >
                   <Check
@@ -193,7 +193,7 @@ export function ModelSelector({
             return (
               <DropdownMenuItem
                 key={m.id}
-                className={cn("text-xs", isActive && "bg-accent/30")}
+                className={cn("text-xs", isActive && "bg-primary/30")}
                 onClick={() => onSelect({ providerId, modelId: m.id })}
               >
                 <Check

@@ -37,7 +37,20 @@ export interface FileTreeNode {
   extension?: string;
   children?: FileTreeNode[];
   modifiedAt?: string;
+  /** Directory whose children were NOT expanded (depth/budget limit). The client
+   *  renders it as a drill-in node and fetches its subtree on demand. */
+  truncated?: boolean;
+  /** Number of immediate (filtered) entries inside a truncated directory. */
+  childCount?: number;
+  /** Synthetic marker node standing in for entries dropped by the root slice. */
+  overflow?: boolean;
 }
+
+// Bounded-tree defaults. The neural map must stay responsive on a 50-file demo
+// and a 50k-file monorepo alike, so the tree is built breadth-first up to a total
+// node budget; folders beyond it are returned as `truncated` drill-in nodes.
+const DEFAULT_NODE_BUDGET = 1500;
+const DEFAULT_MAX_DEPTH = 8;
 
 // ---------------------------------------------------------------------------
 // Ignored patterns (mirrors WATCHER_CONFIG.ignored)
@@ -62,27 +75,21 @@ function shouldIgnoreName(name: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Recursive tree builder — used by getFileTree
+// Bounded breadth-first tree builder — used by getFileTree
 // ---------------------------------------------------------------------------
 
-async function buildTree(
-  absolutePath: string,
-  rootDir: string,
-  depth: number,
-  maxDepth: number
-): Promise<FileTreeNode | null> {
+/** Stat a single path into a childless FileTreeNode (null if it vanished). */
+async function statNode(absolutePath: string, rootDir: string): Promise<FileTreeNode | null> {
   let stat;
   try {
     stat = await fs.stat(absolutePath);
   } catch {
     return null; // deleted between readdir and stat — skip silently
   }
-
   const name = path.basename(absolutePath);
   const relativePath = path.relative(rootDir, absolutePath) || ".";
   const ext = path.extname(name) || undefined;
-
-  const base: FileTreeNode = {
+  return {
     name,
     path: absolutePath,
     relativePath,
@@ -91,32 +98,94 @@ async function buildTree(
     extension: stat.isFile() ? ext : undefined,
     modifiedAt: stat.mtime.toISOString(),
   };
+}
 
-  if (!stat.isDirectory() || depth >= maxDepth) {
-    return base;
-  }
-
-  let entries: string[];
+/** Filtered, alphabetically-sorted entry names of a directory (null on error). */
+async function readChildNames(dir: string): Promise<string[] | null> {
   try {
-    entries = await fs.readdir(absolutePath);
+    const entries = await fs.readdir(dir);
+    return entries.filter(e => !shouldIgnoreName(e)).sort((a, b) => a.localeCompare(b));
   } catch {
-    return { ...base, children: [] };
+    return null;
+  }
+}
+
+/**
+ * Build a directory tree breadth-first, bounded by a total node budget and a max
+ * depth. Folders that can't be expanded within those limits are returned with
+ * `truncated: true` and a `childCount`, so the client can show them as drill-in
+ * nodes and fetch their subtree on demand. Expansion is all-or-nothing per folder
+ * (a folder is either fully listed or truncated) — except the root, which is
+ * sliced to the budget as a last resort so a huge flat directory still renders.
+ */
+export async function buildBoundedTree(
+  rootAbsolute: string,
+  rootDir: string,
+  maxDepth: number,
+  budget: number,
+): Promise<FileTreeNode | null> {
+  const rootNode = await statNode(rootAbsolute, rootDir);
+  if (!rootNode || rootNode.type !== "directory") return rootNode;
+
+  let count = 0;
+  const queue: Array<{ node: FileTreeNode; depth: number }> = [{ node: rootNode, depth: 0 }];
+
+  while (queue.length) {
+    const { node, depth } = queue.shift()!;
+
+    const names = await readChildNames(node.path);
+    if (!names) { node.children = []; continue; }
+
+    if (depth >= maxDepth) {
+      node.truncated = true;
+      node.childCount = names.length;
+      continue;
+    }
+
+    const remaining = budget - count;
+    let useNames = names;
+    if (names.length > remaining) {
+      if (depth === 0) {
+        // Root: never return empty — show as many children as the budget allows.
+        useNames = names.slice(0, Math.max(0, remaining));
+      } else {
+        node.truncated = true;
+        node.childCount = names.length;
+        continue;
+      }
+    }
+
+    const children = (
+      await Promise.all(useNames.map(n => statNode(path.join(node.path, n), rootDir)))
+    ).filter((c): c is FileTreeNode => c !== null);
+
+    // Directories first, then files (both already alphabetical) — stable for UI.
+    children.sort((a, b) =>
+      a.type !== b.type ? (a.type === "directory" ? -1 : 1) : a.name.localeCompare(b.name),
+    );
+
+    // Root slice dropped some entries — append a visible marker so the omission
+    // isn't silent (only reachable when the root has more direct entries than the
+    // entire budget, e.g. a folder with thousands of flat files).
+    const hidden = names.length - useNames.length;
+    if (hidden > 0) {
+      children.push({
+        name: `… ${hidden} more item${hidden === 1 ? "" : "s"} not shown`,
+        path: `${node.path}::overflow`,
+        relativePath: `${node.relativePath}::overflow`,
+        type: "file",
+        overflow: true,
+      });
+    }
+
+    count += children.length;
+    node.children = children;
+    for (const c of children) {
+      if (c.type === "directory") queue.push({ node: c, depth: depth + 1 });
+    }
   }
 
-  // directories first, then files, both alphabetical — stable sort for UI
-  const filtered = entries.filter(e => !shouldIgnoreName(e)).sort((a, b) => {
-    return a.localeCompare(b);
-  });
-
-  const children = (
-    await Promise.all(
-      filtered.map(entry =>
-        buildTree(path.join(absolutePath, entry), rootDir, depth + 1, maxDepth)
-      )
-    )
-  ).filter((c): c is FileTreeNode => c !== null);
-
-  return { ...base, children };
+  return rootNode;
 }
 
 // ---------------------------------------------------------------------------
@@ -243,6 +312,10 @@ export const projectRouter = router({
       z.object({
         projectId: z.string().min(1),
         rootDir: z.string().min(1),
+        // Optional bounds. On-demand folder expansion fetches a shallower slice
+        // (e.g. maxDepth 3) rooted at the folder being drilled into.
+        maxDepth: z.number().int().min(1).max(12).optional(),
+        nodeBudget: z.number().int().min(50).max(5000).optional(),
       })
     )
     .query(async ({ input }) => {
@@ -257,7 +330,12 @@ export const projectRouter = router({
 
         // Build the tree starting from rootDir's immediate children
         // (so fileTreeToNetwork receives children[], not the root node itself)
-        const rootNode = await buildTree(resolved, resolved, 0, 8);
+        const rootNode = await buildBoundedTree(
+          resolved,
+          resolved,
+          input.maxDepth ?? DEFAULT_MAX_DEPTH,
+          input.nodeBudget ?? DEFAULT_NODE_BUDGET,
+        );
         return (rootNode?.children ?? []) as FileTreeNode[];
       } catch (error) {
         throw new TRPCError({

@@ -60,7 +60,7 @@ export function AgenticWallet() {
       <div className="flex flex-col h-full bg-background overflow-hidden">
         <div className="border-b border-border bg-card px-4 sm:px-6 py-4 flex-shrink-0 flex flex-wrap items-center gap-3 justify-between">
           <div className="flex items-center gap-3 min-w-0">
-            <Wallet className="w-6 h-6 text-accent flex-shrink-0" />
+            <Wallet className="w-6 h-6 text-primary flex-shrink-0" />
             <div className="min-w-0">
               <h1 className="text-lg sm:text-xl font-bold truncate">Agentic Wallet Dashboard</h1>
               <p className="text-xs sm:text-sm text-muted-foreground truncate">
@@ -128,7 +128,7 @@ export function AgenticWallet() {
                 <Card className="shadow-sm">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <CreditCard className="w-4 h-4 text-accent" /> Virtual Cards
+                      <CreditCard className="w-4 h-4 text-primary" /> Virtual Cards
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -139,7 +139,7 @@ export function AgenticWallet() {
                 <Card className="shadow-sm">
                   <CardHeader className="pb-2">
                     <CardTitle className="text-sm font-medium flex items-center gap-2">
-                      <ShieldCheck className="w-4 h-4 text-green-500" /> Prevention
+                      <ShieldCheck className="w-4 h-4 text-accent-success" /> Prevention
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -189,7 +189,7 @@ export function AgenticWallet() {
                             <div key={p.provider} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-muted/50 hover:bg-muted/40 transition-colors">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center border shadow-sm">
-                                  <Zap className="w-4 h-4 text-accent" />
+                                  <Zap className="w-4 h-4 text-primary" />
                                 </div>
                                 <span className="text-sm font-semibold capitalize">{p.provider}</span>
                               </div>

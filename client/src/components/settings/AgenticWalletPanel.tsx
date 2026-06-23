@@ -206,19 +206,19 @@ export function AgenticWalletPanel() {
       </Card>
 
       {/* Lithic Integration */}
-      <Card className="border-accent/30 bg-accent/5 shadow-inner">
+      <Card className="border-primary/30 bg-primary/5 shadow-inner">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-lg">
-            <Lock className="w-5 h-5 text-accent" /> Lithic Virtual Issuance
+            <Lock className="w-5 h-5 text-primary" /> Lithic Virtual Issuance
           </CardTitle>
-          <CardDescription className="text-accent/80 font-medium">
+          <CardDescription className="text-primary/80 font-medium">
             Generate single-use or project-isolated virtual credit cards to fund autonomous agents.
           </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-5 rounded-2xl border bg-card mb-6 shadow-sm">
             <div className="flex items-center gap-4 min-w-0">
-              <div className="w-14 h-9 rounded-lg bg-gradient-to-br from-gray-800 to-black border-gray-700 border flex items-center justify-center shadow-lg relative overflow-hidden flex-shrink-0">
+              <div className="w-14 h-9 rounded-lg bg-gradient-to-br from-gray-800 to-black border-border border flex items-center justify-center shadow-lg relative overflow-hidden flex-shrink-0">
                 <div className="absolute top-0 left-0 w-full h-full bg-white/5 opacity-20 pointer-events-none" />
                 <span className="text-[10px] text-white/40 font-mono tracking-widest z-10">VISA</span>
               </div>
@@ -227,7 +227,7 @@ export function AgenticWalletPanel() {
                 <p className="text-xs text-muted-foreground truncate">System authenticated and ready to issue</p>
               </div>
             </div>
-            <Badge className="bg-green-500/20 text-green-500 border-green-500/30 font-bold px-4 py-1 flex-shrink-0">CONNECTED</Badge>
+            <Badge className="bg-accent-success/20 text-accent-success border-accent-success/30 font-bold px-4 py-1 flex-shrink-0">CONNECTED</Badge>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
@@ -258,14 +258,14 @@ export function AgenticWalletPanel() {
             {/* HITL Authorization Option */}
             <div className="flex flex-col border border-muted bg-muted/10 rounded-xl p-5 shadow-sm min-h-[160px]">
               <h4 className="text-sm font-semibold text-foreground mb-1.5 flex items-center gap-2">
-                <ShieldCheck className="w-4 h-4 text-accent" /> Security Authorization
+                <ShieldCheck className="w-4 h-4 text-primary" /> Security Authorization
               </h4>
               <p className="text-xs text-muted-foreground leading-relaxed mb-4 flex-1">
                 Access the Human-in-the-Loop review queue to approve pending card issuance and audit high-value transaction requests.
               </p>
               <Button
                 variant="outline"
-                className="w-full mt-auto h-9 font-medium border-accent/40 text-accent hover:bg-accent/10"
+                className="w-full mt-auto h-9 font-medium border-primary/40 text-primary hover:bg-primary/10"
                 disabled={executionMode === "sovereign"}
                 onClick={handleOpenHitlQueue}
                 aria-label="Open HITL-review queue for pending card issuance and high-value transaction requests"
@@ -283,7 +283,7 @@ export function AgenticWalletPanel() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <ShieldAlert className="w-5 h-5 text-amber-500" />
+              <ShieldAlert className="w-5 h-5 text-accent-warning" />
               HITL Authorization Queue
             </DialogTitle>
             <DialogDescription>

@@ -61,7 +61,7 @@ function SectionHeader({ label, open, onToggle, children }: { label: string; ope
   return (
     <button
       type="button"
-      className="w-full flex items-center justify-between py-2 text-sm font-semibold hover:text-accent transition-colors"
+      className="w-full flex items-center justify-between py-2 text-sm font-semibold hover:text-primary transition-colors"
       onClick={onToggle}
     >
       <span className="flex items-center gap-2">{label}{children}</span>
@@ -190,7 +190,7 @@ export function MapManager() {
       {/* Header */}
       <div className="flex items-center justify-between px-2">
         <h2 className="text-lg font-semibold flex items-center gap-2">
-          <Brain className="w-5 h-5 text-accent" />
+          <Brain className="w-5 h-5 text-primary" />
           Neural Maps
         </h2>
         <Button size="sm" variant="outline" className="gap-2" onClick={() => setIsOpen(true)}>
@@ -244,7 +244,7 @@ export function MapManager() {
                               const label = isGithub ? s.replace("github://", "") : s.replace("integration://", "");
                               const emoji = s.includes("github") ? "🐙" : s.includes("gmail") ? "✉️" : s.includes("outlook") ? "📧" : s.includes("google-drive") ? "☁️" : s.includes("dropbox") ? "📦" : "💼";
                               return (
-                                <span key={s} className="text-[10px] bg-accent/20 text-accent-foreground rounded px-1.5 py-0.5">
+                                <span key={s} className="text-[10px] bg-primary/20 text-accent-foreground rounded px-1.5 py-0.5">
                                   {emoji} {label}
                                 </span>
                               );
@@ -366,7 +366,7 @@ export function MapManager() {
                       <ul className="space-y-1">
                         {localFolders.map(f => (
                           <li key={f} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-muted/50 text-xs font-mono group">
-                            <FolderOpen className="w-3.5 h-3.5 text-accent shrink-0" />
+                            <FolderOpen className="w-3.5 h-3.5 text-primary shrink-0" />
                             <span className="flex-1 truncate">{f}</span>
                             <button
                               onClick={() => removeLocalFolder(f)}
@@ -393,14 +393,14 @@ export function MapManager() {
                     <Badge variant="secondary" className="text-[10px] px-1.5">{githubRepos.length}</Badge>
                   )}
                   {!githubConnected && (
-                    <Badge variant="outline" className="text-[10px] px-1.5 border-amber-500 text-amber-500">Not connected</Badge>
+                    <Badge variant="outline" className="text-[10px] px-1.5 border-accent-warning text-accent-warning">Not connected</Badge>
                   )}
                 </SectionHeader>
 
                 {openSections.github && (
                   <div className="pb-3 space-y-3">
                     {!githubConnected && (
-                      <p className="text-xs text-amber-500 flex items-center gap-1.5">
+                      <p className="text-xs text-accent-warning flex items-center gap-1.5">
                         <AlertCircle className="w-3.5 h-3.5 shrink-0" />
                         Connect GitHub in <a href="/integrations" className="underline">Integrations</a> to index private repos. Public repos can still be added.
                       </p>
@@ -431,7 +431,7 @@ export function MapManager() {
                       <ul className="space-y-1">
                         {githubRepos.map(r => (
                           <li key={r} className="flex items-center justify-between gap-2 py-1 px-2 rounded bg-muted/50 text-xs group">
-                            <Github className="w-3.5 h-3.5 text-accent shrink-0" />
+                            <Github className="w-3.5 h-3.5 text-primary shrink-0" />
                             <span className="flex-1 truncate font-mono">{r}</span>
                             <button
                               onClick={() => removeRepo(r)}
@@ -477,17 +477,17 @@ export function MapManager() {
                             className={cn(
                               "flex items-center gap-3 w-full rounded-lg border px-3 py-2.5 text-sm transition-colors text-left",
                               selected
-                                ? "border-accent bg-accent/10 text-accent"
+                                ? "border-primary/30 bg-primary/10 text-primary"
                                 : available
                                   ? "border-border hover:border-muted-foreground bg-background hover:bg-muted/30"
                                   : "border-border bg-muted/20 opacity-60 cursor-not-allowed"
                             )}
                           >
-                            <span className={cn("shrink-0", selected ? "text-accent" : "text-muted-foreground")}>
+                            <span className={cn("shrink-0", selected ? "text-primary" : "text-muted-foreground")}>
                               {src.icon}
                             </span>
                             <span className="flex-1 font-medium">{src.label}</span>
-                            {selected && <CheckCircle2 className="w-4 h-4 text-accent shrink-0" />}
+                            {selected && <CheckCircle2 className="w-4 h-4 text-primary shrink-0" />}
                             {!connected && (
                               <span className="text-[10px] text-muted-foreground shrink-0">Not connected</span>
                             )}
@@ -495,7 +495,7 @@ export function MapManager() {
                               <span className="text-[10px] text-muted-foreground shrink-0">Coming soon</span>
                             )}
                             {connected && src.neuralMapSupported && !selected && (
-                              <span className="text-[10px] text-emerald-500 shrink-0 flex items-center gap-0.5">
+                              <span className="text-[10px] text-accent-success shrink-0 flex items-center gap-0.5">
                                 <CheckCircle2 className="w-3 h-3" /> Connected
                               </span>
                             )}
@@ -509,8 +509,8 @@ export function MapManager() {
 
               {/* Source summary */}
               {totalSources > 0 && (
-                <div className="rounded-lg bg-accent/5 border border-accent/20 px-3 py-2 text-xs text-muted-foreground">
-                  <span className="font-semibold text-accent">{totalSources}</span> source{totalSources !== 1 ? "s" : ""} will be indexed into this map.
+                <div className="rounded-lg bg-primary/5 border border-primary/20 px-3 py-2 text-xs text-muted-foreground">
+                  <span className="font-semibold text-primary">{totalSources}</span> source{totalSources !== 1 ? "s" : ""} will be indexed into this map.
                 </div>
               )}
 

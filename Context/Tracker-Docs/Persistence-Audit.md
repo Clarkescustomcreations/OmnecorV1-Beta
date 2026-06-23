@@ -225,8 +225,9 @@
 - **Storage**: ChromaDB (vector store) — `MemoryArchitectService`; semantic embeddings via `ONNXEmbeddingService.ts` (real BPE via `@anthropic-ai/tokenizer` — replaced whitespace pseudo-tokenizer in F11); ChromaDB per-agent isolation for RecursiveMAS
 - **Create**: Verified — `trpc.knowledgeBase.ingestDirectory` triggers file parsing + embedding insertion
 - **Update**: Verified — re-indexing overwrites existing embeddings for changed files
-- **Delete**: Verified — `trpc.knowledgeBase.deleteCollection` removes ChromaDB collection
-- **Restart Persistence**: Verified — ChromaDB persists to disk (configured data directory)
+- **Delete**: Verified — `trpc.knowledgeBase.deleteCollection` removes ChromaDB collection. Map-scoped (2026-06-23): `neuralMaps.delete` drops the map's whole collection; `neuralMaps.update` removing a remote root calls `MemoryArchitectService.deleteRemoteSource` (→ `VectorDBService.removeDocumentsWhere({ sourceUri })`); re-index reconciles per-source (delete-where then re-add).
+- **Remote-source ingest (2026-06-23)**: `integrations.indexMapSources` fetches real content from a map's `github://` / `integration://` roots and embeds it into `omnecor_{mapId}` (gated by `settings.indexingEnabled`); persists to ChromaDB disk like any other collection. Chat reads it via `ragContext.injectMapRagContext` when `settings.enableAIContext`.
+- **Restart Persistence**: Verified — ChromaDB persists to disk (configured data directory). Note: the `integrations.indexMapSources` **job-status** map is in-memory only (a restart simply shows no in-flight job; the embedded vectors persist).
 - **Import**: Verified — `trpc.knowledgeBase.ingestDirectory` (local folder path, validated by `validatePath`)
 - **Export**: Not Applicable
 

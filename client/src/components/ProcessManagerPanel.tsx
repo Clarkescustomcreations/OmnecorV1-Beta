@@ -123,26 +123,26 @@ export function ProcessManagerPanel() {
   const getStatusIcon = (status: string) => {
     switch (status) {
       case "completed":
-        return <CheckCircle2 className="w-4 h-4 text-emerald-500" />;
+        return <CheckCircle2 className="w-4 h-4 text-accent-success" />;
       case "failed":
-        return <XCircle className="w-4 h-4 text-rose-500" />;
+        return <XCircle className="w-4 h-4 text-destructive" />;
       case "idle":
         return <Clock className="w-4 h-4 text-muted-foreground" />;
       default:
-        return <Loader2 className="w-4 h-4 text-accent animate-spin" />;
+        return <Loader2 className="w-4 h-4 text-primary animate-spin" />;
     }
   };
 
   const getStatusColor = (status: string) => {
     switch (status) {
       case "completed":
-        return "bg-emerald-500/10 text-emerald-500 border-emerald-500/20";
+        return "bg-accent-success/10 text-accent-success border-accent-success/20";
       case "failed":
-        return "bg-rose-500/10 text-rose-500 border-rose-500/20";
+        return "bg-destructive/10 text-destructive border-destructive/20";
       case "idle":
         return "bg-muted text-muted-foreground";
       default:
-        return "bg-accent/10 text-accent border-accent/20";
+        return "bg-primary/10 text-primary border-primary/20";
     }
   };
 
@@ -151,7 +151,7 @@ export function ProcessManagerPanel() {
       <CardHeader className="border-b border-border/50 pb-4">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Terminal className="w-5 h-5 text-accent" />
+            <Terminal className="w-5 h-5 text-primary" />
             <CardTitle className="text-lg">Process Manager</CardTitle>
           </div>
           <Badge variant={connected ? "default" : "destructive"}>

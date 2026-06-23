@@ -59,11 +59,11 @@ export function FictionModePanel() {
   return (
     <div className="flex flex-col h-full gap-4 p-2">
       <div className="flex items-center justify-between border-b border-border pb-2">
-        <h2 className="text-lg font-semibold text-accent flex items-center gap-2">
-          <Heart className="w-5 h-5 text-accent fill-accent/20" />
+        <h2 className="text-lg font-semibold text-primary flex items-center gap-2">
+          <Heart className="w-5 h-5 text-primary fill-accent/20" />
           Fiction Workspace
         </h2>
-        <Badge variant="outline" className="border-accent text-accent bg-accent/5">
+        <Badge variant="outline" className="border-primary/30 text-primary bg-primary/5">
           Sandboxed
         </Badge>
       </div>
@@ -105,7 +105,7 @@ export function FictionModePanel() {
                   <Card key={key}>
                     <CardHeader className="p-4 pb-2">
                       <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                        <Tag className="w-4 h-4 text-accent" />
+                        <Tag className="w-4 h-4 text-primary" />
                         {key}
                       </CardTitle>
                     </CardHeader>
@@ -143,7 +143,7 @@ export function FictionModePanel() {
                     <Card key={node.id}>
                       <CardHeader className="p-4 pb-2">
                         <CardTitle className="text-sm font-semibold flex items-center gap-2">
-                          <Users className="w-4 h-4 text-accent" />
+                          <Users className="w-4 h-4 text-primary" />
                           {node.label}
                         </CardTitle>
                       </CardHeader>
@@ -187,9 +187,9 @@ export function FictionModePanel() {
               <div className="relative border-l-2 border-border ml-3 pl-4 space-y-4 py-2">
                 {fictionState.timeline.map(event => (
                   <div key={event.id} className="relative">
-                    <span className="absolute -left-[25px] top-1 bg-background border-2 border-accent w-3 h-3 rounded-full flex items-center justify-center" />
+                    <span className="absolute -left-[25px] top-1 bg-background border-2 border-primary/30 w-3 h-3 rounded-full flex items-center justify-center" />
                     <div className="space-y-1">
-                      <span className="text-[10px] text-accent font-semibold">
+                      <span className="text-[10px] text-primary font-semibold">
                         Sequence #{event.order}
                       </span>
                       <h4 className="text-sm font-semibold text-foreground">{event.title}</h4>

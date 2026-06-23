@@ -30,9 +30,11 @@ import { ENV } from "../_core/env.js";
 import { createLogger } from "../_core/logger.js";
 import type { FileTreeNode } from "./projectRouter.js";
 import { getDb } from "../db.factory.js";
-import { platformAccounts } from "../../drizzle/schema.js";
+import { platformAccounts, neuralMaps } from "../../drizzle/schema.js";
 import { and, desc, eq } from "drizzle-orm";
 import { refreshOAuthToken } from "../oauth/oauthClients.js";
+import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
+import { NotificationService } from "../_core/NotificationService.js";
 
 const log = createLogger("integrations");
 
@@ -470,6 +472,529 @@ async function fetchIntegrationItems(type: string, token: string): Promise<FileT
 }
 
 // ---------------------------------------------------------------------------
+// Remote-source CONTENT ingestion — turn a source URI into real text documents
+// for the VectorDB feed (map RAG). Listing (fetchSourceTree) gives structure;
+// this layer fetches the actual bodies so semantic search is over content, not
+// just file names. Generic pipeline downstream (MemoryArchitect chunk/redact/
+// embed); only the per-adapter "given an item, get its text" differs here.
+//
+// Hard bounds keep a single index run from hammering an external API or
+// blowing up memory; per-item failures are skipped, never fatal.
+// ---------------------------------------------------------------------------
+
+/** A resolved document ready for the VectorDB feed. */
+export interface SourceDocument {
+  /** Stable, source-relative identity (e.g. repo path or `notion/<id>`). */
+  path: string;
+  /** The text body to embed. */
+  text: string;
+  /** Node kind — always "file" for content docs. */
+  type: string;
+}
+
+const CONTENT_MAX_ITEMS = 400;                 // max files/docs fetched per source
+const CONTENT_MAX_BYTES_PER_ITEM = 100_000;    // skip/clip bodies larger than ~100 KB
+const CONTENT_MAX_TOTAL_BYTES = 8_000_000;     // ~8 MB ceiling per source per run
+const CONTENT_CONCURRENCY = 5;                 // parallel content fetches
+
+/** Extensions whose bodies are worth embedding (text/code). Mirrors the
+ *  KnowledgeBase ingestible set; binaries are skipped. */
+const TEXT_EXTENSIONS = new Set([
+  "txt", "md", "markdown", "mdx", "rst", "py", "ts", "tsx", "js", "jsx", "mjs", "cjs",
+  "json", "jsonc", "yaml", "yml", "toml", "cfg", "ini", "env", "html", "htm", "css",
+  "scss", "sass", "less", "rs", "go", "java", "kt", "kts", "c", "cc", "cpp", "h", "hpp",
+  "cs", "sh", "bash", "zsh", "fish", "sql", "graphql", "gql", "proto", "r", "lua", "rb",
+  "php", "swift", "scala", "clj", "ex", "exs", "vue", "svelte", "xml", "csv", "tsv", "log",
+]);
+
+export function hasTextExtension(name: string): boolean {
+  const dot = name.lastIndexOf(".");
+  if (dot < 0) {
+    // Extensionless but commonly-text filenames worth indexing.
+    const base = name.toLowerCase();
+    return base === "dockerfile" || base === "makefile" || base === "readme" || base === "license";
+  }
+  return TEXT_EXTENSIONS.has(name.slice(dot + 1).toLowerCase());
+}
+
+const sleep = (ms: number) => new Promise<void>(r => setTimeout(r, ms));
+
+/** Run an async mapper over items with bounded concurrency, preserving order. */
+export async function mapWithConcurrency<T, R>(
+  items: T[],
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results: R[] = new Array(items.length);
+  let cursor = 0;
+  const worker = async () => {
+    while (true) {
+      const idx = cursor++;
+      if (idx >= items.length) break;
+      results[idx] = await fn(items[idx], idx);
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, Math.min(limit, items.length)) }, worker));
+  return results;
+}
+
+/** Clip a body to the per-item ceiling so one huge file can't dominate. */
+function clip(text: string): string {
+  return text.length > CONTENT_MAX_BYTES_PER_ITEM ? text.slice(0, CONTENT_MAX_BYTES_PER_ITEM) : text;
+}
+
+/** A running total guard — returns false once the per-source byte ceiling is hit. */
+function makeByteBudget() {
+  let used = 0;
+  return {
+    take(text: string): boolean {
+      if (used >= CONTENT_MAX_TOTAL_BYTES) return false;
+      used += text.length;
+      return true;
+    },
+  };
+}
+
+/** Strip HTML to rough plain text for email/rich bodies. */
+export function htmlToText(html: string): string {
+  return html
+    .replace(/<(script|style)[\s\S]*?<\/\1>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/&nbsp;/gi, " ")
+    .replace(/&amp;/gi, "&")
+    .replace(/&lt;/gi, "<")
+    .replace(/&gt;/gi, ">")
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+/** Percent-encode each path segment for the GitHub contents API. */
+export function encodeGithubPath(p: string): string {
+  return p.split("/").map(encodeURIComponent).join("/");
+}
+
+// ── GitHub ──────────────────────────────────────────────────────────────────
+
+/** GET a single file's decoded UTF-8 content via the contents API, with one
+ *  backoff retry on secondary-rate-limit (403/429). Returns null on any miss. */
+async function githubGetContent(owner: string, repo: string, p: string, branch: string, token: string): Promise<string | null> {
+  for (let attempt = 0; ; attempt++) {
+    const res = await fetch(
+      `https://api.github.com/repos/${owner}/${repo}/contents/${encodeGithubPath(p)}?ref=${encodeURIComponent(branch)}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: "application/vnd.github+json",
+          "X-GitHub-Api-Version": "2022-11-28",
+          "User-Agent": "Omnecor/1.0",
+        },
+        signal: AbortSignal.timeout(15_000),
+      },
+    );
+    if ((res.status === 403 || res.status === 429) && attempt < 2) {
+      const retryAfter = Number(res.headers.get("retry-after")) || 2 ** attempt;
+      await sleep(retryAfter * 1000);
+      continue;
+    }
+    if (!res.ok) return null;
+    const data = await res.json() as { content?: string; encoding?: string };
+    if (!data.content) return null;
+    return Buffer.from(data.content, (data.encoding as BufferEncoding) || "base64").toString("utf-8");
+  }
+}
+
+async function fetchGithubDocuments(owner: string, repo: string, token: string): Promise<SourceDocument[]> {
+  const info = await githubFetch(`/repos/${owner}/${repo}`, token) as { default_branch?: string };
+  const branch = info.default_branch || "main";
+  const tree = await githubFetch(`/repos/${owner}/${repo}/git/trees/${branch}?recursive=1`, token) as {
+    tree?: Array<{ path: string; type: "blob" | "tree"; size?: number }>;
+  };
+  const files = (tree.tree ?? [])
+    .filter(e => e.type === "blob" && hasTextExtension(e.path) && (e.size ?? 0) <= CONTENT_MAX_BYTES_PER_ITEM)
+    .slice(0, CONTENT_MAX_ITEMS);
+
+  const budget = makeByteBudget();
+  const docs = await mapWithConcurrency(files, CONTENT_CONCURRENCY, async (f) => {
+    try {
+      const text = await githubGetContent(owner, repo, f.path, branch, token);
+      if (!text || !text.trim() || !budget.take(text)) return null;
+      return { path: f.path, text: clip(text), type: "file" } as SourceDocument;
+    } catch { return null; }
+  });
+  return docs.filter((d): d is SourceDocument => d !== null);
+}
+
+// ── Notion ──────────────────────────────────────────────────────────────────
+
+/** Flatten a page's top-level blocks into plain text. */
+export function extractNotionText(blocks: Array<Record<string, any>>): string {
+  const lines: string[] = [];
+  for (const b of blocks) {
+    const type = b.type as string | undefined;
+    const node = type ? b[type] : undefined;
+    const rich = node?.rich_text as Array<{ plain_text?: string }> | undefined;
+    if (Array.isArray(rich)) {
+      const line = rich.map(r => r.plain_text ?? "").join("");
+      if (line.trim()) lines.push(line);
+    }
+  }
+  return lines.join("\n");
+}
+
+async function fetchNotionDocuments(token: string): Promise<SourceDocument[]> {
+  const res = await notionFetch("/search", token, { page_size: 50 }) as {
+    results: Array<{ id: string; title?: Array<{ plain_text?: string }>; properties?: Record<string, any> }>;
+  };
+  const pages = (res.results ?? []).slice(0, CONTENT_MAX_ITEMS);
+  const budget = makeByteBudget();
+  const docs = await mapWithConcurrency(pages, CONTENT_CONCURRENCY, async (pg) => {
+    try {
+      let title = pg.title?.[0]?.plain_text;
+      if (!title && pg.properties) {
+        for (const prop of Object.values(pg.properties)) {
+          if (prop?.type === "title" && prop.title?.[0]?.plain_text) { title = prop.title[0].plain_text; break; }
+        }
+      }
+      const children = await notionFetch(`/blocks/${pg.id}/children?page_size=100`, token) as {
+        results?: Array<Record<string, any>>;
+      };
+      const body = extractNotionText(children.results ?? []);
+      const text = `${title ?? "Untitled"}\n\n${body}`.trim();
+      if (!body.trim() || !budget.take(text)) return null;
+      return { path: `notion/${pg.id}`, text: clip(text), type: "file" } as SourceDocument;
+    } catch { return null; }
+  });
+  return docs.filter((d): d is SourceDocument => d !== null);
+}
+
+// ── Slack ───────────────────────────────────────────────────────────────────
+
+async function fetchSlackDocuments(token: string): Promise<SourceDocument[]> {
+  const data = await slackFetch("conversations.list", token, { limit: "100", types: "public_channel,private_channel" }) as {
+    channels?: Array<{ id: string; name: string }>;
+  };
+  const channels = (data.channels ?? []).slice(0, CONTENT_MAX_ITEMS);
+  const budget = makeByteBudget();
+  const docs = await mapWithConcurrency(channels, CONTENT_CONCURRENCY, async (c) => {
+    try {
+      const hist = await slackFetch("conversations.history", token, { channel: c.id, limit: "50" }) as {
+        messages?: Array<{ text?: string }>;
+      };
+      const body = (hist.messages ?? []).map(m => m.text ?? "").filter(Boolean).join("\n");
+      const text = `#${c.name}\n\n${body}`.trim();
+      if (!body.trim() || !budget.take(text)) return null;
+      return { path: `slack/${c.id}`, text: clip(text), type: "file" } as SourceDocument;
+    } catch { return null; }
+  });
+  return docs.filter((d): d is SourceDocument => d !== null);
+}
+
+// ── Google Drive ──────────────────────────────────────────────────────────────
+
+/** Resolve a Drive file's text: export Google-native docs to text, download
+ *  text MIME types directly, skip binaries. */
+async function downloadGdriveText(
+  file: { id: string; name: string; mimeType: string }, token: string,
+): Promise<string | null> {
+  const auth = { Authorization: `Bearer ${token}` };
+  let url: string | null = null;
+  if (file.mimeType.startsWith("application/vnd.google-apps.")) {
+    const exportType =
+      file.mimeType === "application/vnd.google-apps.spreadsheet" ? "text/csv" :
+      file.mimeType === "application/vnd.google-apps.document" ||
+      file.mimeType === "application/vnd.google-apps.presentation" ? "text/plain" : null;
+    if (!exportType) return null; // forms, drawings, folders, etc. — nothing to embed
+    url = `https://www.googleapis.com/drive/v3/files/${file.id}/export?mimeType=${encodeURIComponent(exportType)}`;
+  } else if (file.mimeType.startsWith("text/") || file.mimeType === "application/json" || hasTextExtension(file.name)) {
+    url = `https://www.googleapis.com/drive/v3/files/${file.id}?alt=media`;
+  } else {
+    return null;
+  }
+  const res = await fetch(url, { headers: auth, signal: AbortSignal.timeout(15_000) });
+  if (!res.ok) return null;
+  return clip(await res.text());
+}
+
+async function fetchGdriveDocuments(token: string): Promise<SourceDocument[]> {
+  const res = await gdriveFetch(
+    "/files?pageSize=200&orderBy=modifiedTime desc&fields=files(id,name,mimeType,size)&q=" +
+      encodeURIComponent("trashed = false"),
+    token,
+  ) as { files?: Array<{ id: string; name: string; mimeType: string; size?: string }> };
+  const files = (res.files ?? [])
+    .filter(f => f.mimeType !== "application/vnd.google-apps.folder")
+    .slice(0, CONTENT_MAX_ITEMS);
+  const budget = makeByteBudget();
+  const docs = await mapWithConcurrency(files, CONTENT_CONCURRENCY, async (f) => {
+    try {
+      const body = await downloadGdriveText(f, token);
+      const text = body ? `${f.name}\n\n${body}`.trim() : "";
+      if (!text || !budget.take(text)) return null;
+      return { path: `gdrive/${f.id}`, text: clip(text), type: "file" } as SourceDocument;
+    } catch { return null; }
+  });
+  return docs.filter((d): d is SourceDocument => d !== null);
+}
+
+// ── Gmail / Outlook ───────────────────────────────────────────────────────────
+
+/** Recursively pull the first text/plain (or text/html) body from a Gmail payload. */
+export function extractGmailBody(payload: any): string {
+  if (!payload) return "";
+  const decode = (data?: string) => data ? Buffer.from(data, "base64url").toString("utf-8") : "";
+  if (payload.mimeType === "text/plain" && payload.body?.data) return decode(payload.body.data);
+  if (payload.mimeType === "text/html" && payload.body?.data) return htmlToText(decode(payload.body.data));
+  for (const part of payload.parts ?? []) {
+    const found = extractGmailBody(part);
+    if (found) return found;
+  }
+  return "";
+}
+
+async function fetchGmailDocuments(token: string): Promise<SourceDocument[]> {
+  const auth = { Authorization: `Bearer ${token}` };
+  const list = await fetch(
+    "https://gmail.googleapis.com/gmail/v1/users/me/messages?maxResults=50",
+    { headers: auth, signal: AbortSignal.timeout(10_000) },
+  ).then(r => r.json()) as { messages?: Array<{ id: string }> };
+  const ids = (list.messages ?? []).slice(0, Math.min(CONTENT_MAX_ITEMS, 50)).map(m => m.id);
+  const budget = makeByteBudget();
+  const docs = await mapWithConcurrency(ids, CONTENT_CONCURRENCY, async (id) => {
+    try {
+      const msg = await fetch(
+        `https://gmail.googleapis.com/gmail/v1/users/me/messages/${id}?format=full`,
+        { headers: auth, signal: AbortSignal.timeout(15_000) },
+      ).then(r => r.json()) as { snippet?: string; payload?: any };
+      const subject = (msg.payload?.headers ?? []).find((h: any) => h.name === "Subject")?.value ?? "(no subject)";
+      const body = extractGmailBody(msg.payload) || msg.snippet || "";
+      const text = `${subject}\n\n${body}`.trim();
+      if (!body.trim() || !budget.take(text)) return null;
+      return { path: `gmail/${id}`, text: clip(text), type: "file" } as SourceDocument;
+    } catch { return null; }
+  });
+  return docs.filter((d): d is SourceDocument => d !== null);
+}
+
+async function fetchOutlookDocuments(token: string): Promise<SourceDocument[]> {
+  const auth = { Authorization: `Bearer ${token}` };
+  const list = await fetch(
+    "https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?$top=50&$select=id,subject,body,bodyPreview",
+    { headers: auth, signal: AbortSignal.timeout(15_000) },
+  ).then(r => r.json()) as {
+    value?: Array<{ id: string; subject?: string; body?: { contentType?: string; content?: string }; bodyPreview?: string }>;
+  };
+  const msgs = (list.value ?? []).slice(0, CONTENT_MAX_ITEMS);
+  const budget = makeByteBudget();
+  const docs: SourceDocument[] = [];
+  for (const m of msgs) {
+    const raw = m.body?.content ?? m.bodyPreview ?? "";
+    const body = m.body?.contentType === "html" ? htmlToText(raw) : raw.trim();
+    const text = `${m.subject ?? "(no subject)"}\n\n${body}`.trim();
+    if (!body.trim() || !budget.take(text)) continue;
+    docs.push({ path: `outlook/${m.id}`, text: clip(text), type: "file" });
+  }
+  return docs;
+}
+
+// ── Dropbox / OneDrive (OAuth) ────────────────────────────────────────────────
+
+/** Bounded recursive Dropbox listing → text-file content downloads. */
+async function fetchDropboxDocuments(token: string): Promise<SourceDocument[]> {
+  const headers = { Authorization: `Bearer ${token}`, "Content-Type": "application/json" };
+  type Entry = { [".tag"]: string; name: string; id: string; path_lower?: string; size?: number };
+  const files: Entry[] = [];
+  let body: any = { path: "", recursive: true, limit: 1000 };
+  let url = "https://api.dropboxapi.com/2/files/list_folder";
+  for (let page = 0; page < 5 && files.length < CONTENT_MAX_ITEMS; page++) {
+    const res = await fetch(url, { method: "POST", headers, body: JSON.stringify(body), signal: AbortSignal.timeout(15_000) });
+    if (!res.ok) break;
+    const data = await res.json() as { entries?: Entry[]; cursor?: string; has_more?: boolean };
+    for (const e of data.entries ?? []) {
+      if (e[".tag"] === "file" && hasTextExtension(e.name) && (e.size ?? 0) <= CONTENT_MAX_BYTES_PER_ITEM) files.push(e);
+    }
+    if (!data.has_more || !data.cursor) break;
+    url = "https://api.dropboxapi.com/2/files/list_folder/continue";
+    body = { cursor: data.cursor };
+  }
+  const budget = makeByteBudget();
+  const docs = await mapWithConcurrency(files.slice(0, CONTENT_MAX_ITEMS), CONTENT_CONCURRENCY, async (f) => {
+    try {
+      const res = await fetch("https://content.dropboxapi.com/2/files/download", {
+        method: "POST",
+        headers: { Authorization: `Bearer ${token}`, "Dropbox-API-Arg": JSON.stringify({ path: f.path_lower || f.id }) },
+        signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return null;
+      const text = await res.text();
+      if (!text.trim() || !budget.take(text)) return null;
+      return { path: `dropbox/${f.id}`, text: clip(text), type: "file" } as SourceDocument;
+    } catch { return null; }
+  });
+  return docs.filter((d): d is SourceDocument => d !== null);
+}
+
+/** Bounded BFS of the OneDrive tree → text-file content downloads. */
+async function fetchOnedriveDocuments(token: string): Promise<SourceDocument[]> {
+  const auth = { Authorization: `Bearer ${token}` };
+  type Item = { id: string; name: string; size?: number; folder?: unknown; file?: unknown };
+  const files: Item[] = [];
+  const folderQueue: string[] = ["root"];
+  let listings = 0;
+  while (folderQueue.length > 0 && files.length < CONTENT_MAX_ITEMS && listings < 40) {
+    const folderId = folderQueue.shift()!;
+    listings++;
+    const seg = folderId === "root" ? "root" : `items/${folderId}`;
+    const res = await fetch(
+      `https://graph.microsoft.com/v1.0/me/drive/${seg}/children?$select=id,name,size,folder,file&$top=200`,
+      { headers: auth, signal: AbortSignal.timeout(15_000) },
+    );
+    if (!res.ok) continue;
+    const data = await res.json() as { value?: Item[] };
+    for (const it of data.value ?? []) {
+      if (it.folder) folderQueue.push(it.id);
+      else if (it.file && hasTextExtension(it.name) && (it.size ?? 0) <= CONTENT_MAX_BYTES_PER_ITEM) files.push(it);
+    }
+  }
+  const budget = makeByteBudget();
+  const docs = await mapWithConcurrency(files.slice(0, CONTENT_MAX_ITEMS), CONTENT_CONCURRENCY, async (f) => {
+    try {
+      const res = await fetch(`https://graph.microsoft.com/v1.0/me/drive/items/${f.id}/content`, {
+        headers: auth, signal: AbortSignal.timeout(15_000),
+      });
+      if (!res.ok) return null;
+      const text = await res.text();
+      if (!text.trim() || !budget.take(text)) return null;
+      return { path: `onedrive/${f.id}`, text: clip(text), type: "file" } as SourceDocument;
+    } catch { return null; }
+  });
+  return docs.filter((d): d is SourceDocument => d !== null);
+}
+
+/**
+ * Resolve a neural-map source URI to real text documents for the VectorDB feed.
+ * Mirrors fetchSourceTree's URI dispatch but returns CONTENT, not just labels.
+ * Reuses the same encrypted token store / OAuth refresh as the listing path.
+ */
+async function resolveSourceDocuments(uri: string, userId: number): Promise<SourceDocument[]> {
+  if (uri.startsWith("github://")) {
+    const slug = uri.slice("github://".length).replace(/\.git$/, "");
+    const [owner, repo] = slug.split("/");
+    if (!owner || !repo) throw new TRPCError({ code: "BAD_REQUEST", message: `Invalid GitHub source: ${uri}` });
+    return fetchGithubDocuments(owner, repo, getUserToken(String(userId), "github"));
+  }
+
+  if (uri.startsWith("integration://")) {
+    const type = uri.slice("integration://".length);
+    if (OAUTH_INTEGRATION_TYPES.has(type)) {
+      // Resolve (refreshing if near-expiry) the OAuth token via the same
+      // platformAccounts store the listing path uses, then fetch content.
+      const token = await resolveOAuthToken(userId, type);
+      return type === "dropbox" ? fetchDropboxDocuments(token) : fetchOnedriveDocuments(token);
+    }
+    const token = getUserToken(String(userId), type);
+    switch (type) {
+      case "notion": return fetchNotionDocuments(token);
+      case "slack": return fetchSlackDocuments(token);
+      case "google-drive": return fetchGdriveDocuments(token);
+      case "gmail": return fetchGmailDocuments(token);
+      case "outlook": return fetchOutlookDocuments(token);
+      default:
+        throw new TRPCError({ code: "NOT_IMPLEMENTED", message: `Content ingestion for "${type}" is not available.` });
+    }
+  }
+
+  throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported source URI: ${uri}` });
+}
+
+/** A valid, fresh OAuth access token for an OAuth integration (refresh-on-need),
+ *  reusing the platformAccounts store. Throws if not connected / unrefreshable. */
+async function resolveOAuthToken(userId: number, platform: string): Promise<string> {
+  const account = await getOAuthAccount(userId, platform);
+  if (!account) throw new TRPCError({ code: "NOT_FOUND", message: `${platform} is not connected.` });
+  // If the stored token is still valid, use it; otherwise refresh.
+  const expired = account.tokenExpiresAt ? account.tokenExpiresAt.getTime() <= Date.now() + 60_000 : false;
+  if (!expired) return account.oauthToken;
+  if (!account.oauthRefreshToken) return account.oauthToken;
+  const refreshed = await refreshOAuthToken(platform, account.oauthRefreshToken);
+  if (!refreshed.access_token) return account.oauthToken;
+  const db = await getDb();
+  await db.update(platformAccounts).set({
+    oauthToken: refreshed.access_token,
+    oauthRefreshToken: refreshed.refresh_token || account.oauthRefreshToken,
+    tokenExpiresAt: refreshed.expires_in ? new Date(Date.now() + refreshed.expires_in * 1000) : account.tokenExpiresAt,
+  }).where(eq(platformAccounts.id, account.id));
+  return refreshed.access_token;
+}
+
+// ---------------------------------------------------------------------------
+// Index-job tracking — a detached run per map, polled by the client for
+// progress. Kept in-memory: a fresh process simply has no in-flight jobs.
+// ---------------------------------------------------------------------------
+
+interface IndexedSourceResult {
+  uri: string;
+  ok: boolean;
+  items: number;
+  chunks: number;
+  error?: string;
+}
+
+interface MapIndexStatus {
+  mapId: string;
+  state: "running" | "done" | "error";
+  startedAt: string;
+  finishedAt: string | null;
+  totalSources: number;
+  completedSources: number;
+  totalChunks: number;
+  sources: IndexedSourceResult[];
+  error: string | null;
+}
+
+const indexJobs = new Map<string, MapIndexStatus>();
+
+const isRemoteRoot = (r: string) => r.startsWith("github://") || r.startsWith("integration://");
+
+/** Run the (detached) index of every remote root of a map into its collection. */
+async function runMapIndexJob(mapId: string, userId: number, remoteRoots: string[]): Promise<void> {
+  const status = indexJobs.get(mapId)!;
+  const memory = MemoryArchitectService.getInstance();
+  await memory.init().catch(() => {});
+
+  for (const uri of remoteRoots) {
+    const result: IndexedSourceResult = { uri, ok: false, items: 0, chunks: 0 };
+    try {
+      const sourceType = uri.startsWith("github://") ? "github" : uri.slice("integration://".length);
+      const docs = await resolveSourceDocuments(uri, userId);
+      const { items, chunks } = await memory.reindexRemoteSource(mapId, uri, sourceType, docs);
+      result.ok = true;
+      result.items = items;
+      result.chunks = chunks;
+      status.totalChunks += chunks;
+    } catch (err) {
+      result.error = err instanceof Error ? err.message : String(err);
+      log.warn(`Map index: source failed`, { mapId, uri, error: result.error });
+    }
+    status.sources.push(result);
+    status.completedSources++;
+  }
+
+  status.state = status.sources.every(s => s.ok) ? "done" : (status.sources.some(s => s.ok) ? "done" : "error");
+  status.finishedAt = new Date().toISOString();
+
+  const okCount = status.sources.filter(s => s.ok).length;
+  NotificationService.getInstance().notify({
+    kind: "system",
+    title: "Map indexing complete",
+    body: `Indexed ${okCount}/${status.totalSources} source${status.totalSources === 1 ? "" : "s"} · ${status.totalChunks} chunks into the map's knowledge base.`,
+    href: "/brain-map",
+    data: { mapId, totalChunks: status.totalChunks },
+  });
+}
+
+// ---------------------------------------------------------------------------
 // Router
 // ---------------------------------------------------------------------------
 
@@ -800,6 +1325,79 @@ export const integrationsRouter = router({
       }
 
       throw new TRPCError({ code: "BAD_REQUEST", message: `Unsupported source URI: ${input.uri}` });
+    }),
+
+  /**
+   * Feed a neural map's remote sources into its VectorDB collection so map RAG
+   * over remote content becomes real. Verifies map ownership, honours the map's
+   * `indexingEnabled` write-gate, then runs a DETACHED job (content fetch can be
+   * slow) whose progress is polled via `getMapIndexStatus`. Returns immediately.
+   * externalServiceProcedure: pulls from external (cloud) sources → Sovereign-gated.
+   */
+  indexMapSources: externalServiceProcedure
+    .input(z.object({ mapId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const userId = Number(ctx.user.id);
+
+      const db = await getDb();
+      const rows = await db.select().from(neuralMaps)
+        .where(and(eq(neuralMaps.id, input.mapId), eq(neuralMaps.userId, ctx.user.id)))
+        .limit(1);
+      const map = rows[0];
+      if (!map) throw new TRPCError({ code: "NOT_FOUND", message: "Map not found." });
+
+      const settings = (map.settings ?? {}) as Record<string, unknown>;
+      if (settings.indexingEnabled === false) {
+        return { started: false, skipped: true, reason: "Indexing is disabled for this map.", status: indexJobs.get(input.mapId) ?? null };
+      }
+
+      const remoteRoots = (map.rootDirectories ?? []).filter(isRemoteRoot);
+      if (remoteRoots.length === 0) {
+        return { started: false, skipped: true, reason: "This map has no remote sources to index.", status: null };
+      }
+
+      const existing = indexJobs.get(input.mapId);
+      if (existing?.state === "running") {
+        return { started: false, alreadyRunning: true, status: existing };
+      }
+
+      const status: MapIndexStatus = {
+        mapId: input.mapId,
+        state: "running",
+        startedAt: new Date().toISOString(),
+        finishedAt: null,
+        totalSources: remoteRoots.length,
+        completedSources: 0,
+        totalChunks: 0,
+        sources: [],
+        error: null,
+      };
+      indexJobs.set(input.mapId, status);
+
+      // Detached — do not await; the client polls getMapIndexStatus.
+      void runMapIndexJob(input.mapId, userId, remoteRoots).catch(err => {
+        status.state = "error";
+        status.error = err instanceof Error ? err.message : String(err);
+        status.finishedAt = new Date().toISOString();
+        log.warn("Map index job crashed", { mapId: input.mapId, error: status.error });
+      });
+
+      return { started: true, status };
+    }),
+
+  /** Poll the progress/result of a map's remote-source index run. Local read —
+   *  protectedProcedure so it still works in Sovereign mode. */
+  getMapIndexStatus: protectedProcedure
+    .input(z.object({ mapId: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
+      const db = await getDb();
+      const rows = await db.select({ id: neuralMaps.id }).from(neuralMaps)
+        .where(and(eq(neuralMaps.id, input.mapId), eq(neuralMaps.userId, ctx.user.id)))
+        .limit(1);
+      if (!rows[0]) throw new TRPCError({ code: "NOT_FOUND", message: "Map not found." });
+      return indexJobs.get(input.mapId) ?? null;
     }),
 
   /** Persist per-integration settings (non-sensitive config). */

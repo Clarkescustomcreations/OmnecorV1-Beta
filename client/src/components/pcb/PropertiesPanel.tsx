@@ -149,7 +149,7 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
                     flex-1 h-8 text-xs font-medium rounded border transition-all
                     ${
                       selectedNode.data.rotation === angle
-                        ? 'bg-accent text-accent-foreground border-accent'
+                        ? 'bg-primary/10 text-accent-foreground border-primary/30'
                         : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
                     }
                   `}

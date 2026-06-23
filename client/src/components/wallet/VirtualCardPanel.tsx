@@ -130,15 +130,15 @@ export function VirtualCardPanel() {
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {/* Card Display */}
-        <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-slate-800 text-white relative overflow-hidden group">
-          <div className="absolute top-0 right-0 w-32 h-32 bg-accent/10 blur-3xl -mr-16 -mt-16 group-hover:bg-accent/20 transition-colors" />
+        <Card className="bg-gradient-to-br from-slate-900 to-slate-950 border-border text-white relative overflow-hidden group">
+          <div className="absolute top-0 right-0 w-32 h-32 bg-primary/10 blur-3xl -mr-16 -mt-16 group-hover:bg-primary/20 transition-colors" />
           <CardHeader className="pb-8">
             <div className="flex justify-between items-start">
-              <CreditCard className="w-8 h-8 text-accent" />
+              <CreditCard className="w-8 h-8 text-primary" />
               <div className="flex flex-col items-end">
                 {activeCard ? (
                   <>
-                    <Badge variant="outline" className={cn("text-[10px] h-5", activeCard.status === "OPEN" ? "border-emerald-500/30 text-emerald-400 bg-emerald-500/5" : "border-amber-500/30 text-amber-400 bg-amber-500/5")}>
+                    <Badge variant="outline" className={cn("text-[10px] h-5", activeCard.status === "OPEN" ? "border-accent-success/30 text-accent-success bg-accent-success/5" : "border-accent-warning/30 text-accent-warning bg-accent-warning/5")}>
                       {activeCard.status}
                     </Badge>
                     <p className="text-[9px] text-muted-foreground mt-1 uppercase font-bold tracking-tighter">Single Use</p>
@@ -151,16 +151,16 @@ export function VirtualCardPanel() {
           </CardHeader>
           <CardContent className="space-y-6">
             {!activeCard ? (
-              <p className="text-sm text-slate-400 italic">No virtual card issued yet. Issue one using the form.</p>
+              <p className="text-sm text-muted-foreground italic">No virtual card issued yet. Issue one using the form.</p>
             ) : (
               <>
                 <div className="space-y-1">
-                  <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Card Number</p>
+                  <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Card Number</p>
                   <div className="flex items-center gap-2">
                     <p className="font-mono text-lg tracking-[0.2em]">{formattedPan}</p>
                     <Button
                       size="icon" variant="ghost"
-                      className="h-6 w-6 text-slate-500 hover:text-white"
+                      className="h-6 w-6 text-muted-foreground hover:text-white"
                       onClick={handleReveal}
                       disabled={revealPanMutation.isPending}
                     >
@@ -173,19 +173,19 @@ export function VirtualCardPanel() {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Expiry</p>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Expiry</p>
                     <p className="font-mono text-sm">{formattedExpiry}</p>
                   </div>
                   <div className="space-y-1">
-                    <p className="text-[10px] uppercase font-bold text-slate-500 tracking-widest">Limit</p>
+                    <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Limit</p>
                     <p className="font-mono text-sm">${((activeCard.spendLimitCents ?? 0) / 100).toFixed(2)}</p>
                   </div>
                 </div>
 
-                <div className="pt-2 border-t border-slate-800 flex justify-end">
+                <div className="pt-2 border-t border-border flex justify-end">
                   <Button
                     size="icon" variant="outline"
-                    className="h-8 w-8 border-slate-800 bg-slate-900/50 hover:bg-slate-800"
+                    className="h-8 w-8 border-border bg-card/50 hover:bg-card"
                     onClick={handleCopyPan}
                     title="Copy card number"
                   >
@@ -198,7 +198,7 @@ export function VirtualCardPanel() {
         </Card>
 
         {/* Issue New Card Form */}
-        <Card className="bg-muted/20 border-accent/10">
+        <Card className="bg-muted/20 border-primary/10">
           <CardHeader>
             <CardTitle className="text-sm">Issue Task-Specific Card</CardTitle>
             <CardDescription className="text-xs">Create a new virtual card for a specific agentic task or project.</CardDescription>
@@ -222,8 +222,8 @@ export function VirtualCardPanel() {
                 className="h-9 text-sm"
               />
             </div>
-            <div className="p-3 rounded-lg bg-accent/5 border border-accent/20 space-y-2">
-              <div className="flex items-center gap-2 text-accent">
+            <div className="p-3 rounded-lg bg-primary/5 border border-primary/20 space-y-2">
+              <div className="flex items-center gap-2 text-primary">
                 <ShieldCheck className="w-3.5 h-3.5" />
                 <span className="text-[10px] font-bold uppercase">HITL Security</span>
               </div>
@@ -232,7 +232,7 @@ export function VirtualCardPanel() {
               </p>
             </div>
             <Button
-              className="w-full gap-2 h-10 bg-accent text-accent-foreground"
+              className="w-full gap-2 h-10 bg-primary/10 text-accent-foreground"
               disabled={isIssuing}
               onClick={handleIssue}
             >
@@ -248,7 +248,7 @@ export function VirtualCardPanel() {
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-base flex items-center gap-2">
-              <Activity className="w-4 h-4 text-blue-500" /> Card Activity
+              <Activity className="w-4 h-4 text-primary" /> Card Activity
             </CardTitle>
             <div className="flex items-center gap-2">
               {loadingTx && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
@@ -284,8 +284,8 @@ export function VirtualCardPanel() {
                   <div className="text-right">
                     <p className="text-sm font-mono font-bold">${(tx.amount / 100).toFixed(2)}</p>
                     <Badge variant="outline" className={cn("text-[9px] h-4 uppercase",
-                      tx.status === "SETTLED" ? "text-emerald-500 border-emerald-500/20"
-                      : tx.status === "PENDING" ? "text-amber-500 border-amber-500/20"
+                      tx.status === "SETTLED" ? "text-accent-success border-accent-success/20"
+                      : tx.status === "PENDING" ? "text-accent-warning border-accent-warning/20"
                       : "text-muted-foreground border-muted"
                     )}>
                       {tx.status}

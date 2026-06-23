@@ -133,7 +133,7 @@ export function ModelHub() {
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <Zap className="w-6 h-6 text-accent flex-shrink-0" />
+              <Zap className="w-6 h-6 text-primary flex-shrink-0" />
               <div className="min-w-0">
                 <h1 className="text-xl font-bold truncate">Model Hub</h1>
                 <p className="text-sm text-muted-foreground truncate">Manage local and API-based AI models</p>
@@ -188,7 +188,7 @@ export function ModelHub() {
                 {selectedModel && (
                   <Button
                     size="sm"
-                    className="h-6 px-2 text-[10px] font-bold bg-accent text-accent-foreground hover:bg-accent/90 shadow-[0_0_12px_rgba(168,85,247,0.4)] border border-accent/20 transition-all duration-300 animate-pulse flex-shrink-0"
+                    className="h-6 px-2 text-[10px] font-bold bg-primary/10 text-accent-foreground hover:bg-primary/90 shadow-[0_0_12px_rgba(168,85,247,0.4)] border border-primary/20 transition-all duration-300 animate-pulse flex-shrink-0"
                     onClick={handleUseThisModel}
                   >
                     Use Model
@@ -239,7 +239,7 @@ export function ModelHub() {
               <CardContent className="px-4 pb-0 mt-1">
                 <div className="w-full min-w-0 max-h-32 overflow-y-auto rounded border border-border/50 bg-muted/20 p-1.5 space-y-1">
                   {configuredProviders.map(p => (
-                    <div key={p.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-accent/5 text-[11px] font-mono min-w-0 gap-2">
+                    <div key={p.id} className="flex items-center justify-between px-2 py-1 rounded hover:bg-primary/5 text-[11px] font-mono min-w-0 gap-2">
                       <span className="text-muted-foreground truncate">{p.label}</span>
                       {p.configured ? (
                         <span className="flex items-center gap-1 text-accent-success font-medium flex-shrink-0">
@@ -287,11 +287,11 @@ export function ModelHub() {
                   <div className="w-full min-w-0 max-h-24 overflow-y-auto rounded border border-border/50 bg-muted/20 p-1.5 space-y-1 mt-1">
                     <div className="flex items-center justify-between px-2 py-1 rounded text-[11px] font-mono min-w-0 gap-2">
                       <span className="text-muted-foreground flex-shrink-0">Default Chat:</span>
-                      <span className="text-accent font-bold break-all ml-2 text-right">Auto</span>
+                      <span className="text-primary font-bold break-all ml-2 text-right">Auto</span>
                     </div>
                     <div className="flex items-center justify-between px-2 py-1 rounded text-[11px] font-mono min-w-0 gap-2">
                       <span className="text-muted-foreground flex-shrink-0">Default Code:</span>
-                      <span className="text-accent font-bold break-all ml-2 text-right">Auto</span>
+                      <span className="text-primary font-bold break-all ml-2 text-right">Auto</span>
                     </div>
                   </div>
                 </div>

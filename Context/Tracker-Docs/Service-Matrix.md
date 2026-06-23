@@ -71,6 +71,7 @@
 - **Embedding Fix (F11)**: `@anthropic-ai/tokenizer` BPE encoder — replaced whitespace pseudo-tokenizer that produced identical token IDs for same-length strings (broken vector search). Now produces unique, content-sensitive embeddings.
 - **Failure Handling**: `VectorDBService` degrades gracefully when ChromaDB unreachable — semantic search disabled, episodic memory unavailable; `console.warn` logged; no crash
 - **Per-Agent Isolation**: `recursive_mas_bridge.py` creates a separate ChromaDB collection per agent to prevent context leakage in multi-agent runs
+- **Collection naming (2026-06-23)**: all writers + the reader derive names from the shared `VectorDBService.sanitizeCollectionName` (single source of truth). A neural map's collection `omnecor_{mapId}` holds **both** local-file content (via `FileSystemWatcherService`) and remote-source content (via `integrations.indexMapSources` → `MemoryArchitectService.reindexRemoteSource`). Fixed a latent seam where the watcher wrote a raw, unsanitized name that diverged from the reader's sanitized one for hyphenated map UUIDs.
 
 ### ComfyUI
 - **Port**: Configurable — `COMFYUI_URL` env var (default `http://localhost:8188`)

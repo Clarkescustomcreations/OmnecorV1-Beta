@@ -45,7 +45,7 @@ export const PCBNode: React.FC<NodeProps<PCBNodeData>> = ({
           type="source"
           position={positionMap[handle.position ?? "left"] ?? Position.Left}
           id={handle.id}
-          className="w-2 h-2 bg-orange-400 rounded-none border border-orange-600 hover:bg-orange-300"
+          className="w-2 h-2 bg-accent-warning rounded-none border border-accent-warning hover:bg-accent-warning"
           style={{
             opacity: 0.5,
           }}
@@ -60,8 +60,8 @@ export const PCBNode: React.FC<NodeProps<PCBNodeData>> = ({
         relative p-1 rounded border transition-all
         ${
           selected
-            ? 'border-2 border-blue-400 bg-blue-100 shadow-lg'
-            : `border border-gray-400 ${layer === 'top' ? 'bg-red-50' : 'bg-blue-50'} shadow`
+            ? 'border-2 border-primary bg-primary shadow-lg'
+            : `border border-border ${layer === 'top' ? 'bg-red-50' : 'bg-blue-50'} shadow`
         }
       `}
       style={{
@@ -83,7 +83,7 @@ export const PCBNode: React.FC<NodeProps<PCBNodeData>> = ({
 
       {/* Reference Label */}
       <div
-        className="absolute top-0 left-0 text-xs font-bold text-gray-700 pointer-events-none bg-white bg-opacity-70 px-1 rounded"
+        className="absolute top-0 left-0 text-xs font-bold text-muted-foreground pointer-events-none bg-white bg-opacity-70 px-1 rounded"
         style={{
           transform: `rotate(-${rotationDeg}deg)`,
           transformOrigin: 'top left',

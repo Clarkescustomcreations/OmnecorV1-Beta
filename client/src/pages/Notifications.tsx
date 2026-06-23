@@ -205,7 +205,7 @@ function AgentMessenger({ initialPersona }: { initialPersona?: string }) {
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-1.5">
                   <span className="text-sm font-medium truncate">{c.name}</span>
-                  {c.alwaysOn && <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 shrink-0" />}
+                  {c.alwaysOn && <span className="w-1.5 h-1.5 rounded-full bg-accent-success shrink-0" />}
                 </div>
                 <p className="text-[11px] text-muted-foreground truncate">
                   {c.lastMessage ?? c.type.replace(/_/g, " ")}

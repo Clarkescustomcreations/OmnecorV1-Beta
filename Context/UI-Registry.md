@@ -24,6 +24,43 @@ The `Status` column above records *what the handler is wired to*. The new **Veri
 
 ---
 
+## Session 24 (2026-06-23) — Map RAG over remote sources (VectorDB feed, end-to-end)
+
+Completes the neural-map remote-source pipeline: `fetchSourceTree` listing → real
+**content** ingestion into the map's VectorDB collection → chat RAG retrieval. Built
+full (no deferrals) per the *Build Complete, Fix Now* directive. Full detail in
+`Progress-Tracker.md`.
+
+New / changed interactive elements:
+
+1. **`BrainMap.tsx` — "Index" button (page header)** — ~~new~~ **CONNECTED**. Fires
+   **`integrations.indexMapSources`** (externalServiceProcedure mutation; ownership-checked,
+   `indexingEnabled`-gated; runs a detached server job) and polls **`integrations.getMapIndexStatus`**
+   (query, 1.5 s while a run is in flight). Auto-triggers once per map open when the map has
+   remote roots and indexing is enabled; manual click re-indexes. Label states:
+   `Index` → `Indexing {done}/{total}…` → `Indexed · {n} chunks` → `Indexing off` (disabled).
+   Shown only when the active map has `github://` / `integration://` roots.
+   **Visual:** reuses the established header-button pattern — `Button size="sm" variant="outline"`
+   + `h-8 gap-1.5 text-xs`, `Database` / `Loader2` (animate-spin) icons — consistent with the
+   View-switcher and Window-control buttons in the same header. No new visual primitives.
+2. **`Chat.tsx` — chat send** now passes **`ragMapId`** (the active map id, gated client-side by
+   the map's `enableAIContext`) to **`aiProvider.chatStream`**; the server-side read-wiring also
+   covers **`ai.chat`**. Not a new visible control — a new field on the existing chat call that
+   lets the server inject the map's indexed knowledge into the prompt. The internal
+   summarize/compress `ai.chat` call deliberately does **not** set it.
+3. **Lifecycle (no UI control):** removing a remote source from a map (`neuralMaps.update`) or
+   deleting a map (`neuralMaps.delete`) now reconciles/drops the corresponding vectors.
+
+> **Verified verdict:** `integrations.indexMapSources`, `integrations.getMapIndexStatus`, and the
+> `ragMapId` read-path on `aiProvider.chatStream` / `ai.chat` → **UNVERIFIED ⚠️**. Wired to real
+> impls (traced), `tsc` 0 · `vitest` 371/371 (20 new) · production build ✓ · symbols confirmed in
+> both bundles — but **not live-driven this pass**: the sandbox terminates any bound HTTP listener,
+> and a true end-to-end ingest additionally needs ChromaDB running + real GitHub/OAuth tokens.
+> Promote to VERIFIED-REAL ✅ once driven against a live ChromaDB + a connected source.
+> (`integrations.fetchSourceTree` remains VERIFIED-REAL ✅ from Session 23.)
+
+---
+
 ## Session 23 (2026-06-20) — Ruthless beta code-sweep + live verification
 
 UI-affecting changes from the 3-session sweep (full detail in `Progress-Tracker.md`):
@@ -1401,7 +1438,7 @@ Read-only display component. No interactive elements.
 | GitHub Repo Enter key | add | addRepo | None | LOCAL |
 | Add Repo Button | add | addRepo | None | LOCAL |
 | Remove Repo × | remove | removeRepo | None | LOCAL |
-| Cloud source toggle | toggle | toggleCloud (gmail/outlook/google-drive now ingestable; dropbox/onedrive still "coming soon") | selected `integration://`/`github://` roots → `integrations.fetchSourceTree` when the map renders in BrainMap | **LOCAL** (feeds CONNECTED ingestion, Session 23) |
+| Cloud source toggle | toggle | toggleCloud (all types ingestable — gmail/outlook/google-drive/github + dropbox/onedrive since 2026-06-22; no "coming soon" remain) | selected `integration://`/`github://` roots → `integrations.fetchSourceTree` (listing) + `integrations.indexMapSources` (content→VectorDB) when the map renders/opens in BrainMap | **LOCAL** (feeds CONNECTED ingestion + RAG, Session 24) |
 | Create Map Button | create | createMap (context hook) | useNeuralMap().createMap | CONNECTED |
 | Duplicate Map Button | duplicate | duplicateMap (context hook) | useNeuralMap().duplicateMap | CONNECTED |
 | Delete Map Button | delete | deleteMap (context hook) | useNeuralMap().deleteMap | CONNECTED |
@@ -2893,3 +2930,48 @@ Each `ChainCard` contains:
 - Reorder is pure local state manipulation (array splice + index swap). The order is serialized into `steps[]` on Save.
 - The cloud chain card (`moe_chain_omesh`) shows a sovereign-mode warning badge when the user's `executionMode` is `sovereign`, since that chain type is blocked in sovereign mode.
 - Both cards are always rendered (not conditionally hidden) so the user can configure them before activating either routing mode.
+
+---
+
+### Neural Map — Computing-layout overlay, truncated-folder badge & tree drill-in
+
+File: client/src/components/neural/NeuralGraphView.tsx, client/src/components/neural/NeuralTreeView.tsx
+Last updated: 2026-06-22
+
+New UI from the off-thread-layout (Web Worker) + bounded-loading (server budget + lazy folder expansion) work. Three reusable patterns:
+
+**1. Working / "Computing layout…" overlay** (graph viewport — shown while the Web-Worker layout runs)
+
+| Property | Class |
+|---|---|
+| Scrim | `absolute inset-0 z-30 bg-background/60 backdrop-blur-sm pointer-events-none` |
+| Layout | `flex items-center justify-center` |
+| Pill container | `flex items-center gap-2 rounded-md border border-primary/20 bg-card/90 px-4 py-2 shadow-lg` |
+| Pill text | `text-sm text-muted-foreground` |
+| Spinner icon | `w-4 h-4 animate-spin text-primary` (lucide `RotateCw`) |
+
+**2. Inline status badge — truncated folder** (graph node, sibling of the in-context `ctx` badge)
+
+| Property | Class |
+|---|---|
+| Background | `bg-primary/15` |
+| Text | `text-primary` |
+| Radius | `rounded` |
+| Spacing | `px-1 gap-0.5` + inline `paddingTop/Bottom: 1` (scales with node size) |
+| Layout | `flex items-center leading-none flex-shrink-0` |
+| Icon / count | lucide `FolderPlus` (sized from node `fontSize`) + `+{childCount}` |
+
+**3. Tree-view drill-in** (NeuralTreeView, sibling of the chevron toggle)
+
+| Property | Class |
+|---|---|
+| Drill-in button | `p-0.5 hover:bg-primary/20 rounded transition-colors` (lucide `FolderPlus` `w-3.5 h-3.5 text-primary`) |
+| Count badge | `text-[10px] text-primary/70 tabular-nums` |
+| Tooltip hint | `text-[10px] text-primary mt-1` |
+
+**Pattern notes:**
+- **Viewport "working" overlay standard:** `bg-background/60 backdrop-blur-sm` scrim + centered `bg-card/90 border border-primary/20 rounded-md shadow-lg px-4 py-2` pill with `text-sm text-muted-foreground` and an `animate-spin text-primary` icon. Reuse for any "working…" state over a canvas/viewport. Keep it `pointer-events-none` so it never traps interaction.
+- **Token-resolved canvas colors:** MiniMap node/mask + Background dot colors are resolved from `--color-*` tokens at runtime via `resolveCssColor` (ReactFlow paints these as SVG *attributes*, which don't resolve `var()`). Never hardcode hex here — pass resolved token values with the UI-Tokens palette as fallback.
+- **Inline node status badges share a shape:** `<bg-X/opacity> text-X px-1 rounded leading-none flex-shrink-0`. Truncated → primary; in-context ("ctx") → accent-success. Padding is inline (not `py-0.5`) only because the node badge font-size scales with the Node Size control.
+- **Drill-in affordances** reuse the tree's existing icon-button hover (`hover:bg-primary/20 rounded transition-colors`) and `text-[10px] … tabular-nums` count style, tinted `text-primary`/`text-primary/70` to signal "loadable" vs the muted `text-muted-foreground/50` used for already-loaded child counts.
+- **⚠ Drift to flag:** the truncated badge uses `bg-primary/15` while the sibling `ctx` badge uses `bg-accent-success/20`. Inline status badges should standardize on **/20** background opacity — align the truncated badge to `bg-primary/20` when convenient.

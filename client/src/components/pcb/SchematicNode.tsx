@@ -46,7 +46,7 @@ export const SchematicNode: React.FC<NodeProps<SchematicNodeData>> = ({
           type={handle.type === 'both' ? 'source' : handle.type === 'source' ? 'source' : 'target'}
           position={positionMap[handle.position ?? "left"] ?? Position.Left}
           id={handle.id}
-          className="w-3 h-3 bg-amber-500 rounded-none border-2 border-amber-600 hover:bg-amber-400"
+          className="w-3 h-3 bg-accent-warning rounded-none border-2 border-accent-warning hover:bg-accent-warning"
           style={{
             // Position handles around the node
             opacity: 0.5,
@@ -62,8 +62,8 @@ export const SchematicNode: React.FC<NodeProps<SchematicNodeData>> = ({
         relative p-2 rounded border-2 transition-all
         ${
           selected
-            ? 'border-blue-500 bg-blue-50 shadow-lg'
-            : 'border-amber-500 bg-slate-900 shadow'
+            ? 'border-primary bg-blue-50 shadow-lg'
+            : 'border-accent-warning bg-card shadow'
         }
       `}
       style={{
@@ -82,14 +82,14 @@ export const SchematicNode: React.FC<NodeProps<SchematicNodeData>> = ({
 
       {/* Reference and Value Labels */}
       <div
-        className="absolute top-0 left-0 text-xs font-bold text-amber-500 pointer-events-none"
+        className="absolute top-0 left-0 text-xs font-bold text-accent-warning pointer-events-none"
         style={{
           transform: `rotate(-${rotationDeg}deg)`,
           transformOrigin: 'top left',
         }}
       >
         <div>{reference}</div>
-        {value && <div className="text-xs text-amber-400">{value}</div>}
+        {value && <div className="text-xs text-accent-warning">{value}</div>}
       </div>
 
       {/* Connection Handles */}

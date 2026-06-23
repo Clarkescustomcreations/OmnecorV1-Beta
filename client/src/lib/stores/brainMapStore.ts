@@ -9,8 +9,14 @@ interface BrainMapState {
   // Folder collapse/expand state — IDs of folders whose children are hidden
   collapsedFolderIds: string[];
 
+  // True while the layout engine (Web Worker) is computing node positions.
+  // Drives the "Computing layout…" overlay so a large map's layout pass — now
+  // off the render thread — is visible instead of silently blocking.
+  layoutComputing: boolean;
+
   // Actions
   setProjectId: (id: string | null) => void;
+  setLayoutComputing: (computing: boolean) => void;
   setNodes: (nodes: Node[] | ((prev: Node[]) => Node[])) => void;
   setEdges: (edges: Edge[] | ((prev: Edge[]) => Edge[])) => void;
   onNodesChange: OnNodesChange;
@@ -37,6 +43,7 @@ export const useBrainMapStore = create<BrainMapState>((set, get) => ({
   edges: [],
   projectId: null,
   collapsedFolderIds: [],
+  layoutComputing: false,
   windowMode: 'embedded',
   windowPosition: { x: 100, y: 100 },
   windowSize: { width: 800, height: 600 },
@@ -45,6 +52,8 @@ export const useBrainMapStore = create<BrainMapState>((set, get) => ({
     set({ projectId: id, collapsedFolderIds: [] }); // reset collapse state on project switch
     syncChannel.postMessage({ type: 'setProjectId', payload: id });
   },
+
+  setLayoutComputing: (computing) => set({ layoutComputing: computing }),
 
   setNodes: (nodesOrFn) => {
     const newNodes = typeof nodesOrFn === 'function' ? nodesOrFn(get().nodes) : nodesOrFn;

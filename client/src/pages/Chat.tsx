@@ -698,6 +698,10 @@ export function Chat() {
             apiKey: selectedModel.apiKey,
             baseUrl: selectedModel.baseUrl,
             messages: apiMessages,
+            // Map RAG: anchor the chat to the active map so the server can inject
+            // its indexed knowledge. Gated client-side by the same enableAIContext
+            // toggle used for projectContext; the server re-checks authoritatively.
+            ragMapId: activeMap?.settings.enableAIContext ? activeMap.id : undefined,
           },
         {
           onData(chunk) {
@@ -786,7 +790,7 @@ export function Chat() {
         startStream(selectedModel.providerId, selectedModel.modelId);
       }
     },
-    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, conversation.id, excludedMessageIds]
+    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, conversation.id, excludedMessageIds, activeMap?.id, activeMap?.settings.enableAIContext]
   );
 
   // ── Send message ─────────────────────────────────────────────────────────
@@ -1367,7 +1371,7 @@ export function Chat() {
                 {btwNotes.map((note, i) => (
                   <div
                     key={`btw-${i}`}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent/40 border border-border text-xs max-w-xs"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/40 border border-border text-xs max-w-xs"
                   >
                     <span className="font-semibold text-accent-foreground opacity-70">btw</span>
                     <span className="text-muted-foreground truncate">{note}</span>
@@ -1496,9 +1500,9 @@ export function Chat() {
             <div className="fixed inset-y-0 right-0 w-[85vw] max-w-sm sm:static sm:w-96 sm:max-w-none lg:w-[400px] xl:w-[500px] flex flex-col gap-2 overflow-hidden flex-shrink-0 border border-border rounded-xl bg-card shadow-xl animate-in slide-in-from-right-4 duration-300 z-30 sm:z-10">
               <div className="flex items-center justify-between px-3 py-2 border-b border-border bg-muted/30">
                 <div className="flex items-center gap-2">
-                  {previewMode === "3d" && <Box className="w-4 h-4 text-accent" />}
-                  {previewMode === "pcb" && <Cpu className="w-4 h-4 text-accent" />}
-                  {previewMode === "web" && <Globe className="w-4 h-4 text-accent" />}
+                  {previewMode === "3d" && <Box className="w-4 h-4 text-primary" />}
+                  {previewMode === "pcb" && <Cpu className="w-4 h-4 text-primary" />}
+                  {previewMode === "web" && <Globe className="w-4 h-4 text-primary" />}
                   <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                     Live Preview
                   </span>
@@ -1507,7 +1511,7 @@ export function Chat() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="h-6 w-6 hover:bg-accent/20 hover:text-accent"
+                    className="h-6 w-6 hover:bg-primary/20 hover:text-primary"
                     title="Edit in Designer (Current Tab)"
                     onClick={() => {
                       localStorage.setItem("omnecor:designer_code", previewCode);
@@ -1520,7 +1524,7 @@ export function Chat() {
                   <Button
                     size="icon"
                     variant="ghost"
-                    className="w-6 h-6 hover:bg-accent/20 hover:text-accent"
+                    className="w-6 h-6 hover:bg-primary/20 hover:text-primary"
                     title="Pop out to new window"
                     onClick={() => {
                       localStorage.setItem("omnecor:designer_code", previewCode);
@@ -1540,7 +1544,7 @@ export function Chat() {
                   </Button>
                 </div>
               </div>
-              <div className="min-h-0 flex-1 overflow-hidden relative bg-slate-950">
+              <div className="min-h-0 flex-1 overflow-hidden relative bg-background">
                 {previewMode === "3d" && <ThreeViewer code={previewCode} />}
                 {previewMode === "pcb" && <EnhancedPCBEditor />}
                 {previewMode === "web" && <WebPreview code={previewCode} />}

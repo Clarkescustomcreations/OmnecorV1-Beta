@@ -248,7 +248,7 @@ function PersonaPreviewCard({
             </Badge>
           )}
           {persona.alwaysOn && (
-            <Badge className="text-xs gap-1 bg-green-500/20 text-green-400 border-green-500/30 hover:bg-green-500/20">
+            <Badge className="text-xs gap-1 bg-accent-success/20 text-accent-success border-accent-success/30 hover:bg-accent-success/20">
               <CircleDot className="w-3 h-3 animate-pulse" />
               Always-On
             </Badge>
@@ -271,7 +271,7 @@ function PersonaPreviewCard({
             {persona.traits.slice(0, 4).map(t => (
               <span
                 key={t}
-                className="text-[10px] bg-accent/20 text-accent-foreground rounded px-1.5 py-0.5"
+                className="text-[10px] bg-primary/20 text-accent-foreground rounded px-1.5 py-0.5"
               >
                 {t}
               </span>
@@ -333,10 +333,10 @@ function useStoredBrainMaps(): NeuralBrainMap[] {
 }
 
 const MODE_COLORS: Record<string, string> = {
-  standard: "bg-blue-500/20 text-blue-400",
-  coding:   "bg-green-500/20 text-green-400",
-  research: "bg-purple-500/20 text-purple-400",
-  fiction:  "bg-amber-500/20 text-amber-400",
+  standard: "bg-primary/20 text-primary",
+  coding:   "bg-accent-success/20 text-accent-success",
+  research: "bg-accent-purple/20 text-accent-purple",
+  fiction:  "bg-accent-warning/20 text-accent-warning",
   roleplay: "bg-pink-500/20 text-pink-400",
 };
 
@@ -453,7 +453,7 @@ function IdentityTab({
       <div className="space-y-2">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Network className="w-4 h-4 text-accent" />
+            <Network className="w-4 h-4 text-primary" />
             <Label>Neural Brain Map</Label>
           </div>
           <a
@@ -538,7 +538,7 @@ function IdentityTab({
       {/* Assigned email */}
       <div className="space-y-2">
         <div className="flex items-center gap-2">
-          <Mail className="w-4 h-4 text-accent" />
+          <Mail className="w-4 h-4 text-primary" />
           <Label htmlFor="assigned-email">Assigned Email Address</Label>
         </div>
         <Input
@@ -590,7 +590,7 @@ function AgenticWalletSection({
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-2">
-        <Wallet className="w-4 h-4 text-accent" />
+        <Wallet className="w-4 h-4 text-primary" />
         <Label>Agentic Wallet</Label>
       </div>
       <p className="text-xs text-muted-foreground">
@@ -749,13 +749,13 @@ function AppearanceTab({
       {/* AI generation section */}
       <div className="space-y-3">
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-accent" />
+          <Sparkles className="w-4 h-4 text-primary" />
           <Label>Generate Avatar with AI</Label>
         </div>
 
         {!providersQuery.data?.fal && !providersQuery.data?.openart && (
-          <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground flex items-start gap-2">
-            <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+          <div className="rounded-md border border-accent-warning/30 bg-accent-warning/10 px-3 py-2 text-xs text-muted-foreground flex items-start gap-2">
+            <AlertCircle className="w-3.5 h-3.5 text-accent-warning shrink-0 mt-0.5" />
             <span>
               Add <code className="bg-muted px-1 rounded">FAL_KEY</code> or{" "}
               <code className="bg-muted px-1 rounded">OPENART_API_KEY</code> to your{" "}
@@ -939,7 +939,7 @@ function VoiceTab({
         <div className="space-y-3 rounded-lg bg-muted/30 border p-4">
           {!elevenStatus.data?.configured ? (
             <p className="text-xs text-muted-foreground flex items-start gap-2">
-              <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+              <AlertCircle className="w-3.5 h-3.5 text-accent-warning shrink-0 mt-0.5" />
               Add <code className="bg-muted px-1 rounded mx-1">ELEVENLABS_API_KEY</code> to your .env and restart.
             </p>
           ) : (
@@ -1044,8 +1044,8 @@ function VideoAvatarTab({
 
   return (
     <div className="space-y-5">
-      <div className="rounded-md border border-accent/20 bg-accent/5 px-4 py-3 text-sm flex items-start gap-2">
-        <Sparkles className="w-4 h-4 text-accent shrink-0 mt-0.5" />
+      <div className="rounded-md border border-primary/20 bg-primary/5 px-4 py-3 text-sm flex items-start gap-2">
+        <Sparkles className="w-4 h-4 text-primary shrink-0 mt-0.5" />
         <div>
           <p className="font-medium text-foreground">Talking-Head Video Generation</p>
           <p className="text-xs text-muted-foreground mt-0.5">
@@ -1226,7 +1226,7 @@ function AlwaysOnModelSection({
       {/* Always-On toggle header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Power className={`w-4 h-4 ${persona.alwaysOn ? "text-green-400" : "text-muted-foreground"}`} />
+          <Power className={`w-4 h-4 ${persona.alwaysOn ? "text-accent-success" : "text-muted-foreground"}`} />
           <div>
             <p className="text-sm font-semibold">Always-On Agent</p>
             <p className="text-xs text-muted-foreground">
@@ -1239,7 +1239,7 @@ function AlwaysOnModelSection({
           aria-checked={persona.alwaysOn}
           onClick={() => onChange({ alwaysOn: !persona.alwaysOn })}
           className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring
-            ${persona.alwaysOn ? "bg-green-500" : "bg-muted-foreground/30"}`}
+            ${persona.alwaysOn ? "bg-accent-success" : "bg-muted-foreground/30"}`}
         >
           <span
             className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform
@@ -1251,9 +1251,9 @@ function AlwaysOnModelSection({
       {persona.alwaysOn && (
         <>
           {/* Status pulse */}
-          <div className="flex items-center gap-2 rounded-md bg-green-500/10 border border-green-500/20 px-3 py-2">
-            <CircleDot className="w-3.5 h-3.5 text-green-400 animate-pulse" />
-            <span className="text-xs text-green-400 font-medium">Agent is active — awaiting messages</span>
+          <div className="flex items-center gap-2 rounded-md bg-accent-success/10 border border-accent-success/20 px-3 py-2">
+            <CircleDot className="w-3.5 h-3.5 text-accent-success animate-pulse" />
+            <span className="text-xs text-accent-success font-medium">Agent is active — awaiting messages</span>
           </div>
 
           <Separator />
@@ -1332,7 +1332,7 @@ function AlwaysOnModelSection({
               ) : (
                 <div className="rounded-md border bg-background px-3 py-2 flex items-center justify-between">
                   <div className="flex items-center gap-2 text-sm">
-                    <Radio className="w-4 h-4 text-accent" />
+                    <Radio className="w-4 h-4 text-primary" />
                     <span>
                       {(meshPeers.data ?? []).length === 0
                         ? "No mesh peers discovered"
@@ -1359,8 +1359,8 @@ function AlwaysOnModelSection({
                   <Loader2 className="w-3.5 h-3.5 animate-spin" />Loading sessions…
                 </div>
               ) : (cloudSessions.data ?? []).length === 0 ? (
-                <div className="rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-muted-foreground flex items-start gap-2">
-                  <AlertCircle className="w-3.5 h-3.5 text-amber-500 shrink-0 mt-0.5" />
+                <div className="rounded-md border border-accent-warning/30 bg-accent-warning/10 px-3 py-2 text-xs text-muted-foreground flex items-start gap-2">
+                  <AlertCircle className="w-3.5 h-3.5 text-accent-warning shrink-0 mt-0.5" />
                   No active sessions. Start one in{" "}
                   <span className="text-foreground font-medium ml-1">Settings → Cloud Compute</span>.
                 </div>
@@ -1512,7 +1512,7 @@ function MessagingChannelsSection({
   return (
     <div className="space-y-4 rounded-xl border bg-muted/20 p-4">
       <div className="flex items-center gap-2">
-        <MessageSquare className="w-4 h-4 text-accent" />
+        <MessageSquare className="w-4 h-4 text-primary" />
         <p className="text-sm font-semibold">Messaging Channels</p>
       </div>
 
@@ -1884,8 +1884,8 @@ export const PersonaCreationPanel: React.FC = () => {
     <div className="space-y-8">
       {/* Header */}
       <div className="flex items-center gap-3">
-        <div className="p-2 rounded-lg bg-accent/20">
-          <User className="w-5 h-5 text-accent" />
+        <div className="p-2 rounded-lg bg-primary/20">
+          <User className="w-5 h-5 text-primary" />
         </div>
         <div>
           <h2 className="text-lg font-semibold">Character Persona Studio</h2>
@@ -1957,7 +1957,7 @@ export const PersonaCreationPanel: React.FC = () => {
             {current.type === "agent" && (
               <div className="mt-5 pt-5 border-t">
                 <div className="flex items-center gap-2 mb-4">
-                  <Brain className="w-4 h-4 text-accent" />
+                  <Brain className="w-4 h-4 text-primary" />
                   <p className="text-sm font-semibold">Agent Configuration</p>
                 </div>
                 <AgentConfigTab persona={current} onChange={handleChange} />

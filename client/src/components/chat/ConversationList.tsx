@@ -271,7 +271,7 @@ export function ConversationList({
                   className={cn(
                     "group relative flex flex-col gap-0.5 px-2.5 py-2 cursor-pointer rounded-lg transition-all",
                     conv.id === activeId
-                      ? "bg-accent/40 text-accent-foreground shadow-sm"
+                      ? "bg-primary/40 text-accent-foreground shadow-sm"
                       : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
                   onClick={() => onSelect(conv.id)}
@@ -291,7 +291,7 @@ export function ConversationList({
                     />
                   ) : (
                     <div className="flex items-center gap-2">
-                      <MessageSquare className={cn("w-3 h-3", conv.id === activeId ? "text-accent" : "text-muted-foreground/50")} />
+                      <MessageSquare className={cn("w-3 h-3", conv.id === activeId ? "text-primary" : "text-muted-foreground/50")} />
                       <span className="text-xs font-medium truncate flex-1">
                         {conv.title}
                       </span>
@@ -347,8 +347,8 @@ export function ConversationList({
                   onClick={() => onSelectScript?.(script)}
                 >
                   <div className="flex items-start gap-2">
-                    <div className="w-5 h-5 rounded bg-blue-500/10 flex items-center justify-center mt-0.5">
-                      <Terminal className="w-3 h-3 text-blue-500" />
+                    <div className="w-5 h-5 rounded bg-primary/10 flex items-center justify-center mt-0.5">
+                      <Terminal className="w-3 h-3 text-primary" />
                     </div>
                     <div className="flex-1 min-w-0">
                       {editingId === String(script.id) ? (
@@ -370,7 +370,7 @@ export function ConversationList({
                         </span>
                       )}
                       <div className="flex items-center gap-1.5 mt-0.5">
-                        <Badge variant="secondary" className="text-[9px] px-1 h-3.5 bg-blue-500/5 text-blue-500/80 border-blue-500/20">
+                        <Badge variant="secondary" className="text-[9px] px-1 h-3.5 bg-primary/5 text-primary/80 border-primary/20">
                           {script.project || "Default"}
                         </Badge>
                         <span className="text-[10px] text-muted-foreground opacity-60">

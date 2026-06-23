@@ -324,7 +324,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
           <span className="font-semibold text-slate-300">Live Web Preview</span>
           <Badge variant="outline" className={cn(
             "text-[9px] py-0",
-            editMode ? "border-accent text-accent bg-accent/10" : "border-slate-700 text-slate-400"
+            editMode ? "border-primary/30 text-primary bg-primary/10" : "border-slate-700 text-slate-400"
           )}>
             {editMode ? "Interactive Visual Builder" : "Standard Preview"}
           </Badge>
@@ -342,7 +342,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
             className={cn(
               "h-7 text-[10px] px-2.5 flex items-center gap-1",
               editMode 
-                ? "bg-accent hover:bg-accent/90 text-white border-none" 
+                ? "bg-primary/10 hover:bg-primary/90 text-white border-none" 
                 : "border-slate-800 hover:bg-slate-800 text-slate-300"
             )}
             onClick={() => {
@@ -356,7 +356,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
               </>
             ) : (
               <>
-                <Edit3 className="w-3.5 h-3.5 text-accent" /> Visual Edit Mode
+                <Edit3 className="w-3.5 h-3.5 text-primary" /> Visual Edit Mode
               </>
             )}
           </Button>
@@ -371,7 +371,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
         )}>
           {loading && (
             <div className="absolute inset-0 bg-slate-900 flex flex-col items-center justify-center text-white/50 z-10">
-              <Loader2 className="w-8 h-8 animate-spin mb-2 text-accent" />
+              <Loader2 className="w-8 h-8 animate-spin mb-2 text-primary" />
               <p className="text-sm">Rendering Preview...</p>
             </div>
           )}
@@ -390,7 +390,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
           <div className="w-[30%] h-full bg-slate-900 border-l border-slate-800 flex flex-col overflow-y-auto p-4 select-text">
             <div className="flex items-center justify-between mb-4 pb-2 border-b border-slate-800 flex-shrink-0">
               <div className="flex items-center gap-1.5">
-                <Sliders className="w-4 h-4 text-accent" />
+                <Sliders className="w-4 h-4 text-primary" />
                 <span className="text-xs font-semibold text-slate-100 uppercase tracking-wide">
                   Style Inspector
                 </span>
@@ -412,7 +412,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                     <label className="text-slate-400 text-[10px]">Text Content</label>
                     <textarea
                       rows={2}
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded p-1.5 outline-none focus:border-accent resize-none font-mono"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded p-1.5 outline-none focus:border-primary/30 resize-none font-mono"
                       value={selectedElement.textContent}
                       onChange={(e) => applyText(e.target.value)}
                     />
@@ -425,7 +425,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                     <label className="text-slate-400 text-[10px]">Image URL</label>
                     <input
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent font-mono"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30 font-mono"
                       placeholder="Paste image url..."
                       onChange={(e) => applyImageSrc(e.target.value)}
                     />
@@ -475,7 +475,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                   </div>
                   <input
                     type="text"
-                    className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent font-mono"
+                    className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30 font-mono"
                     value={selectedElement.styles.fontSize}
                     onChange={(e) => applyStyle("fontSize", e.target.value)}
                   />
@@ -485,7 +485,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                   <div className="space-y-1">
                     <label className="text-slate-400 text-[10px]">Font Weight</label>
                     <select
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30"
                       value={selectedElement.styles.fontWeight}
                       onChange={(e) => applyStyle("fontWeight", e.target.value)}
                     >
@@ -502,7 +502,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                   <div className="space-y-1">
                     <label className="text-slate-400 text-[10px]">Font Family</label>
                     <select
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30"
                       value={selectedElement.styles.fontFamily.split(",")[0].replace(/['"]/g, "")}
                       onChange={(e) => applyStyle("fontFamily", e.target.value)}
                     >
@@ -525,7 +525,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                     <label className="text-slate-400 text-[10px]">Padding</label>
                     <input
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent font-mono"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30 font-mono"
                       value={selectedElement.styles.padding}
                       onChange={(e) => applyStyle("padding", e.target.value)}
                     />
@@ -534,7 +534,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                     <label className="text-slate-400 text-[10px]">Margin</label>
                     <input
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent font-mono"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30 font-mono"
                       value={selectedElement.styles.margin}
                       onChange={(e) => applyStyle("margin", e.target.value)}
                     />
@@ -546,7 +546,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                     <label className="text-slate-400 text-[10px]">Border Radius</label>
                     <input
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent font-mono"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30 font-mono"
                       value={selectedElement.styles.borderRadius}
                       onChange={(e) => applyStyle("borderRadius", e.target.value)}
                     />
@@ -574,7 +574,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                     <label className="text-slate-400 text-[10px]">Width</label>
                     <input
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent font-mono"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30 font-mono"
                       value={selectedElement.styles.width}
                       onChange={(e) => applyStyle("width", e.target.value)}
                     />
@@ -583,7 +583,7 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
                     <label className="text-slate-400 text-[10px]">Height</label>
                     <input
                       type="text"
-                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-accent font-mono"
+                      className="w-full bg-slate-950 border border-slate-800 text-[11px] text-slate-100 rounded px-2 py-1 outline-none focus:border-primary/30 font-mono"
                       value={selectedElement.styles.height}
                       onChange={(e) => applyStyle("height", e.target.value)}
                     />

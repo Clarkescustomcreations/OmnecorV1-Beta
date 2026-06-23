@@ -180,7 +180,7 @@ export function SpecializedModuleLauncher({
               </div>
               <div className="w-full bg-muted rounded-full h-2">
                 <div
-                  className="bg-accent h-2 rounded-full transition-all"
+                  className="bg-primary/10 h-2 rounded-full transition-all"
                   style={{ width: `${llmSession.progress}%` }}
                 />
               </div>
@@ -258,7 +258,7 @@ export function SpecializedModuleLauncher({
                   >
                     <div className="flex justify-between">
                       <span>Epoch {metric.epoch}</span>
-                      <span className="text-accent">
+                      <span className="text-primary">
                         Loss: {metric.loss.toFixed(3)}
                       </span>
                     </div>
@@ -278,7 +278,7 @@ export function SpecializedModuleLauncher({
 
       {/* LoRA Config Editor */}
       {editingLoraConfig && (
-        <Card className="bg-accent/5 border-accent/20">
+        <Card className="bg-primary/5 border-primary/20">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm">Edit LoRA Config</CardTitle>
@@ -444,7 +444,7 @@ export function SpecializedModuleLauncher({
             <CardTitle className="text-sm">Scene Objects</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-3xl font-bold text-accent">
+            <div className="text-3xl font-bold text-primary">
               {blenderProject.objects.length}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -502,7 +502,7 @@ export function SpecializedModuleLauncher({
 
       {/* Object Editor */}
       {selectedObject && (
-        <Card className="bg-accent/5 border-accent/20">
+        <Card className="bg-primary/5 border-primary/20">
           <CardHeader>
             <div className="flex items-center justify-between">
               <CardTitle className="text-sm">Edit Object Properties</CardTitle>
@@ -633,7 +633,7 @@ export function SpecializedModuleLauncher({
             <CardTitle className="text-sm">Components</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-3xl font-bold text-accent">
+            <div className="text-3xl font-bold text-primary">
               {pcbProject.components.length}
             </div>
             <div className="text-xs text-muted-foreground">
@@ -648,7 +648,7 @@ export function SpecializedModuleLauncher({
             <CardTitle className="text-sm">Nets</CardTitle>
           </CardHeader>
           <CardContent className="space-y-3">
-            <div className="text-3xl font-bold text-accent">
+            <div className="text-3xl font-bold text-primary">
               {pcbProject.nets.length}
             </div>
             <div className="text-xs text-muted-foreground">Total nets</div>

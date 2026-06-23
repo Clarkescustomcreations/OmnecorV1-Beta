@@ -18,7 +18,7 @@ export function Integrations() {
       <div className="h-full flex flex-col bg-background">
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3 min-w-0">
-            <Plug className="w-6 h-6 text-accent flex-shrink-0" />
+            <Plug className="w-6 h-6 text-primary flex-shrink-0" />
             <div className="min-w-0">
               <h1 className="text-xl font-bold truncate">Integrations</h1>
               <p className="text-sm text-muted-foreground truncate">

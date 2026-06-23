@@ -321,7 +321,7 @@ export function AgentNetworking() {
             <div className={cn(
               "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
               linkedToMap
-                ? "bg-accent/10 border-accent/40 text-accent"
+                ? "bg-primary/10 border-primary/40 text-primary"
                 : "border-border text-muted-foreground"
             )}>
               <Brain className="w-3.5 h-3.5 flex-shrink-0" />
@@ -525,7 +525,7 @@ export function AgentNetworking() {
               <CardContent>
                 <div className="space-y-4">
                   {isLoadingScheduled ? (
-                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
                   ) : scheduledPostsData?.length === 0 ? (
                     <p className="text-center py-8 text-muted-foreground">No posts scheduled yet. Curate content to begin.</p>
                   ) : (
@@ -630,7 +630,7 @@ export function AgentNetworking() {
               <CardContent>
                 <div className="grid gap-4">
                   {isLoadingPending ? (
-                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
                   ) : pendingPosts?.length === 0 ? (
                     <p className="text-center py-8 text-muted-foreground">No posts pending review. Curate some articles first.</p>
                   ) : (
@@ -678,7 +678,7 @@ export function AgentNetworking() {
               <CardContent>
                 <div className="space-y-6">
                   {isLoadingAnalytics ? (
-                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
                   ) : analyticsSummary?.length === 0 ? (
                     <p className="text-center py-8 text-muted-foreground">No analytics data available yet.</p>
                   ) : (
@@ -692,7 +692,7 @@ export function AgentNetworking() {
                         </div>
                         <div className="h-2 bg-muted rounded-full overflow-hidden">
                           <div
-                            className="h-full bg-accent"
+                            className="h-full bg-primary/10"
                             style={{ width: `${Math.min(100, (platform.totalImpressions || 0) / 100)}%` }}
                           />
                         </div>
@@ -717,7 +717,7 @@ export function AgentNetworking() {
                   <p className="text-sm font-medium">Connected Accounts</p>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                     {isLoadingAccounts ? (
-                      <div className="col-span-2 flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+                      <div className="col-span-2 flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
                     ) : accountsData?.length === 0 ? (
                       <p className="col-span-2 text-center py-8 text-muted-foreground text-sm">No platforms connected yet. Connect one below to get started.</p>
                     ) : (
@@ -775,7 +775,7 @@ export function AgentNetworking() {
               <CardContent>
                 <div className="space-y-3">
                   {isLoadingDiscovery ? (
-                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+                    <div className="flex justify-center p-8"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
                   ) : unprocessedArticles?.length === 0 ? (
                     <p className="text-center py-8 text-muted-foreground">No new articles found. Click Refresh to sync feeds.</p>
                   ) : (
@@ -887,7 +887,7 @@ function MeshFederationPanel() {
               <CardTitle>Federated Networking</CardTitle>
               <CardDescription>Manage how your agents interact with other OMMESH nodes.</CardDescription>
             </div>
-            {loadingPeers && <Loader2 className="w-4 h-4 animate-spin text-accent" />}
+            {loadingPeers && <Loader2 className="w-4 h-4 animate-spin text-primary" />}
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
@@ -1014,7 +1014,7 @@ function MeshFederationPanel() {
         <Card>
           <CardHeader>
             <CardTitle className="text-sm font-bold flex items-center gap-2">
-              <Shield className="w-4 h-4 text-accent" /> Node Identity
+              <Shield className="w-4 h-4 text-primary" /> Node Identity
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
@@ -1032,9 +1032,9 @@ function MeshFederationPanel() {
           </CardContent>
         </Card>
 
-        <Card className="bg-accent/5 border-accent/20">
+        <Card className="bg-primary/5 border-primary/20">
           <CardHeader>
-            <CardTitle className="text-sm font-bold flex items-center gap-2 text-accent">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 text-primary">
               <Zap className="w-4 h-4" /> Mesh Strength
             </CardTitle>
           </CardHeader>
@@ -1042,7 +1042,7 @@ function MeshFederationPanel() {
             <div className="text-2xl font-bold">{(peers?.filter((p) => p.isApproved).length || 0) + 1} Nodes</div>
             <p className="text-xs text-muted-foreground">Active in distributed cloud</p>
             <div className="mt-4 h-1.5 w-full bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-accent" style={{ width: '45%' }} />
+              <div className="h-full bg-primary/10" style={{ width: '45%' }} />
             </div>
           </CardContent>
         </Card>
@@ -1265,7 +1265,7 @@ function CurationPanel() {
 
         <TabsContent value="discovery" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-            <Card className="border-accent/10">
+            <Card className="border-primary/10">
               <CardHeader>
                 <CardTitle className="text-base">Incoming Stream</CardTitle>
                 <CardDescription>Articles found by the discovery engine based on your agent's interests.</CardDescription>
@@ -1274,7 +1274,7 @@ function CurationPanel() {
                 <ScrollArea className="h-[500px] pr-4">
                   <div className="space-y-4">
                     {loadingArticles ? (
-                      <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>
+                      <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-primary" /></div>
                     ) : articles?.length === 0 ? (
                       <div className="text-center p-12 text-muted-foreground italic">No articles found. Try syncing your feeds.</div>
                     ) : (
@@ -1317,7 +1317,7 @@ function CurationPanel() {
                     <label className="text-xs font-bold uppercase text-muted-foreground">Active Keywords</label>
                     <div className="flex flex-wrap gap-2">
                       {["AI Infrastructure", "Sovereign Computing", "Neural Mesh", "Distributed VRAM"].map(tag => (
-                        <Badge key={tag} className="bg-accent/10 text-accent hover:bg-accent/20 border-accent/20 cursor-pointer">
+                        <Badge key={tag} className="bg-primary/10 text-primary hover:bg-primary/20 border-primary/20 cursor-pointer">
                           {tag} <XCircle className="w-3 h-3 ml-1.5" />
                         </Badge>
                       ))}
@@ -1340,18 +1340,18 @@ function CurationPanel() {
                 </CardContent>
               </Card>
 
-              <Card className="bg-accent/5 border-accent/20 overflow-hidden">
-                <div className="h-1 bg-accent" />
+              <Card className="bg-primary/5 border-primary/20 overflow-hidden">
+                <div className="h-1 bg-primary/10" />
                 <CardHeader>
                   <CardTitle className="text-sm font-bold flex items-center gap-2">
-                    <MessageSquare className="w-4 h-4 text-accent" /> AI Persona Selection
+                    <MessageSquare className="w-4 h-4 text-primary" /> AI Persona Selection
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-xs text-muted-foreground">Selected persona will handle the "voice" of curated content.</p>
                   <div className="p-3 rounded-lg border bg-background flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-accent/20 flex items-center justify-center text-accent font-bold">O</div>
+                      <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center text-primary font-bold">O</div>
                       <div>
                         <p className="text-sm font-bold">Omnecor Primary</p>
                         <p className="text-[10px] text-muted-foreground">Technical / Visionary</p>
@@ -1368,7 +1368,7 @@ function CurationPanel() {
         <TabsContent value="approvals" className="space-y-4">
           <div className="grid grid-cols-1 gap-6">
             {loadingPending ? (
-              <div className="flex justify-center p-24"><Loader2 className="w-12 h-12 animate-spin text-accent" /></div>
+              <div className="flex justify-center p-24"><Loader2 className="w-12 h-12 animate-spin text-primary" /></div>
             ) : pendingPosts?.length === 0 ? (
               <div className="flex flex-col items-center justify-center py-24 text-center border-2 border-dashed rounded-3xl bg-muted/20">
                 <CheckCircle2 className="w-12 h-12 text-muted-foreground opacity-20 mb-4" />
@@ -1381,7 +1381,7 @@ function CurationPanel() {
                 const draftLen = (post.content ?? "").length;
                 const draftOverLimit = draftLimit != null && draftLen > draftLimit;
                 return (
-                <Card key={post.id} className="overflow-hidden border-accent/20">
+                <Card key={post.id} className="overflow-hidden border-primary/20">
                   <div className="flex flex-col md:flex-row h-full">
                     <div className="p-6 flex-1 space-y-4">
                       <div className="flex items-center justify-between">
@@ -1465,7 +1465,7 @@ function CurationPanel() {
                         <p className="text-xs text-muted-foreground">Tone: Authoritative, Technical</p>
                       </div>
                       <div className="pt-6">
-                        <Button variant="link" className="text-accent p-0 h-auto text-xs gap-1">
+                        <Button variant="link" className="text-primary p-0 h-auto text-xs gap-1">
                           <ExternalLink className="w-3 h-3" /> View Original Source
                         </Button>
                       </div>

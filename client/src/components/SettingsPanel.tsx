@@ -689,9 +689,9 @@ export function SettingsPanel({ className }: SettingsPanelProps) {
                     </Select>
                   </div>
 
-                  <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20 flex gap-2">
-                    <AlertCircle className="w-4 h-4 text-blue-400 flex-shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-400">
+                  <div className="p-3 rounded-lg bg-primary/10 border border-primary/20 flex gap-2">
+                    <AlertCircle className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                    <p className="text-xs text-primary">
                       Data is encrypted before upload. Only you can decrypt it.
                     </p>
                   </div>
@@ -866,7 +866,7 @@ export function SettingsPanel({ className }: SettingsPanelProps) {
                 <div className="rounded-md border border-border bg-muted/30 p-3 space-y-1 text-sm">
                   <div className="flex items-center gap-2">
                     {valetModelInfo.status === "ready" ? (
-                      <CheckCircle2 className="w-4 h-4 text-green-500 shrink-0" />
+                      <CheckCircle2 className="w-4 h-4 text-accent-success shrink-0" />
                     ) : (
                       <XCircle className="w-4 h-4 text-destructive shrink-0" />
                     )}

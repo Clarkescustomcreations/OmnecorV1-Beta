@@ -7,7 +7,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
-import { Brain, Grid3x3, List, Settings, Shield, Maximize2, Anchor, ExternalLink, PanelRightClose, PanelRightOpen, Palette, Layers, Activity, Filter, Zap, X as XIcon, Pencil, Lock, LockOpen, Map, MessageSquare, FolderOpen } from "lucide-react";
+import { Brain, Grid3x3, List, Settings, Shield, Maximize2, Anchor, ExternalLink, PanelRightClose, PanelRightOpen, Palette, Layers, Activity, Filter, Zap, X as XIcon, Pencil, Lock, LockOpen, Map as MapIcon, MessageSquare, FolderOpen, Database, Loader2 } from "lucide-react";
 import { useState, useMemo, useEffect, useCallback, useRef } from "react";
 import { NeuralGraphView, BrainMapViewport } from "@/components/neural/NeuralGraphView";
 import { NeuralTreeView } from "@/components/neural/NeuralTreeView";
@@ -17,7 +17,7 @@ import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useBrainMapStore } from "@/lib/stores/brainMapStore";
 import { useAppStore } from "@/lib/store/app.store";
 import { trpc } from "@/lib/trpc";
-import { fileTreeToNetwork } from "@/lib/fileTreeToNetwork";
+import { fileTreeToNetwork, subtreeToNodes } from "@/lib/fileTreeToNetwork";
 import { generateOmnecorProjectMock } from "@/lib/demoProject";
 import { convertFileSystemToNeuralNetwork, buildMasterNetwork, type NeuralNetwork, type NeuralNode } from "@/lib/neuralNodeTree";
 import { NeuralMapProvider, useNeuralMap } from "@/contexts/NeuralMapContext";
@@ -128,7 +128,7 @@ function NeuralMapToolbar() {
 
   return (
     <Card className={cn(
-      "shadow-lg border-accent/20 bg-background/95 backdrop-blur-md transition-all duration-300",
+      "shadow-lg border-primary/20 bg-background/95 backdrop-blur-md transition-all duration-300",
       collapsed ? "w-10 overflow-hidden" : "w-auto min-w-[240px]"
     )}>
       <div className="flex items-center p-1.5 border-b border-border/50">
@@ -156,19 +156,19 @@ function NeuralMapToolbar() {
             <Label className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">Legend</Label>
             <div className="flex flex-col gap-1">
               <div className="flex items-center gap-2 text-[11px]">
-                <span className="w-3 h-3 rounded-full bg-blue-500 flex-shrink-0" />
+                <span className="w-3 h-3 rounded-full bg-primary flex-shrink-0" />
                 <span className="text-muted-foreground">Folder</span>
               </div>
               <div className="flex items-center gap-2 text-[11px]">
-                <span className="w-3 h-3 rounded-full bg-green-500 flex-shrink-0" />
+                <span className="w-3 h-3 rounded-full bg-accent-success flex-shrink-0" />
                 <span className="text-muted-foreground">File</span>
               </div>
               <div className="flex items-center gap-2 text-[11px]">
-                <span className="w-3 h-3 rounded-full bg-purple-500 flex-shrink-0" />
+                <span className="w-3 h-3 rounded-full bg-accent-purple flex-shrink-0" />
                 <span className="text-muted-foreground">Project</span>
               </div>
               <div className="flex items-center gap-2 text-[11px]">
-                <span className="w-3 h-3 rounded-full bg-emerald-400 flex-shrink-0" />
+                <span className="w-3 h-3 rounded-full bg-accent-success flex-shrink-0" />
                 <span className="text-muted-foreground">In AI Context</span>
               </div>
             </div>
@@ -201,7 +201,7 @@ function NeuralMapToolbar() {
                 <Button
                   size="icon"
                   variant={locked ? "default" : "outline"}
-                  className={cn("h-8 w-8 flex-shrink-0", locked && "bg-amber-500/20 border-amber-500/50 text-amber-400 hover:bg-amber-500/30")}
+                  className={cn("h-8 w-8 flex-shrink-0", locked && "bg-accent-warning/20 border-accent-warning/50 text-accent-warning hover:bg-accent-warning/30")}
                   onClick={() => {
                     if (locked) {
                       setUnlockDialogOpen(true);
@@ -216,7 +216,7 @@ function NeuralMapToolbar() {
               </HowToTooltip>
             </div>
             {locked && (
-              <p className="text-[10px] text-amber-400 flex items-center gap-1">
+              <p className="text-[10px] text-accent-warning flex items-center gap-1">
                 <Lock className="w-2.5 h-2.5" /> Layout pinned — drag nodes freely
               </p>
             )}
@@ -246,7 +246,7 @@ function NeuralMapToolbar() {
             </div>
             <div className="flex items-center justify-between">
               <Label className="text-[10px] text-muted-foreground flex items-center gap-1.5">
-                <Map className="w-3 h-3" /> Mini Map
+                <MapIcon className="w-3 h-3" /> Mini Map
               </Label>
               <Switch checked={showMiniMap} onCheckedChange={setShowMiniMap} />
             </div>
@@ -340,6 +340,9 @@ function BrainMapContent() {
   const collapsedFolderIds = useBrainMapStore(s => s.collapsedFolderIds);
   const setCollapsedFolderIds = useBrainMapStore(s => s.setCollapsedFolderIds);
 
+  // Absolute paths of truncated folders the user drilled into (lazy-loaded subtrees).
+  const [expandedPaths, setExpandedPaths] = useState<string[]>([]);
+
   // Sync collapsedFolderIds FROM activeMap TO useBrainMapStore on mount/project switch
   const lastActiveMapIdRef = useRef<string | null>(null);
   useEffect(() => {
@@ -348,9 +351,11 @@ function BrainMapContent() {
         lastActiveMapIdRef.current = activeMap.id;
         const dbCollapsed = activeMap.settings.collapsedFolderIds || [];
         setCollapsedFolderIds(dbCollapsed);
+        setExpandedPaths([]); // drill-in state is per-map
       }
     } else {
       lastActiveMapIdRef.current = null;
+      setExpandedPaths([]);
     }
   }, [activeMap, setCollapsedFolderIds]);
 
@@ -433,10 +438,57 @@ function BrainMapContent() {
     )
   );
 
+  // On-demand subtree fetches for folders the user drilled into. Each fetches a
+  // shallow slice rooted at the truncated folder; results are merged into the
+  // network below. getFileTree already accepts an arbitrary rootDir, so no new
+  // procedure is needed.
+  const subtreeQueries = trpc.useQueries(t =>
+    expandedPaths.map(p =>
+      t.project.getFileTree(
+        { projectId: activeMap?.id ?? "", rootDir: p, maxDepth: 3 },
+        {
+          enabled: !!activeMap,
+          retry: false,
+          refetchInterval: activeMap?.settings.realtimeSync ? 60000 : false,
+        }
+      )
+    )
+  );
+
   const isLoading =
     fileTreeQueries.some(q => q.isLoading) || remoteSourceQueries.some(q => q.isLoading);
   const loadedCount = fileTreeQueries.filter(q => !!q.data).length;
   const remoteLoadedCount = remoteSourceQueries.filter(q => !!q.data).length;
+  const subtreeLoadedCount = subtreeQueries.filter(q => !!q.data).length;
+
+  // Tracks expansions whose toast has already resolved (success/error), so the
+  // settle effect below fires exactly once per fetch and not on every refetch.
+  const expandSettledRef = useRef<Set<string>>(new Set());
+
+  const handleRequestExpand = useCallback((p: string) => {
+    const name = p.split("/").pop() || p;
+    expandSettledRef.current.delete(p); // re-arm feedback on retry
+    setExpandedPaths(prev => (prev.includes(p) ? prev : [...prev, p]));
+    toast.loading(`Loading ${name}…`, { id: `expand-${p}` });
+  }, []);
+
+  // Resolve each expansion's loading toast and surface failures. On error the
+  // path is dropped so the folder reverts to a drill-in node the user can retry.
+  useEffect(() => {
+    subtreeQueries.forEach((q, i) => {
+      const p = expandedPaths[i];
+      if (!p || expandSettledRef.current.has(p)) return;
+      const name = p.split("/").pop() || p;
+      if (q.isSuccess) {
+        expandSettledRef.current.add(p);
+        toast.success(`Loaded ${name}`, { id: `expand-${p}`, duration: 1500 });
+      } else if (q.isError) {
+        expandSettledRef.current.add(p);
+        toast.error(`Couldn't load ${name}: ${q.error?.message ?? "fetch failed"}`, { id: `expand-${p}` });
+        setExpandedPaths(prev => prev.filter(x => x !== p));
+      }
+    });
+  }, [subtreeQueries, expandedPaths]);
 
   // Register watchers for all local roots of the active map
   const registerProject = trpc.project.registerProject.useMutation({
@@ -450,6 +502,52 @@ function BrainMapContent() {
       });
     }
   }, [activeMap?.id]); // Only on map switch
+
+  // ── Remote-source VectorDB indexing (map RAG feed) ───────────────────────
+  // Feeds this map's remote sources (github:// + integration://) into its
+  // vector collection so chat RAG can use them. Gated by the map's indexing
+  // setting; runs detached on the server and is polled for progress.
+  const hasRemoteSources = remoteRoots.length > 0;
+  const indexingOn = activeMap?.settings.indexingEnabled ?? true;
+
+  const indexMutation = trpc.integrations.indexMapSources.useMutation();
+  const indexStatusQuery = trpc.integrations.getMapIndexStatus.useQuery(
+    { mapId: activeMap?.id ?? "" },
+    {
+      enabled: !!activeMap && hasRemoteSources,
+      // Poll while a run is in flight; stop once it settles.
+      refetchInterval: (q: any) => (q?.state?.data?.state === "running" ? 1500 : false),
+    },
+  );
+  const indexStatus = indexStatusQuery.data;
+  const isIndexing = indexMutation.isPending || indexStatus?.state === "running";
+
+  const triggerIndex = useCallback((manual: boolean) => {
+    if (!activeMap) return;
+    indexMutation.mutate(
+      { mapId: activeMap.id },
+      {
+        onSuccess: (r) => {
+          if (manual) {
+            if ("skipped" in r && r.skipped) toast.info(r.reason ?? "Nothing to index.");
+            else if ("alreadyRunning" in r && r.alreadyRunning) toast.info("Indexing already in progress…");
+            else toast.success("Indexing started — fetching remote source content…");
+          }
+          indexStatusQuery.refetch();
+        },
+        onError: (err) => { if (manual) toast.error("Indexing failed: " + err.message); },
+      },
+    );
+  }, [activeMap?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Auto-index once per map open (only when enabled and there are remote roots).
+  const autoIndexedRef = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    if (!activeMap || !hasRemoteSources || !indexingOn) return;
+    if (autoIndexedRef.current.has(activeMap.id)) return;
+    autoIndexedRef.current.add(activeMap.id);
+    triggerIndex(false);
+  }, [activeMap?.id, hasRemoteSources, indexingOn, triggerIndex]);
 
   const neuralNetwork = useMemo(() => {
     // No map selected → render the labeled "Omnecor Demo" showcase network so
@@ -503,6 +601,33 @@ function BrainMapContent() {
       ...remoteNetworks.flatMap(n => n.edges),
     ];
 
+    // Merge lazily-expanded folder subtrees. Process shallowest paths first so a
+    // parent folder's nodes exist before a deeper expansion links under them.
+    if (expandedPaths.length > 0) {
+      const nodeById = new Map(allNodes.map(n => [n.id, n]));
+      const nodeIds = new Set(allNodes.map(n => n.id));
+      const edgeIds = new Set(allEdges.map(e => e.id));
+      const ordered = [...expandedPaths].sort((a, b) => a.length - b.length);
+      for (const p of ordered) {
+        const data = subtreeQueries[expandedPaths.indexOf(p)]?.data;
+        const parent = nodeById.get(`node-${p}`);
+        if (!data || !parent) continue;
+        parent.data = { ...parent.data, truncated: false }; // it's loaded now
+        const { nodes: subNodes, edges: subEdges } = subtreeToNodes(data, `node-${p}`, parent.data.depth);
+        for (const sn of subNodes) {
+          if (nodeIds.has(sn.id)) continue;
+          nodeIds.add(sn.id);
+          nodeById.set(sn.id, sn);
+          allNodes.push(sn);
+        }
+        for (const se of subEdges) {
+          if (edgeIds.has(se.id)) continue;
+          edgeIds.add(se.id);
+          allEdges.push(se);
+        }
+      }
+    }
+
     // A real map whose roots produced no nodes (still resolving, empty directory,
     // or a load error) renders as a genuine empty network — never the demo. The
     // viewport below surfaces the loading spinner / empty-state message instead.
@@ -514,7 +639,7 @@ function BrainMapContent() {
       edges: allEdges,
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeMap?.id, loadedCount, remoteLoadedCount, indexingEnabled, localRoots.join(","), remoteRoots.join(",")]);
+  }, [activeMap?.id, loadedCount, remoteLoadedCount, subtreeLoadedCount, indexingEnabled, localRoots.join(","), remoteRoots.join(","), expandedPaths.join(",")]);
 
   // Global master network — aggregates all maps, no file-tree queries needed
   const masterNetwork = useMemo(() => buildMasterNetwork(maps), [maps]);
@@ -649,17 +774,17 @@ function BrainMapContent() {
               {/* Header */}
               <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3 min-w-0">
-                  <Brain className="w-6 h-6 text-accent flex-shrink-0" />
+                  <Brain className="w-6 h-6 text-primary flex-shrink-0" />
                   <div className="min-w-0">
                     <h1 className="text-xl font-bold flex flex-wrap items-center gap-2">
                       {activeMap?.name ?? "Omnecor Demo"}
                       {isFictionMode && (
-                        <Badge variant="outline" className="text-accent border-accent text-[10px] py-0">
+                        <Badge variant="outline" className="text-primary border-primary/30 text-[10px] py-0">
                           Fiction Mode
                         </Badge>
                       )}
                       {!activeMap && (
-                        <Badge variant="secondary" className="text-[10px] py-0 bg-accent/10 text-accent border-accent/20">
+                        <Badge variant="secondary" className="text-[10px] py-0 bg-primary/10 text-primary border-primary/20">
                           Omnecor Demo
                         </Badge>
                       )}
@@ -705,7 +830,7 @@ function BrainMapContent() {
                         variant={masterView ? "default" : "ghost"}
                         className={cn(
                           "h-7 px-2 text-xs gap-1.5",
-                          masterView && "bg-accent text-accent-foreground"
+                          masterView && "bg-primary/10 text-accent-foreground"
                         )}
                         onClick={() => setMasterView(v => !v)}
                       >
@@ -740,6 +865,36 @@ function BrainMapContent() {
                       <ExternalLink className="w-4 h-4" />
                     </Button>
                   </HowToTooltip>
+
+                  {/* Remote-source indexing — feeds GitHub & integration sources
+                      into the map's knowledge base for chat RAG. */}
+                  {activeMap && hasRemoteSources && (
+                    <HowToTooltip
+                      title="Index Remote Sources"
+                      description="Fetch the content of this map's connected remote sources (GitHub & integrations) and embed it into the map's knowledge base, so chat can ground answers in it. Runs automatically when a map opens; click to re-index."
+                    >
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-8 gap-1.5 text-xs"
+                        onClick={() => triggerIndex(true)}
+                        disabled={isIndexing || !indexingOn}
+                      >
+                        {isIndexing
+                          ? <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          : <Database className="w-3.5 h-3.5" />}
+                        {!indexingOn
+                          ? "Indexing off"
+                          : isIndexing
+                            ? (indexStatus?.state === "running"
+                                ? `Indexing ${indexStatus.completedSources}/${indexStatus.totalSources}…`
+                                : "Indexing…")
+                            : indexStatus?.state === "done"
+                              ? `Indexed · ${indexStatus.totalChunks} chunks`
+                              : "Index"}
+                      </Button>
+                    </HowToTooltip>
+                  )}
                 </div>
               </div>
 
@@ -757,8 +912,8 @@ function BrainMapContent() {
                       </div>
                     ) : !masterView && activeMap && displayNetwork.nodes.length === 0 ? (
                       <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-muted/20">
-                        <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center mb-4">
-                          <Brain className="h-6 w-6 text-accent" />
+                        <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                          <Brain className="h-6 w-6 text-primary" />
                         </div>
                         <h3 className="text-lg font-semibold mb-2">No indexed files yet</h3>
                         <p className="text-sm text-muted-foreground max-w-md">
@@ -782,11 +937,13 @@ function BrainMapContent() {
                                   network={displayNetwork}
                                   projectId={masterView ? "master" : (activeMap?.id ?? "demo")}
                                   onNodeClick={setSelectedNodeId}
+                                  onRequestExpand={masterView ? undefined : handleRequestExpand}
                                 />
                               ) : (
                                 <NeuralTreeView
                                   network={displayNetwork}
                                   onNodeClick={setSelectedNodeId}
+                                  onRequestExpand={masterView ? undefined : handleRequestExpand}
                                 />
                               )}
                             </div>
@@ -804,8 +961,8 @@ function BrainMapContent() {
                           </>
                         ) : (
                           <div className="flex-1 flex flex-col items-center justify-center text-center p-12 bg-muted/20">
-                            <div className="h-12 w-12 rounded-full bg-accent/20 flex items-center justify-center mb-4">
-                              <Anchor className="h-6 w-6 text-accent animate-pulse" />
+                            <div className="h-12 w-12 rounded-full bg-primary/20 flex items-center justify-center mb-4">
+                              <Anchor className="h-6 w-6 text-primary animate-pulse" />
                             </div>
                             <h3 className="text-lg font-semibold mb-2">Neural Map Detached</h3>
                             <p className="text-sm text-muted-foreground max-w-md">
@@ -814,7 +971,7 @@ function BrainMapContent() {
                             </p>
                             <Button 
                               variant="outline" 
-                              className="mt-6 border-accent/30 hover:bg-accent/10"
+                              className="mt-6 border-primary/30 hover:bg-primary/10"
                               onClick={() => setWindowMode("embedded")}
                             >
                               Re-dock to Workspace
@@ -872,7 +1029,7 @@ function BrainMapContent() {
                             <span className="text-muted-foreground">View:</span>
                             <span className="font-medium">
                               {masterView ? (
-                                <Badge variant="default" className="text-[10px] px-1.5 bg-accent/80">Master ({maps.length} maps)</Badge>
+                                <Badge variant="default" className="text-[10px] px-1.5 bg-primary/80">Master ({maps.length} maps)</Badge>
                               ) : (
                                 activeMap?.name || "Omnecor Demo"
                               )}
@@ -880,7 +1037,7 @@ function BrainMapContent() {
                           </div>
                           <div className="flex justify-between">
                             <span className="text-muted-foreground">Nodes:</span>
-                            <span className="font-mono text-accent">{displayNetwork.nodes.length}</span>
+                            <span className="font-mono text-primary">{displayNetwork.nodes.length}</span>
                           </div>
                           {activeMap ? (
                             <div className="flex justify-between">
@@ -892,7 +1049,7 @@ function BrainMapContent() {
                           ) : (
                             <div className="flex justify-between">
                               <span className="text-muted-foreground">Status:</span>
-                              <Badge variant="outline" className="text-accent border-accent/30 bg-accent/5">Read Only</Badge>
+                              <Badge variant="outline" className="text-primary border-primary/30 bg-primary/5">Read Only</Badge>
                             </div>
                           )}
                         </CardContent>
@@ -914,7 +1071,7 @@ function BrainMapContent() {
                                 title={projectCardEditing ? "Done editing" : "Edit project context"}
                               >
                                 {projectCardEditing
-                                  ? <Filter className="w-3.5 h-3.5 text-accent" />
+                                  ? <Filter className="w-3.5 h-3.5 text-primary" />
                                   : <Settings className="w-3.5 h-3.5" />}
                               </Button>
                             </CardTitle>
@@ -983,7 +1140,7 @@ function BrainMapContent() {
                                 {(pc.techStack ?? []).length > 0 && (
                                   <div className="flex flex-wrap gap-1">
                                     {pc.techStack!.map(t => (
-                                      <span key={t} className="text-[10px] bg-accent/10 text-accent px-1.5 rounded">{t}</span>
+                                      <span key={t} className="text-[10px] bg-primary/10 text-primary px-1.5 rounded">{t}</span>
                                     ))}
                                   </div>
                                 )}
@@ -1022,7 +1179,7 @@ function BrainMapContent() {
                                 {editingLabel ? (
                                   <div className="flex gap-1">
                                     <input
-                                      className="flex-1 text-sm font-mono bg-muted border border-accent rounded px-2 py-0.5 outline-none"
+                                      className="flex-1 text-sm font-mono bg-muted border border-primary/30 rounded px-2 py-0.5 outline-none"
                                       value={labelDraft}
                                       onChange={e => setLabelDraft(e.target.value)}
                                       onKeyDown={e => {
@@ -1050,7 +1207,7 @@ function BrainMapContent() {
                                   </div>
                                 ) : (
                                   <button
-                                    className="text-left font-mono break-all hover:text-accent transition-colors group flex items-center gap-1"
+                                    className="text-left font-mono break-all hover:text-primary transition-colors group flex items-center gap-1"
                                     onClick={() => {
                                       setLabelDraft(activeMap?.labelOverrides?.[selectedNode.id] ?? selectedNode.label);
                                       setEditingLabel(true);
@@ -1097,10 +1254,10 @@ function BrainMapContent() {
                                         {children.map(child => (
                                           <li
                                             key={child.id}
-                                            className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-accent/10 cursor-pointer text-[10px] font-mono"
+                                            className="flex items-center gap-1.5 px-1.5 py-1 rounded hover:bg-primary/10 cursor-pointer text-[10px] font-mono"
                                             onClick={() => setSelectedNodeId(child.id)}
                                           >
-                                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${child.type === "folder" ? "bg-blue-500" : "bg-green-500"}`} />
+                                            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${child.type === "folder" ? "bg-primary" : "bg-accent-success"}`} />
                                             <span className="truncate">{child.label}</span>
                                           </li>
                                         ))}
@@ -1144,7 +1301,7 @@ function BrainMapContent() {
                         <CardHeader className="pb-2">
                           <CardTitle className="text-base flex items-center justify-between">
                             <span className="flex items-center gap-2">
-                              <Zap className="w-4 h-4 text-accent" /> AI Context Files
+                              <Zap className="w-4 h-4 text-primary" /> AI Context Files
                             </span>
                             {contextEntries.length > 0 && (
                               <Button
@@ -1188,7 +1345,7 @@ function BrainMapContent() {
                             className={cn(
                               "rounded-lg border-2 border-dashed transition-all duration-200 flex items-center justify-center text-xs text-center min-h-[60px] p-3",
                               dropZoneActive
-                                ? "border-accent bg-accent/10 text-accent"
+                                ? "border-primary/30 bg-primary/10 text-primary"
                                 : "border-border/50 text-muted-foreground"
                             )}
                           >
@@ -1206,11 +1363,11 @@ function BrainMapContent() {
                                 {contextEntries.map(entry => (
                                   <li
                                     key={entry.id}
-                                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-emerald-500/10 border border-emerald-500/20 group"
+                                    className="flex items-center gap-2 px-2 py-1.5 rounded bg-accent-success/10 border border-accent-success/20 group"
                                   >
                                     <span className={cn(
                                       "w-1.5 h-1.5 rounded-full flex-shrink-0",
-                                      entry.nodeType === "folder" ? "bg-blue-400" : "bg-emerald-400"
+                                      entry.nodeType === "folder" ? "bg-primary" : "bg-accent-success"
                                     )} />
                                     <span className="flex-1 text-[10px] font-mono truncate text-foreground">
                                       {entry.name}
@@ -1229,7 +1386,7 @@ function BrainMapContent() {
                           )}
 
                           {contextEntries.length > 0 && (
-                            <p className="text-[10px] text-emerald-400 flex items-center gap-1 mt-1">
+                            <p className="text-[10px] text-accent-success flex items-center gap-1 mt-1">
                               <Zap className="w-3 h-3" />
                               {contextEntries.length} file{contextEntries.length !== 1 ? "s" : ""} active in AI context
                             </p>

@@ -71,8 +71,8 @@ function KaggleTrainingCard() {
   const isConnected = kaggleStatus.data?.connected;
   const connectedAs = kaggleStatus.data?.username;
   const statusColor: Record<string, string> = {
-    running: "text-blue-500", queued: "text-amber-500",
-    complete: "text-green-500", error: "text-destructive", unknown: "text-muted-foreground",
+    running: "text-primary", queued: "text-accent-warning",
+    complete: "text-accent-success", error: "text-destructive", unknown: "text-muted-foreground",
   };
 
   return (
@@ -91,7 +91,7 @@ function KaggleTrainingCard() {
       <CardContent className="space-y-5">
         <div className="flex items-center gap-2">
           {isConnected
-            ? <Badge className="bg-green-600 text-white border-transparent text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Connected as {connectedAs}</Badge>
+            ? <Badge className="bg-accent-success text-white border-transparent text-xs"><CheckCircle2 className="w-3 h-3 mr-1" />Connected as {connectedAs}</Badge>
             : <Badge variant="secondary" className="text-xs"><AlertCircle className="w-3 h-3 mr-1" />Not connected</Badge>
           }
           {!isConnected && (
@@ -258,7 +258,7 @@ export function ValetRouterPanel() {
             {valetStatus.isLoading ? (
               <Badge variant="secondary">Checking…</Badge>
             ) : valetStatus.data?.available ? (
-              <Badge className="bg-green-600 text-white border-transparent">Online</Badge>
+              <Badge className="bg-accent-success text-white border-transparent">Online</Badge>
             ) : (
               <Badge variant="outline" className="text-muted-foreground">Offline (rule fallback active)</Badge>
             )}
@@ -267,11 +267,11 @@ export function ValetRouterPanel() {
             <div className="flex items-center justify-between">
               <span className="text-sm text-muted-foreground">Model</span>
               {valetStatus.data.modelLoaded ? (
-                <Badge className="bg-green-600 text-white border-transparent">
+                <Badge className="bg-accent-success text-white border-transparent">
                   Loaded{valetStatus.data.backend ? ` · ${valetStatus.data.backend}` : ""}
                 </Badge>
               ) : (
-                <Badge variant="outline" className="text-amber-600 dark:text-amber-400">
+                <Badge variant="outline" className="text-accent-warning dark:text-accent-warning">
                   Loading…
                 </Badge>
               )}
@@ -286,7 +286,7 @@ export function ValetRouterPanel() {
             </div>
           )}
           {artifact?.status === "pending" && !valetStatus.data?.available && (
-            <p className="text-xs text-amber-600 dark:text-amber-400">
+            <p className="text-xs text-accent-warning dark:text-accent-warning">
               No trained artifact registered. Use the controls below to build one, or run{" "}
               <code className="font-mono bg-muted px-1 rounded">pnpm valet:fetch --tag v1.0.0</code>.
             </p>
@@ -355,14 +355,14 @@ export function ValetRouterPanel() {
                   <span className="text-muted-foreground">Detecting GPU…</span>
                 ) : gpuOk ? (
                   <>
-                    <span className="text-green-600 dark:text-green-400 font-medium">GPU ready</span>
+                    <span className="text-accent-success dark:text-accent-success font-medium">GPU ready</span>
                     <span className="text-xs text-muted-foreground">
                       {gpu!.name} · {Math.round(gpu!.vramMb / 1024)} GB VRAM
                     </span>
                   </>
                 ) : gpu?.available ? (
                   <>
-                    <span className="text-amber-600 dark:text-amber-400 font-medium">GPU: insufficient VRAM</span>
+                    <span className="text-accent-warning dark:text-accent-warning font-medium">GPU: insufficient VRAM</span>
                     <span className="text-xs text-muted-foreground">
                       {Math.round(gpu.vramMb / 1024)} GB / 8 GB min
                     </span>
@@ -377,7 +377,7 @@ export function ValetRouterPanel() {
                 {venvQuery.isLoading ? (
                   <span className="text-muted-foreground">Checking ML stack…</span>
                 ) : venvOk ? (
-                  <span className="text-green-600 dark:text-green-400 font-medium">Unsloth stack ready</span>
+                  <span className="text-accent-success dark:text-accent-success font-medium">Unsloth stack ready</span>
                 ) : (
                   <span className="text-muted-foreground">
                     ML stack not installed —{" "}
@@ -438,12 +438,12 @@ export function ValetRouterPanel() {
               </p>
             )}
             {localTrainingEnabled && !gpuOk && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-xs text-accent-warning dark:text-accent-warning">
                 GPU requirement not met. Training needs ≥ 8 GB VRAM.
               </p>
             )}
             {localTrainingEnabled && gpuOk && !venvOk && (
-              <p className="text-xs text-amber-600 dark:text-amber-400">
+              <p className="text-xs text-accent-warning dark:text-accent-warning">
                 Run <code className="font-mono bg-muted px-1 rounded">pnpm valet:setup-ml</code> to install
                 the Unsloth + TRL training stack, then reload.
               </p>

@@ -27,6 +27,7 @@ import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { getWsInstance } from "../phase2/websocket/WebSocketServer.js";
 import { NotificationService } from "../_core/NotificationService.js";
 import { assertProviderAllowedInMode } from "../_core/sovereign.js";
+import { injectMapRagContext } from "../_core/ragContext.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sovereign-mode enforcement
@@ -107,6 +108,9 @@ const chatInputSchema = z.object({
   projectId: z.string().max(256).optional(),
   sessionId: z.string().max(256).optional(),
   modelPath: z.string().max(4096).optional(),
+  /** Active neural map — when set (and its enableAIContext is on), the map's
+   *  indexed knowledge is retrieved and injected as system context. */
+  ragMapId: z.string().max(256).optional(),
 });
 
 const createSessionSchema = z.object({
@@ -293,10 +297,20 @@ ${transcript}
         return { content };
       }
       assertProviderAllowedInMode(input.providerId, ctx.user?.executionMode);
+      // Read-side map RAG: inject the active map's indexed knowledge (local +
+      // remote sources) into the prompt. Local retrieval → Sovereign-safe.
+      const rag = await injectMapRagContext({
+        mapId: input.ragMapId,
+        userId: ctx.user?.id,
+        messages: input.messages,
+        systemPrompt: input.systemPrompt,
+      });
       // Pass userId/executionMode like the streaming path so moe_chain routing and
       // Sovereign enforcement work identically on the blocking endpoint.
       const content = await ctx.services.aiProvider.chat({
         ...input,
+        messages: rag.messages,
+        systemPrompt: rag.systemPrompt,
         userId: ctx.user?.id,
         executionMode: ctx.user?.executionMode,
       });

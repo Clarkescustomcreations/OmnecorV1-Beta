@@ -35,11 +35,11 @@ export function ContextTransparencyIndicator({
 }: ContextTransparencyIndicatorProps) {
   const getStatusIcon = () => {
     if (transparency.usedPercentage >= 90) {
-      return <AlertCircle className="w-5 h-5 text-red-500" />;
+      return <AlertCircle className="w-5 h-5 text-destructive" />;
     } else if (transparency.usedPercentage >= 70) {
       return <AlertTriangle className="w-5 h-5 text-yellow-500" />;
     } else {
-      return <CheckCircle className="w-5 h-5 text-green-500" />;
+      return <CheckCircle className="w-5 h-5 text-accent-success" />;
     }
   };
 
@@ -57,11 +57,11 @@ export function ContextTransparencyIndicator({
 
   const getProgressColor = () => {
     if (transparency.usedPercentage >= 90) {
-      return "bg-red-500";
+      return "bg-destructive";
     } else if (transparency.usedPercentage >= 70) {
       return "bg-yellow-500";
     } else {
-      return "bg-green-500";
+      return "bg-accent-success";
     }
   };
 
@@ -139,8 +139,8 @@ export function ContextTransparencyIndicator({
         )}
 
         {transparency.usedPercentage >= 90 && (
-          <div className="p-3 rounded-lg bg-red-500/10 border border-red-500/30">
-            <p className="text-xs text-red-700 dark:text-red-400">
+          <div className="p-3 rounded-lg bg-destructive/10 border border-destructive/30">
+            <p className="text-xs text-destructive dark:text-destructive">
               🚨 Critical context usage. Remove files immediately to continue.
             </p>
           </div>

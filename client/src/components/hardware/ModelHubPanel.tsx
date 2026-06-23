@@ -82,7 +82,7 @@ export const ModelHubPanel: React.FC = () => {
     <div className="p-6 space-y-6">
       <div>
         <h2 className="text-2xl font-bold flex items-center gap-2">
-          <Database className="w-6 h-6 text-blue-500" aria-hidden="true" /> Model Hub
+          <Database className="w-6 h-6 text-primary" aria-hidden="true" /> Model Hub
         </h2>
         <p className="text-sm text-muted-foreground">Manage local Ollama models — install, configure, and delete.</p>
       </div>
@@ -147,7 +147,7 @@ export const ModelHubPanel: React.FC = () => {
                               </Badge>
                             )}
                             {isActive && (
-                              <Badge className="text-xs bg-green-600">Active</Badge>
+                              <Badge className="text-xs bg-accent-success">Active</Badge>
                             )}
                             <Badge variant="outline" className="text-xs font-mono truncate max-w-[80px]">
                               {model.digest?.slice(7, 14) ?? "—"}
@@ -309,7 +309,7 @@ export const ModelHubPanel: React.FC = () => {
                       <p className="text-sm text-muted-foreground text-center py-4">No models found for "{marketplaceSearch}"</p>
                     )}
                     {marketplaceQuery.error && (
-                      <p className="text-sm text-red-500 text-center py-2">Error: {marketplaceQuery.error.message}</p>
+                      <p className="text-sm text-destructive text-center py-2">Error: {marketplaceQuery.error.message}</p>
                     )}
                   </>
                 )}
@@ -381,7 +381,7 @@ export const ModelHubPanel: React.FC = () => {
                   </Button>
                 </div>
               </div>
-              <p className="text-xs text-muted-foreground text-amber-600">
+              <p className="text-xs text-muted-foreground text-accent-warning">
                 This action cannot be undone. A HITL approval request will appear in the approvals panel before deletion proceeds.
               </p>
             </CardContent>

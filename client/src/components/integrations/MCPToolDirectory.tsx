@@ -366,7 +366,7 @@ function AgenticOsStatus() {
     <div className="flex items-center gap-2 text-sm">
       <span className="text-muted-foreground font-medium">AgenticOS:</span>
       {data?.configured ? (
-        <Badge variant="default" className="bg-green-600 text-white border-transparent">
+        <Badge variant="default" className="bg-accent-success text-white border-transparent">
           AgenticOS Connected
         </Badge>
       ) : (

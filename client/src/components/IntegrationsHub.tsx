@@ -191,11 +191,11 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
   // Get status indicator color
   const getStatusColor = (status: string): string => {
     switch (status) {
-      case "connected": return "bg-green-500";
+      case "connected": return "bg-accent-success";
       case "disconnected": return "bg-gray-400";
-      case "error": return "bg-red-500";
+      case "error": return "bg-destructive";
       case "checking": return "bg-yellow-500";
-      default: return "bg-gray-300";
+      default: return "bg-muted";
     }
   };
 
@@ -225,7 +225,7 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                         const fl = FEATURE_LABELS[f];
                         if (!fl) return null;
                         return (
-                          <span key={f} className="inline-flex items-center gap-1 text-[10px] bg-accent/20 text-accent-foreground rounded px-1.5 py-0.5">
+                          <span key={f} className="inline-flex items-center gap-1 text-[10px] bg-primary/20 text-accent-foreground rounded px-1.5 py-0.5">
                             {fl.icon}{fl.label}
                           </span>
                         );
@@ -248,7 +248,7 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                 </Badge>
               </div>
               {item.isConnected && !crossProject && activeMap && (
-                <span className="inline-flex items-center gap-1 text-[9px] bg-accent/10 text-accent rounded px-1.5 py-0.5 whitespace-nowrap">
+                <span className="inline-flex items-center gap-1 text-[9px] bg-primary/10 text-primary rounded px-1.5 py-0.5 whitespace-nowrap">
                   <Brain className="w-2.5 h-2.5" />{activeMap.name}
                 </span>
               )}
@@ -260,7 +260,7 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
           {item.isConnected && meta && (
             <div className="p-3 rounded-lg bg-background/50 border">
               <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className="w-4 h-4 text-accent" />
+                <CheckCircle2 className="w-4 h-4 text-primary" />
                 <span className="text-sm font-semibold">{String(meta.username ?? "")}</span>
               </div>
               {!!meta.email && (
@@ -313,7 +313,7 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
         <div className={cn(
           "flex items-center gap-2 px-3 py-1.5 rounded-lg border transition-colors",
           !crossProject && activeMap
-            ? "bg-accent/10 border-accent/40 text-accent"
+            ? "bg-primary/10 border-primary/40 text-primary"
             : "border-border text-muted-foreground"
         )}>
           <Brain className="w-3.5 h-3.5 flex-shrink-0" />
@@ -354,11 +354,11 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
         <TabsContent value="social" className="space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {socialAccounts?.map(account => (
-              <Card key={account.id} className="bg-muted/50 border-accent/10">
+              <Card key={account.id} className="bg-muted/50 border-primary/10">
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-accent/10 flex items-center justify-center font-bold">
+                      <div className="w-10 h-10 rounded-full bg-primary/10 flex items-center justify-center font-bold">
                         {account.platform.charAt(0).toUpperCase()}
                       </div>
                       <div>
@@ -366,7 +366,7 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                         <CardDescription className="text-xs">{account.accountName}</CardDescription>
                       </div>
                     </div>
-                    <Badge className="bg-green-500/10 text-green-500 border-green-500/20">Active</Badge>
+                    <Badge className="bg-accent-success/10 text-accent-success border-accent-success/20">Active</Badge>
                   </div>
                 </CardHeader>
                 <CardContent>
@@ -455,8 +455,8 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                 <div className={cn(
                   "p-2 rounded text-sm",
                   healthStatus.status === "error"
-                    ? "bg-red-500/10 text-red-700"
-                    : "bg-green-500/10 text-green-700"
+                    ? "bg-destructive/10 text-destructive"
+                    : "bg-accent-success/10 text-accent-success"
                 )}>
                   Status: {healthStatus.status}
                   {healthStatus.errorMessage && <span className="ml-2 text-xs">({healthStatus.errorMessage})</span>}

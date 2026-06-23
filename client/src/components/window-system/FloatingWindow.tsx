@@ -48,7 +48,7 @@ export function FloatingWindow({
           height: initialSize.height,
         }}
         className={cn(
-          "fixed flex flex-col overflow-hidden rounded-xl border border-border bg-background/95 shadow-2xl backdrop-blur-xl floating-window-root",
+          "fixed top-0 left-0 flex flex-col overflow-hidden rounded-xl border border-border bg-background/95 shadow-2xl backdrop-blur-xl floating-window-root",
           isPinned ? "z-[9999]" : "z-50"
         )}
         transition={{ type: "spring", duration: 0.3, bounce: 0.2 }}
@@ -59,7 +59,7 @@ export function FloatingWindow({
           className="flex items-center justify-between border-b border-border bg-muted/30 px-4 py-2 cursor-grab active:cursor-grabbing select-none"
         >
           <div className="flex items-center gap-2">
-            <div className={cn("h-2 w-2 rounded-full animate-pulse", isPinned ? "bg-red-500 shadow-[0_0_8px_red]" : "bg-accent")} />
+            <div className={cn("h-2 w-2 rounded-full animate-pulse", isPinned ? "bg-destructive shadow-[0_0_8px_red]" : "bg-primary/10")} />
             <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground truncate max-w-[200px]">
               {title}
             </span>
@@ -70,7 +70,7 @@ export function FloatingWindow({
               <Button 
                 variant="ghost" 
                 size="icon" 
-                className={cn("h-7 w-7", isPinned && "text-accent bg-accent/10")} 
+                className={cn("h-7 w-7", isPinned && "text-primary bg-primary/10")} 
                 onClick={() => setIsPinned(!isPinned)}
               >
                 {isPinned ? <PinOff className="h-3.5 h-3.5" /> : <Pin className="h-3.5 h-3.5" />}

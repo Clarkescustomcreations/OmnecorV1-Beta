@@ -28,7 +28,7 @@ export const TaskManager: React.FC = () => {
       <div className="flex justify-between items-center">
         <div>
           <h2 className="text-2xl font-bold flex items-center gap-2">
-            <Activity className="w-6 h-6 text-green-500" /> Neural Task Manager
+            <Activity className="w-6 h-6 text-accent-success" /> Neural Task Manager
           </h2>
           <p className="text-sm text-muted-foreground">Monitor and manage asynchronous autonomous processes.</p>
         </div>

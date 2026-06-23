@@ -565,7 +565,7 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
 
         <div className="relative" ref={projectDropdownRef}>
           <button
-            className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-accent transition-colors"
+            className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary transition-colors"
             onClick={() => setShowProjectDropdown((v) => !v)}
           >
             <span className="max-w-[180px] truncate">
@@ -581,7 +581,7 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
                   key={proj.id}
                   className={`w-full text-left px-3 py-1.5 text-xs transition-colors ${
                     proj.id === pcbProjectId
-                      ? 'bg-accent/10 text-accent font-semibold'
+                      ? 'bg-primary/10 text-primary font-semibold'
                       : 'text-foreground hover:bg-muted'
                   }`}
                   onClick={() => {
@@ -598,7 +598,7 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
                   <div className="px-2 py-1 flex items-center gap-1">
                     <input
                       autoFocus
-                      className="flex-1 bg-background border border-border rounded px-2 py-0.5 text-xs text-foreground outline-none focus:border-accent"
+                      className="flex-1 bg-background border border-border rounded px-2 py-0.5 text-xs text-foreground outline-none focus:border-primary/30"
                       placeholder="Project name…"
                       value={newProjectName}
                       onChange={(e) => setNewProjectName(e.target.value)}

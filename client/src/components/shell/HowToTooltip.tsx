@@ -42,10 +42,10 @@ export function HowToTooltip({
           side={side}
           align={align}
           sideOffset={6}
-          className="max-w-[240px] p-3 bg-card/95 border-accent/20 shadow-2xl backdrop-blur-md z-[100]"
+          className="max-w-[240px] p-3 bg-card/95 border-primary/20 shadow-2xl backdrop-blur-md z-[100]"
         >
           <div className="space-y-1.5">
-            <h5 className="text-[11px] font-bold uppercase tracking-widest text-accent">
+            <h5 className="text-[11px] font-bold uppercase tracking-widest text-primary">
               {title}
             </h5>
             <p className="text-xs leading-relaxed text-foreground/90">

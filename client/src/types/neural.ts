@@ -52,6 +52,8 @@ export interface NeuralBrainMap {
 
 export interface FileEvent {
   eventType: "add" | "addDir" | "change" | "unlink" | "unlinkDir";
+  /** Absolute, normalised path — matches neural-map node ids (`node-${filePath}`). */
+  filePath?: string;
   relativePath: string;
   size?: number;
   extension?: string;

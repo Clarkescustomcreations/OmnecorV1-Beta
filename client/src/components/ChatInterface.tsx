@@ -219,7 +219,7 @@ function AssistantBubble({
   return (
     <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 group">
       {/* Avatar */}
-      <div className="w-6 h-6 rounded-full bg-accent flex items-center justify-center flex-shrink-0 mt-1 text-[10px] font-bold text-accent-foreground">
+      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1 text-[10px] font-bold text-accent-foreground">
         AI
       </div>
 
@@ -394,7 +394,7 @@ function UserBubble({
   return (
     <div className="flex gap-3 justify-end animate-in fade-in slide-in-from-bottom-2 group">
       <div className="flex flex-col gap-1 items-end max-w-xl min-w-0">
-        <div className="rounded-lg px-4 py-3 bg-accent text-accent-foreground text-sm w-full shadow-sm">
+        <div className="rounded-lg px-4 py-3 bg-primary/10 text-accent-foreground text-sm w-full shadow-sm">
           {editing ? (
             <div className="flex flex-col gap-2">
               <Textarea
@@ -719,7 +719,7 @@ export function ChatInterface({
             />
           ) : (
             <button
-              className="text-sm font-semibold hover:text-accent transition-colors truncate max-w-[200px]"
+              className="text-sm font-semibold hover:text-primary transition-colors truncate max-w-[200px]"
               onClick={() => setEditingTitle(true)}
               title="Click to rename"
             >
@@ -855,7 +855,7 @@ export function ChatInterface({
             <Button
               size="icon"
               variant="ghost"
-              className="h-7 w-7 text-accent"
+              className="h-7 w-7 text-primary"
               onClick={onToggleMemory}
             >
               <Brain className="w-3.5 h-3.5" />
@@ -925,7 +925,7 @@ export function ChatInterface({
         <div role="log" aria-live="polite" aria-label="Conversation messages" className="space-y-4 py-4">
           {messages.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-48 gap-3 text-center text-muted-foreground">
-              <div className="w-12 h-12 rounded-full bg-accent/20 flex items-center justify-center text-2xl">
+              <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center text-2xl">
                 💬
               </div>
               <div>

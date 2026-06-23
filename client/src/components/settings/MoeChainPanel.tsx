@@ -274,7 +274,7 @@ function ChainCard({ chainType }: { chainType: "local" | "cloud" }) {
           </div>
           {data ? (
             <Badge variant="secondary" className="flex items-center gap-1 text-xs">
-              <CheckCircle2 className="h-3 w-3 text-green-500" />
+              <CheckCircle2 className="h-3 w-3 text-accent-success" />
               Configured
             </Badge>
           ) : (

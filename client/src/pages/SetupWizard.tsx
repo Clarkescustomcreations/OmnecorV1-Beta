@@ -368,7 +368,7 @@ export function SetupWizard() {
         return (
           <div className="flex flex-col items-center justify-center space-y-8 py-10 animate-in fade-in zoom-in duration-500">
             <div className="relative">
-              <div className="absolute -inset-4 bg-accent/20 rounded-full blur-2xl animate-pulse" />
+              <div className="absolute -inset-4 bg-primary/20 rounded-full blur-2xl animate-pulse" />
               <img src={logoMark} alt="Omnecor Logo" className="w-32 h-32 relative drop-shadow-2xl object-contain" />
             </div>
             <div className="text-center space-y-4 max-w-lg">
@@ -377,8 +377,8 @@ export function SetupWizard() {
                 Welcome to the ultimate sovereign AI workstation. We'll guide you through a quick setup to ensure your local-first experience is optimized for your hardware and privacy.
               </p>
               <div className="flex items-center justify-center gap-4 pt-4">
-                <Badge variant="outline" className="px-3 py-1 border-accent/30 text-accent">v2.3.0 Sovereign</Badge>
-                <Badge variant="outline" className="px-3 py-1 border-accent/30 text-accent">Neural Mesh Ready</Badge>
+                <Badge variant="outline" className="px-3 py-1 border-primary/30 text-primary">v2.3.0 Sovereign</Badge>
+                <Badge variant="outline" className="px-3 py-1 border-primary/30 text-primary">Neural Mesh Ready</Badge>
               </div>
             </div>
           </div>
@@ -396,7 +396,7 @@ export function SetupWizard() {
                   <Button
                     variant="outline"
                     disabled={authBusy}
-                    className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-accent hover:bg-accent/5"
+                    className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-primary/30 hover:bg-primary/5"
                     onClick={() => handleOAuth('google')}
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
@@ -405,7 +405,7 @@ export function SetupWizard() {
                   <Button
                     variant="outline"
                     disabled={authBusy}
-                    className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-accent hover:bg-accent/5"
+                    className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-primary/30 hover:bg-primary/5"
                     onClick={() => handleOAuth('microsoft')}
                   >
                     <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#F25022" d="M1 1h10v10H1z"/><path fill="#7FBA00" d="M13 1h10v10H13z"/><path fill="#00A4EF" d="M1 13h10v10H1z"/><path fill="#FFB900" d="M13 13h10v10H13z"/></svg>
@@ -414,7 +414,7 @@ export function SetupWizard() {
                   <div className="relative my-2"><div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div><div className="relative flex justify-center"><span className="bg-card px-3 text-xs text-muted-foreground">or</span></div></div>
                   <Button
                     variant="outline"
-                    className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-accent hover:bg-accent/5"
+                    className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-primary/30 hover:bg-primary/5"
                     onClick={async () => {
                       if (!apiBase) {
                         toast.error("Desktop bridge not ready. If this persists, restart Omnecor.");
@@ -467,7 +467,7 @@ export function SetupWizard() {
                     <Input type="password" placeholder="Repeat password" value={localPassword2} onChange={e => setLocalPassword2(e.target.value)}
                       onKeyDown={e => e.key === "Enter" && handleLocalRegister()} />
                   </div>
-                  <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold" disabled={authBusy} onClick={handleLocalRegister}>
+                  <Button className="w-full bg-primary/10 text-accent-foreground hover:bg-primary/90 font-bold" disabled={authBusy} onClick={handleLocalRegister}>
                     {authBusy ? "Creating account…" : "Create account & continue"}
                   </Button>
                 </div>
@@ -489,7 +489,7 @@ export function SetupWizard() {
                     <Input type="password" placeholder="Your password" value={localPassword} onChange={e => setLocalPassword(e.target.value)} autoFocus
                       onKeyDown={e => e.key === "Enter" && handleLocalLogin()} />
                   </div>
-                  <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90 font-bold" disabled={authBusy} onClick={handleLocalLogin}>
+                  <Button className="w-full bg-primary/10 text-accent-foreground hover:bg-primary/90 font-bold" disabled={authBusy} onClick={handleLocalLogin}>
                     {authBusy ? "Signing in…" : "Sign in & continue"}
                   </Button>
                 </div>
@@ -512,7 +512,7 @@ export function SetupWizard() {
                   onClick={() => setSelectedMode(mode.id as "sovereign" | "scrapper" | "big_spender")}
                   className={cn(
                     "flex items-start gap-4 p-4 rounded-xl border-2 cursor-pointer transition-all hover:bg-muted/50",
-                    selectedMode === mode.id ? "border-accent bg-accent/5 ring-1 ring-accent" : "border-border"
+                    selectedMode === mode.id ? "border-primary/30 bg-primary/5 ring-1 ring-primary/30" : "border-border"
                   )}
                 >
                   <div className={cn("p-2 rounded-lg bg-background border shadow-sm", mode.color)}>
@@ -521,7 +521,7 @@ export function SetupWizard() {
                   <div className="flex-1">
                     <div className="flex items-center justify-between">
                       <Label className="text-lg font-bold cursor-pointer">{mode.label}</Label>
-                      {selectedMode === mode.id && <CheckCircle2 className="w-5 h-5 text-accent" />}
+                      {selectedMode === mode.id && <CheckCircle2 className="w-5 h-5 text-primary" />}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">{mode.desc}</p>
                   </div>
@@ -560,7 +560,7 @@ export function SetupWizard() {
                   value={ollamaUrl}
                   onChange={(e) => setOllamaUrl(e.target.value)}
                   onBlur={(e) => autoSaveKey("ollamaUrl", e.target.value)}
-                  className="bg-background/50 focus-visible:ring-accent font-mono text-xs"
+                  className="bg-background/50 focus-visible:ring-primary/30 font-mono text-xs"
                 />
               </div>
             </div>
@@ -596,7 +596,7 @@ export function SetupWizard() {
                     value={keys[p.id as keyof typeof keys]}
                     onChange={(e) => setKeys({ ...keys, [p.id]: e.target.value })}
                     onBlur={(e) => autoSaveKey(p.id, e.target.value)}
-                    className="bg-background/50 focus-visible:ring-accent"
+                    className="bg-background/50 focus-visible:ring-primary/30"
                   />
                 </div>
               ))}
@@ -626,7 +626,7 @@ export function SetupWizard() {
                   placeholder="your_kaggle_username"
                   value={kaggleUsername}
                   onChange={(e) => setKaggleUsername(e.target.value)}
-                  className="bg-background/50 focus-visible:ring-accent font-mono text-xs"
+                  className="bg-background/50 focus-visible:ring-primary/30 font-mono text-xs"
                 />
               </div>
               <div className="space-y-1.5">
@@ -637,7 +637,7 @@ export function SetupWizard() {
                     placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
                     value={kaggleApiKey}
                     onChange={(e) => setKaggleApiKey(e.target.value)}
-                    className="bg-background/50 focus-visible:ring-accent font-mono text-xs"
+                    className="bg-background/50 focus-visible:ring-primary/30 font-mono text-xs"
                   />
                   <Button
                     size="sm"
@@ -661,8 +661,8 @@ export function SetupWizard() {
         return (
           <div className="space-y-8 py-4">
             <div className="flex flex-col items-center text-center space-y-4">
-              <div className="p-4 rounded-2xl bg-accent/10 border border-accent/20">
-                <Share2 className="w-12 h-12 text-accent" />
+              <div className="p-4 rounded-2xl bg-primary/10 border border-primary/20">
+                <Share2 className="w-12 h-12 text-primary" />
               </div>
               <h3 className="text-xl font-bold">Neural Mesh Discovery</h3>
               <p className="text-sm text-muted-foreground max-w-md">
@@ -694,8 +694,8 @@ export function SetupWizard() {
         return (
           <div className="space-y-6 py-4">
              <div className="flex items-center gap-4 mb-4">
-                <div className="p-3 rounded-xl bg-accent/10">
-                  <FolderOpen className="w-6 h-6 text-accent" />
+                <div className="p-3 rounded-xl bg-primary/10">
+                  <FolderOpen className="w-6 h-6 text-primary" />
                 </div>
                 <div>
                   <h3 className="text-lg font-bold">Initial Context</h3>
@@ -733,7 +733,7 @@ export function SetupWizard() {
             <div className="grid grid-cols-2 gap-6">
                <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <HardDrive className="w-4 h-4 text-accent" />
+                    <HardDrive className="w-4 h-4 text-primary" />
                     <Label className="font-bold">Model Memory</Label>
                   </div>
                   <div className="space-y-3">
@@ -744,7 +744,7 @@ export function SetupWizard() {
                </div>
                <div className="space-y-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <Mic2 className="w-4 h-4 text-accent" />
+                    <Mic2 className="w-4 h-4 text-primary" />
                     <Label className="font-bold">Voice Engine</Label>
                   </div>
                   <div className="space-y-3">
@@ -761,9 +761,9 @@ export function SetupWizard() {
                </div>
             </div>
             <div className="pt-6 border-t">
-              <div className="p-4 rounded-xl border bg-accent/5 border-accent/10 flex items-center justify-between">
+              <div className="p-4 rounded-xl border bg-primary/5 border-primary/10 flex items-center justify-between">
                  <div className="flex items-center gap-3">
-                    <Cpu className="w-5 h-5 text-accent" />
+                    <Cpu className="w-5 h-5 text-primary" />
                     <div>
                       <p className="text-sm font-bold">Hardware Discovery</p>
                       <p className="text-xs text-muted-foreground">Auto-detect local Blender, KiCad, and GPUs.</p>
@@ -790,10 +790,10 @@ export function SetupWizard() {
                     onClick={() => setTheme(opt.id as Parameters<typeof setTheme>[0])}
                     className={cn(
                       "flex flex-col items-center gap-3 p-6 rounded-2xl border-2 cursor-pointer transition-all",
-                      theme === opt.id ? "border-accent bg-accent/5" : "border-border hover:border-accent/30"
+                      theme === opt.id ? "border-primary/30 bg-primary/5" : "border-border hover:border-primary/30"
                     )}
                   >
-                    <opt.icon className={cn("w-10 h-10", theme === opt.id ? "text-accent" : "text-muted-foreground")} />
+                    <opt.icon className={cn("w-10 h-10", theme === opt.id ? "text-primary" : "text-muted-foreground")} />
                     <div className="text-center">
                       <p className="font-bold">{opt.label}</p>
                       <p className="text-[10px] text-muted-foreground mt-1">{opt.desc}</p>
@@ -833,8 +833,8 @@ export function SetupWizard() {
       case "finish":
         return (
           <div className="flex flex-col items-center justify-center space-y-8 py-10 animate-in fade-in slide-in-from-bottom-4 duration-700">
-             <div className="w-24 h-24 rounded-full bg-accent/10 border-2 border-accent/20 flex items-center justify-center animate-bounce">
-                <Rocket className="w-12 h-12 text-accent" />
+             <div className="w-24 h-24 rounded-full bg-primary/10 border-2 border-primary/20 flex items-center justify-center animate-bounce">
+                <Rocket className="w-12 h-12 text-primary" />
              </div>
              <div className="text-center space-y-2">
                 <h3 className="text-3xl font-black italic italic">SYSTEM READY</h3>
@@ -844,15 +844,15 @@ export function SetupWizard() {
              </div>
              <div className="grid grid-cols-3 gap-8 pt-4">
                 <div className="text-center">
-                  <p className="text-xl font-bold text-accent">✓</p>
+                  <p className="text-xl font-bold text-primary">✓</p>
                   <p className="text-[10px] uppercase font-bold text-muted-foreground">Privacy</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-accent">✓</p>
+                  <p className="text-xl font-bold text-primary">✓</p>
                   <p className="text-[10px] uppercase font-bold text-muted-foreground">Mesh</p>
                 </div>
                 <div className="text-center">
-                  <p className="text-xl font-bold text-accent">✓</p>
+                  <p className="text-xl font-bold text-primary">✓</p>
                   <p className="text-[10px] uppercase font-bold text-muted-foreground">Neural</p>
                 </div>
              </div>
@@ -875,7 +875,7 @@ export function SetupWizard() {
         const StatusBadge = ({ ok, loading }: { ok: boolean; loading: boolean }) => {
           if (loading) return <span className="inline-flex items-center gap-1 text-[10px] font-bold text-muted-foreground"><Loader2 className="w-3 h-3 animate-spin" />Checking…</span>;
           return ok
-            ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-accent"><CheckCircle className="w-3 h-3" />Detected</span>
+            ? <span className="inline-flex items-center gap-1 text-[10px] font-bold text-primary"><CheckCircle className="w-3 h-3" />Detected</span>
             : <span className="inline-flex items-center gap-1 text-[10px] font-bold text-destructive"><AlertCircle className="w-3 h-3" />Not found</span>;
         };
 
@@ -894,13 +894,13 @@ export function SetupWizard() {
           return (
             <div className={cn(
               "rounded-xl border p-4 transition-colors",
-              allOk ? "border-accent/30 bg-accent/5" : "border-border bg-muted/20"
+              allOk ? "border-primary/30 bg-primary/5" : "border-border bg-muted/20"
             )}>
               <div className="flex items-center justify-between mb-3">
                 <div className="flex items-center gap-2">
-                  <span className={cn("text-base", allOk ? "text-accent" : "text-muted-foreground")}>{icon}</span>
+                  <span className={cn("text-base", allOk ? "text-primary" : "text-muted-foreground")}>{icon}</span>
                   <span className="text-sm font-bold">{label}</span>
-                  {allOk && <CheckCircle2 className="w-3.5 h-3.5 text-accent" />}
+                  {allOk && <CheckCircle2 className="w-3.5 h-3.5 text-primary" />}
                 </div>
                 <div className="flex items-center gap-2">
                   {!allOk && (
@@ -908,7 +908,7 @@ export function SetupWizard() {
                       <button
                         id={`checklist-get-${String(groupKey)}`}
                         onClick={() => openUrl(getItUrl)}
-                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md border border-border hover:border-accent hover:text-accent transition-colors text-muted-foreground"
+                        className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md border border-border hover:border-primary/30 hover:text-primary transition-colors text-muted-foreground"
                       >
                         <ExternalLink className="w-3 h-3" />
                         {getItLabel ?? "Get It"}
@@ -942,7 +942,7 @@ export function SetupWizard() {
               id="checklist-install-ollama"
               disabled={installOllamaMutation.isPending}
               onClick={() => installOllamaMutation.mutate()}
-              className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-accent text-accent-foreground hover:bg-accent/90 disabled:opacity-60 transition-colors"
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-accent-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
             >
               {installOllamaMutation.isPending
                 ? <><Loader2 className="w-3 h-3 animate-spin" />Installing…</>
@@ -1083,8 +1083,8 @@ export function SetupWizard() {
       />
 
       {/* Background Ambience */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-accent/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
+      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-primary/5 rounded-full blur-[120px] pointer-events-none" />
 
       {/* Main Container */}
       <div className="w-full max-w-5xl flex flex-col md:flex-row gap-8 relative z-10">
@@ -1108,13 +1108,13 @@ export function SetupWizard() {
                   >
                     <div className={cn(
                       "w-8 h-8 rounded-full border-2 flex items-center justify-center text-xs font-bold",
-                      idx === currentStep ? "border-accent bg-accent text-accent-foreground" : 
-                      idx < currentStep ? "border-accent text-accent" : "border-muted-foreground"
+                      idx === currentStep ? "border-primary/30 bg-primary/10 text-accent-foreground" : 
+                      idx < currentStep ? "border-primary/30 text-primary" : "border-muted-foreground"
                     )}>
                       {idx < currentStep ? "✓" : idx + 1}
                     </div>
                     <div>
-                      <p className={cn("text-sm font-bold uppercase tracking-wider", idx === currentStep ? "text-accent" : "text-foreground")}>
+                      <p className={cn("text-sm font-bold uppercase tracking-wider", idx === currentStep ? "text-primary" : "text-foreground")}>
                         {step.title}
                       </p>
                       {idx === currentStep && (
@@ -1139,8 +1139,8 @@ export function SetupWizard() {
           <CardHeader className="border-b bg-muted/20 p-8">
             <div className="flex items-center justify-between mb-6">
                <div className="flex items-center gap-2">
-                 <div className="w-2 h-2 rounded-full bg-accent animate-pulse" />
-                 <span className="text-[10px] uppercase font-black tracking-[0.2em] text-accent">Configuration Sequence</span>
+                 <div className="w-2 h-2 rounded-full bg-primary/10 animate-pulse" />
+                 <span className="text-[10px] uppercase font-black tracking-[0.2em] text-primary">Configuration Sequence</span>
                </div>
                <span className="text-xs font-mono text-muted-foreground">STEP_0{currentStep + 1} / 0{STEPS.length}</span>
             </div>
@@ -1186,7 +1186,7 @@ export function SetupWizard() {
                 <Button
                   onClick={handleFinish}
                   size="lg"
-                  className="bg-accent text-accent-foreground hover:bg-accent/90 shadow-[0_0_20px_rgba(var(--accent),0.3)] gap-2 px-8 font-bold"
+                  className="bg-primary/10 text-accent-foreground hover:bg-primary/90 shadow-[0_0_20px_rgba(var(--accent),0.3)] gap-2 px-8 font-bold"
                 >
                   Launch Workstation
                   <ArrowRight className="w-5 h-5" />

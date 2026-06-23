@@ -131,7 +131,7 @@ export const ESPToolPanel: React.FC = () => {
           <Badge variant="outline" className="font-mono">{selectedPort || "disconnected"}</Badge>
         </CardHeader>
         <CardContent className="flex-1 p-0 overflow-hidden">
-          <ScrollArea className="h-full bg-black text-green-500 font-mono text-xs p-4">
+          <ScrollArea className="h-full bg-black text-accent-success font-mono text-xs p-4">
             {serialOutput.map((line, i) => (
               <div key={i}>{line}</div>
             ))}

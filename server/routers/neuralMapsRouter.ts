@@ -4,6 +4,9 @@ import { getDb } from "../db.factory.js";
 import { neuralMaps } from "../../drizzle/schema.js";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
+
+const isRemoteRoot = (r: string) => r.startsWith("github://") || r.startsWith("integration://");
 
 const settingsSchema = z.object({
   autoWatch: z.boolean().default(true),
@@ -91,6 +94,21 @@ export const neuralMapsRouter = router({
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
+      // When the root list changes, reconcile the vector store: any remote
+      // source dropped from the map has its indexed chunks removed so RAG never
+      // returns content from a source the user disconnected.
+      let removedRemoteRoots: string[] = [];
+      if (input.rootDirectories !== undefined) {
+        const existing = await db
+          .select({ rootDirectories: neuralMaps.rootDirectories })
+          .from(neuralMaps)
+          .where(and(eq(neuralMaps.id, input.id), eq(neuralMaps.userId, userId)))
+          .limit(1);
+        const before = new Set(existing[0]?.rootDirectories ?? []);
+        const after = new Set(input.rootDirectories);
+        removedRemoteRoots = [...before].filter(r => isRemoteRoot(r) && !after.has(r));
+      }
+
       const patch: Partial<typeof neuralMaps.$inferInsert> = { updatedAt: new Date() };
       if (input.name !== undefined) patch.name = input.name;
       if (input.mode !== undefined) patch.mode = input.mode;
@@ -103,6 +121,13 @@ export const neuralMapsRouter = router({
         .update(neuralMaps)
         .set(patch)
         .where(and(eq(neuralMaps.id, input.id), eq(neuralMaps.userId, userId)));
+
+      if (removedRemoteRoots.length > 0) {
+        const memory = MemoryArchitectService.getInstance();
+        await Promise.all(
+          removedRemoteRoots.map(uri => memory.deleteRemoteSource(input.id, uri).catch(() => {})),
+        );
+      }
 
       return { success: true };
     }),
@@ -119,6 +144,10 @@ export const neuralMapsRouter = router({
       await db
         .delete(neuralMaps)
         .where(and(eq(neuralMaps.id, input.id), eq(neuralMaps.userId, userId)));
+
+      // Drop the map's entire vector collection so its indexed content (local
+      // + remote) doesn't linger after the map is gone.
+      await MemoryArchitectService.getInstance().deleteCollection(input.id).catch(() => {});
 
       return { success: true };
     }),

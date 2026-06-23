@@ -111,18 +111,18 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
   });
 
   return (
-    <div className="flex flex-col h-full bg-slate-900 border-l border-slate-800 w-80">
-      <div className="p-4 border-b border-slate-800 bg-slate-950 flex items-center justify-between">
+    <div className="flex flex-col h-full bg-card border-l border-border w-80">
+      <div className="p-4 border-b border-border bg-background flex items-center justify-between">
         <div className="flex items-center gap-2">
-          <Settings className="w-4 h-4 text-accent" />
+          <Settings className="w-4 h-4 text-primary" />
           <span className="text-xs font-bold uppercase tracking-wider">Manufacturing Engine</span>
         </div>
-        <Badge variant="outline" className="text-[10px] h-5 border-accent/20 text-accent">Phase 3</Badge>
+        <Badge variant="outline" className="text-[10px] h-5 border-primary/20 text-primary">Phase 3</Badge>
       </div>
 
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as "3d" | "pcb")} className="min-h-0 flex-1 overflow-hidden flex flex-col">
-        <div className="p-2 bg-slate-950/50">
-          <TabsList className="grid w-full grid-cols-2 h-8 bg-slate-900">
+        <div className="p-2 bg-background/50">
+          <TabsList className="grid w-full grid-cols-2 h-8 bg-card">
             <TabsTrigger value="3d" className="text-[10px] gap-1.5"><Box className="w-3 h-3" /> 3D Render</TabsTrigger>
             <TabsTrigger value="pcb" className="text-[10px] gap-1.5"><Cpu className="w-3 h-3" /> PCB Fab</TabsTrigger>
           </TabsList>
@@ -131,22 +131,22 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
         <div className="min-h-0 flex-1 overflow-auto p-4 space-y-6 custom-scrollbar">
           {/* 3D Tab */}
           <TabsContent value="3d" className="m-0 space-y-6">
-            <Card className="bg-slate-950 border-slate-800 shadow-none">
+            <Card className="bg-background border-border shadow-none">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm">Blender Headless</CardTitle>
                 <CardDescription className="text-[10px]">Remote rendering & export engine status</CardDescription>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-4">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-card border border-border">
                   <span className="text-[10px] text-muted-foreground uppercase font-bold">Engine</span>
                   <div className="flex items-center gap-1.5">
-                    <div className={cn("w-1.5 h-1.5 rounded-full", blenderStatus?.isInstalled ? "bg-emerald-500" : "bg-rose-500")} />
+                    <div className={cn("w-1.5 h-1.5 rounded-full", blenderStatus?.isInstalled ? "bg-accent-success" : "bg-destructive")} />
                     <span className="text-[10px] font-mono">{blenderStatus?.isInstalled ? "Ready" : "Offline"}</span>
                   </div>
                 </div>
 
                 <Button 
-                  className="w-full gap-2 h-9 bg-accent text-accent-foreground hover:bg-accent/90"
+                  className="w-full gap-2 h-9 bg-primary/10 text-accent-foreground hover:bg-primary/90"
                   disabled={!blenderStatus?.isInstalled || renderMutation.isPending}
                   onClick={() => renderMutation.mutate({ label: "High Fidelity UI Mockup" })}
                 >
@@ -158,7 +158,7 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-8 gap-1.5 border-slate-800 bg-slate-900 hover:bg-slate-800"
+                    className="text-[10px] h-8 gap-1.5 border-border bg-card hover:bg-card"
                     disabled={!blenderStatus?.isInstalled || stlExportMutation.isPending}
                     onClick={() => stlExportMutation.mutate({ blendFile: "scene.blend", outputPath: "export.stl" })}
                   >
@@ -167,7 +167,7 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                   <Button
                     variant="outline"
                     size="sm"
-                    className="text-[10px] h-8 gap-1.5 border-slate-800 bg-slate-900 hover:bg-slate-800"
+                    className="text-[10px] h-8 gap-1.5 border-border bg-card hover:bg-card"
                     disabled={!blenderStatus?.isInstalled || glbExportMutation.isPending}
                     onClick={() => glbExportMutation.mutate({ blendFile: "scene.blend", outputPath: "export.glb" })}
                   >
@@ -177,8 +177,8 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
               </CardContent>
             </Card>
 
-            <div className="p-4 rounded-xl border border-amber-500/10 bg-amber-500/5 space-y-2">
-              <div className="flex items-center gap-2 text-amber-500">
+            <div className="p-4 rounded-xl border border-accent-warning/10 bg-accent-warning/5 space-y-2">
+              <div className="flex items-center gap-2 text-accent-warning">
                 <AlertTriangle className="w-3.5 h-3.5" />
                 <span className="text-[10px] font-bold uppercase">Manufacturing Note</span>
               </div>
@@ -190,23 +190,23 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
 
           {/* PCB Tab */}
           <TabsContent value="pcb" className="m-0 space-y-6">
-            <Card className="bg-slate-950 border-slate-800 shadow-none">
+            <Card className="bg-background border-border shadow-none">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm">KiCad CLI Toolchain</CardTitle>
                 <CardDescription className="text-[10px]">DRC, ERC, and Gerber generation</CardDescription>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-3">
-                <div className="flex items-center justify-between p-2 rounded-lg bg-slate-900 border border-slate-800">
+                <div className="flex items-center justify-between p-2 rounded-lg bg-card border border-border">
                   <span className="text-[10px] text-muted-foreground uppercase font-bold">KiCad Suite</span>
                   <div className="flex items-center gap-1.5">
-                    <div className={cn("w-1.5 h-1.5 rounded-full", kicadStatus?.isInstalled ? "bg-emerald-500" : "bg-rose-500")} />
+                    <div className={cn("w-1.5 h-1.5 rounded-full", kicadStatus?.isInstalled ? "bg-accent-success" : "bg-destructive")} />
                     <span className="text-[10px] font-mono">{kicadStatus?.isInstalled ? "Ready" : "Offline"}</span>
                   </div>
                 </div>
 
                 <Button 
                   variant="outline" 
-                  className="w-full gap-2 h-9 border-slate-800 bg-slate-900 hover:bg-slate-800"
+                  className="w-full gap-2 h-9 border-border bg-card hover:bg-card"
                   disabled={!kicadStatus?.isInstalled || drcMutation.isPending}
                   onClick={() => drcMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
                 >
@@ -216,17 +216,17 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
               </CardContent>
             </Card>
 
-            <Card className="bg-slate-950 border-slate-800 shadow-none">
+            <Card className="bg-background border-border shadow-none">
               <CardHeader className="p-4">
                 <CardTitle className="text-sm flex items-center gap-2">
-                  <ShoppingCart className="w-4 h-4 text-blue-500" /> 
+                  <ShoppingCart className="w-4 h-4 text-primary" /> 
                   Checkout & Fab
                 </CardTitle>
               </CardHeader>
               <CardContent className="px-4 pb-4 space-y-4">
                 {!quote ? (
                   <Button 
-                    className="w-full gap-2 h-10 bg-blue-600 hover:bg-blue-700 text-white border-none"
+                    className="w-full gap-2 h-10 bg-primary hover:bg-primary text-white border-none"
                     onClick={() => quoteMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
                     disabled={quoteMutation.isPending}
                   >
@@ -235,24 +235,24 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                   </Button>
                 ) : (
                   <div className="space-y-4">
-                    <div className="p-3 rounded-lg bg-blue-500/10 border border-blue-500/20">
+                    <div className="p-3 rounded-lg bg-primary/10 border border-primary/20">
                       <div className="flex justify-between items-center mb-1">
-                        <span className="text-[10px] font-bold uppercase text-blue-400">Total Price</span>
+                        <span className="text-[10px] font-bold uppercase text-primary">Total Price</span>
                         <span className="text-lg font-bold">${quote.totalPrice}</span>
                       </div>
-                      <p className="text-[10px] text-blue-400/70">Estimated Lead Time: {quote.leadTimeDays} days</p>
+                      <p className="text-[10px] text-primary/70">Estimated Lead Time: {quote.leadTimeDays} days</p>
                     </div>
 
-                    <div className="space-y-3 pt-2 border-t border-slate-800">
+                    <div className="space-y-3 pt-2 border-t border-border">
                        <p className="text-[10px] font-bold text-muted-foreground uppercase">Shipping To:</p>
                        <div className="space-y-2">
                          <Input 
-                            className="h-8 text-[10px] bg-slate-900 border-slate-800" 
+                            className="h-8 text-[10px] bg-card border-border" 
                             value={address.name} 
                             onChange={(e) => setShippingAddress({...address, name: e.target.value})}
                          />
                          <Input 
-                            className="h-8 text-[10px] bg-slate-900 border-slate-800" 
+                            className="h-8 text-[10px] bg-card border-border" 
                             value={address.address} 
                             onChange={(e) => setShippingAddress({...address, address: e.target.value})}
                          />
@@ -260,7 +260,7 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                     </div>
 
                     <Button 
-                      className="w-full h-11 gap-2 bg-emerald-600 hover:bg-emerald-700 text-white border-none font-bold"
+                      className="w-full h-11 gap-2 bg-accent-success hover:bg-accent-success text-white border-none font-bold"
                       onClick={() => orderMutation.mutate({ quoteId: quote.id, shippingAddress: address })}
                       disabled={orderMutation.isPending}
                     >
@@ -277,12 +277,12 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
           </TabsContent>
         </div>
 
-        <div className="p-4 border-t border-slate-800 bg-slate-950/50">
+        <div className="p-4 border-t border-border bg-background/50">
           <div className="flex items-center justify-between text-[10px] text-muted-foreground mb-3">
              <span className="uppercase font-bold tracking-tighter">Manufacturing Queue</span>
              <span>0 Jobs</span>
           </div>
-          <div className="p-3 rounded-lg border border-slate-800 bg-slate-900 text-center">
+          <div className="p-3 rounded-lg border border-border bg-card text-center">
             <p className="text-[10px] italic opacity-50">No active fab jobs.</p>
           </div>
         </div>

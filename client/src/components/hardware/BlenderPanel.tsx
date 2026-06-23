@@ -77,8 +77,8 @@ export const BlenderPanel: React.FC = () => {
               <FileText className="w-4 h-4" /> Console Output
             </CardTitle>
           </CardHeader>
-          <CardContent className="flex-1 p-0 overflow-hidden bg-zinc-950">
-            <ScrollArea className="h-full font-mono text-xs text-zinc-400 p-4">
+          <CardContent className="flex-1 p-0 overflow-hidden bg-background">
+            <ScrollArea className="h-full font-mono text-xs text-muted-foreground p-4">
               {stdout.map((line, i) => (
                 <div key={i} className="mb-1">{line}</div>
               ))}
@@ -92,17 +92,17 @@ export const BlenderPanel: React.FC = () => {
             <CardHeader className="py-3 border-b">
               <CardTitle className="text-sm font-medium">Render Preview</CardTitle>
             </CardHeader>
-            <CardContent className="flex-1 p-0 flex items-center justify-center bg-zinc-900 relative">
+            <CardContent className="flex-1 p-0 flex items-center justify-center bg-card relative">
               {previewUrl ? (
                 <img src={previewUrl} alt="Preview" className="max-h-full object-contain" />
               ) : (
-                <div className="text-zinc-500 text-xs italic">No preview available</div>
+                <div className="text-muted-foreground text-xs italic">No preview available</div>
               )}
               {renderProgress > 0 && (
                 <div className="absolute bottom-4 left-4 right-4 space-y-1">
                   <div className="text-[10px] uppercase font-bold text-white drop-shadow-md">Rendering {renderProgress}%</div>
                   <div className="h-1 bg-white/20 rounded-full overflow-hidden">
-                    <div className="h-full bg-blue-500 transition-all duration-300" style={{ width: `${renderProgress}%` }} />
+                    <div className="h-full bg-primary transition-all duration-300" style={{ width: `${renderProgress}%` }} />
                   </div>
                 </div>
               )}

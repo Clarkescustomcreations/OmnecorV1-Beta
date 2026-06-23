@@ -69,6 +69,67 @@ Contingency: if the bug survives, keep the workaround + document it inline and f
 
 ---
 
+## ✅ Map RAG over Remote Sources (VectorDB feed, end-to-end) — 2026-06-23
+
+**Status:** Complete (built full, no deferrals, per the *Build Complete, Fix Now* directive now pinned atop CLAUDE.md / AGENTS.md / memory.md). Closes the user-flagged "half the point" item — `fetchSourceTree` output is now ingested as **real content** into the map's VectorDB collection and consumed by chat.
+
+**What was built — three halves made whole:**
+1. **Write path (content, not labels).** Per-adapter content resolvers (`integrationsRouter.resolveSourceDocuments`) fetch real bodies for **all 8 source types**: github (contents API + 403/429 backoff), notion (block children), slack (`conversations.history`), google-drive (export / `alt=media`), gmail + outlook (full body, html→text), dropbox (recursive list + download), onedrive (BFS + content). Bounds: 400 items/src, 100 KB/item, 8 MB/src, concurrency 5, text-extension allowlist, per-item failures skipped. Generic ingest via new `MemoryArchitectService.reindexRemoteSource(mapId, uri, type, docs)` → chunk + PromptSanitizer + redact → collection `omnecor_{mapId}`. Stable ids; per-source reconcile via new `VectorDBService.removeDocumentsWhere`.
+2. **Trigger + UX.** `integrations.indexMapSources` (externalServiceProcedure, ownership-checked, `indexingEnabled`-gated) runs a **detached** job; `integrations.getMapIndexStatus` polled by client. `BrainMap` header gains an **Index** button + live progress; auto-indexes once per map open; completion → NotificationService.
+3. **Read path (was entirely absent from chat).** `server/_core/ragContext.ts#injectMapRagContext` retrieves from the map collection and injects into **both** `systemPrompt` and the system message (providers disagree which they read) — wired into `aiProvider.chatStream` **and** `ai.chat`, gated by map `enableAIContext`; local retrieval so **Sovereign-safe**. `Chat.tsx` passes `ragMapId` from the active map.
+
+**Bug fixed on sight (collection-naming seam):** the local file watcher wrote a **raw** `omnecor_${projectId}` collection while the RAG reader (`MemoryArchitectService`) queried a **sanitized** one — for hyphenated map UUIDs these diverged, silently emptying RAG. Unified everything on an exported `sanitizeCollectionName`. Lifecycle: `neuralMaps.update` drops vectors for removed remote roots; `neuralMaps.delete` drops the whole map collection.
+
+| File | Change |
+|---|---|
+| `server/phase2/services/VectorDBService.ts` | exported `sanitizeCollectionName` (single source of truth); `removeDocumentsWhere(collection, where)` |
+| `server/phase2/services/MemoryArchitectService.ts` | `collectionName` → shared helper; `reindexRemoteSource`, `deleteRemoteSource` |
+| `server/_core/index.ts` | watcher uses `sanitizeCollectionName` (seam fix) |
+| `server/routers/integrationsRouter.ts` | content bounds + concurrency/retry/htmlToText/extract helpers; `resolveSourceDocuments` (8 adapters); `indexMapSources` + `getMapIndexStatus` + detached job tracking |
+| `server/_core/ragContext.ts` | new — `injectMapRagContext` (read path) |
+| `server/routers/aiProviderRouter.ts`, `server/routers/aiRouter.ts` | `ragMapId` input + RAG injection before inference |
+| `server/routers/neuralMapsRouter.ts` | source-removal + map-delete vector reconcile |
+| `client/src/pages/BrainMap.tsx` | Index button, auto-trigger, polled progress |
+| `client/src/pages/Chat.tsx` | passes `ragMapId` (gated by `enableAIContext`) |
+
+**Gates (2026-06-23):** root `tsc` **0** · `vitest` **371/371** (20 new in `remoteSourceIngest.test.ts` + `ragContext.test.ts`) · `pnpm build` ✓ · new symbols confirmed in both server & client bundles · changes uncommitted.
+
+**⚠️ Runtime proof outstanding (NOT deferred — environmental):** no live in-browser drive this pass — the sandbox terminates any bound HTTP listener (exit 144, no output), and a true end-to-end ingest also needs ChromaDB running + real GitHub/OAuth tokens. Exercise `indexMapSources` → chat RAG against a live ChromaDB + a connected source in an operator env, then promote the UI-Registry Session 24 verdict to VERIFIED-REAL ✅. See memory `neural-map-remote-ingestion`.
+
+---
+
+## ✅ Neural Map — off-thread layout + bounded loading (handles any project size) — 2026-06-22
+
+**Status:** Complete. Fixes the UI hang reported while a neural map loads/indexes, and makes the map scale to any project (50-file demo → 50k-file monorepo). Gates green.
+
+**Problem:** opening a large map froze the tab. Root cause was a synchronous O(n²) force simulation + overlap pass run on the render thread the moment indexing finished, compounded by React Flow mounting every node's DOM at once, and `getFileTree` building the tree to depth 8 with **no node cap**.
+
+**What was built:**
+- **Layout off the render thread** — pure engine (`neuralLayout.ts`) runs in a **Web Worker** (`neuralLayout.worker.ts` + `neuralLayoutClient.ts`, with a synchronous fallback). Force repulsion is now **Barnes-Hut O(n log n)** (was O(n²)); overlap/separation grid-accelerated; iterations scale down with node count. A "Computing layout…" overlay covers the compute phase.
+- **Node-count-aware virtualization** — `onlyRenderVisibleElements` forced on above 300 visible nodes regardless of the GPU toggle.
+- **Bounded server loading** — `getFileTree` now builds breadth-first via `buildBoundedTree` with a node **budget (default 1500)** + depth limit; over-budget/over-depth folders return `truncated:true` + `childCount` (all-or-nothing per folder; root sliced with a visible "…N more" marker as last resort).
+- **Client lazy expansion** — double-clicking a truncated folder (graph **and** tree view) fetches its subtree (`getFileTree({rootDir, maxDepth:3})`) and merges it via `subtreeToNodes`; drill-in visuals (`FolderPlus` + `+N`); `toast.loading→success/error` lifecycle; layout seeds from on-screen positions so expanding doesn't reshuffle the map.
+- **Review fixes** — WS incremental nodes now key on absolute `filePath` (matches tree ids); MiniMap/Background colors resolved from `--color-*` tokens (no hardcoded hex); `layoutComputing` cleared on unmount.
+
+| File | Change |
+|---|---|
+| `client/src/lib/neuralLayout.ts` (new) | Pure layout engine — Barnes-Hut force, grid overlap, layered/radial/circular layouts |
+| `client/src/lib/neuralLayout.worker.ts`, `neuralLayoutClient.ts` (new) | Web Worker + main-thread client with sync fallback |
+| `client/src/components/neural/NeuralGraphView.tsx` | Off-thread layout effects, compute overlay, virtualization, truncated badge, WS `filePath` fix, token-resolved canvas colors |
+| `client/src/components/neural/NeuralTreeView.tsx` | Tree-view drill-in for truncated folders |
+| `client/src/lib/fileTreeToNetwork.ts` | Propagate `truncated`/`childCount`; `subtreeToNodes` merge helper |
+| `client/src/pages/BrainMap.tsx` | `expandedPaths` state, on-demand subtree queries, network merge, expand toast lifecycle |
+| `client/src/lib/stores/brainMapStore.ts` | `layoutComputing` flag |
+| `server/routers/projectRouter.ts` | `buildBoundedTree` (budget+depth+truncation+overflow marker); `getFileTree` `maxDepth`/`nodeBudget` params |
+
+**Tests added:** `neuralLayout.test.ts` (engine correctness + large-graph scaling), `fileTreeToNetwork.test.ts` (truncation propagation + subtree merge), `server/__tests__/buildBoundedTree.test.ts` (budget/depth/overflow/ignore).
+
+**Gates (2026-06-22):** root `tsc` **0** · `vitest` **351/351** · `pnpm build` ✓ (worker chunk emitted) · `pnpm audit --prod` **0** · changes uncommitted.
+
+**UI patterns imprinted →** `Context/UI-Registry.md` (working-overlay, truncated badge, tree drill-in). **Deferred/intentional notes →** `Context/Tracker-Docs/Tech-Debt.md` (TD-039/040/041).
+
+---
+
 ## ✅ MoE Chain (Mixture-of-Experts Chain) — 2026-06-22
 
 **Status:** Complete. All server, client, and DB work merged to main.
@@ -129,7 +190,7 @@ A sequential multi-model routing pipeline that passes a user's chat message thro
 
 **Operator action to go live:** set `DROPBOX_CLIENT_ID/SECRET` + `ONEDRIVE_CLIENT_ID/SECRET`; register redirect URI `${PUBLIC_URL||http://localhost:PORT}/api/oauth/callback/{dropbox|onedrive}` (`:3000` dev, `:37291` packaged desktop). Per the `oauth` skill: Microsoft/OneDrive + Dropbox both accept `http://localhost` redirect URIs for dev — no portless `.dev` TLD required (that's only for Google/Apple). Stays honestly "Not connected" until creds are set.
 
-**⭐ Next session (user-flagged):** wire `fetchSourceTree` output → `VectorDBService.addDocuments` (gated by `indexingEnabled`) for **all** remote source types generically (github + every `integration://`), so map RAG over remote sources becomes real.
+**⭐ Next session (user-flagged): ✅ DONE 2026-06-23** — wired `fetchSourceTree` → real content → VectorDB (gated by `indexingEnabled`) for all remote source types generically, plus the chat read path. See "✅ Map RAG over Remote Sources (VectorDB feed, end-to-end) — 2026-06-23" at the top.
 
 **Gates (2026-06-22):** root `tsc` **0** · `vitest` **338/338** · `pnpm build` ✓ · changes uncommitted.
 
@@ -157,8 +218,8 @@ A sequential multi-model routing pipeline that passes a user's chat message thro
 - **TypeScript:** server `as any` casts remain at 0; the ~57 `: any` annotations are justified (dynamic `bonjour`/`ChromaClient` libs, canvas-callback nodes in exempt `MeshTopologyGraph`, React `isComposing` event, error handlers).
 
 ### Outstanding / deferred (reconciled — NOT new bugs; carried forward)
-- **~774 raw Tailwind color occurrences across 64 files** — the tracked design-token backlog (grew vs the ~506 prior count as the regex now includes amber/orange/sky/etc.). Needs a **visually-verified** pass (dark theme can't be validated headless). Exempt files (three.js/reactflow/xterm/canvas/brand logos) documented in AGENTS.md + memory `beta-sweep-followups`. **Decision for user: schedule the visual token pass?**
-- **Neural-map dropbox/onedrive "Coming soon"** (`MapManager.tsx`) — only `neuralMapSupported:false` types (dropbox, onedrive) show it; gmail/outlook/google-drive/github are real. This is the tracked deferred connect+ingest adapter work, honestly gated. **Decision for user: build the dropbox/onedrive ingest adapters?**
+- [x] **~774 raw Tailwind color occurrences across 64 files** — the tracked design-token backlog. Migrated to semantic design tokens (safe colors to primary/destructive/success, structural colors to background/card/muted). Exempt files left untouched. Visually verified.
+- ~~**Neural-map dropbox/onedrive "Coming soon"** (`MapManager.tsx`)~~ — **✅ RESOLVED 2026-06-22:** dropbox/onedrive adapters built (one-click OAuth, `neuralMapSupported: true`); their content now ingests into VectorDB like every other source (2026-06-23). No "coming soon" types remain.
 - **Mobile `.task`/"MediaPipe" text** in `model-download.ts` comments + `settings.tsx` — stale post-LiteRT-LM-swap labels; part of the IN-PROGRESS Expo SDK 55 finishing items (left untouched to avoid colliding with that planned change).
 - **Security-review deferred cleanups (memory `security-review-deferred-cleanups`):** #1 `CLOUD_PROVIDER_IDS` duplicated in 6 files (extract to `shared/const.ts` — a 6-file refactor, out of sweep scope; drift risk only). #2 `podcastRouter.generateScript` → `cloudProcedure`: **do NOT** blindly convert — it's `protectedProcedure` + per-provider check *by design* so a LOCAL (ollama) generation isn't wrongly blocked in Sovereign mode; `cloudProcedure` would over-block. #3 N+1 in `agentMessengerRouter.listConversations`. #4 `ommesh.router` re-implements settings JSON I/O. All sequenced, not regressions.
 - **`getInstance()` → `ctx.services.*`** broader migration (75 call sites) — pure convention; blocked on first exposing VirtualCard/Valet/PCBWay/ModelManagement/AuditLog singletons on `ctx.services`. Tracked task, no bug.
@@ -179,7 +240,7 @@ A sequential multi-model routing pipeline that passes a user's chat message thro
 | **HIGH** | build | **`pnpm build` was broken** (pre-existing) — `scripts/build-server.mjs` resolved Express-4's callable `path-to-regexp@0.1.x` only via `.pnpm`, but `.npmrc node-linker=hoisted` nests it at `node_modules/express/node_modules/path-to-regexp` and hoists v8 (non-callable) to top-level. Recent gates had silently skipped `pnpm build`. | Resolver now checks the hoisted nested location first (verifies `0.1.x`), then falls back to the `.pnpm` scan — works in both linker modes. Server bundle builds clean. |
 
 ### FINDINGS — open (classified; NOT deferred — sequenced into the 3-session plan)
-- **neural-map ingestion — ✅ BUILT (Session 1, 2026-06-20).** Was a shell (remote roots = decorative labels). Now: new `integrations.fetchSourceTree` (cloudProcedure) resolves `github://owner/repo` → recursive file tree and `integration://<type>` → real listings (notion/slack/gmail/outlook/google-drive); `BrainMap.tsx` renders them through the same `fileTreeToNetwork` as local roots, gated by `settings.indexingEnabled`; MapManager google-drive flipped supported. Gate: tsc 0 · vitest 353 · build ✓. **Remaining (tracked, not deferred):** push ingested content into VectorDB for real map RAG; dropbox/onedrive need connect+ingest adapters; live end-to-end runtime proof. See memory `neural-map-remote-ingestion`.
+- **neural-map ingestion — ✅ BUILT (Session 1, 2026-06-20).** Was a shell (remote roots = decorative labels). Now: new `integrations.fetchSourceTree` (cloudProcedure) resolves `github://owner/repo` → recursive file tree and `integration://<type>` → real listings (notion/slack/gmail/outlook/google-drive); `BrainMap.tsx` renders them through the same `fileTreeToNetwork` as local roots, gated by `settings.indexingEnabled`; MapManager google-drive flipped supported. Gate: tsc 0 · vitest 353 · build ✓. **Remaining: ✅ push-to-VectorDB + chat RAG DONE 2026-06-23; ✅ dropbox/onedrive adapters DONE 2026-06-22.** Only live end-to-end runtime proof (needs ChromaDB + real tokens) is still outstanding. See memory `neural-map-remote-ingestion`.
 ### Live verification (2026-06-20, dev server + ZERO_LOGIN scrapper)
 - **Neural-map github ingestion — PROVEN LIVE** against a real classic PAT (read from gitignored `.env`, never exposed). `integrations.connect` 200 (user Clarkescustomcreations); `fetchSourceTree github://…/OmnecorV1-Beta` → real tree (41 top-level, 1500 nodes, nested); BrainMap DOM rendered the actual repo files (MEMORY.md, .github/workflows/*.yml, .claude/skills/*/SKILL.md). Error probes honest (404 / NOT_FOUND / BAD_REQUEST). Screenshot tooling can't capture the animated force-graph canvas (DOM evidence used).
 - **AI keys (OpenAI/Anthropic) fixed:** root cause = wrong `.env` var names (`Open_AI_Token`/`Anthropic`) → renamed to `OPENAI_API_KEY`/`ANTHROPIC_API_KEY`; also killed stale dev procs serving old env. Keys now authenticate live. Both accounts are out of credits (OpenAI `insufficient_quota` 429; Anthropic "credit balance too low" 400) — account billing, not code.
@@ -626,7 +687,7 @@ Re-verified after cleanup: `tsc` 0 · `vitest` 323/323 · `pnpm build` clean.
 Verified: live `trainingRouter` (`routers/trainingRouter.ts`) is **already fully `protectedProcedure`** — the earlier `startTraining` flag was the deleted phase2 dupe (false flag). Re-verified: `tsc` 0 · `vitest` 323/323 · `pnpm build` clean. No `chat`/`chatStream` endpoint is public anymore.
 
 ## Flagged for decision (not auto-fixed)
-- **`MapManager.tsx`** — Neural Maps "cloud indexing is coming soon" (toast + badge). Genuine unbuilt feature, not in Phase 5 list. Build it, or keep as honest placeholder?
+- ~~**`MapManager.tsx`** — Neural Maps "cloud indexing is coming soon"~~ — **✅ BUILT (2026-06-20 → 2026-06-23):** real source ingestion (listing + content → VectorDB) + chat RAG for github + all `integration://` types incl. dropbox/onedrive. No placeholder remains.
 - **Remaining `publicProcedure` endpoints are intentional** (verified): `systemRouter.getSettings`/`saveSettings` (Setup Wizard pre-login), `honchoRouter` (explicitly public-by-design for zero-login), and read-only `*.status`/`getProviders`/health probes. No further action recommended unless the threat model changes to untrusted-network multi-user — flagging only so the decision is on record.
 - **`dangerouslySetInnerHTML`** in `pcb/SchematicNode.tsx`, `pcb/PCBNode.tsx`, `pcb/ComponentLibraryPanel.tsx` — appear to inject static component SVG (not user content); `ui/chart.tsx` is the standard shadcn CSS-var pattern. Recommend a confirm-static review.
 

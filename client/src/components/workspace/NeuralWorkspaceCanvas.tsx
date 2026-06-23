@@ -206,7 +206,7 @@ export const NeuralWorkspaceCanvas: React.FC<{ workspaceId: string }> = ({ works
             <span>Nodes: {nodes.length}</span>
             <span>Edges: {edges.length}</span>
             {searchQuery && <span className="text-yellow-500">Filter: {searchQuery}</span>}
-            <span className="text-green-500">Live Sync Active</span>
+            <span className="text-accent-success">Live Sync Active</span>
           </div>
         </Panel>
       </ReactFlow>

@@ -45,10 +45,10 @@ export function ImageGeneratorPanel() {
             disabled={isDisabled(p)}
             className={`px-3 py-1.5 rounded text-sm transition-colors ${
               provider === p
-                ? "bg-blue-600 text-white"
+                ? "bg-primary text-white"
                 : isDisabled(p)
-                ? "bg-gray-800 text-gray-600 cursor-not-allowed"
-                : "bg-gray-700 text-gray-300 hover:bg-gray-600"
+                ? "bg-card text-muted-foreground cursor-not-allowed"
+                : "bg-muted text-foreground hover:bg-gray-600"
             }`}
           >
             {PROVIDER_LABELS[p]}
@@ -73,7 +73,7 @@ export function ImageGeneratorPanel() {
       )}
 
       <div className="flex gap-3 items-center">
-        <label className="text-sm text-gray-400">
+        <label className="text-sm text-muted-foreground">
           W
           <Input
             type="number"
@@ -84,7 +84,7 @@ export function ImageGeneratorPanel() {
             max={2048}
           />
         </label>
-        <label className="text-sm text-gray-400">
+        <label className="text-sm text-muted-foreground">
           H
           <Input
             type="number"
@@ -105,7 +105,7 @@ export function ImageGeneratorPanel() {
       </Button>
 
       {generate.isError && (
-        <p className="text-red-400 text-sm">{generate.error?.message}</p>
+        <p className="text-destructive text-sm">{generate.error?.message}</p>
       )}
 
       {resultUrl && (

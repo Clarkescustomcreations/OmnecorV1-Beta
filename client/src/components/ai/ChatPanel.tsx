@@ -101,17 +101,17 @@ export const ChatPanel: React.FC = () => {
           {messages.map((m, i) => (
             <div key={i} className={`flex gap-3 ${m.role === 'user' ? 'justify-end' : ''}`}>
               {m.role === 'assistant' && (
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 shadow-sm">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white shrink-0 shadow-sm">
                   <Bot className="w-4 h-4" />
                 </div>
               )}
-              <Card className={`max-w-[80%] border-none shadow-sm ${m.role === 'user' ? 'bg-blue-600 text-white' : 'bg-muted/50'}`}>
+              <Card className={`max-w-[80%] border-none shadow-sm ${m.role === 'user' ? 'bg-primary text-white' : 'bg-muted/50'}`}>
                 <CardContent className="p-3 text-sm leading-relaxed whitespace-pre-wrap break-words">
                   {m.content}
                 </CardContent>
               </Card>
               {m.role === 'user' && (
-                <div className="w-8 h-8 rounded-full bg-zinc-800 flex items-center justify-center text-white shrink-0 shadow-sm">
+                <div className="w-8 h-8 rounded-full bg-card flex items-center justify-center text-white shrink-0 shadow-sm">
                   <User className="w-4 h-4" />
                 </div>
               )}
@@ -119,12 +119,12 @@ export const ChatPanel: React.FC = () => {
           ))}
           {isStreaming && (
              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shrink-0 animate-pulse">
+                <div className="w-8 h-8 rounded-full bg-primary flex items-center justify-center text-white shrink-0 animate-pulse">
                   <Bot className="w-4 h-4" />
                 </div>
                 <Card className="bg-muted/50 border-none shadow-sm">
                   <CardContent className="p-3 flex items-center gap-2">
-                    <Loader2 className="w-3 h-3 animate-spin text-blue-600" />
+                    <Loader2 className="w-3 h-3 animate-spin text-primary" />
                     <span className="text-xs text-muted-foreground italic">Thinking...</span>
                   </CardContent>
                 </Card>
@@ -150,7 +150,7 @@ export const ChatPanel: React.FC = () => {
                  <StopCircle className="w-5 h-5" />
                </Button>
              )}
-             <Button size="icon" className="h-9 w-9 bg-blue-600 hover:bg-blue-700 shadow-md" onClick={handleSend} disabled={isStreaming}>
+             <Button size="icon" className="h-9 w-9 bg-primary hover:bg-primary shadow-md" onClick={handleSend} disabled={isStreaming}>
                <Send className="w-4 h-4" />
              </Button>
           </div>

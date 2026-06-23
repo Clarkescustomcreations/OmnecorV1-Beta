@@ -57,7 +57,7 @@ export const DocumentLibrary: React.FC = () => {
       <Card className="border-none shadow-xl bg-card/50 backdrop-blur">
         <CardHeader className="border-b pb-4">
           <CardTitle className="text-lg flex items-center gap-2">
-            <FileText className="w-5 h-5 text-blue-500" />
+            <FileText className="w-5 h-5 text-primary" />
             Search Results
             {searchQuery.isFetching && <span className="text-xs text-muted-foreground ml-2">Searching...</span>}
           </CardTitle>
@@ -76,7 +76,7 @@ export const DocumentLibrary: React.FC = () => {
                 <TableRow key={i} className="group transition-colors hover:bg-muted/30">
                   <TableCell>
                     <div className="flex items-center gap-3">
-                      <div className="p-2 bg-blue-500/10 rounded text-blue-600">
+                      <div className="p-2 bg-primary/10 rounded text-primary">
                         <FileText className="w-4 h-4" />
                       </div>
                       <span className="font-medium truncate max-w-sm">{res.content}</span>
@@ -117,7 +117,7 @@ export const DocumentLibrary: React.FC = () => {
         <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              <FileText className="w-4 h-4 text-blue-500" />
+              <FileText className="w-4 h-4 text-primary" />
               Document Content
               {previewDoc && (
                 <Badge variant="outline" className="ml-2">

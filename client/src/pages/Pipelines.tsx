@@ -49,7 +49,7 @@ export function Pipelines() {
             <Button variant="ghost" size="sm" onClick={() => setSelectedPipelineId(null)} className="flex-shrink-0">
               <ArrowLeft className="w-4 h-4 mr-1" /> Back
             </Button>
-            <Zap className="w-5 h-5 text-accent flex-shrink-0" />
+            <Zap className="w-5 h-5 text-primary flex-shrink-0" />
             <span className="font-semibold truncate">Pipeline Detail</span>
           </div>
           <div className="min-h-0 flex-1 overflow-auto p-6">
@@ -66,7 +66,7 @@ export function Pipelines() {
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
-              <Zap className="w-6 h-6 text-accent flex-shrink-0" />
+              <Zap className="w-6 h-6 text-primary flex-shrink-0" />
               <div className="min-w-0">
                 <h1 className="text-xl font-bold truncate">GodMode Pipelines</h1>
                 <p className="text-sm text-muted-foreground truncate">5-phase gated execution framework</p>
@@ -114,7 +114,7 @@ export function Pipelines() {
                   <p className="text-muted-foreground text-sm">No pipelines yet. Create one above.</p>
                 )}
                 {listPipelines.data?.map((p) => (
-                  <div key={p.id} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between transition-all hover:border-accent/30 group">
+                  <div key={p.id} className="rounded-lg border border-border bg-card p-4 flex items-center justify-between transition-all hover:border-primary/30 group">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <span className="text-foreground font-medium text-sm">{p.name}</span>
@@ -127,7 +127,7 @@ export function Pipelines() {
                       </div>
                       <p className="text-muted-foreground text-xs truncate">{p.goal}</p>
                     </div>
-                    <Button size="sm" variant="outline" className="ml-4 shrink-0 group-hover:bg-accent group-hover:text-accent-foreground" onClick={() => setSelectedPipelineId(p.id)}>
+                    <Button size="sm" variant="outline" className="ml-4 shrink-0 group-hover:bg-primary/10 group-hover:text-accent-foreground" onClick={() => setSelectedPipelineId(p.id)}>
                       View Detail
                     </Button>
                   </div>
@@ -137,9 +137,9 @@ export function Pipelines() {
 
             <div className="space-y-6">
                <JobsPanel />
-               <Card className="bg-accent/5 border-accent/20">
+               <Card className="bg-primary/5 border-primary/20">
                  <CardHeader className="p-4">
-                   <CardTitle className="text-xs font-bold uppercase tracking-tighter text-accent">Optimization Logic</CardTitle>
+                   <CardTitle className="text-xs font-bold uppercase tracking-tighter text-primary">Optimization Logic</CardTitle>
                  </CardHeader>
                  <CardContent className="px-4 pb-4">
                    <p className="text-[10px] text-muted-foreground leading-relaxed">

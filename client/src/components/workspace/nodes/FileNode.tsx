@@ -16,19 +16,19 @@ export type FileNodeData = {
 const getFileIcon = (filename: string, language?: string) => {
   const ext = filename.split('.').pop()?.toLowerCase();
   if (language === 'typescript' || language === 'javascript' || ['ts', 'tsx', 'js', 'jsx'].includes(ext || '')) {
-    return <FileCode className="w-4 h-4 text-blue-400" />;
+    return <FileCode className="w-4 h-4 text-primary" />;
   }
   if (['md', 'txt'].includes(ext || '')) {
     return <FileText className="w-4 h-4 text-muted-foreground" />;
   }
   if (['png', 'jpg', 'jpeg', 'svg', 'webp'].includes(ext || '')) {
-    return <ImageIcon className="w-4 h-4 text-purple-400" />;
+    return <ImageIcon className="w-4 h-4 text-accent-purple" />;
   }
   if (['json', 'yml', 'yaml'].includes(ext || '')) {
-    return <Hash className="w-4 h-4 text-orange-400" />;
+    return <Hash className="w-4 h-4 text-accent-warning" />;
   }
   if (['sh', 'bash', 'py'].includes(ext || '')) {
-    return <Terminal className="w-4 h-4 text-green-400" />;
+    return <Terminal className="w-4 h-4 text-accent-success" />;
   }
   return <File className="w-4 h-4 text-muted-foreground" />;
 };
@@ -45,7 +45,7 @@ const FileNodeComponent = ({ data, selected }: NodeProps<FileNodeData>) => {
   return (
     <div className={cn(
       "transition-all duration-200",
-      selected ? "ring-2 ring-blue-500 rounded-lg" : ""
+      selected ? "ring-2 ring-primary rounded-lg" : ""
     )}>
       <Handle type="target" position={Position.Top} className="w-2 h-2 !bg-muted-foreground" />
       

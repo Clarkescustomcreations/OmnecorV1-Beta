@@ -131,7 +131,7 @@ export const NetlistPanel: React.FC<NetlistPanelProps> = ({
             netlist.map((net) => (
               <div key={net.net} className="border border-border rounded p-2">
                 <div className="font-semibold text-xs text-foreground mb-2 flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-accent" />
+                  <div className="w-2 h-2 rounded-full bg-primary/10" />
                   {net.net}
                 </div>
 
