@@ -183,20 +183,30 @@ export const aiRouter = router({
     }),
   getSessions: protectedProcedure
     .input(z.object({ projectId: z.string().min(1) }))
-    .query(async ({ input }) => {
-      return await getChatSessions(input.projectId);
+    .query(async ({ ctx, input }) => {
+      // Ownership scoping: a project can hold sessions from multiple users, so
+      // only return the caller's own (mirrors chatRouter's per-user isolation).
+      const sessions = await getChatSessions(input.projectId);
+      return sessions.filter(s => s.userId === ctx.user.id);
     }),
   getSession: protectedProcedure
     .input(z.object({ sessionId: z.string().uuid() }))
-    .query(async ({ input }) => {
+    .query(async ({ ctx, input }) => {
       const session = await getChatSession(input.sessionId);
-      if (!session) return null;
+      // Treat a non-owned session as not found — never leak another user's
+      // conversation by UUID guess.
+      if (!session || session.userId !== ctx.user.id) return null;
       const messages = await getChatMessages(input.sessionId);
       return { session, messages };
     }),
   saveMessage: protectedProcedure
     .input(saveMessageSchema)
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      // Authorization: only the session's owner may append messages to it.
+      const session = await getChatSession(input.sessionId);
+      if (!session || session.userId !== ctx.user.id) {
+        throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      }
       const messageId = uuidv4();
       await addChatMessage({
         id: messageId,
@@ -229,7 +239,10 @@ export const aiRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const session = await getChatSession(input.sessionId);
-      if (!session) throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
+      // Authorization: a user may only summarize/consolidate their own session,
+      // never another user's conversation by UUID.
+      if (!session || session.userId !== ctx.user.id)
+        throw new TRPCError({ code: "NOT_FOUND", message: "Session not found" });
 
       const messages = await getChatMessages(input.sessionId);
       if (messages.length === 0)

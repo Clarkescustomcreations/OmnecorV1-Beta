@@ -70,8 +70,19 @@ pnpm format
 Omnecor uses `vitest` for testing. You can run the tests with:
 
 ```bash
-pnpm test
+pnpm test            # run the full suite
+pnpm test:coverage   # run with a V8 coverage report (coverage/ + thresholds)
 ```
+
+`pnpm test:coverage` enforces ratcheting coverage thresholds defined in
+`vitest.config.ts`. They are a floor, not a target — please keep coverage at or
+above the current baseline, and raise the thresholds as you add tests.
+
+For tRPC routers, prefer **route-level** tests that drive the real router via
+`appRouter.createCaller(ctx)` (so auth middleware, Zod validation, and DB queries
+all run), using the shared helpers in `server/__tests__/_helpers/trpcHarness.ts`
+(`createTestDb` / `seedUser` / `makeContext`). See `server/__tests__/chatRouter.test.ts`
+and `aiRouter.test.ts` for the pattern.
 
 Ensure all tests pass before submitting your pull request.
 

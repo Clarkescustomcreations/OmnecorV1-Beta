@@ -491,7 +491,7 @@ export default function SettingsScreen() {
 
             {/* Helper text */}
             <Text className="text-xs text-muted mb-4">
-              Use a GGUF model already on your phone. (Google AI Edge Gallery .task/.litertlm models use a different engine and aren't loadable here.)
+              Use a GGUF model already on your phone. (Google AI Edge Gallery .litertlm models use a different engine and aren't loadable here.)
             </Text>
 
             {/* Detected local models */}

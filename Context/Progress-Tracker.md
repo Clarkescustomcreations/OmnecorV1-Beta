@@ -62,10 +62,25 @@ Contingency: if the bug survives, keep the workaround + document it inline and f
   Nitro tasks with no autolinking-codegen ordering failure → root cause resolved by the upgrade.
 - ✅ Removed the `rm -rf app/.cxx app/build/generated/autolinking` from the three `apk:*` scripts +
   CHANGELOG entry.
-- ⬜ **Remaining (functional, tracked):** update `model-download.ts` + `settings.tsx` user-facing text
-  (`.task`/"MediaPipe" → `.litertlm`/"LiteRT-LM") and point model downloads at `.litertlm` models so
-  the LiteRT-LM engine has loadable models; on-device install + runtime smoke test on an arm64 device;
-  consider `apk:release` (signed) build.
+- ⬜ **Remaining (functional, tracked):** on-device install + runtime smoke test on an arm64 device; consider `apk:release` (signed) build. (Note: `model-download.ts` + `settings.tsx` user-facing labels/comments `.task`/"MediaPipe" → `.litertlm`/"LiteRT-LM" updated on 2026-06-24).
+
+---
+
+## ✅ Test-coverage tooling + first route-level tRPC tests; aiRouter IDOR fix — 2026-06-24
+
+**Status:** Complete. Closes the long-standing "no coverage tooling / API boundary untested" gap (tracked as **TD-044**) for its first two routers, and fixes a High-risk access-control bug found in the process (**TD-043**).
+
+**What was built:**
+1. **Coverage tooling.** `@vitest/coverage-v8` + `pnpm test:coverage`; `vitest.config.ts` gains a V8 `coverage` block (text-summary/text/html/lcov → `coverage/`, source-only includes) with **ratcheting thresholds** locked to the measured baseline (stmts/lines ~9–10%, branches/funcs ~6–7% — a floor that only moves up).
+2. **Route-level test harness.** `server/__tests__/_helpers/trpcHarness.ts` — `createTestDb()` backs route tests with a **real in-memory libSQL DB** (actual `drizzle/schema.ts` + migrations, FK cascade on) so ownership filters/upserts/cascades genuinely execute; plus `seedUser()` and `makeContext()`. Tests drive the real router via `appRouter.createCaller(ctx)`, not mocks.
+3. **First two suites.** `chatRouter.test.ts` (15 tests → **100% line coverage**: per-user isolation, upsert semantics, FK cascade, auth boundary) and `aiRouter.test.ts` (20 tests → ~57%: Sovereign per-provider gate, `baseUrl` SSRF guard, ommesh precondition, loop-violation audit, + 6 IDOR regression guards).
+4. **Security fix (TD-043).** `aiRouter.getSession`/`getSessions`/`saveMessage`/`summarizeAndPruneSession` were `protectedProcedure`s with **no ownership check** — any authenticated user/device could read, append to, or summarize another user's chat session by UUID (`summarizeAndPruneSession` is reachable from the UI's Memory Archiver). All four now scope by `ctx.user.id`, matching `chatRouter`'s isolation. `createSession` already scoped on write.
+
+**Re-verified the source analysis first:** counts were directionally right but imprecise (32 test files not 31; `auth.logout` already drives one route so routers weren't literally 0%; ~8 service modules tested, not 4). No phantom files — safe to build from.
+
+**Gates:** root `tsc` 0 · `vitest` **412/412** (+35) · coverage thresholds pass · `pnpm build` not re-run (no bundle-affecting change).
+
+**Remaining (priority queue, tracked in TD-044):** auth/`admin`/`owner` procedure middleware → `walletRouter`/`virtualCardRouter` route layer → `HITLApprovalService` → `MeshServer` mTLS + cert pinning → `AiProviderService` spend/fallback → `PipelineEngineService`.
 
 ---
 

@@ -97,13 +97,18 @@ All new features and bug fixes should be accompanied by appropriate tests. Omnec
 To run all tests:
 
 ```bash
-pnpm run test
+pnpm run test            # full suite
+pnpm run test:coverage   # full suite + V8 coverage report (coverage/)
 ```
+
+`test:coverage` writes a text/html/lcov report to `coverage/` and enforces the
+ratcheting thresholds in `vitest.config.ts` (a floor that should only move up).
 
 ### 4.2. Writing Tests
 
 -   **Unit Tests**: For individual functions, components, or services.
 -   **Integration Tests**: For verifying the interaction between multiple components or services.
+-   **Route-level (tRPC) Tests**: Drive the real router through `appRouter.createCaller(ctx)` instead of mocking the route, so auth middleware, input validation, and DB queries all execute. Use the shared harness in `server/__tests__/_helpers/trpcHarness.ts` (`createTestDb` backs tests with a real in-memory libSQL DB + migrations). Examples: `server/__tests__/chatRouter.test.ts`, `server/__tests__/aiRouter.test.ts`.
 
 Ensure your tests cover the new functionality and that all existing tests pass after your changes.
 

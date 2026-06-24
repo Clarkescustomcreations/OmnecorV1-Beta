@@ -310,6 +310,7 @@ broken gates — fix them first or document exactly why they cannot be fixed now
 ```bash
 pnpm check          # 0 TypeScript errors (root workspace)
 pnpm test           # all passing (count grows as features land)
+pnpm test:coverage  # optional: coverage report + ratcheting thresholds (vitest.config.ts)
 pnpm build          # Clean production build
 pnpm audit --prod   # 0 known vulnerabilities
 ```

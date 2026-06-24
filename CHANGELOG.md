@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+### 2026-06-24 — Coverage tooling + first route-level tRPC tests; aiRouter IDOR fix
+
+#### Added
+
+- **V8 coverage tooling.** `@vitest/coverage-v8` + a new `pnpm test:coverage` script. `vitest.config.ts` gains a `coverage` block (text-summary/text/html/lcov reporters → `coverage/`, source-only include list) with **ratcheting thresholds** set to the current baseline (statements/lines ~9–10%, branches/functions ~6–7%) so coverage can only move up.
+- **Route-level (integration) tests for `chatRouter` (15) and `aiRouter` (20).** These drive the real router via `appRouter.createCaller(ctx)` — exercising the `protectedProcedure` auth middleware, Zod input validation (incl. the `aiRouter` `baseUrl` SSRF guard), the per-provider Sovereign-mode gate, and the actual Drizzle queries. New shared harness `server/__tests__/_helpers/trpcHarness.ts`: `createTestDb()` backs tests with a **real in-memory libSQL DB** (actual schema + migrations, FK cascade on), plus `seedUser()` and `makeContext()`. `chatRouter` reaches 100% line coverage; `aiRouter` ~57%.
+
+#### Fixed
+
+- **Security — `aiRouter` chat-persistence IDOR (broken access control).** `aiRouter.getSession`, `getSessions`, `saveMessage`, and `summarizeAndPruneSession` were `protectedProcedure`s with **no ownership check**, so any authenticated user (or paired device) could read, append to, or summarize **another user's** chat session by UUID — and `summarizeAndPruneSession` is reachable from the UI's Memory Archiver, exfiltrating another user's conversation into the caller's episodic memory. All four now scope by `ctx.user.id` (non-owned → `null` / filtered out / `NOT_FOUND`), matching `chatRouter`'s existing per-user isolation. `createSession` already scoped on write (`userId: ctx.user.id`); the legitimate client paths are unaffected. Regression tests added.
+
+**Gates:** root `tsc` 0 · `vitest` 412/412 (+35) · coverage thresholds pass.
+
+---
+
 ### 2026-06-22 — Device pairing for the mobile app (replaces OAuth)
 
 #### Added

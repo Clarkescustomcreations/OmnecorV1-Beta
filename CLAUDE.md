@@ -23,6 +23,11 @@ pnpm check
 # Run all tests
 pnpm test
 
+# Run all tests with a V8 coverage report (text summary + html + lcov in
+# coverage/). Enforces the ratcheting thresholds in vitest.config.ts — raise
+# them as new suites land; never lower them.
+pnpm test:coverage
+
 # Run a single test file
 pnpm vitest run server/__tests__/redaction.test.ts
 
@@ -48,6 +53,8 @@ pnpm format
 - `pnpm build:push` (`drizzle-kit generate && migrate`) — **dev**: after editing `drizzle/schema.ts`, regenerate the SQL files, then apply them.
 - `pnpm db:migrate` (`server/scripts/migrate.ts`) — **prod/CI**: apply already-generated migrations explicitly before `pnpm start`. Does *not* regenerate.
 - `server/db.ts` `init()` auto-`migrate()` — **runtime fallback**: applies pending migrations on first DB connect (non-fatal — a failure logs a warning and boot continues). `db:migrate` is the explicit, fail-loud alternative to relying on this.
+
+**Tests.** Vitest, files matched by `*.test.ts` under `server/`, `client/`, `packaging/`. Route-level (tRPC) tests drive the real `appRouter.createCaller(ctx)` rather than mocking the route. Shared helpers live in `server/__tests__/_helpers/trpcHarness.ts`: `createTestDb()` spins up an in-memory libSQL DB with the **real** schema + migrations (FK cascade on) so ownership filters/upserts/cascades actually execute; `seedUser()` and `makeContext(user, db, services?)` build the context. For routers that call the `db.factory` *helper functions* (e.g. `getChatSession`) rather than `getDb()`, mock those helpers directly (see `aiRouter.test.ts`); for routers that call `getDb()`, redirect it via `vi.mock("../db.factory.js", …)` (see `chatRouter.test.ts`). Stub `AuditLogService` in route tests so the audit middleware doesn't touch the real file DB.
 
 ## Architecture
 

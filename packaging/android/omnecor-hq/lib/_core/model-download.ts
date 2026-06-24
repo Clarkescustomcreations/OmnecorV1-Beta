@@ -179,8 +179,8 @@ export async function importModelFromDevice(): Promise<DownloadedModel | null> {
 }
 
 /**
- * Scan the app models directory for LiteRT `.task`/.bin/.litertlm files
- * (Google AI Edge Gallery format) the user has imported.
+ * Scan the app models directory for LiteRT-LM `.litertlm` (or legacy `.task`/.bin)
+ * files (Google AI Edge Gallery format) the user has imported.
  */
 export async function listLocalTask(): Promise<DownloadedModel[]> {
   const dirInfo = await FileSystem.getInfoAsync(MODELS_DIR);
@@ -197,7 +197,7 @@ export async function listLocalTask(): Promise<DownloadedModel[]> {
   return out;
 }
 
-/** Whether a filename is any supported on-device model (GGUF or LiteRT). */
+/** Whether a filename is any supported on-device model (GGUF or LiteRT-LM). */
 export function isSupportedModelFile(name: string): boolean {
   return isGguf(name) || isTask(name);
 }
@@ -217,9 +217,9 @@ export async function importSharedModelFile(srcPath: string, fileName: string): 
 }
 
 /**
- * Pick a LiteRT `.task`/.bin/.litertlm model already on the device (e.g. one
- * exported/shared from Google AI Edge Gallery) and copy it into the app so the
- * MediaPipe engine (`mediapipe-inference.ts`) can load it. No code edits needed
+ * Pick a LiteRT-LM `.litertlm` (or legacy `.task`/.bin) model already on the device
+ * (e.g. one exported/shared from Google AI Edge Gallery) and copy it into the app so the
+ * LiteRT-LM engine (`mediapipe-inference.ts`) can load it. No code edits needed
  * by the user — purely in-app. Returns the imported model, or null if cancelled.
  */
 export async function importTaskModelFromDevice(): Promise<DownloadedModel | null> {
@@ -228,7 +228,7 @@ export async function importTaskModelFromDevice(): Promise<DownloadedModel | nul
   const asset = res.assets[0];
   if (!asset) return null;
   if (!isTask(asset.name)) {
-    throw new Error(`"${asset.name}" is not a .task/.bin/.litertlm model. Use the GGUF import for .gguf files.`);
+    throw new Error(`"${asset.name}" is not a LiteRT-LM model (.litertlm). Use GGUF import for .gguf files.`);
   }
   await ensureDir();
   const dest = modelPath(asset.name);
