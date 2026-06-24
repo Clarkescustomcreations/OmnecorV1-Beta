@@ -5,6 +5,7 @@ import type { TrpcContext } from "./context";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { hasPermission, type Role } from "../phase2/config/rbac.js";
 import { getSetting } from "../phase2/services/SettingsService.js";
+import { isSovereignMode } from "./sovereign.js";
 import { createLogger } from "./logger.js";
 
 const log = createLogger("trpc-audit");
@@ -98,7 +99,7 @@ export const nonDeviceProcedure = protectedProcedure.use(rejectDevice);
 
 const sovereignCheck = t.middleware(async (opts) => {
   const { ctx, meta, next, path } = opts;
-  if (ctx.user?.executionMode === "sovereign" && meta?.cloud === true) {
+  if (meta?.cloud === true && ctx.user && isSovereignMode(ctx.user.executionMode)) {
     const kind = meta.cloudKind ?? "ai";
     // When the operator opts into "block AI providers only", non-AI external
     // services (GitHub/Notion/Drive sync, etc.) are allowed through in Sovereign

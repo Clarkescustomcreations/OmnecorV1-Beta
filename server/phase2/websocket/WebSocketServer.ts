@@ -41,7 +41,7 @@ import { createHash, timingSafeEqual } from "crypto";
 import { parse as parseCookieHeader } from "cookie";
 import { ENV } from "../../_core/env.js";
 import { sdk } from "../../_core/sdk.js";
-import { CLOUD_PROVIDER_IDS } from "../../_core/sovereign.js";
+import { CLOUD_PROVIDER_IDS, isSovereignMode } from "../../_core/sovereign.js";
 import { COOKIE_NAME } from "../../../shared/const.js";
 import {
   FileSystemWatcherService,
@@ -713,7 +713,7 @@ export class OmnecorWebSocketServer {
             const personaData = persona.data ?? {};
             const backend = resolveBackend(personaData);
 
-            if (user?.executionMode === "sovereign" && CLOUD_PROVIDER_IDS.has(backend.providerId)) {
+            if (isSovereignMode(user?.executionMode) && CLOUD_PROVIDER_IDS.has(backend.providerId)) {
               throw new Error(`Sovereign mode: cloud provider "${backend.providerId}" is disabled. Use a local provider.`);
             }
 

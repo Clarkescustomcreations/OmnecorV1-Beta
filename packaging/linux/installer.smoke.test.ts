@@ -162,22 +162,31 @@ describe('.deb build script (build-deb.sh)', () => {
     checkBashSyntax(BUILD_DEB);
   });
 
-  it('installs native Node modules into the package (so the server can start)', () => {
+  it('ships the libSQL native binding the bundled server loads at runtime', () => {
     const script = readFileSync(BUILD_DEB, 'utf8');
     expect(
       script,
-      'build-deb.sh never runs npm install — the bundled dist/index.js externalises better-sqlite3, onnxruntime-node, and mysql2; without node_modules the server exits immediately',
-    ).toMatch(/npm install/);
+      'build-deb.sh must ship @libsql/linux-x64-gnu (index.node): the bundle inlines @libsql JS but loads the platform binding via a runtime require the bundler cannot follow. Without it the server crashes on first DB connect.',
+    ).toContain('@libsql/linux-x64-gnu');
   });
 
-  it('includes better-sqlite3 as a native dependency', () => {
+  it('ships the generated Drizzle migrations so the schema exists on first boot', () => {
     const script = readFileSync(BUILD_DEB, 'utf8');
-    expect(script).toContain('better-sqlite3');
+    expect(
+      script,
+      'build-deb.sh must copy drizzle/migrations into the package; the server applies them on first DB connect (MIGRATIONS_DIR).',
+    ).toContain('drizzle/migrations');
   });
 
-  it('includes onnxruntime-node as a native dependency', () => {
+  it('does NOT install the dead onnxruntime/better-sqlite3/mysql2 natives', () => {
+    // The bundled dist/index.js has ZERO references to these (verified). The old
+    // NATPKG block npm-installed ~550MB of binaries that can never execute; the
+    // headless server's only native dep is the @libsql binding above. Guard
+    // against regressing to a JSON dependency block for the dead modules.
     const script = readFileSync(BUILD_DEB, 'utf8');
-    expect(script).toContain('onnxruntime-node');
+    expect(script).not.toMatch(/"onnxruntime-node":\s*"/);
+    expect(script).not.toMatch(/"better-sqlite3":\s*"/);
+    expect(script).not.toMatch(/"mysql2":\s*"/);
   });
 
   it('bundles the systemd service file', () => {
@@ -251,13 +260,12 @@ describe('Flatpak manifest (org.omnecor.HMCI.yml)', () => {
 // ── Version consistency ────────────────────────────────────────────────────
 
 describe('Linux packaging version consistency', () => {
-  it('build-deb.sh default version matches base version in package.json', () => {
-    const baseVersion = getBaseVersion(JSON.parse(readFileSync(ROOT_PKG, 'utf8')).version);
+  it('build-deb.sh derives its default version from package.json', () => {
     const script = readFileSync(BUILD_DEB, 'utf8');
     expect(
       script,
-      `build-deb.sh VERSION default should be "${baseVersion}" — update: VERSION="\${1:-${baseVersion}}"`,
-    ).toContain(`VERSION="\${1:-${baseVersion}}"`);
+      "build-deb.sh should read the version from package.json (single source of truth) rather than hardcoding it — expected a `require('.../package.json').version` lookup",
+    ).toContain("package.json').version");
   });
 
   it('build-appimage.sh default version matches base version in package.json', () => {

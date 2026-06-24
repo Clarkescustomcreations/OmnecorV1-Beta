@@ -1,6 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc.js";
+import { isSovereignMode } from "../_core/sovereign.js";
 import { MCPClientService } from "../phase2/services/MCPClientService.js";
 import { AuditLogService } from "../phase2/services/AuditLogService.js";
 import { createLogger } from "../_core/logger.js";
@@ -26,7 +27,7 @@ export const mcpRouter = router({
       })
     )
     .mutation(async ({ ctx, input }) => {
-      if (ctx.user?.executionMode === "sovereign" && input.transport === "websocket" && input.url) {
+      if (isSovereignMode(ctx.user?.executionMode) && input.transport === "websocket" && input.url) {
         try {
           const parsedUrl = new URL(input.url);
           const hostname = parsedUrl.hostname;
@@ -94,7 +95,7 @@ export const mcpRouter = router({
     )
     .mutation(async ({ ctx, input }) => {
       const config = MCPClientService.getInstance().listConnectedServers().find(c => c.id === input.serverId);
-      if (ctx.user?.executionMode === "sovereign" && config) {
+      if (isSovereignMode(ctx.user?.executionMode) && config) {
         if (config.transport === "websocket" && config.url) {
           try {
             const parsedUrl = new URL(config.url);

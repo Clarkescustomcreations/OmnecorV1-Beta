@@ -15,6 +15,7 @@
  */
 import type { MoeChainStep } from "../../../drizzle/schema.js";
 import { LlamaCppService } from "./LlamaCppService.js";
+import { isSovereignMode } from "../../_core/sovereign.js";
 import type { Message } from "./AiProviderService.js";
 
 export type ChunkCallback = (chunk: { content: string; done: boolean }) => void;
@@ -151,7 +152,7 @@ export class MoeChainService {
     isLast: boolean,
     onChunk: ChunkCallback,
   ): Promise<string> {
-    if (ctx.executionMode === "sovereign") {
+    if (isSovereignMode(ctx.executionMode)) {
       throw new Error(
         `Sovereign mode: cloud chain step "${step.label}" is blocked. ` +
         "Switch to the local GGUF chain or disable Sovereign mode."

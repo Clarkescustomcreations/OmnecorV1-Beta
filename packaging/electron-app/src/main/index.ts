@@ -177,9 +177,10 @@ function startBackend(): void {
     ? join(__dirname, '../../../..') // project root in dev
     : join(process.resourcesPath, 'app.asar.unpacked', 'backend')
 
-  // Use Electron's own Node.js runtime (ELECTRON_RUN_AS_NODE) in production so
-  // native modules compiled by electron-builder (better-sqlite3, onnxruntime-node)
-  // match the ABI. System `node` has a different NODE_MODULE_VERSION.
+  // Use Electron's own Node.js runtime (ELECTRON_RUN_AS_NODE) in production so the
+  // bundled backend runs on a known Node version. The DB native binding (@libsql)
+  // is N-API (ABI-stable across Node versions), so no electron-rebuild is needed —
+  // but pinning the runtime keeps behaviour identical to `pnpm start`.
   const nodeExec = is.dev ? 'node' : process.execPath
 
   log(`backend path: ${backendPath}`)

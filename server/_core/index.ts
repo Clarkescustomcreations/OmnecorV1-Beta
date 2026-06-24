@@ -596,6 +596,12 @@ async function startServer() {
           : `execution mode is ${mode.toUpperCase()} — cloud inference ALLOWED (spend-tracked). Set ZERO_LOGIN_EXECUTION_MODE=sovereign for a true air-gap.`;
       log.warn(`ZERO_LOGIN_MODE enabled — OAuth disabled, all requests authenticated as local admin; ${cloudNote}`);
     }
+
+    if (ENV.sovereignMode) {
+      log.warn(
+        "SOVEREIGN_MODE enabled — server-wide air-gap: cloud AI inference is blocked for ALL accounts regardless of each user's stored execution mode."
+      );
+    }
   }
   logStartupChecklist();
 
