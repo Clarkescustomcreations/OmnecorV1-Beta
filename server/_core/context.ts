@@ -152,6 +152,8 @@ export async function createContext(
       passwordHash: null,
       role: "admin",
       executionMode: mode,
+      tosAcceptedAt: dbUser?.tosAcceptedAt ?? null,
+      tosAcceptedVersion: dbUser?.tosAcceptedVersion ?? null,
       createdAt: dbUser?.createdAt ?? new Date(),
       updatedAt: dbUser?.updatedAt ?? new Date(),
       lastSignedIn: dbUser?.lastSignedIn ?? new Date(),

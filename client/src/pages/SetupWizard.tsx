@@ -18,8 +18,10 @@ import {
   ChevronRight, ArrowRight, CheckCircle2, Lock, Zap, Flame, Monitor,
   Sun, Moon, Globe, Database, Volume2, Save, Rocket, SkipForward, CheckCircle,
   Package, AlertCircle, RefreshCw, ExternalLink, Download, Loader2,
-  Bot, Layers, BrainCircuit, Box, Wrench, Palette, Radio,
+  Bot, Layers, BrainCircuit, Box, Wrench, Palette, Radio, FileText,
 } from "lucide-react";
+import { TOS_SECTIONS, TOS_FOOTER } from "@/lib/tosContent";
+import { hasAcceptedCurrentTos } from "@shared/tos";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
 import { setSessionToken } from "@/lib/desktopAuth";
@@ -35,6 +37,7 @@ interface WizardSettings {
 const STEPS = [
   { id: "welcome", title: "Welcome", description: "Let's configure your sovereign AI workstation." },
   { id: "account", title: "Sign In", description: "Create or sign in to your Omnecor account." },
+  { id: "terms", title: "Terms of Service", description: "Please review and accept before continuing." },
   { id: "mode", title: "Execution Mode", description: "Choose how you want Omnecor to handle AI requests." },
   { id: "providers", title: "AI Providers", description: "Configure your cloud API keys (optional)." },
   { id: "mesh", title: "OMMESH Network", description: "Setup local connectivity and peer discovery." },
@@ -55,13 +58,55 @@ export function SetupWizard() {
   const { theme, setTheme } = useTheme();
 
   // If the user is already authenticated (e.g. returned from OAuth redirect),
-  // skip the account step and land on the mode step instead.
-  const { data: me } = trpc.auth.me.useQuery();
+  // skip account + terms and land on mode. If authenticated but hasn't accepted
+  // the CURRENT ToS version (new account, or terms updated since last accept),
+  // land on terms so they re-accept.
+  const { data: me, refetch: refetchMe } = trpc.auth.me.useQuery();
   useEffect(() => {
-    if (me && currentStep === 0) {
-      setCurrentStep(STEPS.findIndex(s => s.id === "mode"));
+    if (me && currentStep <= 1) {
+      const target = hasAcceptedCurrentTos(me.tosAcceptedVersion)
+        ? STEPS.findIndex(s => s.id === "mode")
+        : STEPS.findIndex(s => s.id === "terms");
+      setCurrentStep(target);
     }
   }, [me, currentStep]);
+
+  const [tosAccepted, setTosAccepted] = useState(false);
+
+  // Sync checkbox with DB state so back-navigation doesn't show it unchecked
+  // after the user has already accepted the current version. A stale-version
+  // acceptance does NOT pre-check — they must read and re-accept.
+  useEffect(() => {
+    if (hasAcceptedCurrentTos(me?.tosAcceptedVersion)) setTosAccepted(true);
+  }, [me?.tosAcceptedVersion]);
+
+  const acceptTosMutation = trpc.auth.acceptTos.useMutation({
+    onSuccess: () => {
+      refetchMe();
+      setCurrentStep(s => s + 1);
+    },
+    onError: (e) => toast.error("Failed to record acceptance: " + e.message),
+  });
+
+  // ToS scroll-gate: the acceptance checkbox stays locked until the user has
+  // scrolled to the bottom of the agreement. Already-accepted users (back-nav)
+  // and content short enough not to overflow are treated as read.
+  const tosViewportRef = useRef<HTMLDivElement>(null);
+  const [tosScrolledToEnd, setTosScrolledToEnd] = useState(false);
+  const tosReadable = tosScrolledToEnd || hasAcceptedCurrentTos(me?.tosAcceptedVersion);
+  useEffect(() => {
+    if (STEPS[currentStep].id !== "terms") return;
+    const el = tosViewportRef.current;
+    if (!el) return;
+    const check = () => {
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) {
+        setTosScrolledToEnd(true);
+      }
+    };
+    check(); // content may fit without scrolling — nothing left to read
+    el.addEventListener("scroll", check, { passive: true });
+    return () => el.removeEventListener("scroll", check);
+  }, [currentStep]);
 
   // --- Backend Data ---
   const { data: aiProviders, refetch: refetchAiProviders } = trpc.system.aiProviders.useQuery();
@@ -325,6 +370,14 @@ export function SetupWizard() {
   const nextStep = () => {
     if (currentStep < STEPS.length - 1) {
       const stepId = STEPS[currentStep].id;
+      if (stepId === "terms") {
+        if (!tosAccepted) {
+          toast.error("You must accept the Terms of Service to continue.");
+          return;
+        }
+        acceptTosMutation.mutate();
+        return; // step advance happens in onSuccess once the DB write confirms
+      }
       if (stepId === "mode") {
         setModeMutation.mutate({ mode: selectedMode });
       } else if (stepId === "providers") {
@@ -495,6 +548,67 @@ export function SetupWizard() {
                 </div>
               </div>
             )}
+          </div>
+        );
+
+      case "terms":
+        return (
+          <div className="space-y-6 py-2 animate-in fade-in duration-300">
+            <div className="p-3 border rounded-xl bg-accent-info/5 border-accent-info/20 flex gap-3">
+              <FileText className="w-4 h-4 text-accent-info flex-shrink-0 mt-0.5" />
+              <p className="text-xs text-accent-info">
+                Please read the full Terms of Service below. You must scroll through and accept before continuing.
+              </p>
+            </div>
+
+            <ScrollArea viewportRef={tosViewportRef} className="h-[340px] rounded-xl border bg-muted/20 p-5">
+              <div className="space-y-6 pr-2">
+                {TOS_SECTIONS.map((section) => (
+                  <div key={section.title} className="space-y-2">
+                    <h3 className="text-sm font-bold text-foreground">{section.title}</h3>
+                    {section.body.map((paragraph, i) => (
+                      <p key={i} className="text-xs text-muted-foreground leading-relaxed whitespace-pre-line">
+                        {paragraph}
+                      </p>
+                    ))}
+                  </div>
+                ))}
+                <div className="pt-2 border-t border-border/50">
+                  <p className="text-[11px] text-muted-foreground italic leading-relaxed">
+                    {TOS_FOOTER}
+                  </p>
+                </div>
+              </div>
+            </ScrollArea>
+
+            <div
+              className={cn(
+                "flex items-start gap-3 p-4 rounded-xl border-2 transition-all select-none",
+                !tosReadable
+                  ? "cursor-not-allowed opacity-50 border-border"
+                  : tosAccepted
+                    ? "cursor-pointer border-primary/30 bg-primary/5"
+                    : "cursor-pointer border-border hover:border-primary/20",
+              )}
+              onClick={() => { if (tosReadable) setTosAccepted(v => !v); }}
+            >
+              <div className={cn(
+                "w-5 h-5 rounded border-2 flex-shrink-0 mt-0.5 flex items-center justify-center transition-all",
+                tosAccepted ? "border-primary bg-primary" : "border-muted-foreground",
+              )}>
+                {tosAccepted && <CheckCircle2 className="w-3 h-3 text-background" />}
+              </div>
+              <div className="space-y-0.5">
+                <p className="text-sm font-semibold leading-snug">
+                  I have read and agree to the Omnecor Terms of Service
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  {tosReadable
+                    ? "Your acceptance will be recorded with a timestamp to your account."
+                    : "Scroll to the bottom of the Terms above to enable acceptance."}
+                </p>
+              </div>
+            </div>
           </div>
         );
 
@@ -1169,8 +1283,8 @@ export function SetupWizard() {
             </Button>
 
             <div className="flex items-center gap-3">
-              {/* Skip button — visible on all middle steps (not welcome, not account, not finish) */}
-              {currentStep > 0 && STEPS[currentStep].id !== "account" && currentStep < STEPS.length - 1 && (
+              {/* Skip button — visible on middle steps; hidden on account and terms (both are required) */}
+              {currentStep > 0 && STEPS[currentStep].id !== "account" && STEPS[currentStep].id !== "terms" && currentStep < STEPS.length - 1 && (
                 <Button
                   variant="ghost"
                   size="sm"
@@ -1195,10 +1309,15 @@ export function SetupWizard() {
                 <Button
                   onClick={nextStep}
                   size="lg"
-                  className="bg-foreground text-background hover:bg-foreground/90 gap-2 px-8 font-bold transition-all"
+                  disabled={STEPS[currentStep].id === "terms" && (!tosAccepted || acceptTosMutation.isPending)}
+                  className="bg-foreground text-background hover:bg-foreground/90 gap-2 px-8 font-bold transition-all disabled:opacity-50"
                 >
-                  Next Step
-                  <ChevronRight className="w-5 h-5" />
+                  {STEPS[currentStep].id === "terms"
+                    ? acceptTosMutation.isPending
+                      ? <><Loader2 className="w-4 h-4 animate-spin" />Recording…</>
+                      : <>I Agree &amp; Continue<ChevronRight className="w-5 h-5" /></>
+                    : <>Next Step<ChevronRight className="w-5 h-5" /></>
+                  }
                 </Button>
               )}
             </div>

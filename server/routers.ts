@@ -33,10 +33,11 @@
 
 import { z } from "zod";
 import { COOKIE_NAME } from "@shared/const";
+import { TOS_VERSION } from "@shared/tos";
 import { getSessionCookieOptions } from "./_core/cookies.js";
 import { systemRouter } from "./_core/systemRouter.js";
 import { publicProcedure, protectedProcedure, router } from "./_core/trpc.js";
-import { updateUserExecutionMode } from "./db.factory.js";
+import { updateUserExecutionMode, acceptTosForUser } from "./db.factory.js";
 
 // ─── Unified Feature Routers ────────────────────────────────────────────────
 import { knowledgeBaseRouter } from "./routers/knowledgeBase.js";
@@ -98,7 +99,14 @@ export const appRouter = router({
   // ─── Core System ──────────────────────────────────────────────────────────
   system: systemRouter,
   auth: router({
-    me: publicProcedure.query(opts => opts.ctx.user),
+    me: publicProcedure.query(opts => {
+      const u = opts.ctx.user;
+      if (!u) return null;
+      // Never ship passwordHash to the client. Everything else on the row is the
+      // caller's own non-sensitive profile/state (email, role, tosAcceptedAt, …).
+      const { passwordHash: _passwordHash, ...safe } = u;
+      return safe;
+    }),
     logout: publicProcedure.mutation(({ ctx }) => {
       const cookieOptions = getSessionCookieOptions(ctx.req);
       ctx.res.clearCookie(COOKIE_NAME, { ...cookieOptions, maxAge: -1 });
@@ -112,6 +120,10 @@ export const appRouter = router({
         await updateUserExecutionMode(ctx.user.id, input.mode);
         return { success: true } as const;
       }),
+    acceptTos: protectedProcedure.mutation(async ({ ctx }) => {
+      await acceptTosForUser(ctx.user.id, TOS_VERSION);
+      return { success: true, acceptedAt: new Date(), acceptedVersion: TOS_VERSION } as const;
+    }),
   }),
 
   // ─── Jobs (Unified Background Process Management) ─────────────────────────

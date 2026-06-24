@@ -37,3 +37,11 @@ export async function updateUserExecutionMode(
   const db = await getDb();
   await db.update(users).set({ executionMode: mode }).where(eq(users.id, userId));
 }
+
+export async function acceptTosForUser(userId: number, version: string): Promise<void> {
+  const db = await getDb();
+  await db
+    .update(users)
+    .set({ tosAcceptedAt: new Date(), tosAcceptedVersion: version })
+    .where(eq(users.id, userId));
+}

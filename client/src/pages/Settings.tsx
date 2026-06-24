@@ -18,7 +18,8 @@ import {
   UserCircle2, CheckCircle, ArrowLeft, Wallet, Settings as SettingsIcon,
   FolderOpen, Settings2, Trash2, Plus, AlertCircle, Upload, Save, Loader2,
   Search, Share2, Mic2, History, FileJson, Server, Globe, Database, ShieldAlert,
-  Eye, Layout, Clock, Coins, Brain, Copy, RefreshCw, Usb, Rocket, Smartphone
+  Eye, Layout, Clock, Coins, Brain, Copy, RefreshCw, Usb, Rocket, Smartphone,
+  FileText, ExternalLink
 } from "lucide-react";
 import { useTheme, type Theme } from "../contexts/ThemeContext";
 import { CloudComputePanel } from "../components/settings/CloudComputePanel";
@@ -31,6 +32,7 @@ import { PairDevicePanel } from "../components/settings/PairDevicePanel";
 import { advancedSettings } from "../lib/advancedSettings";
 import { OmnecorDashboardLayout } from "../components/OmnecorDashboardLayout";
 import { useLocation } from "wouter";
+import { TOS_VERSION, hasAcceptedCurrentTos } from "@shared/tos";
 import { cn } from "@/lib/utils";
 import { applyFontSize, getStoredFontSize } from "@/lib/fontSize";
 
@@ -2678,7 +2680,106 @@ const AdvancedPanel: React.FC = () => {
           <Save className="w-4 h-4" /> {saveMutation.isPending ? "Saving..." : "Save Advanced Settings"}
         </Button>
       </div>
+
+      <LegalPanel />
     </div>
   );
 };
+
+function LegalPanel() {
+  const [, setLocation] = useLocation();
+  const utils = trpc.useUtils();
+  const { data: me } = trpc.auth.me.useQuery();
+
+  const acceptTos = trpc.auth.acceptTos.useMutation({
+    onSuccess: () => {
+      utils.auth.me.invalidate();
+      toast.success("Terms of Service accepted");
+    },
+    onError: (e) => toast.error("Failed to record acceptance: " + e.message),
+  });
+
+  const acceptedAt = me?.tosAcceptedAt
+    ? new Date(me.tosAcceptedAt).toLocaleString(undefined, {
+        year: "numeric", month: "long", day: "numeric",
+        hour: "2-digit", minute: "2-digit",
+      })
+    : null;
+  const acceptedVersion = me?.tosAcceptedVersion ?? null;
+  const acceptedCurrent = hasAcceptedCurrentTos(acceptedVersion);
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <FileText className="w-4 h-4" />
+          Legal
+        </CardTitle>
+        <CardDescription>Terms of Service and acceptance record</CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex items-center justify-between">
+          <div className="space-y-0.5">
+            <Label className="text-sm font-semibold">Terms of Service</Label>
+            <p className="text-xs text-muted-foreground">View the full Omnecor Terms of Service</p>
+          </div>
+          <Button variant="outline" size="sm" className="gap-2" onClick={() => setLocation("/terms")}>
+            <ExternalLink className="w-3.5 h-3.5" />
+            View Terms
+          </Button>
+        </div>
+
+        <div className="pt-2 border-t">
+          <Label className="text-xs text-muted-foreground uppercase tracking-widest font-bold">Acceptance Record</Label>
+          <div className="mt-2 p-3 rounded-lg bg-muted/30 border border-border/50">
+            {acceptedCurrent ? (
+              <div className="flex items-start gap-3">
+                <CheckCircle2 className="w-4 h-4 text-primary flex-shrink-0 mt-0.5" />
+                <div className="space-y-0.5">
+                  <p className="text-xs font-semibold text-foreground">Terms accepted — v{acceptedVersion}</p>
+                  <p className="text-[11px] text-muted-foreground font-mono">{acceptedAt}</p>
+                  <p className="text-[10px] text-muted-foreground">This record is linked to your account.</p>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-start gap-3">
+                <AlertCircle className="w-4 h-4 text-accent-warning flex-shrink-0 mt-0.5" />
+                <div className="flex-1 space-y-2">
+                  <div className="space-y-0.5">
+                    {acceptedVersion ? (
+                      <>
+                        <p className="text-xs font-semibold text-foreground">Terms update requires re-acceptance</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          You accepted v{acceptedVersion}{acceptedAt ? ` on ${acceptedAt}` : ""}. The Terms have since
+                          been updated to v{TOS_VERSION} — please review and re-accept.
+                        </p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-xs font-semibold text-foreground">No acceptance on record</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Review the Terms, then record your acceptance below.
+                        </p>
+                      </>
+                    )}
+                  </div>
+                  <Button
+                    size="sm"
+                    className="gap-2"
+                    disabled={acceptTos.isPending}
+                    onClick={() => acceptTos.mutate()}
+                  >
+                    {acceptTos.isPending
+                      ? <><Loader2 className="w-3.5 h-3.5 animate-spin" /> Recording…</>
+                      : <><CheckCircle2 className="w-3.5 h-3.5" /> {acceptedVersion ? "Re-accept Terms" : "Accept Terms"}</>}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
 

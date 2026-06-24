@@ -40,6 +40,10 @@ export const users = sqliteTable("users", {
   // enums are a TS-level constraint (no CHECK is emitted), so this is type-only.
   role: text("role", { enum: ["viewer", "user", "admin", "owner", "device"] }).default("user").notNull(),
   executionMode: text("executionMode", { enum: ["sovereign", "scrapper", "big_spender"] }).notNull().default("scrapper"),
+  tosAcceptedAt: integer("tosAcceptedAt", { mode: "timestamp" }),
+  // Which ToS version the user accepted (shared/tos.ts TOS_VERSION). Compared
+  // against the current version to re-prompt acceptance after the terms change.
+  tosAcceptedVersion: text("tosAcceptedVersion"),
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
   updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
   lastSignedIn: integer("lastSignedIn", { mode: "timestamp" }).notNull().$defaultFn(now),

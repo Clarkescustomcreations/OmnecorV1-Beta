@@ -24,6 +24,61 @@ The `Status` column above records *what the handler is wired to*. The new **Veri
 
 ---
 
+## Session 25 (2026-06-24) — Terms of Service
+
+New `"terms"` wizard step, `/terms` standalone page, `LegalPanel` in Settings, and `auth.acceptTos` backend mutation.
+
+### New backend procedure
+
+| Procedure | Router | Type | Notes |
+|---|---|---|---|
+| `auth.acceptTos` | `server/routers.ts` (inline auth router) | `protectedProcedure` mutation | Sets `tosAcceptedAt = new Date()` **and `tosAcceptedVersion = TOS_VERSION`** (from `@shared/tos`) on the current user row; returns `{ success, acceptedAt, acceptedVersion }`. Idempotent (re-accepting overwrites both). |
+| `auth.me` (hardened) | `server/routers.ts` (inline auth router) | `publicProcedure` query | Strips `passwordHash` from the returned row before it leaves the server (was shipping the raw user row). Still returns the caller's own non-sensitive fields (`email`, `role`, `executionMode`, `tosAcceptedAt`, `tosAcceptedVersion`, timestamps). Returns `null` when unauthenticated. |
+
+### Versioned acceptance (shared/tos.ts)
+
+`shared/tos.ts` is the single source of truth for `TOS_VERSION` (now **`1.1.0`**), `TOS_EFFECTIVE_DATE`, `TOS_GOVERNING_JURISDICTION` (**`Nova Scotia, Canada`** — used only as a soft plain-language note in the closing section, not a formal governing-law clause), and the `hasAcceptedCurrentTos(version)` helper — imported by both the server (recording) and client (gating). `client/src/lib/tosContent.ts` re-exports the version/date and holds the human-readable section text. Bumping `TOS_VERSION` re-prompts every user, because acceptance is stored per-version.
+
+**Tone (deliberate):** the Terms are a **plain-language "here's the deal, and here are the risks I'm warning you about" notice**, not a hard litigation-ready contract — fitting a free, solo-dev, MIT OSS project. **13 sections.** The protective substance is kept (as-is / no warranties, limited liability capped at CAD $0, beta warning, AI/agent/wallet risk, acceptable use, cloning-consent responsibility, data/biometric responsibility). The pure courtroom scaffolding was **dropped**: no indemnification clause, and no formal governing-law clause (just the soft "I'm based in Nova Scotia" note). Section 2 is permissive **MIT** (use/modify/sell allowed), matching the repo `LICENSE`, after the earlier MIT-vs-ToS conflict was found.
+
+### Schema change
+
+`tosAcceptedAt integer` (timestamp, nullable) — migration `0009_cultured_jack_power.sql`.
+`tosAcceptedVersion text` (nullable) — migration `0010_special_blue_blade.sql`. Records which ToS version the user accepted; compared against `TOS_VERSION` to re-prompt after the terms change.
+
+### New interactive elements
+
+#### `client/src/pages/SetupWizard.tsx` — "terms" step (step 3 of 11)
+
+| Element | Type | Status | API / tRPC Call | Notes |
+|---|---|---|---|---|
+| Terms step — scrollable ToS content | Display | **LOCAL** | — | `ScrollArea h-[340px]` (now passed a `viewportRef`); 13 sections from `tosContent.ts`. Drives the scroll-gate below. |
+| Terms step — acceptance checkbox | Toggle | **LOCAL** | — | `tosAccepted` boolean state. **Scroll-gated:** locked (opacity-50, cursor-not-allowed, no toggle) until `tosReadable` — i.e. the viewport has been scrolled within 24px of the bottom (or content doesn't overflow, or the user already accepted the **current version** via back-nav). Helper copy switches to "Scroll to the bottom of the Terms above to enable acceptance." while locked. Pre-check + step-routing now gate on `hasAcceptedCurrentTos(me.tosAcceptedVersion)`, so a user who accepted an **older** version is sent back to this step and must re-read + re-accept. |
+| Terms step — "I Agree & Continue" button | Button | **CONNECTED** | `trpc.auth.acceptTos.useMutation()` | Disabled until checkbox checked + mutation not pending (the checkbox itself can't be checked until scrolled, so scroll is transitively enforced). Step advances only in `onSuccess` (not fire-and-forget). Shows `Loader2` + "Recording…" while pending. |
+
+**Skip button** is hidden on this step (same as the account step) — acceptance is mandatory.
+
+#### `client/src/pages/Terms.tsx` — standalone `/terms` route
+
+| Element | Type | Status | Notes |
+|---|---|---|---|
+| Back button | Button | **LOCAL** | `window.history.back()` — native browser history nav, works in Electron. |
+| Section content | Display | — | Static; sourced from `tosContent.ts` (single source of truth shared with wizard). |
+
+Route excluded from the setup-redirect guard (`location !== "/terms"`) so it's accessible before setup completes.
+
+#### `client/src/pages/Settings.tsx` — `LegalPanel` (Advanced tab)
+
+| Element | Type | Status | API / tRPC Call | Notes |
+|---|---|---|---|---|
+| Acceptance record (3-state) | Display | **CONNECTED** | `trpc.auth.me.useQuery()` | Reads `me.tosAcceptedAt` + `me.tosAcceptedVersion`. Three states via `hasAcceptedCurrentTos`: **current** → green "Terms accepted — v{version}" + timestamp; **stale** (accepted an older version) → warning "Terms update requires re-acceptance" showing old→new version; **never** → "No acceptance on record". |
+| "View Terms" button | Button | **LOCAL** | — | `setLocation("/terms")` — navigates to the standalone `/terms` page. |
+| "Accept / Re-accept Terms" button | Button | **CONNECTED** | `trpc.auth.acceptTos.useMutation()` | Shown in both non-current states (never-accepted demo-mode installs, and stale-version users after a `TOS_VERSION` bump). Records the current version, invalidates `auth.me` on success; `Loader2` + "Recording…" while pending. Label is "Accept Terms" (never) / "Re-accept Terms" (stale). |
+
+> **Verified verdict:** `auth.acceptTos` / version gating → **UNVERIFIED ⚠️**. Wired to real impl (traced) and covered by `authRouter.test.ts` (persistence incl. `tosAcceptedVersion`, idempotency, `auth.me` passwordHash-strip). `tsc` 0 · `vitest` 416/416 · migrations `0009`+`0010` apply in the test DB (version round-trips) — but not live-driven this pass. Promote to VERIFIED-REAL ✅ once driven against a running instance and the version/timestamp confirmed in DB.
+
+---
+
 ## Session 24 (2026-06-23) — Map RAG over remote sources (VectorDB feed, end-to-end)
 
 Completes the neural-map remote-source pipeline: `fetchSourceTree` listing → real
@@ -2975,3 +3030,96 @@ New UI from the off-thread-layout (Web Worker) + bounded-loading (server budget 
 - **Inline node status badges share a shape:** `<bg-X/opacity> text-X px-1 rounded leading-none flex-shrink-0`. Truncated → primary; in-context ("ctx") → accent-success. Padding is inline (not `py-0.5`) only because the node badge font-size scales with the Node Size control.
 - **Drill-in affordances** reuse the tree's existing icon-button hover (`hover:bg-primary/20 rounded transition-colors`) and `text-[10px] … tabular-nums` count style, tinted `text-primary`/`text-primary/70` to signal "loadable" vs the muted `text-muted-foreground/50` used for already-loaded child counts.
 - **⚠ Drift to flag:** the truncated badge uses `bg-primary/15` while the sibling `ctx` badge uses `bg-accent-success/20`. Inline status badges should standardize on **/20** background opacity — align the truncated badge to `bg-primary/20` when convenient.
+
+---
+
+### Terms of Service — Wizard Step (SetupWizard.tsx)
+
+File: `client/src/pages/SetupWizard.tsx` (`case "terms":` in `renderStepContent`)
+Last updated: 2026-06-24 (Session 25)
+
+| Property | Class |
+|---|---|
+| Info banner background | `bg-accent-info/5` |
+| Info banner border | `border border-accent-info/20 rounded-xl` |
+| Info banner spacing | `p-3 flex gap-3` |
+| Info banner icon | `w-4 h-4 text-accent-info flex-shrink-0 mt-0.5` |
+| Info banner text | `text-xs text-accent-info` |
+| Scroll area container | `h-[340px] rounded-xl border bg-muted/20 p-5` |
+| Section heading (in scroll) | `text-sm font-bold text-foreground` |
+| Body paragraph (in scroll) | `text-xs text-muted-foreground leading-relaxed whitespace-pre-line` |
+| Footer note (in scroll) | `text-[11px] text-muted-foreground italic leading-relaxed` |
+| Checkbox row (idle) | `flex items-start gap-3 p-4 rounded-xl border-2 border-border hover:border-primary/20 cursor-pointer select-none transition-all` |
+| Checkbox row (checked) | `border-primary/30 bg-primary/5` |
+| Checkbox box (idle) | `w-5 h-5 rounded border-2 border-muted-foreground flex-shrink-0 mt-0.5 flex items-center justify-center transition-all` |
+| Checkbox box (checked) | `border-primary bg-primary` |
+| Checkbox icon (checked) | `CheckCircle2 w-3 h-3 text-background` |
+| Checkbox label | `text-sm font-semibold leading-snug` |
+| Checkbox sublabel | `text-[11px] text-muted-foreground` |
+
+**Pattern notes:**
+- Info banners inside wizard steps consistently use `bg-accent-info/5 border-accent-info/20 rounded-xl p-3` — match this for any instructional callout inside a wizard step. The shield/info icon is always `text-accent-info` at `w-4 h-4`.
+- The custom checkbox (`div` + `border-2`) is used instead of a shadcn `Checkbox` because it needs a large click area (`p-4 rounded-xl`) and animated border state. Do not use `<input type="checkbox">` or shadcn `<Checkbox>` for ToS-style acceptance patterns — keep this row pattern.
+- The `select-none` class on the row container prevents text selection on repeated click-to-toggle. Always include it on interactive toggle rows.
+- Scroll area height is fixed at `h-[340px]` to fit within the wizard card's min-height of `450px` with the checkbox row and info banner above it. Do not increase without checking wizard card overflow.
+
+---
+
+### Terms of Service — Standalone Page (Terms.tsx)
+
+File: `client/src/pages/Terms.tsx`
+Last updated: 2026-06-24 (Session 25)
+
+| Property | Class |
+|---|---|
+| Page container | `min-h-screen bg-background flex flex-col` |
+| Sticky header | `border-b bg-card/80 backdrop-blur-xl sticky top-0 z-10` |
+| Header inner max-width | `max-w-3xl mx-auto px-6 py-4` |
+| Content area | `max-w-3xl mx-auto px-6 py-12 flex-1 w-full` |
+| Page title | `text-3xl font-black tracking-tight` |
+| Page subtitle | `text-sm text-muted-foreground` |
+| Feature icon container | `p-2.5 rounded-xl bg-primary/10 border border-primary/20` |
+| Feature icon | `w-6 h-6 text-primary` |
+| Intro info box | `p-4 rounded-xl bg-muted/30 border border-border/50 flex gap-3` |
+| Intro info icon | `w-4 h-4 text-muted-foreground flex-shrink-0 mt-0.5` |
+| Intro info text | `text-xs text-muted-foreground leading-relaxed` |
+| Section spacing | `space-y-10` |
+| Section heading | `text-base font-bold text-foreground border-b pb-2` |
+| Section body paragraph | `text-sm text-muted-foreground leading-relaxed whitespace-pre-line` |
+| Footer divider | `mt-12 pt-6 border-t border-border/50 space-y-4` |
+| Footer meta line | `text-[10px] text-muted-foreground` |
+| Back button | `Button variant="ghost" size="sm" gap-2 text-muted-foreground` |
+
+**Pattern notes:**
+- `max-w-3xl mx-auto` is the document-page max-width — use this for any full-page text-heavy view (legal, help, changelog). Gives ~672px of readable text at desktop viewport, scales naturally on smaller screens.
+- The sticky header uses `bg-card/80 backdrop-blur-xl` — the same pattern as floating panels and command palette headers. Always pair `bg-card/80` with `backdrop-blur-xl`; never use raw `bg-card` on blurred overlays.
+- `Back` uses `window.history.back()`, not `setLocation`. This is the correct pattern for any page that can be reached from multiple navigational contexts (wizard, settings, direct URL). `setLocation` hardcoded paths would break navigation for users who linked directly.
+- Section headings use `border-b pb-2` as dividers — do not add `my-*` margin to the heading itself; rely on the parent `space-y-10` for vertical rhythm.
+
+---
+
+### Legal Card — Settings Panel (Settings.tsx → LegalPanel)
+
+File: `client/src/pages/Settings.tsx` (`LegalPanel` function)
+Last updated: 2026-06-24 (Session 25)
+
+| Property | Class |
+|---|---|
+| Card | standard `Card` component (no extra classes) |
+| Card title row | `flex items-center gap-2` |
+| Card title icon | `FileText w-4 h-4` |
+| Section label (above record box) | `text-xs text-muted-foreground uppercase tracking-widest font-bold` |
+| Record box container | `mt-2 p-3 rounded-lg bg-muted/30 border border-border/50` |
+| Accepted — icon | `CheckCircle2 w-4 h-4 text-primary flex-shrink-0 mt-0.5` |
+| Accepted — heading | `text-xs font-semibold text-foreground` |
+| Accepted — timestamp | `text-[11px] text-muted-foreground font-mono` |
+| Accepted — note | `text-[10px] text-muted-foreground` |
+| Not accepted — icon | `AlertCircle w-4 h-4 text-accent-warning flex-shrink-0 mt-0.5` |
+| Not accepted — heading | `text-xs font-semibold text-foreground` |
+| Not accepted — note | `text-[11px] text-muted-foreground` |
+
+**Pattern notes:**
+- The section label (`text-xs text-muted-foreground uppercase tracking-widest font-bold`) matches the established settings sub-section label pattern seen across the Settings page. Use it for any label that introduces a data-display group inside a `CardContent`.
+- The record box (`p-3 rounded-lg bg-muted/30 border border-border/50`) is the standard settings display-only data box. Not `rounded-xl` — settings cards use `rounded-lg` for inner containers; the outer `Card` uses the shadcn default.
+- Icon-lead row layout (`flex items-start gap-3` + `flex-shrink-0 mt-0.5` on the icon) is the standard pattern for all icon-prefixed status messages. The `mt-0.5` aligns the icon top with the first line of text when using `text-xs`. Always use `items-start` (not `items-center`) for multi-line content.
+- Timestamps in settings use `font-mono` to visually signal immutability. Any machine-generated, non-editable date/time value should carry `font-mono text-muted-foreground`.

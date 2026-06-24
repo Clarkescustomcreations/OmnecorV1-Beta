@@ -1,0 +1,129 @@
+import {
+  TOS_VERSION,
+  TOS_EFFECTIVE_DATE,
+  TOS_GOVERNING_JURISDICTION,
+} from "@shared/tos";
+
+// Version + date are owned by `shared/tos.ts` (shared with the server, which
+// records the accepted version). Re-exported here so existing UI imports from
+// `@/lib/tosContent` keep working unchanged.
+export { TOS_VERSION, TOS_EFFECTIVE_DATE };
+
+export interface TosSection {
+  title: string;
+  body: string[];
+}
+
+// Tone: a plain-language "here's the deal, and here are the risks I'm warning
+// you about" notice — not a hard, litigation-ready contract. The protective
+// substance (as-is, limited liability, beta, AI/agent/wallet risk) is kept; the
+// pure courtroom scaffolding (indemnification, formal governing-law) is not.
+export const TOS_SECTIONS: TosSection[] = [
+  {
+    title: "1. Agreeing to These Terms",
+    body: [
+      "By installing or using Omnecor, you're agreeing to these terms. They're written in plain language and exist mainly so we both know where we stand. If you don't agree with them, that's okay — just don't use the software.",
+      "You should be at least 18, or the age of majority where you live, to use Omnecor. Some features — like the agentic wallet and automated actions — can have real-world consequences, so they're intended for use by individuals of appropriate legal age.",
+      "If you're using Omnecor for a business or organization, you're confirming you're allowed to accept these terms on its behalf.",
+    ],
+  },
+  {
+    title: "2. Open Source & License",
+    body: [
+      "Omnecor is free and open source under the MIT License. The full license ships with the software (the LICENSE file) and is what actually governs your rights to the code.",
+      "Under MIT you're free to use, copy, change, share, and even sell Omnecor — including commercially — as long as you keep the original copyright and license notice in any copies, and accept that it comes with no warranty.",
+      "Omnecor also bundles other open-source components, each under its own license (see the Open Source Acknowledgements that ship with the software). Your rights to those come from their licenses.",
+      "The Omnecor name and logo identify the project. Please don't use them in a way that suggests an official endorsement of a fork or derivative without making clear it's an independent project.",
+    ],
+  },
+  {
+    title: "3. Acceptable Use",
+    body: [
+      "Omnecor is built for creativity, productivity, learning, and personal or professional projects. Please don't use it — or its AI, automation, or agent features — for:",
+      "• Anything illegal, or prohibited by the law where you are;\n• Harassment, abuse, threats, or targeted harm to any person or group;\n• Creating or spreading malware, exploits, or tools meant to cause harm;\n• Fraud, financial crime, or deception;\n• Anything that breaks another platform's terms of service.",
+      "If you use Omnecor for something illegal or harmful, that's well outside what it's for — and the responsibility is entirely yours.",
+    ],
+  },
+  {
+    title: "4. Personas, Voice & Image Cloning",
+    body: [
+      "Omnecor includes tools for AI personas, voice cloning, and image generation. They're meant for your own creative use. If you use them, please agree that:",
+      "• You won't clone the voice, likeness, or image of a real person — public figures included — without their clear consent;\n• You won't use the output to impersonate, deceive, or mislead anyone about who's really speaking or pictured;\n• Any audio, images, or recordings you feed in are yours, or something you're allowed to use;\n• You're responsible for making sure anything you publish, share, or sell doesn't infringe someone's rights.",
+      "These exist for creative projects — your own persona, your own voice model, art for your own use. If you misuse them in a way that hurts real people or their rights, that's on you.",
+    ],
+  },
+  {
+    title: "5. Outside Services, AI Providers & Costs",
+    body: [
+      "Omnecor can connect to optional outside services using credentials you provide — cloud AI providers (like OpenAI, Anthropic, Google, ElevenLabs, Fal) and other integrations. When you turn these on, your data goes to those providers and is handled under their own terms and privacy policies, which I don't control. It's worth reading theirs.",
+      "Anything those services cost you, and any transactions Omnecor's agentic or wallet features make, are your responsibility. Spend limits and budgets in Omnecor are helpful guardrails, not guarantees — keep an eye on your own accounts.",
+      "Omnecor's AI agents and wallet can take real actions on your behalf, including spending real money. AI makes mistakes. If you let it act for you, you're accepting responsibility for what it does — I can't be responsible for the resulting charges, losses, or outcomes.",
+    ],
+  },
+  {
+    title: "6. AI Output Can Be Wrong",
+    body: [
+      "Anything an AI model produces through Omnecor can be inaccurate, incomplete, outdated, biased, or simply made up. Treat it as a draft to check, not as advice.",
+      "Please don't rely on AI output for legal, medical, financial, or safety-critical decisions without a qualified human checking it first. Reviewing and verifying output before you act on it is up to you.",
+    ],
+  },
+  {
+    title: "7. Privacy & Your Data",
+    body: [
+      "Omnecor is local-first. By default your data — chats, documents, settings, voice samples, generated media, and credentials — lives on your own device or hardware. I don't run a server that collects it, and I don't sell your data.",
+      "Data only leaves your device when you choose a feature that needs it: cloud AI providers (see section 5) receive the inputs you send them, and networking features like OMMESH share data with peers you connect to. You decide what's switched on.",
+      "Voice recordings, voiceprints, and faces can count as biometric or personal data under laws like the GDPR, CCPA, and BIPA. Handling that material lawfully — including getting any consent that's needed — is your responsibility.",
+      "Securing your own setup is also up to you: your device, your API keys and secrets, your session secret, and any network exposure. Please don't put Omnecor on an untrusted network without taking care.",
+    ],
+  },
+  {
+    title: "8. Your Content",
+    body: [
+      "You keep the rights to what you make with Omnecor — your inputs and the outputs you generate. I don't claim ownership of any of it.",
+      "Rights in AI-generated output can also depend on the model providers you use and the law where you live (including questions about copyright and training data). Making sure you have the rights you need for how you use your content is up to you.",
+      "If you send feedback, bug reports, or ideas, I may use them to improve Omnecor, freely and without any obligation back to you.",
+    ],
+  },
+  {
+    title: "9. This Is Beta Software",
+    body: [
+      "Omnecor is an early-beta release — a solo-developer, AI-assisted open-source project built with real care, but without years of production testing behind it. Some things may be incomplete, rough, or behave unexpectedly.",
+      "By using Omnecor during beta, you're okay with the fact that:",
+      "• You're testing voluntarily, and bugs, data inconsistencies, or surprises can happen;\n• You won't hold me liable for problems, data loss, or disruption you run into while testing;\n• Security was a priority throughout, but beta may surface edge-case vulnerabilities that haven't been found yet — don't expose Omnecor to untrusted networks without appropriate care.",
+      "If you hit a bug or a security concern, please open an issue on the Omnecor GitHub profile. It genuinely helps make the project better for everyone.",
+    ],
+  },
+  {
+    title: "10. No Warranties & Limited Liability",
+    body: [
+      "Omnecor is provided 'as is' and 'as available,' with no warranties of any kind, express or implied. I can't promise it will be uninterrupted, error-free, secure, or right for your particular needs.",
+      "To the fullest extent the law allows, I'm not liable for any damages arising from your use of Omnecor — including hardware damage, data loss, system failure, financial loss, or anything resulting from the AI agents, wallet features, voice or image tools, or third-party services.",
+      "Because Omnecor is free, my total liability to you for anything related to it is capped at CAD $0.",
+      "Use Omnecor at your own risk. Some places don't allow certain warranty or liability exclusions, so parts of this may not apply to you — in that case, my liability is limited as much as the law allows.",
+    ],
+  },
+  {
+    title: "11. Changes to These Terms",
+    body: [
+      "I may update these terms from time to time. When I do, I'll bump the version and date shown here, and material changes will be shown to you in-app. Continuing to use Omnecor after an update means you accept the updated terms.",
+      "Your acceptance is recorded together with the version you agreed to, so if the terms change you may be asked to take another look and accept again.",
+    ],
+  },
+  {
+    title: "12. Project Status",
+    body: [
+      "You can stop using Omnecor at any time. And because this is a free project maintained by one developer, I might change, pause, or discontinue the software, updates, or any individual feature at any time, with or without notice, and without liability to you.",
+    ],
+  },
+  {
+    title: "13. The Rest",
+    body: [
+      "These terms, together with the MIT License and the licenses of any bundled components, are the whole agreement between us about Omnecor. If any part turns out to be unenforceable, the rest still stands.",
+      `For the record, I'm based in ${TOS_GOVERNING_JURISDICTION},. This doesn't take away any consumer-protection rights you may have where you live.`,
+      "Questions or concerns about any of this? Please open an issue on the Omnecor GitHub profile.",
+    ],
+  },
+];
+
+export const TOS_FOOTER =
+  "By clicking 'I Agree & Continue' you're confirming you've read and accept these Terms of Service. Your acceptance is saved with the date and the terms version, linked to your Omnecor account.";
