@@ -180,3 +180,6 @@ trash/
 
 # Valet router temporary training data
 tmp-valet-train/
+
+# Local reference codebases (not part of the repo)
+reference_mcp_codebase/
