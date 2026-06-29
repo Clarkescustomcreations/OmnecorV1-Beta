@@ -22,6 +22,17 @@ log = logging.getLogger("omnecor.voicebox")
 
 app = FastAPI(title="Voice Box Bridge")
 
+_ALLOWED_SPEAKER_BASES = [
+    Path(os.environ.get("HOME", "/tmp")) / ".omnecor",
+    Path(os.environ.get("OMNECOR_UPLOADS_DIR", "/tmp/omnecor-uploads")),
+]
+
+def _validate_speaker_path(raw: str) -> Path:
+    resolved = Path(raw).resolve()
+    if not any(resolved == b or b in resolved.parents for b in _ALLOWED_SPEAKER_BASES):
+        raise HTTPException(status_code=403, detail="Speaker WAV path not allowed")
+    return resolved
+
 class SynthesizeRequest(BaseModel):
     text: str
     speaker_wav_path: str
@@ -34,9 +45,10 @@ def health():
 
 @app.post("/synthesize")
 async def synthesize(req: SynthesizeRequest):
-    log.info(f"Received synthesize request: {req.text[:30]}... using {req.speaker_wav_path}")
-    
-    if not os.path.exists(req.speaker_wav_path):
+    log.info(f"Received synthesize request: {req.text[:30]}...")
+
+    speaker_path = _validate_speaker_path(req.speaker_wav_path)
+    if not speaker_path.exists():
         raise HTTPException(status_code=404, detail="Speaker WAV not found")
         
     try:

@@ -13,11 +13,14 @@ Usage (FastAPI server on port 8014):
 
 import argparse
 import json
+import logging
 import os
 import re
 import sys
 import urllib.request
 from pathlib import Path
+
+log = logging.getLogger("omnecor.valet_kb")
 
 _PROJECT_ROOT = Path(__file__).parent.parent.parent
 _TRAINING_DIR = _PROJECT_ROOT / "docs" / "ai-agents" / "valet-training"
@@ -207,7 +210,8 @@ def _serve(port: int) -> None:
                 "kb_size_bytes": _KB_PATH.stat().st_size if _KB_PATH.exists() else 0,
             }
         except Exception as e:
-            return {"error": str(e)}
+            log.error("Error reading valet KB status", exc_info=True)
+            return {"error": "Internal error reading status"}
 
     uvicorn.run(app, host="127.0.0.1", port=port)
 

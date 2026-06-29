@@ -33,12 +33,13 @@ def health():
 def scan(req: ScanRequest):
     if not is_safe_path(req.target_path):
         raise HTTPException(status_code=403, detail="Path not allowed")
+    safe_path = os.path.realpath(req.target_path)
     findings = []
     if req.scan_type in ("semgrep", "combined"):
-        findings.extend(_run_semgrep(req.target_path))
+        findings.extend(_run_semgrep(safe_path))
     if req.scan_type in ("yara", "combined"):
-        findings.extend(_run_yara(req.target_path))
-    return {"findings": findings, "scan_type": req.scan_type, "target_path": req.target_path}
+        findings.extend(_run_yara(safe_path))
+    return {"findings": findings, "scan_type": req.scan_type, "target_path": safe_path}
 
 
 def _run_semgrep(path: str) -> list:

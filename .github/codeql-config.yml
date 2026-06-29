@@ -1,0 +1,4 @@
+paths-ignore:
+  - "packaging/deb-build"
+  - "Omnecor-Demo"
+  - "packaging/android/omnecor-hq/node_modules_broken"

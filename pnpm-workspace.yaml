@@ -3,19 +3,21 @@ packages:
   - "packaging/electron-app"
   - "packaging/android/omnecor-hq"
 
+# pnpm v11: allowBuilds replaces onlyBuiltDependencies. true = permit build
+# scripts; false = block them. Native bindings and prebuilt downloads must be
+# true or the compiled module is missing at runtime.
+allowBuilds:
+  better-sqlite3: true
+  electron: true
+  esbuild: false
+  llama.rn: true
+  node-pty: true
+  onnxruntime-node: true
+  react-native-litert-lm: true
+  unrs-resolver: true
+
 ignoredBuiltDependencies:
   - "@tailwindcss/oxide"
-  - "esbuild"
-
-# Native modules whose install/build script MUST run so the compiled binding
-# (or downloaded prebuilt) is present. pnpm v10 blocks all build scripts by
-# default; without this allowlist `pnpm install` silently ships better-sqlite3
-# with no native binding and the SQLite DB layer fails to load at runtime.
-onlyBuiltDependencies:
-  - "better-sqlite3"
-  - "electron"
-  - "node-pty"
-  - "onnxruntime-node"
 
 # Dependency `overrides` MUST live here, not in the root package.json's `pnpm`
 # field. In a pnpm workspace (this repo has a pnpm-workspace.yaml) pnpm 10.x
@@ -72,7 +74,7 @@ overrides:
   "express>path-to-regexp": "0.1.13"
   # Dev-tree advisories (build tooling): ReDoS, CSS-stringify XSS, pnpm lockfile/script bypass
   "picomatch": ">=4.0.4"
-  "pnpm": ">=10.28.2"
+  "pnpm": ">=11.8.0"
   "postcss": ">=8.5.10"
   "rollup": ">=4.59.0"
   "shell-quote": ">=1.8.4"
