@@ -29,11 +29,13 @@ import {
 } from "@/lib/_core/mediapipe-inference";
 import * as Auth from "@/lib/_core/auth";
 import { AlwaysListenSettings } from "@/components/always-listen-settings";
+import { useChatDisplaySettings } from "@/hooks/use-chat-display-settings";
 
 export default function SettingsScreen() {
   const colors      = useColors();
   const { colorScheme, setColorScheme } = useThemeContext();
   const isDarkMode = colorScheme === "dark";
+  const { settings: chatDisplaySettings, updateSettings: updateChatDisplaySettings } = useChatDisplaySettings();
 
   // ── Connection ──────────────────────────────────────────────────────────
   const [serverIp,   setServerIp]   = useState("");
@@ -762,11 +764,27 @@ export default function SettingsScreen() {
           {/* ── Appearance ───────────────────────────────────────────────── */}
           <View>
             <Text className="text-lg font-bold text-foreground mb-4">Appearance</Text>
-            <View className="bg-surface border border-border rounded-lg p-4 flex-row justify-between items-center">
-              <Text className="text-sm font-semibold text-foreground">Dark Mode</Text>
-              <Switch value={isDarkMode} onValueChange={(v) => setColorScheme(v ? "dark" : "light")}
-                trackColor={{ false: colors.border, true: colors.primary }}
-                thumbColor={isDarkMode ? colors.background : colors.foreground} />
+            <View className="bg-surface border border-border rounded-lg overflow-hidden gap-0">
+              {/* Dark Mode */}
+              <View className="p-4 flex-row justify-between items-center border-b border-border">
+                <Text className="text-sm font-semibold text-foreground">Dark Mode</Text>
+                <Switch value={isDarkMode} onValueChange={(v) => setColorScheme(v ? "dark" : "light")}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={isDarkMode ? colors.background : colors.foreground} />
+              </View>
+              {/* AI Response Quotes */}
+              <View className="p-4 flex-row justify-between items-center">
+                <View className="flex-1 mr-3">
+                  <Text className="text-sm font-semibold text-foreground">AI Response Quotes</Text>
+                  <Text className="text-xs text-muted mt-0.5">Show a quote while the AI is thinking</Text>
+                </View>
+                <Switch
+                  value={chatDisplaySettings.showThinkingQuotes}
+                  onValueChange={(v) => updateChatDisplaySettings({ showThinkingQuotes: v })}
+                  trackColor={{ false: colors.border, true: colors.primary }}
+                  thumbColor={chatDisplaySettings.showThinkingQuotes ? colors.background : colors.foreground}
+                />
+              </View>
             </View>
           </View>
 

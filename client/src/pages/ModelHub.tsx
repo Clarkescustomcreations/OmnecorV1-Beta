@@ -20,7 +20,7 @@ import { Label } from "@/components/ui/label";
 import { Zap, RefreshCw, Download, Settings, CheckCircle2, XCircle, ExternalLink } from "lucide-react";
 import { useState, useEffect } from "react";
 import { ModelHubPanel } from "@/components/ModelHubPanel";
-import { type AIModel, type ModelMarketplaceItem } from "@/lib/aiModels";
+import { type AIModel, type ModelMarketplaceItem, getActiveModels } from "@/lib/aiModels";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useLocation } from "wouter";
@@ -94,6 +94,8 @@ export function ModelHub() {
     setLocation("/chat");
   };
 
+  const activeList = getActiveModels();
+
   const localModels: AIModel[] = ollamaModels.map(m => ({
     id: m.name,
     name: m.name,
@@ -104,16 +106,14 @@ export function ModelHub() {
     size: m.size ?? 0,
   }));
 
-  const apiModels: AIModel[] = providerHealth
-    .filter(p => p.id !== "ollama")
-    .map(p => ({
-      id: p.id,
-      name: p.name,
-      displayName: p.name,
-      type: "api" as const,
-      source: p.id as AIModel["source"],
-      status: p.status === "online" ? "available" : ("offline" as const),
-    }));
+  const apiModels: AIModel[] = activeList.map(item => ({
+    id: item.modelId,
+    name: item.modelId,
+    displayName: `${item.modelId} (${item.providerId})`,
+    type: "api" as const,
+    source: item.providerId as AIModel["source"],
+    status: "available" as const,
+  }));
 
   const allModels = [...localModels, ...apiModels];
 

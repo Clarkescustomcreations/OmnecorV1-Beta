@@ -1,4 +1,4 @@
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, externalServiceProcedure, router } from "../_core/trpc.js";
 import { z } from "zod";
 import { getDb } from "../db.factory.js";
 import { platformAccounts } from "../../drizzle/schema";
@@ -83,7 +83,7 @@ export const oauthRouter = router({
         });
       }
     }),
-  handleCallback: protectedProcedure
+  handleCallback: externalServiceProcedure
     .input(
       z.object({
         platform: z.enum(SUPPORTED_OAUTH_PROVIDERS),

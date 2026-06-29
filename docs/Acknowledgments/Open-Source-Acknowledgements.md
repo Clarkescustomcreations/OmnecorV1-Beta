@@ -54,6 +54,7 @@ The Omnecor HMCI (Human-Machine Collaboration Interface) leverages various open-
 - **[Cline (formerly Claude Dev)](https://github.com/cline/cline)**: Reference for codebase-aware autonomous editing and coordinated file changes.
 - **[Continue](https://www.continue.dev/)**: Blueprint for source-controlled AI checks and context-aware autocompletion providers.
 - **[Firecrawl](https://www.firecrawl.dev/)**: Reference for the high-quality web crawling and scraping pipeline.
+- **[Playwright](https://playwright.dev/) & [Puppeteer Extra Stealth](https://github.com/berstend/puppeteer-extra/tree/master/packages/puppeteer-extra-plugin-stealth)**: Core engines powering Omnecor's "Bird Claw" (Agent Reach) for stealthy DOM rendering and headless browser scraping.
 - **[Chatbot UI](https://github.com/mckaywrigley/chatbot-ui)**: Design inspiration for the clean, universal chat interface.
 
 ### Hardware & System Integration
@@ -74,6 +75,7 @@ The Omnecor HMCI (Human-Machine Collaboration Interface) leverages various open-
 
 ### Multi-Agent Systems & Protocols (v3.0.0 Roadmap)
 - **[Model Context Protocol SDK](https://github.com/modelcontextprotocol/typescript-sdk)**: Official TypeScript SDK for MCP used to connect Omnecor agents to self-hosted MCP tool servers in the Tool Directory integration.
+- **[Codebase Memory MCP](https://github.com/DeusData/codebase-memory-mcp)**: Tree-sitter powered codebase knowledge graph for AI coding agents via the Model Context Protocol.
 - **[RecursiveMAS](https://github.com/RecursiveMAS/RecursiveMAS)**: Research reference and architectural inspiration for latent-space recursive multi-agent collaboration, informing the RecursiveMAS orchestration layer.
 - **[AgenticOS](https://agentico.dev/)**: Reference for MCPServer declarative management and Tool Directory browsing model.
 
@@ -81,6 +83,7 @@ The Omnecor HMCI (Human-Machine Collaboration Interface) leverages various open-
 - **[React Three Fiber](https://github.com/pmndrs/react-three-fiber)**: React renderer for Three.js used to build the PCB 3D viewer component (`PCBViewer3D.tsx`) in the KiCad integration panel.
 - **[React Three Drei](https://github.com/pmndrs/drei)**: Utility helpers for React Three Fiber providing camera controls, loaders, and 3D UI primitives for the PCB viewer.
 - **[axe-core](https://github.com/dequelabs/axe-core)**: Accessibility testing engine powering the automated WCAG 2.1 AA test suite across all Omnecor pages.
+- **[Penpot](https://penpot.app/)**: Open-source design and prototyping platform, serving as the foundation for the Penpot Agent integration.
 
 ### Security & Threat Intelligence (v3.0.0 Roadmap)
 - **[Semgrep](https://github.com/semgrep/semgrep)**: Open-source static analysis engine used in the automated vulnerability scanning module (`threat_scanner.py`) for code-level security issue detection.
@@ -89,6 +92,7 @@ The Omnecor HMCI (Human-Machine Collaboration Interface) leverages various open-
 
 ### Voice & Media (v3.0.0 Roadmap)
 - **[ElevenLabs JavaScript SDK](https://github.com/elevenlabs/elevenlabs-js)**: Official SDK for ElevenLabs voice synthesis, integrated as an optional cloud voice enhancement alongside the local XTTS-v2 default pipeline.
+- **[Voicebox](https://voicebox.metademolab.com/)**: Reference for advanced voice synthesis and text-to-speech architectures.
 - **[whisper.rn](https://github.com/mybigday/whisper.rn)**: React Native bindings for whisper.cpp enabling on-device automatic speech recognition for mobile nodes.
 
 ### Database & Infrastructure (v3.0.0 Roadmap)

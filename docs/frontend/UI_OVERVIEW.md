@@ -37,8 +37,9 @@ The central and largest part of the UI is the **Main Content Area**, which dynam
         -   **Slash commands** — Type `/` to open the autocomplete popup: `/clear`, `/new`, `/system`, `/export`, `/compress`, `/btw <note>`, `/skill`, `/plan`, `/help`.
         -   **HITL panel** — Floating approval card for agent-loop actions requiring human confirmation.
         -   **Budget spend cards** — Real-time cost tracking card per cloud API call with provider, model, and USD cost.
+        -   **Project vs. Global Scoping** — Chats can be explicitly scoped to the active project (default) to utilize isolated memory and vector DB context, or switched to Global for system-wide queries.
     -   **Neural Workspaces (Neural Brain Map)**: An interactive canvas where users visualize and manage projects as spatial graphs.
-    -   **Model Hub**: Interface for managing local and cloud AI models.
+    -   **Model Hub**: Interface for managing local and cloud AI models. Features the Dynamic Model Hub which synchronizes active local models directly from Ollama alongside remote models from HuggingFace, allowing 1-click model switching.
     -   **Pipelines**: Workflow orchestration and management interface.
     -   **Settings**: Configuration options for the entire application.
 
@@ -87,3 +88,11 @@ While optimized for larger screens, Omnecor components are designed with respons
 ## 5. Theming
 
 Omnecor supports theming, allowing users to customize the visual appearance. The default theme adheres to the Omnecor brand guidelines, featuring a dark slate background with amber accents.
+
+## 6. Mobile UI (Expo / Android)
+
+Omnecor provides a companion mobile application built on React Native and Expo SDK 55. 
+
+-   **LiteRT-LM Native Inference**: The mobile app features a dedicated tab for edge-AI processing. It can load and run quantized models locally on the Android device using `LiteRT-LM` without requiring a network connection.
+-   **Mesh Connectivity**: Mobile devices can connect securely as peers to the main Omnecor node over the OMMESH network.
+-   **Shared Design Tokens**: The mobile app utilizes the same underlying OkLCH design token system, mapped through `NativeWind` for consistency with the web UI.

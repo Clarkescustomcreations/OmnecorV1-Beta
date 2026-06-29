@@ -106,38 +106,37 @@ export class IntegrationManagementService {
    */
   async listIntegrations(
     userId: string,
-    db: any, // TrpcContext's db (null-safe)
+    db: any, // TrpcContext's db (always a live instance)
   ): Promise<IntegrationHealth[]> {
     const integrations: IntegrationHealth[] = [];
 
-    // OAuth-based integrations from platformAccounts
-    if (db) {
-      try {
-        const { platformAccounts } = await import("../../../drizzle/schema.js");
-        const { eq } = await import("drizzle-orm");
+    // OAuth-based integrations from platformAccounts. getDb() always returns a
+    // live instance; the try/catch tolerates any DB error.
+    try {
+      const { platformAccounts } = await import("../../../drizzle/schema.js");
+      const { eq } = await import("drizzle-orm");
 
-        const accounts = await db
-          .select()
-          .from(platformAccounts)
-          .where(eq(platformAccounts.userId, Number(userId)));
+      const accounts = await db
+        .select()
+        .from(platformAccounts)
+        .where(eq(platformAccounts.userId, Number(userId)));
 
-        for (const account of accounts) {
-          const isActive = account.isActive === 1;
-          const status: IntegrationStatus = isActive
-            ? account.oauthToken ? "connected" : "disconnected"
-            : "disconnected";
+      for (const account of accounts) {
+        const isActive = account.isActive === 1;
+        const status: IntegrationStatus = isActive
+          ? account.oauthToken ? "connected" : "disconnected"
+          : "disconnected";
 
-          integrations.push({
-            id: account.platform,
-            name: this.getPlatformDisplayName(account.platform),
-            status,
-            lastCheckedAt: new Date().toISOString(),
-            tokenExpiresAt: account.tokenExpiresAt?.toISOString(),
-          });
-        }
-      } catch (err) {
-        log.warn("Failed to load platformAccounts:", err instanceof Error ? err.message : String(err));
+        integrations.push({
+          id: account.platform,
+          name: this.getPlatformDisplayName(account.platform),
+          status,
+          lastCheckedAt: new Date().toISOString(),
+          tokenExpiresAt: account.tokenExpiresAt?.toISOString(),
+        });
       }
+    } catch (err) {
+      log.warn("Failed to load platformAccounts:", err instanceof Error ? err.message : String(err));
     }
 
     // Local token-based integrations (from integrationsRouter store)
@@ -170,45 +169,44 @@ export class IntegrationManagementService {
 
     let health: IntegrationHealth;
 
-    // Check OAuth-based first
-    if (db) {
-      try {
-        const { platformAccounts } = await import("../../../drizzle/schema.js");
-        const { eq, and } = await import("drizzle-orm");
+    // Check OAuth-based first. getDb() always returns a live instance; the
+    // try/catch tolerates any DB error.
+    try {
+      const { platformAccounts } = await import("../../../drizzle/schema.js");
+      const { eq, and } = await import("drizzle-orm");
 
-        const account = await db
-          .select()
-          .from(platformAccounts)
-          .where(and(
-            eq(platformAccounts.userId, Number(userId)),
-            eq(platformAccounts.platform, integrationId),
-          ))
-          .limit(1);
+      const account = await db
+        .select()
+        .from(platformAccounts)
+        .where(and(
+          eq(platformAccounts.userId, Number(userId)),
+          eq(platformAccounts.platform, integrationId),
+        ))
+        .limit(1);
 
-        if (account.length > 0) {
-          const acc = account[0];
-          const tokenCheck = await verifyOAuthToken(
-            acc.oauthToken,
-            acc.tokenExpiresAt,
-          );
-
-          health = {
-            id: integrationId,
-            name: this.getPlatformDisplayName(integrationId),
-            status: tokenCheck.valid ? "connected" : "error",
-            lastCheckedAt: new Date().toISOString(),
-            errorMessage: tokenCheck.error,
-            tokenExpiresAt: tokenCheck.expiresAt,
-          };
-          setCachedHealth(userId, integrationId, health);
-          return health;
-        }
-      } catch (err) {
-        log.warn(
-          `Failed to check OAuth health for ${integrationId}:`,
-          err instanceof Error ? err.message : String(err),
+      if (account.length > 0) {
+        const acc = account[0];
+        const tokenCheck = await verifyOAuthToken(
+          acc.oauthToken,
+          acc.tokenExpiresAt,
         );
+
+        health = {
+          id: integrationId,
+          name: this.getPlatformDisplayName(integrationId),
+          status: tokenCheck.valid ? "connected" : "error",
+          lastCheckedAt: new Date().toISOString(),
+          errorMessage: tokenCheck.error,
+          tokenExpiresAt: tokenCheck.expiresAt,
+        };
+        setCachedHealth(userId, integrationId, health);
+        return health;
       }
+    } catch (err) {
+      log.warn(
+        `Failed to check OAuth health for ${integrationId}:`,
+        err instanceof Error ? err.message : String(err),
+      );
     }
 
     // Check local token-based

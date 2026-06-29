@@ -15,7 +15,8 @@ The Neural Brain Map transforms traditional file and knowledge management into a
     -   **Nodes**: Represent individual pieces of information, files, tasks, or concepts. Nodes can be of various types (e.g., `FileNode.tsx`).
     -   **Edges**: Represent relationships or connections between nodes.
     -   **Zoom & Pan**: Standard navigation for exploring large graphs.
-    -   **Drag & Drop**: Users can drag and drop files onto the canvas to create new nodes.
+    -   **Bounded Viewport Loading**: Uses intersection observers and viewport culling so that only nodes currently visible on the screen are fully rendered, allowing smooth navigation in massive graphs.
+    -   **Drag & Drop**: Users can drag and drop files onto the canvas to create new nodes. Integrates with cloud adapters (DropBox, OneDrive) allowing direct dragging of cloud assets into the neural layout.
     -   **MiniMap**: A small overview map for easy navigation within large graphs.
 
 ### 2.2. Node Types (`client/src/components/workspace/nodes/FileNode.tsx`)
@@ -67,6 +68,7 @@ Omnecor supports various node types, each with specific visual representations a
 
 -   **`brainMapStore.ts` (Zustand)**: The primary client-side store for the Neural Brain Map state, managing node positions, selections, and other interactive elements.
 -   **`NeuralMapContext.tsx`**: Provides access to the brain map state and actions to components within the map hierarchy.
+-   **Web Worker Physics**: To ensure the main UI thread remains unblocked (60 FPS) when calculating complex forced-directed layouts, the physics engine (d3-force/dagre) is offloaded to a dedicated Web Worker. Messages are passed asynchronously to update node coordinates.
 
 ### 4.2. Backend Integration
 

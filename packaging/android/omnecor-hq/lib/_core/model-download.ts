@@ -110,8 +110,8 @@ export function isDownloading(filename: string): boolean {
 /** GGUF model file extensions llama.rn can load. */
 const GGUF_EXTS = [".gguf"];
 /** LiteRT-LM model file extensions (Google AI Edge Gallery). `.litertlm` is the
- *  format the LiteRT-LM engine loads; legacy `.task` is MediaPipe-only. */
-const TASK_EXTS = [".litertlm", ".task", ".bin"];
+ *  format the LiteRT-LM engine loads. */
+const TASK_EXTS = [".litertlm", ".bin"];
 
 function hasExt(name: string, exts: string[]): boolean {
   const lower = name.toLowerCase();
@@ -123,7 +123,7 @@ function isGguf(name: string): boolean { return hasExt(name, GGUF_EXTS); }
 /**
  * whisper.rn STT models are `ggml-*.bin` (whisper.cpp GGML) and live in the same
  * /models dir as the LLMs. They are NOT LiteRT-LM models, so they must be
- * excluded from the `.litertlm`/.task/.bin scanner — otherwise a downloaded
+ * excluded from the `.litertlm`/.bin scanner — otherwise a downloaded
  * Whisper model would show up (and fail to load) in the LiteRT-LM model list.
  */
 function isWhisperGgml(name: string): boolean {
@@ -179,7 +179,7 @@ export async function importModelFromDevice(): Promise<DownloadedModel | null> {
 }
 
 /**
- * Scan the app models directory for LiteRT-LM `.litertlm` (or legacy `.task`/.bin)
+ * Scan the app models directory for LiteRT-LM `.litertlm` (or `.bin`)
  * files (Google AI Edge Gallery format) the user has imported.
  */
 export async function listLocalTask(): Promise<DownloadedModel[]> {
@@ -217,7 +217,7 @@ export async function importSharedModelFile(srcPath: string, fileName: string): 
 }
 
 /**
- * Pick a LiteRT-LM `.litertlm` (or legacy `.task`/.bin) model already on the device
+ * Pick a LiteRT-LM `.litertlm` (or `.bin`) model already on the device
  * (e.g. one exported/shared from Google AI Edge Gallery) and copy it into the app so the
  * LiteRT-LM engine (`mediapipe-inference.ts`) can load it. No code edits needed
  * by the user — purely in-app. Returns the imported model, or null if cancelled.

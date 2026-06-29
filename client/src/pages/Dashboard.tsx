@@ -269,7 +269,7 @@ export function Dashboard() {
             description="A real-time financial monitor for your AI agents. Set hard/soft budgets, track spending by provider, and manage virtual Lithic cards."
           >
             <Link href="/wallet" className="block mb-6">
-              <Card className="hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer group overflow-hidden">
+              <Card className="hover:border-primary/50 hover:shadow-lg hover:bg-bg-elevated transition-colors duration-200 cursor-pointer group overflow-hidden">
                 <div className="flex flex-col md:flex-row">
                   <div className="flex-1">
                     <CardHeader>
@@ -313,7 +313,7 @@ export function Dashboard() {
                   description={feature.description}
                 >
                   <Link href={feature.href} className="block">
-                    <Card className="h-full hover:border-primary/50 hover:shadow-lg transition-all duration-300 cursor-pointer group">
+                    <Card className="h-full hover:border-primary/50 hover:shadow-lg hover:bg-bg-elevated transition-colors duration-200 cursor-pointer group">
                       <CardHeader>
                         <div className="flex items-start justify-between mb-2">
                           <div className="p-2 rounded-lg bg-primary/10 group-hover:bg-primary/20 transition-colors">

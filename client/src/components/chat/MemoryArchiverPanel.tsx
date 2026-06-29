@@ -101,7 +101,7 @@ export function MemoryArchiverPanel({ sessionId, projectId, selectedModel }: Mem
           <div className="space-y-4">
             <h4 className="text-[10px] font-bold text-muted-foreground uppercase px-1">Context Pruning</h4>
             <Button 
-              className="w-full gap-2 h-10 bg-primary/10 text-accent-foreground hover:bg-primary/90"
+              className="w-full gap-2 h-10 bg-primary/10 text-foreground hover:bg-primary/90 hover:text-primary-foreground"
               onClick={handleArchive}
               disabled={isArchiving}
             >

@@ -42,7 +42,7 @@
 
 ## Saved Scripts
 
-- **Storage**: SQLite — `saved_scripts` table (`id` integer PK autoIncrement, `userId` FK, `name`, `code`, `language`, `project`, timestamps); two indexes
+- **Storage**: SQLite — `saved_scripts` table (`id` integer PK autoIncrement, `userId` FK, `mapId` FK to neuralMaps, `name`, `code`, `language`, `project`, timestamps); two indexes
 - **Create**: Verified — `trpc.scripts.create` (protectedProcedure, always user-scoped — no IDOR); legacy localStorage scripts migrated on first Chat.tsx mount
 - **Update**: Verified — `trpc.scripts.update` (rename, edit code); Drizzle type-safe update
 - **Delete**: Verified — `trpc.scripts.delete` (user-scoped)

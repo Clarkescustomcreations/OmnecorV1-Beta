@@ -24,6 +24,75 @@ The `Status` column above records *what the handler is wired to*. The new **Veri
 
 ---
 
+## Session 27 (2026-06-28) — AI Response Loading Quotes
+
+### Chat Loading Quote (`LoadingQuote.tsx`)
+
+File: `client/src/components/chat/LoadingQuote.tsx`
+Last updated: 2026-06-28
+
+| Property         | Class           |
+| ---------------- | --------------- |
+| Background       | `bg-muted/20` |
+| Border           | `border border-border/50` |
+| Border radius    | `rounded-lg`    |
+| Text             | `text-xs font-medium text-muted-foreground` |
+| Spacing          | `px-4 py-3 min-h-[48px] max-w-sm gap-3` |
+| Icon             | `w-4 h-4 text-primary animate-spin` |
+
+**Pattern notes:**
+Used `<AnimatePresence mode="wait">` to create a smooth cross-fade transition between text quotes as they cycle. Quote categories (Serious vs Funny) are configured via the `quoteStyle` prop which reads from `chatSettings`. Quotes have been balanced to 14 of each type.
+
+### Chat Settings (`ChatInterface.tsx`)
+
+| Element | Type | Status | API / tRPC Call | Notes |
+|---|---|---|---|---|
+| Display Settings — Thinking Quotes | Toggle | **LOCAL** | — | Controls `chatSettings.showThinkingQuotes` via local storage. Passes down to `AssistantBubble`. |
+| Display Settings — Quote Style | Select | **LOCAL** | — | Controls `chatSettings.quoteStyle` ('random', 'funny', 'serious'). Only visible when Thinking Quotes is enabled. |
+
+### Mobile (APK) Integration (`loading-quote.tsx`)
+
+File: `packaging/android/omnecor-hq/components/loading-quote.tsx`
+Last updated: 2026-06-28
+
+**Pattern notes:**
+A native `react-native-reanimated` port of the web `LoadingQuote` using `FadeIn`/`FadeOut` layout animations, matching the web timings (300ms transitions, 3000ms intervals).
+Quote arrays are **identical to the web client** (same curated serious set, same custom funny quotes). Random mode uses the same 60/40 funny/serious split.
+`ActivityIndicator` colour uses `useColors().primary` — no hardcoded hex.
+
+It has been wired into:
+- `app/(tabs)/index.tsx` (Mobile Main Chat) — Rendered as the `ListFooterComponent` of the chat `FlatList` while `isSending` is true. Gated by `chatDisplaySettings.showThinkingQuotes`.
+- `app/(tabs)/notifications.tsx` (Mobile Agent Messenger) — Replaced the static "Agent is typing..." text. Gated by `chatDisplaySettings.showThinkingQuotes`.
+
+**`hooks/use-chat-display-settings.ts`** — New shared hook. `AsyncStorage`-backed persistence of `showThinkingQuotes` and `quoteStyle` with the same defaults as the web Zustand store. Exposed in `app/(tabs)/settings.tsx` under **Settings → Appearance → AI Response Quotes**.
+
+---
+
+## Session 26 (2026-06-27) — Setup Wizard File Dropzone
+
+### File Dropzone (`SetupWizard.tsx` Kaggle Config)
+
+File: `client/src/pages/SetupWizard.tsx`
+Last updated: 2026-06-27
+
+| Property         | Class           |
+| ---------------- | --------------- |
+| Background       | `bg-transparent` |
+| Border           | `border-2 border-dashed border-border` |
+| Border radius    | `rounded-xl`    |
+| Text — primary   | `text-sm font-semibold` |
+| Text — secondary | `text-xs text-muted-foreground` |
+| Spacing          | `p-8 gap-3`     |
+| Hover state      | `hover:border-primary hover:bg-primary/5` |
+| Drag-over state  | `border-primary bg-primary/10` (applied via JS) |
+| Icon             | `w-8 h-8 text-muted-foreground` |
+| Loading Icon     | `w-8 h-8 text-primary animate-spin` |
+
+**Pattern notes:**
+Used for full-zone file drag-and-drop uploads (e.g., `kaggle.json`). The entire `<input type="file">` is positioned `absolute inset-0 opacity-0` over the area to allow native clicking while visual states are handled by the wrapper `div`.
+
+---
+
 ## Session 25 (2026-06-24) — Terms of Service
 
 New `"terms"` wizard step, `/terms` standalone page, `LegalPanel` in Settings, and `auth.acceptTos` backend mutation.
@@ -400,9 +469,7 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 | Element | Type | Status | Notes |
 |---|---|---|---|
 | Kaggle — connection badge | Display | **CONNECTED** | `trpc.training.kaggleStatus.useQuery()` |
-| Kaggle — Username input | Input | **LOCAL** | Controls `kaggleUsername` state |
-| Kaggle — API Key input (password) | Input | **LOCAL** | Controls `kaggleApiKey` state |
-| Kaggle — Connect button | Button | **CONNECTED** | `trpc.training.saveKaggleKey.useMutation()` |
+| Kaggle — kaggle.json file dropzone | Input (File) | **LOCAL/CONNECTED** | Replaced manual inputs. Drag-and-drop `kaggle.json`. Controls `trpc.training.saveKaggleKey.useMutation()` on drop |
 
 #### `client/src/components/SpecializedModuleLauncher.tsx` — LLM Builder tab: Kaggle card
 | Element | Type | Status | Notes |
@@ -1042,13 +1109,17 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 ### PAGE: Pipelines.tsx — /pipelines
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
-| New Pipeline Button | button | setShowCreateForm | None | LOCAL |
-| Pipeline Name Input | input | setName | None | LOCAL |
-| Pipeline Goal Textarea | textarea | setGoal | None | LOCAL |
-| Create Pipeline Button | button | createPipeline.mutate | trpc.pipeline.createPipeline.mutate | CONNECTED |
-| Cancel Create Button | button | setShowCreateForm(false) | None | LOCAL |
-| Pipeline List Item — View Detail | button | setSelectedPipelineId | None | LOCAL |
-| Back Button | button | setSelectedPipelineId(null) | None | LOCAL |
+| New Pipeline Button | `id="btn-new-pipeline"` | setShowCreateForm | None | LOCAL |
+| Pipeline Name Input | `id="input-pipeline-name"` | setName | None | LOCAL |
+| Pipeline Goal Textarea | `id="input-pipeline-goal"` | setGoal | None | LOCAL |
+| Scope to Project Toggle | `id="toggle-scope-project"` | setScopeToProject | None | LOCAL |
+| Create Pipeline Button | `id="btn-create-pipeline"` | createPipeline.mutate | trpc.pipeline.createPipeline.mutate | CONNECTED |
+| Cancel Create Button | `id="btn-cancel-create-pipeline"` | setShowCreateForm(false) | None | LOCAL |
+| Pipeline List Item — View Detail | `id="btn-view-pipeline-{id}"` | setSelectedPipelineId | None | LOCAL |
+| Back Button | `id="btn-back-to-pipelines"` | setSelectedPipelineId(null) | None | LOCAL |
+| All Pipelines Filter Tab | `id="tab-filter-all"` | setActiveTab("all") | None | LOCAL |
+| Project Pipelines Filter Tab | `id="tab-filter-project"` | setActiveTab("project") | None | LOCAL |
+| Global Pipelines Filter Tab | `id="tab-filter-global"` | setActiveTab("global") | None | LOCAL |
 | SpecializedModuleLauncher (delegated) | component | — | None (delegated) | LOCAL |
 
 ---
@@ -2063,15 +2134,17 @@ Read-only display component. No interactive elements.
 ### COMPONENT: ModelHubPanel.tsx (root components/)
 | Element | Label/ID | Handler Function | API/tRPC Call | Status |
 |---|---|---|---|---|
-| Search Input | search | setSearchQuery | None | LOCAL |
-| Filter Type Select | filter | setFilterType | None | LOCAL |
-| Refresh Button | refresh | marketplaceQuery.refetch | trpc.ollama.searchModels | CONNECTED |
-| Active Models Tab | tab | setActiveTab("models") | None | LOCAL |
-| Marketplace Tab | tab | setActiveTab("marketplace") | None | LOCAL |
+| Tab selector buttons | tab-selector-${tab.id} | setActiveTab(tab.id) | None | LOCAL |
+| Active models search | active-models-search | setSearchQuery | None | LOCAL |
 | Model Card (clickable) | select | handleModelSelect | None | LOCAL |
-| Delete Button (per model) | delete | handleDeleteModel | trpc.ollama.deleteModel | CONNECTED |
-| Pull Button (marketplace) | pull | onModelDownload callback | None | LOCAL |
-| Retry Button (error state) | retry | marketplaceQuery.refetch | trpc.ollama.searchModels | CONNECTED |
+| Active Switch (cloud) | switch-active-${model.source}-${model.id} | handleToggleActive | None (localStorage) | LOCAL |
+| Delete Button (Ollama) | btn-delete-ollama-${m.name} | handleDeleteModel | trpc.ollama.deleteModel | CONNECTED |
+| Marketplace search | marketplace-search-input | setMarketplaceSearch | trpc.ollama.searchModels | CONNECTED |
+| Pull Custom Button | btn-pull-custom-input | onModelDownload | None | LOCAL |
+| Pull Button (marketplace) | btn-pull-marketplace-${item.id} | onModelDownload | trpc.ollama.pullModel | CONNECTED |
+| Active Switch (API tab) | switch-activate-${activeTab}-${model.id} | handleToggleActive | None (localStorage) | LOCAL |
+| Custom model input | custom-model-id-input | setCustomModelId | None | LOCAL |
+| Add custom model button | btn-add-custom-model | handleAddCustomModel | None (localStorage) | LOCAL |
 
 ### COMPONENT: SettingsPanel.tsx
 **Notes:** 10+ Switch/Select controls have `value` props but missing `onValueChange` handlers — DEAD for persistence purposes.
@@ -3123,3 +3196,85 @@ Last updated: 2026-06-24 (Session 25)
 - The record box (`p-3 rounded-lg bg-muted/30 border border-border/50`) is the standard settings display-only data box. Not `rounded-xl` — settings cards use `rounded-lg` for inner containers; the outer `Card` uses the shadcn default.
 - Icon-lead row layout (`flex items-start gap-3` + `flex-shrink-0 mt-0.5` on the icon) is the standard pattern for all icon-prefixed status messages. The `mt-0.5` aligns the icon top with the first line of text when using `text-xs`. Always use `items-start` (not `items-center`) for multi-line content.
 - Timestamps in settings use `font-mono` to visually signal immutability. Any machine-generated, non-editable date/time value should carry `font-mono text-muted-foreground`.
+
+---
+
+## Session 26 (2026-06-26) — Chat Workspace Review Fixes
+
+### Scope
+
+Contrast remediation, project-isolation filter tabs, BTW note chip token fix, auto-switch `useEffect` TDZ relocation, and TerminalPanel duplicate-overlay cleanup across `Chat.tsx`, `ConversationList.tsx`, and `TerminalPanel.tsx`.
+
+---
+
+### `client/src/pages/Chat.tsx` — updated patterns
+
+#### New: Filter-scope persistence
+
+`filterScope` (`"project" | "global"`) is stored in `localStorage` under key `omnecor:chat_filter_scope` and initialised via a lazy initialiser in `useState`. The `handleFilterScopeChange` callback writes back on every change. This makes scope survive page refreshes and hard reloads without any server round-trip.
+
+#### BTW note chip — corrected token
+
+| Element | Old (wrong) | Correct |
+|---|---|---|
+| Note chip text | `text-accent-foreground` | `text-accent` |
+| Note chip icon | `text-accent-foreground` | `text-accent` |
+
+`text-accent-foreground` resolves to the **same OKLCH value as the card background** in dark mode — invisible text. `text-accent` is the bright purple/blue. This rule applies to **any** element where colored text is needed on a card or muted background.
+
+#### useEffect placement rule (TDZ)
+
+`useEffect` hooks that reference `useCallback`-defined handlers **must be placed below those handler declarations** in the component body. A `useEffect` at line N that references a `useCallback` at line M where N < M causes a Temporal Dead Zone reference error at runtime. In `Chat.tsx`, the auto-switch effect (depends on `handleSelectConversation` + `handleNewConversation`) was moved to after both handler definitions.
+
+#### New interactive elements
+
+| Element | Type | Status | API / tRPC Call | Notes |
+|---|---|---|---|---|
+| Filter-scope "Project" tab | Button | **LOCAL** | — | Sets `filterScope = "project"`, writes `localStorage`. Active: `bg-primary text-primary-foreground`. |
+| Filter-scope "Global" tab | Button | **LOCAL** | — | Sets `filterScope = "global"`, writes `localStorage`. Active: `bg-primary text-primary-foreground`. |
+
+---
+
+### `client/src/components/chat/ConversationList.tsx` — patterns
+
+#### Scope selector tabs
+
+```
+Container:  flex bg-muted/30 p-0.5 rounded-md border border-border/40 w-full mt-1.5
+Active tab: flex-1 text-center py-1 text-[9px] font-bold uppercase tracking-wider rounded-sm
+            bg-primary text-primary-foreground shadow-xs animate-in fade-in duration-100
+Idle tab:   text-muted-foreground hover:text-foreground
+```
+
+The `animate-in fade-in duration-100` micro-animation on the active tab pill gives the illusion of a sliding indicator without requiring absolute-positioned pseudo-elements or JS transforms.
+
+#### Active conversation row
+
+```
+Active:   bg-primary/40 text-foreground shadow-sm font-semibold
+Idle:     hover:bg-muted/50 text-muted-foreground hover:text-foreground
+Icon:     MessageSquare — text-primary (active) | text-muted-foreground/50 (idle)
+Time/count meta: text-[10px] opacity-60 (no color class — inherits row fg)
+```
+
+#### Mode toggle (Chats / Scripts)
+
+```
+Container: flex bg-muted/50 p-0.5 rounded-lg border border-border/50
+Active:    bg-background text-foreground shadow-sm
+Idle:      text-muted-foreground hover:text-foreground
+Label:     px-2.5 py-1 text-[10px] font-bold uppercase tracking-wider rounded-md
+```
+
+**Pattern notes:**
+- `bg-primary/40` (40% opacity primary) is the established "active row" highlight for sidebar list items where a fully opaque primary background would feel too heavy. The pattern appears in `ConversationList`, sidebar nav items, and pipeline list rows. Do not use `bg-muted` for active items.
+- Hover actions in list rows use `hidden group-hover:flex ... bg-background/90 backdrop-blur-sm rounded-md border border-border/50` — a frosted-glass pill that lifts above the row.
+- `text-[9px]` / `text-[10px]` are intentional for pills and meta lines inside 256 px sidebars. Never go below `text-[9px]`.
+
+---
+
+### `client/src/components/chat/TerminalPanel.tsx` — pattern notes
+
+- Removed a duplicate `absolute inset-0 bg-background` overlay that was positioned above the xterm canvas, making the terminal visually blank.
+- Terminal header row uses `flex items-center justify-between px-3 py-1.5 border-b border-border bg-card/80 backdrop-blur-sm` — same frosted-glass header pattern as other panel headers.
+- xterm theme color values must match the OKLCH equivalents from `UI-Tokens.md`. The only permitted hex exceptions are inside `ITerminalOptions.theme` (xterm canvas — CSS vars cannot be injected). Document these values here if changed.

@@ -78,6 +78,27 @@
       "when": 1782319070112,
       "tag": "0010_special_blue_blade",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1782428622717,
+      "tag": "0011_amazing_kat_farrell",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1782429600262,
+      "tag": "0012_harsh_outlaw_kid",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1782566991061,
+      "tag": "0013_fantastic_marauders",
+      "breakpoints": true
     }
   ]
 }

@@ -35,10 +35,17 @@ export const useDesignerStore = create<DesignerState>((set) => ({
   active3DContext: null,
   activePCBContext: null,
   setActive3DContext: (context) => {
+    if (useDesignerStore.getState().active3DContext === context) return;
     set({ active3DContext: context });
     syncChannel.postMessage({ type: 'setActive3DContext', payload: context });
   },
   setActivePCBContext: (context) => {
+    // Guard: skip the Zustand update (and subscriber notifications) when the
+    // value hasn't actually changed.  Without this, calling setActivePCBContext(null)
+    // repeatedly while pcbProjects is loading always creates a new merged-state
+    // object, which re-notifies every unselectored useDesignerStore() subscriber
+    // and causes an infinite render loop in EnhancedPCBEditorInner.
+    if (useDesignerStore.getState().activePCBContext === context) return;
     set({ activePCBContext: context });
     syncChannel.postMessage({ type: 'setActivePCBContext', payload: context });
   },

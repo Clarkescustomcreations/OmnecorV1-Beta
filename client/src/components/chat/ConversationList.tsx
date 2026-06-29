@@ -38,6 +38,10 @@ interface ConversationListProps {
   collapsed: boolean;
   onToggleCollapse: () => void;
 
+  // Filter scope toggling
+  filterScope?: "project" | "global";
+  onFilterScopeChange?: (scope: "project" | "global") => void;
+
   // Script management
   scripts?: SavedScript[];
   onSelectScript?: (script: SavedScript) => void;
@@ -63,6 +67,8 @@ export function ConversationList({
   onRename,
   collapsed,
   onToggleCollapse,
+  filterScope = "project",
+  onFilterScopeChange,
   scripts = [],
   onSelectScript,
   onDeleteScript,
@@ -254,6 +260,34 @@ export function ConversationList({
             className="h-7 pl-6 pr-2 text-xs bg-muted/30"
           />
         </div>
+
+        {/* Scope selector (Project vs Global) */}
+        {mode === "chats" && onFilterScopeChange && (
+          <div className="flex bg-muted/30 p-0.5 rounded-md border border-border/40 w-full mt-1.5 flex-shrink-0">
+            <button
+              onClick={() => onFilterScopeChange("project")}
+              className={cn(
+                "flex-1 text-center py-1 text-[9px] font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer",
+                filterScope === "project"
+                  ? "bg-primary text-primary-foreground shadow-xs animate-in fade-in duration-100"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Project
+            </button>
+            <button
+              onClick={() => onFilterScopeChange("global")}
+              className={cn(
+                "flex-1 text-center py-1 text-[9px] font-bold uppercase tracking-wider rounded-sm transition-all cursor-pointer",
+                filterScope === "global"
+                  ? "bg-primary text-primary-foreground shadow-xs animate-in fade-in duration-100"
+                  : "text-muted-foreground hover:text-foreground"
+              )}
+            >
+              Global
+            </button>
+          </div>
+        )}
       </div>
 
       {/* List Area */}
@@ -271,7 +305,7 @@ export function ConversationList({
                   className={cn(
                     "group relative flex flex-col gap-0.5 px-2.5 py-2 cursor-pointer rounded-lg transition-all",
                     conv.id === activeId
-                      ? "bg-primary/40 text-accent-foreground shadow-sm"
+                      ? "bg-primary/40 text-foreground shadow-sm font-semibold"
                       : "hover:bg-muted/50 text-muted-foreground hover:text-foreground"
                   )}
                   onClick={() => onSelect(conv.id)}

@@ -42,6 +42,9 @@ import { parse as parseCookieHeader } from "cookie";
 import { ENV } from "../../_core/env.js";
 import { sdk } from "../../_core/sdk.js";
 import { CLOUD_PROVIDER_IDS, isSovereignMode } from "../../_core/sovereign.js";
+import { applyWSSHandler } from "@trpc/server/adapters/ws";
+import { appRouter } from "../../routers.js";
+import { createContext } from "../../_core/context.js";
 import { COOKIE_NAME } from "../../../shared/const.js";
 import {
   FileSystemWatcherService,
@@ -299,6 +302,15 @@ export class OmnecorWebSocketServer {
       verifyClient: (info: any) => this.verifyClient(info),
     });
 
+    // Attach tRPC WebSocket handler
+    applyWSSHandler({
+      wss: this.wss,
+      router: appRouter,
+      createContext: async (opts) => {
+        return createContext(opts as any);
+      },
+    });
+
     // Get service instances
     this.fileWatcher = FileSystemWatcherService.getInstance();
     this.processManager = ProcessManagerService.getInstance();
@@ -462,6 +474,11 @@ export class OmnecorWebSocketServer {
 
   /** Process a message from a client */
   private handleClientMessage(ws: OmnecorSocket, message: ClientMessage): void {
+    // Ignore tRPC protocol messages (which have method or id) so tRPC's applyWSSHandler can process them
+    if ((message as any).method || (message as any).id) {
+      return;
+    }
+
     // Unauthenticated connections (LAN mobile nodes that have not yet completed
     // registration) may ONLY send mobile_node_register. Everything else —
     // subscriptions, PTY, getState, etc. — is refused until the connection is

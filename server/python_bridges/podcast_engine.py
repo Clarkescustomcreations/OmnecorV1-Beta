@@ -37,6 +37,7 @@ log = logging.getLogger("omnecor.podcast")
 # ---------------------------------------------------------------------------
 
 TTS_BASE = os.environ.get("TTS_SERVER_URL", "http://127.0.0.1:8002")
+VOICEBOX_BASE = os.environ.get("VOICEBOX_SERVER_URL", "http://127.0.0.1:8004")
 TTS_SILENCE_SR = 44100
 SILENCE_GAP_S = 0.25          # quarter-second gap between turns
 TTS_TIMEOUT_S = 60.0           # per-turn synthesis timeout
@@ -55,6 +56,7 @@ async def _synthesize_turn(
     text: str,
     speaker_wav: str | None,
     emotion: str,
+    engine_override: str | None,
     index: int,
     output_dir: Path,
     sr: int,
@@ -68,10 +70,12 @@ async def _synthesize_turn(
     }
     if speaker_wav:
         payload["speaker_wav_path"] = speaker_wav
-        payload["engine"] = "xtts"
+        payload["engine"] = engine_override or "xtts"
     else:
         payload["speaker_wav_path"] = "default.wav"
-        payload["engine"] = "kokoro"
+        payload["engine"] = engine_override or "kokoro"
+        
+    target_url = f"{VOICEBOX_BASE}/synthesize" if payload["engine"] == "voicebox" else f"{TTS_BASE}/synthesize"
 
     # Map emotion tags understood by XTTS / Kokoro
     if emotion and emotion != "neutral":
@@ -79,7 +83,7 @@ async def _synthesize_turn(
 
     try:
         resp = await client.post(
-            f"{TTS_BASE}/synthesize",
+            target_url,
             json=payload,
             timeout=TTS_TIMEOUT_S,
         )
@@ -172,6 +176,7 @@ class PodcastOrchestrator:
                     text=turn.get("text", ""),
                     speaker_wav=turn.get("referenceWav") or turn.get("speaker_wav_path"),
                     emotion=turn.get("emotion", "neutral"),
+                    engine_override=turn.get("engine"),
                     index=i,
                     output_dir=self.output_dir,
                     sr=sr,

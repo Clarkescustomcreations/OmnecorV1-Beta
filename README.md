@@ -101,7 +101,7 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **Immutable Audit Log** — Append-only `audit_log` table captures all privileged events. No delete/update API exists.
 - **PII Redaction** — `redactSensitiveData()` scrubs API keys and personal data before any log entry is written.
 - **Prompt Injection Defense** — `PromptSanitizer` blocks injection attempts and fires `security:injection_attempt` events.
-- **Zero-Login / Air-Gapped Mode** — `ZERO_LOGIN_MODE=true` bypasses OAuth entirely and runs every request as a local admin. The session's execution mode is set by `ZERO_LOGIN_EXECUTION_MODE` (**defaults to `sovereign`**, blocking all cloud inference); set it to `scrapper`/`big_spender` to allow spend-tracked cloud calls for local testing.
+- **Zero-Login Mode** — `ZERO_LOGIN_MODE=true` bypasses OAuth entirely and runs every request as a local admin. On first creation the session's execution mode is seeded from `ZERO_LOGIN_EXECUTION_MODE` (**defaults to `scrapper`** — cloud allowed + spend-tracked). Sovereign mode (air-gapped, cloud inference blocked) is **opt-in**: enable it in Settings (persisted to the user record), or set `ZERO_LOGIN_EXECUTION_MODE=sovereign` to start a fresh install air-gapped.
 - **Extended OAuth** — Google and Microsoft identity providers supported out of the box. Zero-login / air-gapped mode available for classified environments.
 - **External API Hardening** — All cloud API calls (OpenAI, Lithic, cloud compute, etc.) protected by circuit breakers, exponential backoff, token refresh safety, and atomic transactions. Payment card data never exposed in errors or logs.
 - **Role-Based Access Control** — Four roles: `viewer`, `user`, `admin`, `owner`.
@@ -254,6 +254,12 @@ The repository is organized into several key directories:
 ---
 
 ## Development
+
+Before running the development server for the first time, you must download the Valet Router model (this is bundled automatically in production releases, but excluded from Git to save bandwidth):
+
+```bash
+pnpm valet:fetch
+```
 
 Information on contributing to Omnecor, including coding standards, pull request processes, and testing expectations, can be found in the [CONTRIBUTING.md](CONTRIBUTING.md) file.
 

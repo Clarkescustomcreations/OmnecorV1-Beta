@@ -49,6 +49,8 @@ export const VOICE_CONFIG = {
   ttsUrl: process.env.TTS_SERVER_URL || "http://localhost:8002",
   /** RVC voice conversion server base URL */
   rvcUrl: process.env.RVC_SERVER_URL || "http://localhost:8003",
+  /** Voice Box cloning server base URL */
+  voiceboxUrl: process.env.VOICEBOX_SERVER_URL || "http://localhost:8004",
   /** Health check timeout in ms */
   healthCheckTimeoutMs: 5000,
 } as const;

@@ -110,7 +110,7 @@ export function VirtualCardPanel() {
               Virtual card issuance requires a Lithic account. Add your API key to settings to enable this feature.
             </p>
           </div>
-          <Button variant="outline" size="sm" onClick={() => setLocation("/settings?tab=api")}>Configure Lithic</Button>
+          <Button id="btn-wallet-configure-lithic" variant="outline" size="sm" onClick={() => setLocation("/settings?tab=api")}>Configure Lithic</Button>
         </CardContent>
       </Card>
     );
@@ -159,6 +159,7 @@ export function VirtualCardPanel() {
                   <div className="flex items-center gap-2">
                     <p className="font-mono text-lg tracking-[0.2em]">{formattedPan}</p>
                     <Button
+                      id="btn-wallet-reveal-card"
                       size="icon" variant="ghost"
                       className="h-6 w-6 text-muted-foreground hover:text-white"
                       onClick={handleReveal}
@@ -184,6 +185,7 @@ export function VirtualCardPanel() {
 
                 <div className="pt-2 border-t border-border flex justify-end">
                   <Button
+                    id="btn-wallet-copy-card-number"
                     size="icon" variant="outline"
                     className="h-8 w-8 border-border bg-card/50 hover:bg-card"
                     onClick={handleCopyPan}
@@ -232,6 +234,7 @@ export function VirtualCardPanel() {
               </p>
             </div>
             <Button
+              id="btn-wallet-issue-card"
               className="w-full gap-2 h-10 bg-primary/10 text-accent-foreground"
               disabled={isIssuing}
               onClick={handleIssue}
@@ -271,7 +274,7 @@ export function VirtualCardPanel() {
           ) : (
             <div className="divide-y border-t">
               {transactions.map(tx => (
-                <div key={tx.token} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
+                <div key={tx.token} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors card-content-safe">
                   <div className="flex items-center gap-3">
                     <div className="w-8 h-8 rounded bg-muted flex items-center justify-center font-bold text-xs uppercase tracking-tighter">
                       {(tx.merchantDescriptor || "?").charAt(0)}

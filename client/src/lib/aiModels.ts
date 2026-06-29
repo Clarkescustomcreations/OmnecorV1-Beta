@@ -187,34 +187,127 @@ export const mockAPIModels: APIModel[] = [
 ];
 
 /**
+ * Local Storage active models persistence
+ */
+export interface ActiveModelItem {
+  providerId: string;
+  modelId: string;
+}
+
+const DEFAULT_ACTIVE_MODELS: ActiveModelItem[] = [
+  { providerId: "gemini", modelId: "gemini-2.0-flash" },
+  { providerId: "gemini", modelId: "gemini-1.5-pro" },
+  { providerId: "gemini", modelId: "gemini-1.5-flash" },
+  { providerId: "openai", modelId: "gpt-4o" },
+  { providerId: "openai", modelId: "gpt-4o-mini" },
+  { providerId: "anthropic", modelId: "claude-3-5-sonnet-latest" },
+  { providerId: "grok", modelId: "grok-2" },
+];
+
+export function getActiveModels(): ActiveModelItem[] {
+  try {
+    const data = localStorage.getItem("omnecor:activeModels");
+    if (data) {
+      const parsed = JSON.parse(data);
+      if (Array.isArray(parsed)) return parsed;
+    }
+  } catch (e) {
+    console.error("Failed to parse active models from localStorage", e);
+  }
+  // Initialize and persist default active models if empty
+  localStorage.setItem("omnecor:activeModels", JSON.stringify(DEFAULT_ACTIVE_MODELS));
+  return DEFAULT_ACTIVE_MODELS;
+}
+
+export function saveActiveModels(models: ActiveModelItem[]): void {
+  localStorage.setItem("omnecor:activeModels", JSON.stringify(models));
+}
+
+export function toggleActiveModel(providerId: string, modelId: string, active: boolean): void {
+  const current = getActiveModels();
+  if (active) {
+    if (!current.some(m => m.providerId === providerId && m.modelId === modelId)) {
+      current.push({ providerId, modelId });
+    }
+  } else {
+    const idx = current.findIndex(m => m.providerId === providerId && m.modelId === modelId);
+    if (idx >= 0) {
+      current.splice(idx, 1);
+      // If the model being deactivated is the currently selected model, select another one or auto-valet
+      try {
+        const selected = localStorage.getItem("omnecor:selectedModel");
+        if (selected) {
+          const parsed = JSON.parse(selected) as { providerId: string; modelId: string };
+          if (parsed && parsed.providerId === providerId && parsed.modelId === modelId) {
+            localStorage.setItem(
+              "omnecor:selectedModel",
+              JSON.stringify({ providerId: "system", modelId: "auto-valet" })
+            );
+          }
+        }
+      } catch {}
+    }
+  }
+  saveActiveModels(current);
+}
+
+export function isModelActive(providerId: string, modelId: string): boolean {
+  if (providerId === "ollama") return true;
+  return getActiveModels().some(m => m.providerId === providerId && m.modelId === modelId);
+}
+
+/**
  * Per-provider catalog of selectable API models, keyed by the provider id
  * returned by `aiProvider.getProviders`. Used by the chat ModelSelector to
  * expand an online provider into its concrete models (instead of a single
  * provider-level row). Only providers representable as a chat `providerId`
- * (openai/anthropic/gemini/grok) appear here.
+ * (openai/anthropic/gemini/grok/huggingface) appear here.
  */
 export const API_MODEL_CATALOG: Record<
-  "openai" | "anthropic" | "gemini" | "grok",
+  "openai" | "anthropic" | "gemini" | "grok" | "huggingface",
   Array<{ id: string; name: string; costPer1kTokens?: { input: number; output: number } }>
 > = {
   openai: [
     { id: "gpt-4o", name: "GPT-4o", costPer1kTokens: { input: 0.0025, output: 0.01 } },
     { id: "gpt-4o-mini", name: "GPT-4o mini", costPer1kTokens: { input: 0.00015, output: 0.0006 } },
     { id: "o1", name: "o1", costPer1kTokens: { input: 0.015, output: 0.06 } },
+    { id: "o1-mini", name: "o1-mini", costPer1kTokens: { input: 0.003, output: 0.012 } },
+    { id: "o3-mini", name: "o3-mini", costPer1kTokens: { input: 0.0011, output: 0.0044 } },
+    { id: "gpt-4-turbo", name: "GPT-4 Turbo", costPer1kTokens: { input: 0.01, output: 0.03 } },
+    { id: "gpt-4", name: "GPT-4", costPer1kTokens: { input: 0.03, output: 0.06 } },
   ],
   anthropic: [
-    { id: "claude-opus-4-8", name: "Claude Opus 4.8" },
-    { id: "claude-sonnet-4-6", name: "Claude Sonnet 4.6" },
-    { id: "claude-haiku-4-5-20251001", name: "Claude Haiku 4.5" },
+    { id: "claude-3-5-sonnet-latest", name: "Claude 3.5 Sonnet (Latest)" },
+    { id: "claude-3-5-haiku-latest", name: "Claude 3.5 Haiku (Latest)" },
+    { id: "claude-3-opus-latest", name: "Claude 3 Opus (Latest)" },
+    { id: "claude-3-5-sonnet-20241022", name: "Claude 3.5 Sonnet v2" },
+    { id: "claude-3-5-sonnet-20240620", name: "Claude 3.5 Sonnet v1" },
+    { id: "claude-3-opus-20240229", name: "Claude 3 Opus" },
+    { id: "claude-3-haiku-20240307", name: "Claude 3 Haiku" },
   ],
   gemini: [
+    { id: "gemini-2.5-flash", name: "Gemini 2.5 Flash" },
+    { id: "gemini-2.5-pro", name: "Gemini 2.5 Pro" },
     { id: "gemini-2.0-flash", name: "Gemini 2.0 Flash" },
+    { id: "gemini-2.0-flash-lite", name: "Gemini 2.0 Flash Lite" },
+    { id: "gemini-2.0-pro-exp-02-05", name: "Gemini 2.0 Pro Exp" },
     { id: "gemini-1.5-pro", name: "Gemini 1.5 Pro" },
     { id: "gemini-1.5-flash", name: "Gemini 1.5 Flash" },
+    { id: "gemini-1.5-flash-8b", name: "Gemini 1.5 Flash 8B" },
+    { id: "gemini-2.0-flash-thinking-exp-01-21", name: "Gemini 2.0 Flash Thinking Exp" },
   ],
   grok: [
+    { id: "grok-2-1212", name: "Grok 2 (1212)" },
     { id: "grok-2", name: "Grok 2" },
-    { id: "grok-2-mini", name: "Grok 2 mini" },
+    { id: "grok-2-mini", name: "Grok 2 Mini" },
+    { id: "grok-beta", name: "Grok Beta" },
+  ],
+  huggingface: [
+    { id: "meta-llama/Llama-3.1-8B-Instruct", name: "Llama 3.1 8B Instruct" },
+    { id: "meta-llama/Llama-3.1-70B-Instruct", name: "Llama 3.1 70B Instruct" },
+    { id: "mistralai/Mistral-7B-Instruct-v0.3", name: "Mistral 7B Instruct v0.3" },
+    { id: "microsoft/Phi-3-mini-4k-instruct", name: "Phi 3 Mini 4K Instruct" },
+    { id: "Qwen/Qwen2.5-72B-Instruct", name: "Qwen 2.5 72B Instruct" },
   ],
 };
 

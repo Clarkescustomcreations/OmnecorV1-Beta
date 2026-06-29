@@ -443,6 +443,7 @@ export function ChatInput({
         <div className="flex items-center gap-2 order-2 sm:order-1 justify-start w-full sm:w-auto">
           {onToggleCliTerminal && (
             <Button
+              id="btn-chat-terminal"
               onClick={onToggleCliTerminal}
               variant="default"
               className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
@@ -454,6 +455,7 @@ export function ChatInput({
           )}
           {onToggleSandbox && (
             <Button
+              id="btn-chat-sandbox"
               onClick={onToggleSandbox}
               variant="default"
               className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
@@ -485,6 +487,7 @@ export function ChatInput({
 
           <HowToTooltip title="Attach File" description="Upload any file as context for the AI to reference." side="top">
             <Button
+              id="btn-chat-attach-file"
               size="icon"
               variant="ghost"
               className="h-7 w-7 cursor-pointer"
@@ -498,6 +501,7 @@ export function ChatInput({
 
           <HowToTooltip title="Attach Image" description="Upload an image for vision-capable models to analyze." side="top">
             <Button
+              id="btn-chat-attach-image"
               size="icon"
               variant="ghost"
               className="h-7 w-7 cursor-pointer"
@@ -523,6 +527,7 @@ export function ChatInput({
           {isLoading ? (
             <HowToTooltip title="Stop Generation" description="Halt the current AI response immediately." side="top">
               <Button
+                id="btn-chat-stop"
                 size="icon"
                 variant="destructive"
                 className="h-7 w-7 cursor-pointer"
@@ -535,6 +540,7 @@ export function ChatInput({
           ) : (
             <HowToTooltip title="Send Message" description="Send your message to the AI. You can also press Enter to send." side="top">
               <Button
+                id="btn-chat-send"
                 size="icon"
                 className="h-7 w-7 cursor-pointer"
                 onClick={handleSend}

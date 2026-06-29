@@ -15,6 +15,9 @@ import { Text, View, FlatList, ActivityIndicator, TextInput, KeyboardAvoidingVie
 import { Pressable } from "@/components/pressable";
 import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
+import { LoadingQuote } from "@/components/loading-quote";
+import { useColors } from "@/hooks/use-colors";
+import { useChatDisplaySettings } from "@/hooks/use-chat-display-settings";
 import { isServerConfigured } from "@/lib/_core/server-config";
 import { useNotifications, type OmnecorNotification, type NotificationKind } from "@/hooks/use-notifications";
 import { useAgentConversations, useAgentThread, type AgentConversation } from "@/hooks/use-agent-messenger";
@@ -210,6 +213,8 @@ function MessengerView() {
   const [active, setActive] = useState<AgentConversation | null>(null);
   const thread = useAgentThread(active?.personaId ?? null);
   const [draft, setDraft] = useState("");
+  const colors = useColors();
+  const { settings: chatDisplaySettings } = useChatDisplaySettings();
 
   if (active) {
     return (
@@ -249,7 +254,13 @@ function MessengerView() {
         />
 
         {thread.sending && (
-          <Text className="text-xs text-muted px-4 pb-1">{active.name} is typing…</Text>
+          <View className="px-4 pb-2 items-start">
+            {chatDisplaySettings.showThinkingQuotes ? (
+              <LoadingQuote quoteStyle={chatDisplaySettings.quoteStyle} />
+            ) : (
+              <ActivityIndicator size="small" color={colors.primary} />
+            )}
+          </View>
         )}
 
         <View className="flex-row gap-2 p-3 border-t border-border bg-surface">

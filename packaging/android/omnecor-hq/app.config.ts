@@ -140,7 +140,7 @@ const config: ExpoConfig = {
     // Nitro-based on-device LiteRT-LM engine (replaces react-native-llm-mediapipe).
     "react-native-litert-lm",
     [
-      // Lets users "Share → Omnecor HQ" a model file (e.g. a .task from Google
+      // Lets users "Share → Omnecor HQ" a model file (e.g. a .litertlm from Google
       // AI Edge Gallery) straight into the app — handled in app/_layout.tsx.
       "expo-share-intent",
       {

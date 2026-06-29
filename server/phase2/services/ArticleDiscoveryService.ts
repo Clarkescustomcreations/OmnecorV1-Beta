@@ -92,11 +92,21 @@ export class ArticleDiscoveryService {
 
     const feeds = this.resolveFeeds(source);
     const parsed: DiscoveredArticleInput[] = [];
+    
+    // Import dynamically or at top-level. Since we are inside the method, let's use the imported class.
+    const { BirdClawService } = await import("./BirdClawService.js");
+    const birdClaw = BirdClawService.getInstance();
+
     for (const feedUrl of feeds) {
       try {
-        parsed.push(...(await this.fetchFeed(feedUrl)));
+        if (BirdClawService.isSocialUrl(feedUrl)) {
+          log.info(`Routing ${feedUrl} to BirdClaw (Playwright stealth scraper)`);
+          parsed.push(...(await birdClaw.scrapeFeed(feedUrl)));
+        } else {
+          parsed.push(...(await this.fetchFeed(feedUrl)));
+        }
       } catch (err) {
-        log.warn(`Failed to fetch feed ${feedUrl}`, err instanceof Error ? err.message : err);
+        log.warn(`Failed to fetch/scrape feed ${feedUrl}`, err instanceof Error ? err.message : err);
       }
     }
 

@@ -12,7 +12,7 @@ const log = createLogger("ValetRouter");
 export type RoutingMode =
   | "api_direct" | "valet_background" | "local_omesh" | "main_api"
   | "multi_api" | "main_api_omesh" | "multi_api_omesh" | "moe_chain"
-  | "moe_chain_omesh" | "multi_task";
+  | "moe_chain_omesh" | "multi_task" | "sub_agent_harness" | "sub_agent_internal";
 
 export type ExecutionMode = "sovereign" | "scrapper" | "big_spender";
 
@@ -47,13 +47,7 @@ export interface RouteDecision {
   requiresStatusMd: boolean;
 }
 
-// HARDCODED RULE: Every task/project must start with todo.md + status.md
-export const HARDCODED_RULE = {
-  requireTodoMd: true,
-  requireStatusMd: true,
-  planModeFolder: "project-docs",
-  planModeDocs: ["PRD.md", "Feature-Plan.md", "Voice-Tone.md", "Design-Preferences.md", "Rules/standards.md"],
-} as const;
+
 
 export class ValetRouterService {
   private static instance: ValetRouterService | null = null;
@@ -85,7 +79,7 @@ export class ValetRouterService {
   async route(request: RouteRequest): Promise<RouteDecision> {
     const available = await this.isAvailable();
     if (!available) {
-      return this.ruleFallback(request);
+      return this.fastFallback(request);
     }
     try {
       const res = await fetch(`${this.baseUrl}/route`, {
@@ -123,42 +117,30 @@ export class ValetRouterService {
         requiresStatusMd: data.requires_status_md,
       };
     } catch {
-      return this.ruleFallback(request);
+      return this.fastFallback(request);
     }
   }
 
-  private ruleFallback(request: RouteRequest): RouteDecision {
+  private async fastFallback(request: RouteRequest): Promise<RouteDecision> {
     log.warn(
-      "[ValetRouter] Inference server offline — using keyword rule fallback. " +
-        "Run 'pnpm valet:fetch' or check Settings → Valet Router to load a model."
+      "[ValetRouter] Inference server offline — using fast static fallback. " +
+        "Run 'pnpm valet:fetch' to load the dedicated fast router."
     );
-    const taskLower = request.task.toLowerCase();
-    const isProject = /project|plan|build|create app|create system/.test(taskLower);
-    const isCode = /code|function|implement|debug|script/.test(taskLower);
-    const isResearch = /research|analyze|compare|summarize/.test(taskLower);
-    const isMedia = /image|video|audio|generate picture/.test(taskLower);
-
-    let category: TaskCategory = "local_task";
-    let costTier: CostTier = "free";
-    let localCapable = true;
-    if (isMedia) { category = "media_generation"; costTier = "medium"; }
-    else if (isCode) { category = "code_generation"; costTier = "medium"; localCapable = false; }
-    else if (isResearch) { category = "research"; costTier = "low"; localCapable = false; }
 
     const mode = request.preferredMode ?? "main_api";
     const primary = request.availableProviders?.[0] ?? "ollama";
     return {
-      category,
+      category: "local_task",
       mode,
       primaryProvider: primary,
       primaryModel: "",
       secondaryProviders: request.availableProviders?.slice(1, 3) ?? [],
-      costTier,
-      localCapable,
-      reasoning: "Rule-based fallback (Valet Router offline)",
+      costTier: "free",
+      localCapable: true,
+      reasoning: "Static fast fallback (Valet Router offline)",
       confidence: 0.5,
-      requiresTodoMd: isProject,
-      requiresStatusMd: isProject,
+      requiresTodoMd: false,
+      requiresStatusMd: false,
     };
   }
 
@@ -173,6 +155,7 @@ export class ValetRouterService {
     // Static fallback
     return [
       { id: "api_direct", label: "API Direct", description: "Bypass valet, send directly to provider" },
+      { id: "sub_agent_harness", label: "Local Sub-Agent Harness", description: "Autonomous Try-Fail-Fix loop for local models" },
       { id: "main_api", label: "Main API", description: "Route to primary configured API" },
       { id: "multi_api", label: "Multi API", description: "Distribute across multiple APIs" },
       { id: "moe_chain", label: "MoE Chain", description: "Sequential chain through fine-tuned models" },

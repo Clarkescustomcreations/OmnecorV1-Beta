@@ -16,6 +16,8 @@ import { useSearch } from "wouter";
 import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import { trpc } from "@/lib/trpc";
 import { useNotifications } from "@/hooks/useNotifications";
+import { LoadingQuote } from "@/components/chat/LoadingQuote";
+import { useAppStore } from "@/lib/store/app.store";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -144,6 +146,7 @@ function AgentMessenger({ initialPersona }: { initialPersona?: string }) {
   const [activeId, setActiveId] = useState<string | undefined>(initialPersona);
   const [draft, setDraft] = useState("");
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { chatDisplaySettings } = useAppStore();
 
   // Default to the first conversation once loaded.
   useEffect(() => {
@@ -260,10 +263,14 @@ function AgentMessenger({ initialPersona }: { initialPersona?: string }) {
                   </div>
                 ))}
                 {send.isPending && (
-                  <div className="flex justify-start">
-                    <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2 text-sm text-muted-foreground">
-                      {active.name} is typing…
-                    </div>
+                  <div className="flex justify-start mt-2">
+                    {chatDisplaySettings.showThinkingQuotes ? (
+                      <LoadingQuote />
+                    ) : (
+                      <div className="bg-muted rounded-2xl rounded-bl-sm px-3 py-2 text-sm text-muted-foreground">
+                        {active.name} is typing…
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

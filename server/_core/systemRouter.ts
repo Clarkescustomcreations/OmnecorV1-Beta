@@ -10,7 +10,7 @@ import { execFile, spawn } from "child_process";
 import { promisify } from "util";
 import * as https from "https";
 import { getDb, updateUserExecutionMode } from "../db.factory.js";
-import { users } from "../../drizzle/schema.js";
+import { users, mcpServerConfigs } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 import { ENV } from "./env.js";
 import { getPermissionsForRole, type Role } from "../phase2/config/rbac.js";
@@ -644,16 +644,25 @@ export const systemRouter = router({
       "C:\\Python310\\Scripts\\esptool.exe",
     ]).then(p => p !== null);
 
+    // ── Codebase Memory MCP ──
+    const cbmMcpResult = findExecutable([
+      homedir() + "/.local/bin/codebase-memory-mcp",
+      "codebase-memory-mcp",
+    ]).then(p => p !== null);
+
+    // ── Valet Router ──
+    const valetRouterResult = fsPromises.access(join(PATHS.valetRouter, "current.json")).then(() => true).catch(() => false);
+
     // Resolve all in parallel
     const [
       ollama, python, llamaCpp, blender, kicad,
-      whisper, tts, comfyui, esptool,
+      whisper, tts, comfyui, esptool, cbmMcp, valetRouter
     ] = await Promise.all([
       ollamaResult, pythonResult, llamaCppResult, blenderResult, kicadResult,
-      whisperResult, ttsResult, comfyResult, esptoolResult,
+      whisperResult, ttsResult, comfyResult, esptoolResult, cbmMcpResult, valetRouterResult
     ]);
 
-    return { ollama, python, llamaCpp, blender, kicad, whisper, tts, comfyui, esptool };
+    return { ollama, python, llamaCpp, blender, kicad, whisper, tts, comfyui, esptool, cbmMcp, valetRouter };
   }),
 
   // ---------------------------------------------------------------------------
@@ -721,16 +730,63 @@ export const systemRouter = router({
     try {
       await downloadToFile("https://ollama.com/install.sh", dest);
     } catch (err) {
-      throw new TRPCError({
-        code: "INTERNAL_SERVER_ERROR",
+      return {
+        success: false,
         message: `Ollama download failed: ${(err as Error).message}. Try https://ollama.com manually.`,
-      });
+      };
     }
     // sh with the script path as a discrete argument — no shell string interpolation
     // spawn supports detached; execFile does not when combined with a callback
     const proc = spawn("sh", [dest], { detached: true, stdio: "ignore" });
-    proc.on("error", (err) => console.warn("[installOllama] Install script error:", err));
+    proc.on("error", (err) => console.warn("[installOllama] Installer error:", err));
     proc.unref();
-    return { success: true, message: "Ollama install script launched. Check your terminal for progress." };
+
+    return { success: true, message: "Ollama installation started in the background." };
+  }),
+
+  // ---------------------------------------------------------------------------
+  // fetchValetModel — run scripts/fetch-valet-model.sh to download the Valet
+  // Router model for local development.
+  // ---------------------------------------------------------------------------
+  fetchValetModel: adminProcedure.mutation(async () => {
+    const scriptPath = join(process.cwd(), "scripts", "fetch-valet-model.sh");
+    const proc = spawn("bash", [scriptPath], { detached: true, stdio: "ignore" });
+    proc.unref();
+    return { success: true, message: "Downloading Valet Router in the background. Check server logs for progress." };
+  }),
+
+  // ── Codebase Memory MCP Installer ──
+  // adminProcedure: this pipes a remote install script into a shell, so it must
+  // never be reachable unauthenticated (cf. fetchValetModel / installOllama).
+  installCodebaseMemoryMCP: adminProcedure.mutation(async () => {
+    const proc = spawn(
+      "bash",
+      ["-c", "curl -fsSL https://raw.githubusercontent.com/DeusData/codebase-memory-mcp/main/install.sh | bash -s -- --ui"],
+      { detached: true, stdio: "ignore" },
+    );
+    proc.on("error", (err) =>
+      console.warn("[installCodebaseMemoryMCP] Installer error:", err),
+    );
+    proc.unref();
+
+    // Also register it in Omnecor's MCP registry. Awaited so an insert failure
+    // is surfaced in logs rather than swallowed in a detached promise.
+    try {
+      const db = await getDb();
+      await db
+        .insert(mcpServerConfigs)
+        .values({
+          id: "codebase-memory-mcp",
+          name: "Codebase Memory MCP",
+          transport: "stdio",
+          command: homedir() + "/.local/bin/codebase-memory-mcp",
+          args: [],
+        })
+        .onConflictDoNothing();
+    } catch (err) {
+      console.warn("[installCodebaseMemoryMCP] Failed to register MCP server:", err);
+    }
+
+    return { success: true, message: "Codebase Memory MCP installation started." };
   }),
 });

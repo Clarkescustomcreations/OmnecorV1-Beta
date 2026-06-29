@@ -23,18 +23,58 @@ import "./Globals.css";
 // flash at the default size on reload.
 applyFontSize(getStoredFontSize(), false);
 
+// Dedupes a burst of concurrent/retried unauthorized errors so we navigate at
+// most once. Without this, every failing query on a wiped/expired session fires
+// its own redirect — and a hard reload to the same workspace re-issues the query,
+// producing an infinite reload loop that strobes the screen.
+let handlingUnauthorized = false;
+
 const redirectToLoginIfUnauthorized = (error: unknown) => {
   if (!(error instanceof TRPCClientError)) return;
   if (typeof window === "undefined") return;
+  if (error.message !== UNAUTHED_ERR_MSG) return;
+  if (handlingUnauthorized) return;
 
-  const isUnauthorized = error.message === UNAUTHED_ERR_MSG;
+  const target = getLoginUrl();
 
-  if (!isUnauthorized) return;
+  // Local-first / desktop build: getLoginUrl() returns "/" when no external OAuth
+  // portal is configured. Hard-redirecting to "/" just reloads the same workspace,
+  // which re-issues the failing query → infinite reload loop (screen strobe). The
+  // sign-in surface here is the in-app Setup Wizard, so navigate there CLIENT-SIDE
+  // (history API, no reload → no flash) exactly once, and clear the stale
+  // setup-complete flag so the route gate keeps the user on the wizard.
+  if (target === "/" || target === "") {
+    // Base-aware setup path: wouter's <Router base> is derived from BASE_URL, so
+    // the raw history path must include the same base or the route won't match.
+    const routerBase = (import.meta.env.BASE_URL || "/").replace(/\/$/, "");
+    const setupPath = `${routerBase}/setup`;
+    if (window.location.pathname === setupPath) return;
+    handlingUnauthorized = true;
+    try {
+      localStorage.removeItem("omnecor:setup_complete");
+    } catch { /* ignore storage errors */ }
+    window.history.pushState(null, "", setupPath);
+    window.dispatchEvent(new PopStateEvent("popstate"));
+    // Release the guard on the next tick so a later genuine session expiry can
+    // still route the user back to sign-in.
+    setTimeout(() => { handlingUnauthorized = false; }, 0);
+    return;
+  }
 
-  window.location.href = getLoginUrl();
+  handlingUnauthorized = true;
+  window.location.href = target;
 };
 
 const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      // Never retry an unauthorized request: it cannot succeed without a session,
+      // and retrying just amplifies the failure storm. Other errors retry twice.
+      retry: (failureCount, error) =>
+        !(error instanceof TRPCClientError && error.message === UNAUTHED_ERR_MSG) &&
+        failureCount < 2,
+    },
+  },
   // Global safety net so no mutation can ever fail silently: any mutation
   // without its own onError handler surfaces the failure as a toast. Mutations
   // that do define onError keep full control (no double-toasting).
@@ -42,7 +82,8 @@ const queryClient = new QueryClient({
     onError: (error, _variables, _context, mutation) => {
       redirectToLoginIfUnauthorized(error);
       console.error("[API Mutation Error]", error);
-      if (!mutation.options.onError) {
+      // Don't toast the "please login" redirect case — it's handled by navigation.
+      if (!mutation.options.onError && !(error instanceof TRPCClientError && error.message === UNAUTHED_ERR_MSG)) {
         const message = error instanceof Error ? error.message : String(error);
         toast.error(message.length > 200 ? `${message.slice(0, 200)}…` : message);
       }

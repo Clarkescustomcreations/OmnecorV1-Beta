@@ -46,6 +46,9 @@ export const pcbEditorRouter = router({
         name: z.string().min(1).max(255),
         description: z.string().optional(),
         mode: z.enum(["schematic", "pcb"]).default("schematic"),
+        // Links the project to the active neural map so it scopes correctly
+        // (e.g. the mobile viewer filters projects by mapId).
+        mapId: z.string().optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -53,7 +56,8 @@ export const pcbEditorRouter = router({
         ctx.user.id,
         input.name,
         input.description,
-        input.mode
+        input.mode,
+        input.mapId ?? null
       );
 
       if (!project) {
@@ -170,7 +174,10 @@ export const pcbEditorRouter = router({
         ctx.user.id,
         input.name,
         input.canvasData,
-        input.description
+        input.description,
+        // Inherit the parent project's map so a design version is always scoped
+        // to the same neural map as its project (no client involvement needed).
+        project.mapId ?? null
       );
 
       if (!design) {

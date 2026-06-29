@@ -332,7 +332,8 @@ function CanvasBackground({ onDeselect }: { onDeselect: () => void }) {
 // ── Main export ────────────────────────────────────────────────────────────────
 
 export function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
-  const { setActive3DContext, activePCBContext } = useDesignerStore();
+  const setActive3DContext = useDesignerStore((s) => s.setActive3DContext);
+  const activePCBContext = useDesignerStore((s) => s.activePCBContext);
   const [selectedName, setSelectedName] = useState<string | null>(null);
   const [aiQuery, setAiQuery] = useState("");
   const [loadedObject, setLoadedObject] = useState<THREE.Object3D | null>(null);

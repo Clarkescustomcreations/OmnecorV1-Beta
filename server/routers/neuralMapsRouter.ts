@@ -5,6 +5,36 @@ import { neuralMaps } from "../../drizzle/schema.js";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
+import { homedir } from "os";
+import { join } from "path";
+import fsPromises from "fs/promises";
+import { SettingsService, getSettingsPath } from "../phase2/services/SettingsService.js";
+import { createLogger } from "../_core/logger.js";
+
+const log = createLogger("neural-maps");
+
+async function readSettingsFileAsync(): Promise<Record<string, unknown>> {
+  try {
+    const path = getSettingsPath();
+    const text = await fsPromises.readFile(path, "utf-8");
+    return JSON.parse(text) as Record<string, unknown>;
+  } catch (error: any) {
+    if (error && typeof error === "object" && error.code === "ENOENT") {
+      return {};
+    }
+    throw new TRPCError({
+      code: "INTERNAL_SERVER_ERROR",
+      message: `Failed to read or parse settings file: ${error instanceof Error ? error.message : String(error)}`,
+    });
+  }
+}
+
+async function writeSettingsFileAsync(settings: Record<string, unknown>): Promise<void> {
+  const path = getSettingsPath();
+  const dir = path.substring(0, path.lastIndexOf("/"));
+  await fsPromises.mkdir(dir, { recursive: true });
+  await fsPromises.writeFile(path, JSON.stringify(settings, null, 2), "utf-8");
+}
 
 const isRemoteRoot = (r: string) => r.startsWith("github://") || r.startsWith("integration://");
 
@@ -125,7 +155,11 @@ export const neuralMapsRouter = router({
       if (removedRemoteRoots.length > 0) {
         const memory = MemoryArchitectService.getInstance();
         await Promise.all(
-          removedRemoteRoots.map(uri => memory.deleteRemoteSource(input.id, uri).catch(() => {})),
+          removedRemoteRoots.map(uri =>
+            memory.deleteRemoteSource(input.id, uri).catch(error => {
+              log.warn(`Failed to delete remote source ${uri} for map ${input.id}:`, error instanceof Error ? error.message : String(error));
+            })
+          ),
         );
       }
 
@@ -147,7 +181,9 @@ export const neuralMapsRouter = router({
 
       // Drop the map's entire vector collection so its indexed content (local
       // + remote) doesn't linger after the map is gone.
-      await MemoryArchitectService.getInstance().deleteCollection(input.id).catch(() => {});
+      await MemoryArchitectService.getInstance().deleteCollection(input.id).catch(error => {
+        log.warn(`Failed to delete vector collection for map ${input.id}:`, error instanceof Error ? error.message : String(error));
+      });
 
       return { success: true };
     }),
@@ -194,5 +230,21 @@ export const neuralMapsRouter = router({
       }
 
       return { success: true, migrated };
+    }),
+
+  /** Get the currently active map ID from settings */
+  getActiveMapId: protectedProcedure.query(async () => {
+    const activeMapId = SettingsService.getInstance().get("activeMapId", null as string | null);
+    return { activeMapId };
+  }),
+
+  /** Set the currently active map ID in settings */
+  setActiveMapId: protectedProcedure
+    .input(z.object({ activeMapId: z.string().uuid().nullable() }))
+    .mutation(async ({ input }) => {
+      const current = await readSettingsFileAsync();
+      const updated = { ...current, activeMapId: input.activeMapId };
+      await writeSettingsFileAsync(updated);
+      return { success: true };
     }),
 });

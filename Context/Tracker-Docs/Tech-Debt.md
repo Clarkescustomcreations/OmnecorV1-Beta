@@ -203,6 +203,22 @@
 - **Risk**: N/A — Resolved
 - **Status**: Resolved — all 5 replaced with `.returning({ id: table.id })` (F9, 2026-06-14).
 
+### TD-046: Zustand Unselectored Subscription + Inline `[]` Default = Infinite Render Loop
+- **Files**: `client/src/lib/stores/designerStore.ts`, `client/src/components/pcb/EnhancedPCBEditor.tsx`, `client/src/pages/3DDesigner.tsx`
+- **Reason**: Two independent patterns combine to produce an infinite render loop that is trivially easy to write and very difficult to spot by reading code:
+  1. **Inline `[]` default in TanStack Query**: `const { data: foo = [] }` creates a **new array reference on every render** while `data === undefined` (loading state). React's `Object.is` comparison sees a new reference and fires any `useEffect` that lists this value in its deps — every render, forever.
+  2. **Zustand unselectored subscription**: `useStore()` without a selector subscribes to the *entire* store. Zustand's `set({ field: value })` always produces a new merged-state object (`Object.assign({}, state, partial)`), so **every `set()` call re-notifies every unselectored subscriber, even when the value hasn't changed**.
+
+  When combined: `pcbProjects = []` inline default → new `[]` every render → `useEffect([pcbProjects])` fires → `setActivePCBContext(null)` → Zustand creates new merged state → all unselectored subscribers re-render → new `[]` → repeat → React hits 25-nested-update limit → throws "Maximum update depth exceeded" → RouteBoundary catches it → "Panel Error" white-screen. The failure only manifested on first boot (no projects in DB yet) and only without first visiting the Web Preview tab, giving it the feel of a timing or unmount race rather than the render-dep bug it actually was.
+
+- **Risk**: High — unhandled crash + white-screen on the 3D Designer → PCB/Schematic tab first-boot navigation path
+- **Status**: **RESOLVED (2026-06-28).** Three-part fix applied in concert:
+  1. **Module-level constant** `EMPTY_PROJECTS` in `EnhancedPCBEditor.tsx` replaces the inline `= []` default — same reference every render, effect dep is stable.
+  2. **Selective subscriptions** in `EnhancedPCBEditor.tsx` and `3DDesigner.tsx`: `useDesignerStore((s) => s.field)` instead of `useDesignerStore()` — component only re-renders when the specific field it reads changes.
+  3. **Equality guard in `setActivePCBContext`** (`designerStore.ts`): `if (getState().activePCBContext === context) return;` before `set()` — short-circuits Zustand notification when the value is identical.
+
+  **Prevention rule:** (a) Never use inline `= []` / `= {}` as TanStack Query defaults — always hoist to a module-level constant. (b) Always use selectors with Zustand: `useStore((s) => s.field)`. (c) Add equality guards to any Zustand setter that may be called with the same value from within a render/effect cycle. Equality guard = defence-in-depth for a missed selector; selector = defence-in-depth for a missing guard.
+
 ---
 
 ## Ruthless Beta Code-Sweep — new entries (2026-06-20, Session 23)
@@ -291,6 +307,12 @@
 - **Risk**: Medium (no functional defect; absence of a safety net for security-sensitive code)
 - **Status**: **In progress (2026-06-24).** Installed `@vitest/coverage-v8`, added `pnpm test:coverage`, and set **ratcheting thresholds** in `vitest.config.ts` at the measured baseline (stmts/lines ~9–10%, branches/funcs ~6–7% — floor only, raise as suites land). Added a reusable route-test harness (`server/__tests__/_helpers/trpcHarness.ts`, real in-memory libSQL + migrations) and the first two route suites — `chatRouter` (15 tests, 100% lines) and `aiRouter` (20 tests, ~57%). Remaining priority order: auth/`admin`/`owner` procedure middleware → `walletRouter`/`virtualCardRouter` route layer → `HITLApprovalService` → `MeshServer` mTLS + cert pinning → `AiProviderService` spend/fallback → `PipelineEngineService`.
 
+### TD-045: Zero-login default execution mode and context source-of-truth configuration (RESOLVED)
+- **File**: `server/_core/context.ts`, `server/_core/env.ts`, `client/src/pages/Settings.tsx`
+- **Reason**: The zero-login local admin execution mode default has been updated to `"scrapper"` to align with the product directive that the system defaults to scrapper and only locks down to sovereign mode if explicitly configured. To prevent setting reverts and system-wide overrides, `createContext` was refactored to use the database user's `executionMode` as the source of truth if it exists, rather than forcing the environment default `zeroLoginExecutionMode` on every API request. The selector in `Settings.tsx` has also been enabled for zero-login users. Changing this back or re-introducing a forced override in context configuration will cause the user's Settings preferences to be ignored or silently overwritten back to the environment default.
+- **Risk**: High (potential regression causing user settings to be silently overwritten and default to wrong modes)
+- **Status**: **RESOLVED (2026-06-25).** Default mode changed to `scrapper`, context override removed, and Settings selector enabled. Fully checked (`tsc --noEmit` clean, 416 tests pass) and rebuilt in Debian package version `2.4.1~beta.1`.
+
 ---
 
 ## Key Insights & Gotchas (2026-06-20 sweep + live verification)
@@ -311,3 +333,4 @@
 - **Setup wizard gates routes** until `localStorage["omnecor:setup_complete"]==="true"` — set it via `addInitScript` before navigating, or you'll be redirected to `/setup`.
 - **Drive the app via the DEV server for ZERO_LOGIN** (production forbids it; local OAuth portal is a dummy). The rate limiter now `skip`s non-`/api` paths, so a Playwright dev-mode page load no longer 429s.
 - **`platforms.addAccount` accepts a RAW token** — social posting can be tested by pasting a token from a platform's own token tool (Graph API Explorer, etc.) instead of implementing the full client-id/secret OAuth flow. "Sign in with Google/Microsoft" can NOT authorize posting to Twitter/LinkedIn/Meta (separate platforms require their own app).
+- **Zustand + TanStack Query infinite loop trap (TD-046).** `const { data: foo = [] }` in a TanStack Query destructure is not just a minor inefficiency — it creates a **new array reference on every render** while `data` is undefined (loading state). `Object.is` sees a new value, so any effect with `foo` in its deps fires every render. Amplifier: an unselectored `useDesignerStore()` (no selector) subscribes to the entire Zustand store; every `set()` call — even with the same value — produces a new merged-state object and re-notifies all subscribers. The combination creates a render → effect → `set()` → re-render → render loop that hits React's 25-nested-update limit with "Maximum update depth exceeded." The failure only appears on the specific first-boot state where loading data is still undefined — once data arrives, the inline `[]` is replaced by the real array and the loop stops. Diagnosis: add render-count and per-effect `console.log` with the dep values; if an effect fires every render, its deps contain an unstable reference. Fix: hoist empty arrays/objects to module-level constants; always use selectors (`useStore((s) => s.field)`); add equality guards to Zustand setters that run in tight loops.

@@ -29,10 +29,15 @@ have already found. Surface trade-offs, then build it fully.
 
 ## Testing With an Authenticated Session (read first)
 
-To exercise the app end-to-end you need a real session. **Do not reach for
-`ZERO_LOGIN_MODE` to test cloud features** — by default it now runs the local
-admin in **Sovereign** mode (cloud AI blocked). Use one of these instead, both
-documented in [`docs/development/LOCAL_TESTING.md`](docs/development/LOCAL_TESTING.md):
+To exercise the app end-to-end you need a real session. `ZERO_LOGIN_MODE` now
+seeds the local admin in **`scrapper`** mode by default (cloud allowed +
+spend-tracked) — the middle-ground starting point most installs want, and far
+saner for testing than the old sovereign-by-default (which blocked everything).
+**Sovereign mode is opt-in:** the user turns it on in Settings, which persists
+`executionMode` to their DB record (the persisted value is the source of truth;
+see `server/_core/context.ts`). `ZERO_LOGIN_EXECUTION_MODE` only seeds the mode
+the first time the local-zero-login user is created. For a real session, use one
+of these, both documented in [`docs/development/LOCAL_TESTING.md`](docs/development/LOCAL_TESTING.md):
 
 - **Option A — Emulated OAuth:** set `GOOGLE_EMULATOR_URL` / `MICROSOFT_EMULATOR_URL`
   (the `google` / `microsoft` skills' `npx emulate` servers) and sign in through the
@@ -41,7 +46,9 @@ documented in [`docs/development/LOCAL_TESTING.md`](docs/development/LOCAL_TESTI
   valid `app_session_id` cookie (default `scrapper`, cloud allowed) for headless
   Playwright/curl tests. The script is git-ignored; recreate it from the doc if missing.
 
-If you do use zero-login for cloud work, set `ZERO_LOGIN_EXECUTION_MODE=scrapper`.
+Zero-login already defaults to `scrapper` (cloud allowed); set
+`ZERO_LOGIN_EXECUTION_MODE=sovereign` only if you want a fresh install to *start*
+air-gapped (existing installs keep whatever mode is persisted on their user).
 `.env` is read once at startup — **restart the dev server after editing it.**
 
 ---
@@ -134,6 +141,7 @@ These are absolute. No exceptions, no "just this once."
 
 ### Process Rules
 
+- **Context Preservation on Model Switch:** Ensure that switching AI models (e.g., Ollama to Claude) mid-conversation preserves context and active project bounds without crashing the session.
 - **Work through Features and Phases in order.** Never skip ahead. The order exists
   because later features depend on earlier ones being correct.
 - **Update `Context/Progress-Tracker.md` after every Feature completion.** Mark the
@@ -186,8 +194,8 @@ These are absolute. No exceptions, no "just this once."
 - **No silent mutations.** Every mutation must either return a payload or broadcast
   a WebSocket event. The global `MutationCache.onError` surfaces all failures — do
   not add local `onError: () => {}` overrides that swallow errors.
-- **No silent `.catch(() => {})` blocks** on audit log writes or any server-side
-  async operation. Use `.catch((e) => console.warn(...))` at minimum.
+- **No Swallowed Exceptions & Masked Failures:** Do not use `catch (e)` blocks that simply log the error and then return `null`, empty strings, or default values. This masks failures from backend callers and causes downstream silent failures. Errors must be properly thrown or properly handled via error state UIs. No silent `.catch(() => {})` blocks on audit log writes or any server-side async operation.
+- **Never parse error strings for control flow:** Do not use string-matching on errors (e.g., `if (res.includes("Error"))` or `if (response.startsWith("Error: "))`). This is a brittle symptom-patching hotfix. Always type-check errors (e.g., `instanceof Error`), check HTTP status codes, or rely on structured error objects.
 
 ---
 
@@ -198,6 +206,7 @@ in the TypeScript compiler's reach — you must know them.
 
 ### Database
 
+- **Strict Project/Neural Map Scoping:** Every database query and feature must properly scope its data to the active `projectId` or `mapId`. All Drizzle queries must include the appropriate `where(eq(...))` clauses to prevent workspace leakage.
 - **`getDb()` never returns null.** The `if (!db)` null-guards scattered in older
   files (`db-pcb.ts` etc.) are dead branches from before the DB unification. Do not
   add new ones. Do not copy the pattern.
@@ -225,6 +234,8 @@ Use the correct tier. Wrong tier = either a security hole or a broken Sovereign 
 | `cloudProcedure` | **Any** call to an external API. Blocks in Sovereign mode. |
 | `adminProcedure` | Config changes, credential rotation, log deletion |
 | `ownerProcedure` | Owner-only operations |
+
+**Note:** The exact tier name is `cloudProcedure`. Do not use deprecated or incorrect names like `externalServiceProcedure` when gating external API calls to enforce Sovereign mode.
 
 Import all from `server/_core/trpc.ts`. The legacy `server/phase2/routers/trpc.ts`
 shim was deleted — do not recreate it.

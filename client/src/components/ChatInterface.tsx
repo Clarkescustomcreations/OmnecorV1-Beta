@@ -56,6 +56,9 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
+import { useNeuralMap } from "@/contexts/NeuralMapContext";
+import { LoadingQuote } from "@/components/chat/LoadingQuote";
+import { useAppStore } from "@/lib/store/app.store";
 
 // ---------------------------------------------------------------------------
 // Code-block copy button injection (runs after Streamdown renders to DOM)
@@ -128,24 +131,28 @@ interface AssistantBubbleProps {
   showTimestamps?: boolean;
   showTokenCounts?: boolean;
   onOpenPreview?: (mode: "3d" | "pcb" | "web", code: string) => void;
+  isTyping?: boolean;
+  quoteStyle?: "random" | "funny" | "serious";
 }
 
 function AssistantBubble({
   message,
+  copied,
+  isLast,
   onCopy,
   onRetry,
   onDelete,
-  copied,
-  isLast,
-  showTimestamps = true,
-  showTokenCounts = true,
+  showTimestamps = false,
+  showTokenCounts = false,
   onOpenPreview,
+  isTyping = false,
 }: AssistantBubbleProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
   const [scriptName, setScriptName] = useState("");
   const [scriptProject, setScriptProject] = useState("");
   const [extractedCode, setExtractedCode] = useState("");
+  const { activeMap } = useNeuralMap();
 
   const scriptsUtils = trpc.useUtils();
   const saveScriptMutation = trpc.scripts.create.useMutation({
@@ -184,6 +191,7 @@ function AssistantBubble({
       code: extractedCode,
       language: "python",
       description: `Saved from chat: ${message.content.slice(0, 100)}...`,
+      mapId: activeMap?.id,
     });
   };
 
@@ -228,6 +236,12 @@ function AssistantBubble({
           <div ref={contentRef} className="prose-sm prose dark:prose-invert max-w-none break-words">
             <Streamdown>{message.content}</Streamdown>
           </div>
+          
+          {isTyping && (
+            <div className="mt-4">
+              <LoadingQuote />
+            </div>
+          )}
 
           {message.metadata?.error && (
             <div className="mt-2 p-2 rounded bg-destructive/10 border border-destructive/30">
@@ -591,41 +605,10 @@ export function ChatInterface({
   const [titleDraft, setTitleDraft] = useState(conversationTitle);
   const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Chat-specific display settings
-  interface ChatDisplaySettings {
-    showTimestamps: boolean;
-    showTokenCounts: boolean;
-    showModelName: boolean;
-    showLatency: boolean;
-    autoStoreMemory: boolean;
-  }
-  const [chatSettings, setChatSettings] = useState<ChatDisplaySettings>(() => {
-    try {
-      const saved = localStorage.getItem("omnecor:chat_display_settings");
-      return saved ? JSON.parse(saved) : {
-        showTimestamps: true,
-        showTokenCounts: true,
-        showModelName: true,
-        showLatency: false,
-        autoStoreMemory: true,
-      };
-    } catch {
-      return {
-        showTimestamps: true,
-        showTokenCounts: true,
-        showModelName: true,
-        showLatency: false,
-        autoStoreMemory: true,
-      };
-    }
-  });
-
-  useEffect(() => {
-    localStorage.setItem("omnecor:chat_display_settings", JSON.stringify(chatSettings));
-  }, [chatSettings]);
+  const { chatDisplaySettings: chatSettings, setChatDisplaySettings } = useAppStore();
 
   const toggleSetting = (key: keyof typeof chatSettings) => {
-    setChatSettings((prev) => ({ ...prev, [key]: !prev[key] }));
+    setChatDisplaySettings({ [key]: !chatSettings[key] });
   };
 
   // Sync title draft when prop changes (switching conversations)
@@ -827,6 +810,36 @@ export function ChatInterface({
                       onCheckedChange={() => toggleSetting("autoStoreMemory")} 
                     />
                   </div>
+
+                  <div className="flex items-center justify-between">
+                    <div className="flex flex-col gap-0.5">
+                      <Label className="text-xs">Thinking Quotes</Label>
+                      <span className="text-[10px] text-muted-foreground">Show quotes while AI is generating</span>
+                    </div>
+                    <Switch 
+                      checked={chatSettings.showThinkingQuotes} 
+                      onCheckedChange={() => toggleSetting("showThinkingQuotes")} 
+                    />
+                  </div>
+
+                  {chatSettings.showThinkingQuotes && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex flex-col gap-0.5">
+                        <Label className="text-xs">Quote Style</Label>
+                        <span className="text-[10px] text-muted-foreground">Category of quotes shown</span>
+                      </div>
+                      <select 
+                        className="h-7 text-xs bg-muted/50 rounded border border-border px-2 outline-none focus:ring-1 focus:ring-primary/50"
+                        value={chatSettings.quoteStyle}
+                        onChange={(e) => setChatDisplaySettings({ quoteStyle: e.target.value as any })}
+                      >
+                        <option value="random">Random</option>
+                        <option value="funny">Funny</option>
+                        <option value="serious">Serious</option>
+                      </select>
+                    </div>
+                  )}
+
                 </div>
               </PopoverContent>
           </Popover>
@@ -958,6 +971,7 @@ export function ChatInterface({
                       showTimestamps={chatSettings.showTimestamps}
                       showTokenCounts={chatSettings.showTokenCounts}
                       onOpenPreview={onOpenPreview}
+                      isTyping={chatSettings.showThinkingQuotes && isLoading && idx === lastAssistantIdx}
                     />
                   ) : (
                     <UserBubble

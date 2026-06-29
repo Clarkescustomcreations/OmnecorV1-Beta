@@ -142,11 +142,15 @@ async function startServer() {
       // hyphenated ids (e.g. map UUIDs), silently emptying RAG.
       const collection = sanitizeCollectionName(event.projectId);
       if (event.eventType === "unlink" || event.eventType === "unlinkDir") {
-        vectorDB.removeDocument(collection, event.filePath).catch(() => {});
+        vectorDB.removeDocument(collection, event.filePath).catch(error => {
+          log.warn(`[Omnecor] File watcher: failed to remove document from collection '${collection}' for path: ${event.filePath}`, error instanceof Error ? error.message : String(error));
+        });
       } else {
         fsp.readFile(event.filePath, "utf-8").then(text =>
           vectorDB.addDocuments(collection, [{ id: event.filePath, text, metadata: { path: event.filePath, projectId: event.projectId } }])
-        ).catch(() => {});
+        ).catch(error => {
+          log.warn(`[Omnecor] File watcher: failed to index document to collection '${collection}' for path: ${event.filePath}`, error instanceof Error ? error.message : String(error));
+        });
       }
     });
     await fileWatcher.restoreFromDb();
@@ -328,12 +332,41 @@ async function startServer() {
   app.get("/health", async (_req, res) => {
     const ollamaUrl = ENV.ollamaUrl;
     const chromaUrl = VECTOR_DB_CONFIG.chromaUrl;
+
+    // The three probes are independent — run them concurrently so an offline
+    // Ollama/ChromaDB doesn't serialize two ~1s timeouts back-to-back (this
+    // endpoint gates the Electron backend-readiness check and uptime polls).
+    // Each probe still captures its error so it appears in structured logs even
+    // when the overall status is "degraded" — catch(() => false) used to
+    // discard the message entirely, making silent failures invisible to alerts.
     const [dbOk, ollamaOk, chromaOk] = await Promise.all([
-      getDb().then(() => true).catch(() => false),
-      fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false),
-      fetch(`${chromaUrl}/api/v1/heartbeat`, { signal: AbortSignal.timeout(1000) }).then(r => r.ok).catch(() => false),
+      getDb()
+        .then(() => true)
+        .catch((err: unknown) => {
+          log.error("[health] DB probe failed", { error: (err as Error)?.message ?? String(err) });
+          return false;
+        }),
+      fetch(`${ollamaUrl}/api/tags`, { signal: AbortSignal.timeout(1000) })
+        .then(r => r.ok)
+        .catch((err: unknown) => {
+          log.warn("[health] Ollama probe failed", { error: (err as Error)?.message ?? String(err) });
+          return false;
+        }),
+      fetch(`${chromaUrl}/api/v1/heartbeat`, { signal: AbortSignal.timeout(1000) })
+        .then(r => r.ok)
+        .catch((err: unknown) => {
+          log.warn("[health] ChromaDB probe failed", { error: (err as Error)?.message ?? String(err) });
+          return false;
+        }),
     ]);
     const migrationOk = getMigrationStatus().ok;
+    // JWT_SECRET absent means OAuth tokens are stored with weak base64 obfuscation.
+    // Surface this in the health payload so ops dashboards / smoke tests can detect it.
+    const jwtSecretOk = !!ENV.cookieSecret;
+    if (!jwtSecretOk) {
+      log.warn("[health] JWT_SECRET is not set — OAuth tokens are stored with weak base64 obfuscation. Set JWT_SECRET for encryption at rest.");
+    }
+
     const ready = dbOk && migrationOk;
     res.status(ready ? 200 : 503).json({
       status: ready ? "healthy" : "degraded",
@@ -342,7 +375,7 @@ async function startServer() {
       architecture: "unified",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      checks: { db: dbOk, migrationOk, ollama: ollamaOk, chromadb: chromaOk },
+      checks: { db: dbOk, migrationOk, ollama: ollamaOk, chromadb: chromaOk, jwtSecret: jwtSecretOk },
       nonce: process.env.BACKEND_NONCE ?? "",
     });
   });

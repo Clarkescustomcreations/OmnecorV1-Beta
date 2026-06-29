@@ -1,6 +1,7 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { OmnecorDashboardLayout } from "@/components/OmnecorDashboardLayout";
 import { trpc } from "@/lib/trpc";
+import { useNeuralMap } from "@/contexts/NeuralMapContext";
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "@/components/ui/card";
@@ -19,8 +20,13 @@ import {
 const GLOBAL_WALLET_ID = "__global__";
 
 export function AgenticWallet() {
+  const { activeMapId } = useNeuralMap();
   const { data: projects } = trpc.project.list.useQuery();
-  const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+  const [selectedProjectId, setSelectedProjectId] = useState<string>(activeMapId || "");
+
+  useEffect(() => {
+    setSelectedProjectId(activeMapId || "");
+  }, [activeMapId]);
 
   // Global vs per-project wallet mode
   const [globalMode, setGlobalMode] = useState<boolean>(() => {
@@ -62,7 +68,7 @@ export function AgenticWallet() {
           <div className="flex items-center gap-3 min-w-0">
             <Wallet className="w-6 h-6 text-primary flex-shrink-0" />
             <div className="min-w-0">
-              <h1 className="text-lg sm:text-xl font-bold truncate">Agentic Wallet Dashboard</h1>
+              <h1 className="text-4xl font-bold tracking-tight truncate">Agentic Wallet Dashboard</h1>
               <p className="text-xs sm:text-sm text-muted-foreground truncate">
                 Live financial monitoring and spend tracking for AI agents
               </p>
@@ -186,7 +192,7 @@ export function AgenticWallet() {
                         <div className="text-xs uppercase font-bold text-muted-foreground tracking-widest mb-2">Provider Breakdown</div>
                         <div className="grid gap-3">
                           {spendSummary?.byProvider.map(p => (
-                            <div key={p.provider} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-muted/50 hover:bg-muted/40 transition-colors">
+                            <div key={p.provider} className="flex items-center justify-between p-4 rounded-xl bg-muted/30 border border-muted/50 hover:bg-muted/40 transition-colors card-content-safe">
                               <div className="flex items-center gap-3">
                                 <div className="w-8 h-8 rounded-lg bg-background flex items-center justify-center border shadow-sm">
                                   <Zap className="w-4 h-4 text-primary" />

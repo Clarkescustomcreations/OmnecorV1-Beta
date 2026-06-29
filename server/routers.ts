@@ -90,6 +90,8 @@ import { notificationRouter } from "./routers/notificationRouter.js";
 import { agentMessengerRouter } from "./routers/agentMessengerRouter.js";
 import { scriptsRouter } from "./routers/scriptsRouter.js";
 import { chatRouter } from "./routers/chatRouter.js";
+import { datasetRouter } from "./routers/datasetRouter.js";
+import { penpotRouter } from "./routers/penpotRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -245,6 +247,8 @@ export const appRouter = router({
   mobileSync: mobileSyncRouter,
   scripts: scriptsRouter,
   chat: chatRouter,
+  dataset: datasetRouter,
+  penpot: penpotRouter,
 });
 
 export type AppRouter = typeof appRouter;

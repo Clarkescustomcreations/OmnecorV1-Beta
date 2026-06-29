@@ -195,6 +195,7 @@ export type InsertAuditLog = typeof auditLog.$inferInsert;
  */
 export const pipelines = sqliteTable("pipelines", {
   id: text("id").primaryKey(),
+  projectId: text("projectId"),
   name: text("name").notNull(),
   goal: text("goal").notNull(),
   status: text("status", { enum: ["pending", "running", "paused", "complete", "aborted"] }).notNull().default("pending"),
@@ -417,13 +418,17 @@ export const designProjects = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("userId").notNull(),
+    mapId: text("mapId").references(() => neuralMaps.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
     mode: text("mode").notNull().default("schematic"), // 'schematic' or 'pcb'
     createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
     updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
   },
-  (t) => [index("design_projects_user_id_idx").on(t.userId)]
+  (t) => [
+    index("design_projects_user_id_idx").on(t.userId),
+    index("design_projects_map_id_idx").on(t.mapId),
+  ]
 );
 
 export type DesignProject = typeof designProjects.$inferSelect;
@@ -438,6 +443,7 @@ export const designSaves = sqliteTable(
     id: integer("id").primaryKey({ autoIncrement: true }),
     projectId: integer("projectId").notNull(),
     userId: integer("userId").notNull(),
+    mapId: text("mapId").references(() => neuralMaps.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description"),
     canvasData: text("canvasData", { mode: "json" }).notNull(),
@@ -451,6 +457,7 @@ export const designSaves = sqliteTable(
   (t) => [
     index("design_saves_project_id_idx").on(t.projectId),
     index("design_saves_user_id_idx").on(t.userId),
+    index("design_saves_map_id_idx").on(t.mapId),
   ]
 );
 
@@ -595,6 +602,7 @@ export const savedScripts = sqliteTable(
   {
     id: integer("id").primaryKey({ autoIncrement: true }),
     userId: integer("userId").notNull(),
+    mapId: text("mapId").references(() => neuralMaps.id, { onDelete: "cascade" }),
     name: text("name").notNull(),
     description: text("description").notNull().default(""),
     code: text("code").notNull(),
@@ -606,6 +614,7 @@ export const savedScripts = sqliteTable(
   (t) => [
     index("saved_scripts_user_id_idx").on(t.userId),
     index("saved_scripts_user_project_idx").on(t.userId, t.project),
+    index("saved_scripts_map_id_idx").on(t.mapId),
   ]
 );
 
@@ -1032,6 +1041,8 @@ export const neuralMapsRelations = relations(neuralMaps, ({ one, many }) => ({
   curatedPosts: many(curatedPosts),
   scheduledPosts: many(scheduledPosts),
   virtualCards: many(virtualCards),
+  discoveredDatasetItems: many(discoveredDatasetItems),
+  curatedTrainingExamples: many(curatedTrainingExamples),
 }));
 
 export const personasRelations = relations(personas, ({ one }) => ({
@@ -1084,4 +1095,68 @@ export const podcastEpisodes = sqliteTable("podcast_episodes", {
 
 export type PodcastEpisode = typeof podcastEpisodes.$inferSelect;
 export type InsertPodcastEpisode = typeof podcastEpisodes.$inferInsert;
+
+/**
+ * Discovered Dataset Items (raw text chunks from files or search queries for custom model training curation)
+ */
+export const discoveredDatasetItems = sqliteTable("discovered_dataset_items", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: text("projectId").references(() => neuralMaps.id, { onDelete: "cascade" }),
+  sourceType: text("sourceType", { enum: ["local", "online_search"] }).notNull(),
+  sourceName: text("sourceName").notNull(),
+  content: text("content").notNull(),
+  isProcessed: integer("isProcessed").default(0),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+}, (t) => [
+  index("discovered_dataset_items_project_idx").on(t.projectId),
+]);
+
+export type DiscoveredDatasetItem = typeof discoveredDatasetItems.$inferSelect;
+export type InsertDiscoveredDatasetItem = typeof discoveredDatasetItems.$inferInsert;
+
+/**
+ * Curated Training Examples (Instruction, Input, Output instruction-tuning pairs)
+ */
+export const curatedTrainingExamples = sqliteTable("curated_training_examples", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  projectId: text("projectId").references(() => neuralMaps.id, { onDelete: "cascade" }),
+  datasetItemId: integer("datasetItemId").references(() => discoveredDatasetItems.id, { onDelete: "cascade" }),
+  createdByUserId: integer("createdByUserId").references(() => users.id, { onDelete: "cascade" }),
+  instruction: text("instruction").notNull(),
+  input: text("input"),
+  output: text("output").notNull(),
+  status: text("status", { enum: ["pending_review", "approved", "rejected"] }).default("pending_review").notNull(),
+  createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+}, (t) => [
+  index("curated_training_examples_project_idx").on(t.projectId),
+  index("curated_training_examples_user_idx").on(t.createdByUserId),
+]);
+
+export type CuratedTrainingExample = typeof curatedTrainingExamples.$inferSelect;
+export type InsertCuratedTrainingExample = typeof curatedTrainingExamples.$inferInsert;
+
+export const discoveredDatasetItemsRelations = relations(discoveredDatasetItems, ({ many, one }) => ({
+  curatedExamples: many(curatedTrainingExamples),
+  project: one(neuralMaps, {
+    fields: [discoveredDatasetItems.projectId],
+    references: [neuralMaps.id],
+  }),
+}));
+
+export const curatedTrainingExamplesRelations = relations(curatedTrainingExamples, ({ one }) => ({
+  datasetItem: one(discoveredDatasetItems, {
+    fields: [curatedTrainingExamples.datasetItemId],
+    references: [discoveredDatasetItems.id],
+  }),
+  user: one(users, {
+    fields: [curatedTrainingExamples.createdByUserId],
+    references: [users.id],
+  }),
+  project: one(neuralMaps, {
+    fields: [curatedTrainingExamples.projectId],
+    references: [neuralMaps.id],
+  }),
+}));
+
 

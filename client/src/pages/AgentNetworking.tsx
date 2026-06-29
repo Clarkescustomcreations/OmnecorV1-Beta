@@ -211,11 +211,11 @@ export function AgentNetworking() {
   };
 
   // Queries
-  const { data: scheduledPostsData, isLoading: isLoadingScheduled, refetch: refetchScheduled } = trpc.scheduling.listScheduledPosts.useQuery({ limit: 50 });
+  const { data: scheduledPostsData, isLoading: isLoadingScheduled, refetch: refetchScheduled } = trpc.scheduling.listScheduledPosts.useQuery({ limit: 50, projectId: activeMap?.id });
   const { data: accountsData, isLoading: isLoadingAccounts, refetch: refetchAccounts } = trpc.platforms.listAccounts.useQuery();
-  const { data: unprocessedArticles, isLoading: isLoadingDiscovery, refetch: refetchDiscovery } = trpc.discovery.listUnprocessed.useQuery({ limit: 10 });
+  const { data: unprocessedArticles, isLoading: isLoadingDiscovery, refetch: refetchDiscovery } = trpc.discovery.listUnprocessed.useQuery({ limit: 10, projectId: activeMap?.id });
   const { data: analyticsSummary, isLoading: isLoadingAnalytics } = trpc.analytics.getPlatformSummary.useQuery();
-  const { data: pendingPosts, isLoading: isLoadingPending, refetch: refetchPending } = trpc.curator.listByStatus.useQuery({ status: "pending_review" });
+  const { data: pendingPosts, isLoading: isLoadingPending, refetch: refetchPending } = trpc.curator.listByStatus.useQuery({ status: "pending_review", projectId: activeMap?.id });
 
   const curateArticleMutation = trpc.curator.curateArticle.useMutation({
     onSuccess: () => {
@@ -536,7 +536,7 @@ export function AgentNetworking() {
                           "flex items-center justify-between p-4 border rounded-lg transition-colors",
                           post.status === "failed"
                             ? "border-l-4 border-l-destructive bg-destructive/5 hover:bg-destructive/10"
-                            : "hover:bg-muted/50",
+                            : "hover:bg-bg-elevated",
                         )}
                       >
                         <div className="space-y-1">
@@ -722,7 +722,7 @@ export function AgentNetworking() {
                       <p className="col-span-2 text-center py-8 text-muted-foreground text-sm">No platforms connected yet. Connect one below to get started.</p>
                     ) : (
                       accountsData?.map((account) => (
-                        <div key={account.id} className="p-4 border rounded-lg flex items-center justify-between hover:bg-muted/50 transition-colors">
+                        <div key={account.id} className="p-4 border rounded-lg flex items-center justify-between hover:bg-bg-elevated transition-colors">
                           <div className="flex items-center gap-4">
                             <div className={`w-2 h-2 rounded-full ${account.isActive ? 'bg-accent-success' : 'bg-destructive'}`} />
                             <div>
@@ -780,7 +780,7 @@ export function AgentNetworking() {
                     <p className="text-center py-8 text-muted-foreground">No new articles found. Click Refresh to sync feeds.</p>
                   ) : (
                     unprocessedArticles?.map((article) => (
-                      <div key={article.id} className="p-4 border rounded-lg hover:bg-muted/50 transition-colors">
+                      <div key={article.id} className="p-4 border rounded-lg hover:bg-bg-elevated transition-colors card-content-safe">
                         <div className="flex justify-between items-start mb-2">
                           <div>
                             <h4 className="font-medium line-clamp-2">{article.title || 'Untitled'}</h4>
@@ -1112,13 +1112,14 @@ function PlatformOAuthButtons({
 }
 
 function CurationPanel() {
+  const { activeMap } = useNeuralMap();
   const [curationTab, setCurationTab] = useState("discovery");
   const [autoPilotEnabled, setAutoPilotEnabled] = useState(false);
   const utils = trpc.useUtils();
 
-  const { data: articles, isLoading: loadingArticles } = trpc.discovery.listUnprocessed.useQuery({ limit: 20 });
-  const { data: pendingPosts, isLoading: loadingPending } = trpc.curator.listByStatus.useQuery({ status: "pending_review" });
-  const { data: scheduledPosts } = trpc.scheduling.listScheduledPosts.useQuery({ limit: 20 });
+  const { data: articles, isLoading: loadingArticles } = trpc.discovery.listUnprocessed.useQuery({ limit: 20, projectId: activeMap?.id });
+  const { data: pendingPosts, isLoading: loadingPending } = trpc.curator.listByStatus.useQuery({ status: "pending_review", projectId: activeMap?.id });
+  const { data: scheduledPosts } = trpc.scheduling.listScheduledPosts.useQuery({ limit: 20, projectId: activeMap?.id });
   const { data: accountsData } = trpc.platforms.listAccounts.useQuery();
 
   const syncMutation = trpc.discovery.fetchArticles.useMutation({
@@ -1279,7 +1280,7 @@ function CurationPanel() {
                       <div className="text-center p-12 text-muted-foreground italic">No articles found. Try syncing your feeds.</div>
                     ) : (
                       articles?.map((article) => (
-                        <div key={article.id} className="p-4 rounded-xl border bg-card hover:bg-muted/20 transition-all group">
+                        <div key={article.id} className="p-4 rounded-xl border bg-card hover:bg-bg-elevated transition-all group card-content-safe">
                           <div className="flex justify-between items-start mb-2">
                             <Badge variant="outline" className="text-[10px] h-5">{article.source}</Badge>
                             <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1381,7 +1382,7 @@ function CurationPanel() {
                 const draftLen = (post.content ?? "").length;
                 const draftOverLimit = draftLimit != null && draftLen > draftLimit;
                 return (
-                <Card key={post.id} className="overflow-hidden border-primary/20">
+                <Card key={post.id} className="overflow-hidden border-primary/20 card-content-safe">
                   <div className="flex flex-col md:flex-row h-full">
                     <div className="p-6 flex-1 space-y-4">
                       <div className="flex items-center justify-between">
@@ -1409,7 +1410,7 @@ function CurationPanel() {
                           <Clock className="w-3 h-3" /> {schedulePostMutation.isPending ? "Scheduling..." : "Schedule"}
                         </Button>
                       </div>
-                      <div className="p-4 rounded-xl bg-muted/50 border min-h-[100px] relative">
+                      <div className="p-4 rounded-xl bg-muted/50 border min-h-[100px] relative card-content-safe">
                         <p className="text-sm leading-relaxed whitespace-pre-wrap break-words">{post.content}</p>
                         <Button
                           variant="ghost"
@@ -1483,7 +1484,7 @@ function CurationPanel() {
             <CardContent className="p-0">
               <div className="divide-y">
                 {scheduledPosts?.filter(p => p.status === 'published').map(post => (
-                  <div key={post.id} className="p-4 flex items-center justify-between hover:bg-muted/10 transition-colors">
+                  <div key={post.id} className="p-4 flex items-center justify-between hover:bg-bg-elevated transition-colors card-content-safe">
                     <div className="flex items-center gap-4">
                       <div className="w-10 h-10 rounded-full bg-accent-success/10 flex items-center justify-center">
                         <Share2 className="w-5 h-5 text-accent-success" />

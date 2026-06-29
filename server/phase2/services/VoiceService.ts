@@ -36,7 +36,7 @@ import { v4 as uuidv4 } from "uuid";
 
 /** Health status of a voice microservice */
 export interface VoiceServiceHealth {
-  service: "whisper" | "tts" | "rvc";
+  service: "whisper" | "tts" | "rvc" | "voicebox";
   isHealthy: boolean;
   url: string;
   model: string | null;
@@ -199,6 +199,7 @@ export class VoiceService extends EventEmitter {
   private readonly whisperUrl: string;
   private readonly ttsUrl: string;
   private readonly rvcUrl: string;
+  private readonly voiceboxUrl: string;
   private readonly healthCheckTimeout: number;
 
   private constructor() {
@@ -206,6 +207,7 @@ export class VoiceService extends EventEmitter {
     this.whisperUrl = VOICE_CONFIG.whisperUrl;
     this.ttsUrl = VOICE_CONFIG.ttsUrl;
     this.rvcUrl = VOICE_CONFIG.rvcUrl;
+    this.voiceboxUrl = VOICE_CONFIG.voiceboxUrl;
     this.healthCheckTimeout = VOICE_CONFIG.healthCheckTimeoutMs;
   }
 
@@ -243,6 +245,13 @@ export class VoiceService extends EventEmitter {
   }
 
   /**
+   * Check if the Voice Box server is healthy and responsive.
+   */
+  async checkVoiceboxHealth(): Promise<VoiceServiceHealth> {
+    return this.checkHealth("voicebox", `${this.voiceboxUrl}/health`);
+  }
+
+  /**
    * Check all voice services at once.
    */
   async checkAllHealth(): Promise<VoiceServiceHealth[]> {
@@ -250,6 +259,7 @@ export class VoiceService extends EventEmitter {
       this.checkWhisperHealth(),
       this.checkTTSHealth(),
       this.checkRVCHealth(),
+      this.checkVoiceboxHealth(),
     ]);
   }
 
@@ -434,16 +444,18 @@ export class VoiceService extends EventEmitter {
       throw new Error(error);
     }
 
+    const engine = request.engine || getSetting("ttsEngine", "kokoro");
     const payload = {
       text,
       speaker_wav_path: speakerWavPath,
       language: language || "en",
-      // TTS backend is user-configurable via Settings → Voice (ttsEngine).
-      engine: request.engine || getSetting("ttsEngine", "kokoro"),
+      engine,
     };
 
+    const targetUrl = engine === "voicebox" ? this.voiceboxUrl : this.ttsUrl;
+
     try {
-      const response = await fetch(`${this.ttsUrl}/synthesize`, {
+      const response = await fetch(`${targetUrl}/synthesize`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -677,7 +689,7 @@ export class VoiceService extends EventEmitter {
 
   /** Generic health check for a voice microservice */
   private async checkHealth(
-    service: "whisper" | "tts" | "rvc",
+    service: "whisper" | "tts" | "rvc" | "voicebox",
     url: string
   ): Promise<VoiceServiceHealth> {
     const checkedAt = new Date().toISOString();

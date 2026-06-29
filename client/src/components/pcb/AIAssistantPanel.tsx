@@ -19,6 +19,8 @@ import { Send, Loader2 } from 'lucide-react';
 import { trpc } from '@/lib/trpc';
 import { toast } from 'sonner';
 import { useDesignerStore } from '@/lib/stores/designerStore';
+import { useAppStore } from '@/lib/store/app.store';
+import { LoadingQuote } from '@/components/chat/LoadingQuote';
 
 export interface AIAssistantPanelProps {
   canvasState: {
@@ -113,6 +115,7 @@ What would you like help with?`,
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const { chatDisplaySettings } = useAppStore();
 
   const chatMutation = trpc.ai.chat.useMutation({
     onSuccess: (data) => {
@@ -242,10 +245,14 @@ What would you like help with?`,
 
           {isLoading && (
             <div className="flex justify-start">
-              <div className="bg-muted text-foreground rounded-lg p-3 flex items-center gap-2">
-                <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
-                <span className="text-sm text-muted-foreground">Thinking...</span>
-              </div>
+              {chatDisplaySettings.showThinkingQuotes ? (
+                <LoadingQuote />
+              ) : (
+                <div className="bg-muted text-foreground rounded-lg p-3 flex items-center gap-2">
+                  <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" />
+                  <span className="text-sm text-muted-foreground">Thinking...</span>
+                </div>
+              )}
             </div>
           )}
 

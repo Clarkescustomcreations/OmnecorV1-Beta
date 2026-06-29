@@ -8,13 +8,24 @@ import { ArticleDiscoveryService } from "../phase2/services/ArticleDiscoveryServ
 
 export const discoveryRouter = router({
   listUnprocessed: protectedProcedure
-    .input(z.object({ limit: z.number().default(10) }))
+    .input(z.object({
+      projectId: z.string().optional(),
+      limit: z.number().default(10),
+    }))
     .query(async ({ input }) => {
       const db = await getDb();
 
+      const whereConditions = [
+        eq(discoveredArticles.isProcessed, 0),
+      ];
+
+      if (input.projectId) {
+        whereConditions.push(eq(discoveredArticles.projectId, input.projectId));
+      }
+
       const articles = await db.select()
         .from(discoveredArticles)
-        .where(eq(discoveredArticles.isProcessed, 0))
+        .where(and(...whereConditions))
         .orderBy(desc(discoveredArticles.fetchedAt))
         .limit(input.limit);
 

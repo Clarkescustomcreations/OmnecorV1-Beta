@@ -122,7 +122,7 @@ const createSessionSchema = z.object({
 });
 
 const saveMessageSchema = z.object({
-  sessionId: z.string().uuid(),
+  sessionId: z.string().min(1),
   role: z.enum(["system", "user", "assistant", "tool", "function"]),
   content: z.string(),
   tokenCount: z.number().optional(),
@@ -190,7 +190,7 @@ export const aiRouter = router({
       return sessions.filter(s => s.userId === ctx.user.id);
     }),
   getSession: protectedProcedure
-    .input(z.object({ sessionId: z.string().uuid() }))
+    .input(z.object({ sessionId: z.string().min(1) }))
     .query(async ({ ctx, input }) => {
       const session = await getChatSession(input.sessionId);
       // Treat a non-owned session as not found — never leak another user's
@@ -231,7 +231,7 @@ export const aiRouter = router({
   summarizeAndPruneSession: protectedProcedure
     .input(
       z.object({
-        sessionId: z.string().uuid(),
+        sessionId: z.string().min(1),
         projectId: z.string().min(1),
         providerId: z.string().min(1),
         modelId: z.string().min(1),

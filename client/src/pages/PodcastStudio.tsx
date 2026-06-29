@@ -62,6 +62,8 @@ interface DialogueTurn {
   speakerId: string;
   text: string;
   emotion: string;
+  engine?: string;
+  referenceWav?: string;
 }
 
 type SourceKind = "audio" | "file" | "text" | "website" | "cloud" | "discovery";
@@ -77,8 +79,8 @@ interface PodcastSource {
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const DEFAULT_TURNS: DialogueTurn[] = [
-  { id: "1", speakerId: "Alex", text: "Welcome to the Omnecor Pulse. I'm your host, Alex.", emotion: "excited" },
-  { id: "2", speakerId: "Sam", text: "And I'm Sam. Today we're exploring local voice cloning technologies.", emotion: "thoughtful" },
+  { id: "1", speakerId: "Alex", text: "Welcome to the Omnecor Pulse. I'm your host, Alex.", emotion: "excited", engine: "kokoro" },
+  { id: "2", speakerId: "Sam", text: "And I'm Sam. Today we're exploring local voice cloning technologies.", emotion: "thoughtful", engine: "kokoro" },
 ];
 
 const KIND_ICON: Record<SourceKind, React.ReactNode> = {
@@ -217,7 +219,7 @@ function SourcesSidebar({ sources, onAdd, onToggle, onDelete, onSelectAll, onDes
             <div
               key={src.id}
               className={cn(
-                "flex items-start gap-2 p-2 rounded-lg border text-[11px] group transition-colors",
+                "flex items-start gap-2 p-2 rounded-lg border text-[11px] group transition-colors card-content-safe",
                 src.selected ? "bg-primary/10 border-primary/30" : "bg-muted/10 border-border hover:border-border/80"
               )}
             >
@@ -418,9 +420,10 @@ interface PodcastSessionState {
   podcastQuality?: "draft" | "standard" | "high";
 }
 
-function loadPodcastSession(): Partial<PodcastSessionState> | null {
+function loadPodcastSession(mapId: string | null): Partial<PodcastSessionState> | null {
   try {
-    const raw = localStorage.getItem(SESSION_KEY);
+    const key = `omnecor:podcast_session_${mapId || "default"}`;
+    const raw = localStorage.getItem(key);
     return raw ? (JSON.parse(raw) as Partial<PodcastSessionState>) : null;
   } catch {
     return null;
@@ -432,28 +435,54 @@ function loadPodcastSession(): Partial<PodcastSessionState> | null {
 // `podcast_episodes` table, so no local interface/loader is needed here.
 
 export function PodcastStudio() {
-  const [turns, setTurns] = useState<DialogueTurn[]>(() => loadPodcastSession()?.turns ?? DEFAULT_TURNS);
-  const [sources, setSources] = useState<PodcastSource[]>(() => loadPodcastSession()?.sources ?? []);
+  const { activeMap, activeMapId } = useNeuralMap();
+  const [turns, setTurns] = useState<DialogueTurn[]>(() => loadPodcastSession(activeMapId)?.turns ?? DEFAULT_TURNS);
+  const [sources, setSources] = useState<PodcastSource[]>(() => loadPodcastSession(activeMapId)?.sources ?? []);
   const [isGenerating, setIsGenerating] = useState(false);
   const [result, setResult] = useState<{ segments: { speaker: string; text?: string; content?: string; audioUrl?: string | null }[] } | null>(null);
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   // Tracks the currently-playing per-segment preview so a new play stops the previous one.
   const activeSegmentAudioRef = useRef<HTMLAudioElement | null>(null);
-  const [podcastLength, setPodcastLength] = useState<PodcastLength>(() => loadPodcastSession()?.podcastLength ?? "medium");
+  const [podcastLength, setPodcastLength] = useState<PodcastLength>(() => loadPodcastSession(activeMapId)?.podcastLength ?? "medium");
   const [regenIndex, setRegenIndex] = useState<number | null>(null);
   // Server-backed episode history (TD-026) — replaces the prior localStorage
   // store so episodes survive a cache clear and follow the user across devices.
   const utils = trpc.useUtils();
   const { data: history = [] } = trpc.podcast.listEpisodes.useQuery();
+  const { data: offlineVoices = [] } = trpc.voice.listOfflineVoices.useQuery();
+  
+  const uploadVoiceMutation = trpc.voice.uploadVoice.useMutation({
+    onSuccess: () => {
+      utils.voice.listOfflineVoices.invalidate();
+      toast.success("Voice sample uploaded successfully");
+    },
+    onError: (e) => toast.error(`Failed to upload voice: ${e.message}`)
+  });
+
+  const handleVoiceUpload = (e: React.ChangeEvent<HTMLInputElement>, turnId: string) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(",")[1];
+      uploadVoiceMutation.mutate({ voiceName: file.name.replace(/\.[^/.]+$/, ""), base64Audio: base64 }, {
+        onSuccess: (data) => {
+          updateTurn(turnId, "referenceWav", data.path);
+        }
+      });
+    };
+    reader.readAsDataURL(file);
+  };
+
   const deleteEpisodeMutation = trpc.podcast.deleteEpisode.useMutation({
     onSuccess: () => { utils.podcast.listEpisodes.invalidate(); },
     onError: (e) => toast.error(`Could not remove episode: ${e.message}`),
   });
   const [showHistory, setShowHistory] = useState(false);
 
-  const [podcastDescription, setPodcastDescription] = useState(() => loadPodcastSession()?.podcastDescription ?? "");
-  const [podcastDuration, setPodcastDuration] = useState<number>(() => loadPodcastSession()?.podcastDuration ?? 15);
-  const [podcastQuality, setPodcastQuality] = useState<"draft" | "standard" | "high">(() => loadPodcastSession()?.podcastQuality ?? "standard");
+  const [podcastDescription, setPodcastDescription] = useState(() => loadPodcastSession(activeMapId)?.podcastDescription ?? "");
+  const [podcastDuration, setPodcastDuration] = useState<number>(() => loadPodcastSession(activeMapId)?.podcastDuration ?? 15);
+  const [podcastQuality, setPodcastQuality] = useState<"draft" | "standard" | "high">(() => loadPodcastSession(activeMapId)?.podcastQuality ?? "standard");
   const [activeJobId, setActiveJobId] = useState<string | null>(null);
   const [generationProgress, setGenerationProgress] = useState(0);
 
@@ -471,10 +500,71 @@ export function PodcastStudio() {
     setPodcastDuration(minutes);
   };
 
+  // Keep a ref of the session state for project-switching
+  const prevMapIdRef = useRef<string | null>(activeMapId);
+  const sessionStateRef = useRef({
+    turns,
+    sources,
+    podcastLength,
+    podcastDescription,
+    podcastDuration,
+    podcastQuality
+  });
+
+  useEffect(() => {
+    sessionStateRef.current = {
+      turns,
+      sources,
+      podcastLength,
+      podcastDescription,
+      podcastDuration,
+      podcastQuality
+    };
+  }, [turns, sources, podcastLength, podcastDescription, podcastDuration, podcastQuality]);
+
+  useEffect(() => {
+    if (prevMapIdRef.current !== activeMapId) {
+      // Save current session to the old map key first
+      const oldKey = `omnecor:podcast_session_${prevMapIdRef.current || "default"}`;
+      try {
+        localStorage.setItem(oldKey, JSON.stringify(sessionStateRef.current));
+      } catch (e) {
+        console.error(e);
+      }
+
+      // Load session for the new map key
+      const newKey = `omnecor:podcast_session_${activeMapId || "default"}`;
+      const saved = localStorage.getItem(newKey);
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved) as Partial<PodcastSessionState>;
+          setTurns(parsed.turns ?? DEFAULT_TURNS);
+          setSources(parsed.sources ?? []);
+          setPodcastLength(parsed.podcastLength ?? "medium");
+          setPodcastDescription(parsed.podcastDescription ?? "");
+          setPodcastDuration(parsed.podcastDuration ?? 15);
+          setPodcastQuality(parsed.podcastQuality ?? "standard");
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        // Reset to defaults
+        setTurns(DEFAULT_TURNS);
+        setSources([]);
+        setPodcastLength("medium");
+        setPodcastDescription("");
+        setPodcastDuration(15);
+        setPodcastQuality("standard");
+      }
+      prevMapIdRef.current = activeMapId;
+    }
+  }, [activeMapId]);
+
   // Persist the editable session whenever it changes.
   useEffect(() => {
     try {
-      localStorage.setItem(SESSION_KEY, JSON.stringify({
+      const key = `omnecor:podcast_session_${activeMapId || "default"}`;
+      localStorage.setItem(key, JSON.stringify({
         turns,
         sources,
         podcastLength,
@@ -485,10 +575,13 @@ export function PodcastStudio() {
     } catch (error) {
       /* storage quota / unavailable — non-fatal */
     }
-  }, [turns, sources, podcastLength, podcastDescription, podcastDuration, podcastQuality]);
+  }, [turns, sources, podcastLength, podcastDescription, podcastDuration, podcastQuality, activeMapId]);
 
   const clearSession = useCallback(() => {
-    try { localStorage.removeItem(SESSION_KEY); } catch { /* ignore */ }
+    try {
+      const key = `omnecor:podcast_session_${activeMapId || "default"}`;
+      localStorage.removeItem(key);
+    } catch { /* ignore */ }
     setTurns(DEFAULT_TURNS);
     setSources([]);
     setPodcastLength("medium");
@@ -498,10 +591,9 @@ export function PodcastStudio() {
     setResult(null);
     setAudioUrl(null);
     toast.info("Session cleared");
-  }, []);
+  }, [activeMapId]);
 
   // Neural map link
-  const { activeMap } = useNeuralMap();
   const { entries: neuralContextFiles } = useNeuralContextStore();
   const [linkedToMap, setLinkedToMap] = useState<boolean>(() => {
     try { return localStorage.getItem("omnecor:podcast_linked_to_map") === "true"; } catch { return false; }
@@ -653,7 +745,8 @@ export function PodcastStudio() {
       id: crypto.randomUUID(),
       speakerId: nextSpeaker,
       text: "",
-      emotion: "neutral"
+      emotion: "neutral",
+      engine: "kokoro"
     }]);
   };
 
@@ -683,7 +776,7 @@ export function PodcastStudio() {
       description: podcastDescription,
       durationMinutes: podcastDuration,
       quality: podcastQuality,
-      turns: turns.map(t => ({ speakerId: t.speakerId, text: t.text, emotion: t.emotion }))
+      turns: turns.map(t => ({ speakerId: t.speakerId, text: t.text, emotion: t.emotion, engine: t.engine, referenceWav: t.referenceWav }))
     });
   };
 
@@ -732,17 +825,17 @@ export function PodcastStudio() {
                 {selectedSources.length} source{selectedSources.length !== 1 ? "s" : ""} active
               </Badge>
             )}
-            <Button variant="outline" size="sm" className="gap-2" onClick={handleGenerateScript} disabled={generateScriptMutation.isPending}>
+            <Button id="btn-podcast-ai-script-gen" variant="outline" size="sm" className="gap-2" onClick={handleGenerateScript} disabled={generateScriptMutation.isPending}>
               {generateScriptMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               AI Script Gen
             </Button>
-            <Button variant="outline" size="sm" className="gap-2" onClick={() => setShowHistory(true)}>
+            <Button id="btn-podcast-history" variant="outline" size="sm" className="gap-2" onClick={() => setShowHistory(true)}>
               <History className="w-4 h-4" /> History{history.length > 0 ? ` (${history.length})` : ""}
             </Button>
-            <Button variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={clearSession} title="Clear saved session and reset to defaults">
+            <Button id="btn-podcast-clear-session" variant="ghost" size="sm" className="gap-2 text-muted-foreground" onClick={clearSession} title="Clear saved session and reset to defaults">
               <Trash2 className="w-4 h-4" /> Clear session
             </Button>
-            <Button size="sm" className="gap-2" onClick={handleGenerate} disabled={isGenerating}>
+            <Button id="btn-podcast-generate" size="sm" className="gap-2" onClick={handleGenerate} disabled={isGenerating}>
               {isGenerating ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -784,7 +877,7 @@ export function PodcastStudio() {
               <CardContent className="pt-6">
                 <div className="space-y-6">
                   {turns.map((turn, index) => (
-                    <div key={turn.id} className="relative animate-in fade-in slide-in-from-left duration-300">
+                    <div key={turn.id} className="relative animate-in fade-in slide-in-from-left duration-300 card-content-safe">
                       <div className="flex items-center gap-3 mb-2">
                         <div className={cn(
                           "w-8 h-8 rounded-full flex items-center justify-center font-bold text-xs border shadow-sm",
@@ -805,6 +898,15 @@ export function PodcastStudio() {
                         <div className="flex-1" />
                         <select
                           className="text-[10px] bg-muted/50 rounded px-1.5 py-0.5 border-none focus:ring-1 focus:ring-primary/30"
+                          value={turn.engine || "kokoro"}
+                          onChange={(e) => updateTurn(turn.id, "engine", e.target.value)}
+                        >
+                          <option value="kokoro">Kokoro</option>
+                          <option value="xtts">XTTS-v2</option>
+                          <option value="voicebox">Voice Box</option>
+                        </select>
+                        <select
+                          className="text-[10px] bg-muted/50 rounded px-1.5 py-0.5 border-none focus:ring-1 focus:ring-primary/30"
                           value={turn.emotion}
                           onChange={(e) => updateTurn(turn.id, "emotion", e.target.value)}
                         >
@@ -817,6 +919,26 @@ export function PodcastStudio() {
                           <Trash2 className="w-3.5 h-3.5" />
                         </Button>
                       </div>
+                      
+                      {(turn.engine === "xtts" || turn.engine === "voicebox") && (
+                        <div className="flex items-center gap-2 mb-2">
+                          <select
+                            className="text-[10px] bg-background border border-border rounded px-1.5 py-0.5 flex-1"
+                            value={turn.referenceWav || ""}
+                            onChange={(e) => updateTurn(turn.id, "referenceWav", e.target.value)}
+                          >
+                            <option value="">Select Reference Voice...</option>
+                            {offlineVoices.map(v => (
+                              <option key={v.path} value={v.path}>{v.name}</option>
+                            ))}
+                          </select>
+                          <Label className="cursor-pointer text-[10px] bg-muted hover:bg-muted/80 rounded px-2 py-1 border border-border flex items-center gap-1">
+                            <Upload className="w-3 h-3" /> Upload
+                            <input type="file" accept="audio/wav" className="hidden" onChange={(e) => handleVoiceUpload(e, turn.id)} />
+                          </Label>
+                        </div>
+                      )}
+
                       <Textarea
                         placeholder="Type dialogue here..."
                         value={turn.text}
@@ -962,7 +1084,7 @@ export function PodcastStudio() {
                     <div className="space-y-2">
                       <p className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">Segment Breakdown</p>
                       {result.segments.map((seg, i) => (
-                        <div key={i} className="flex items-center justify-between p-2 rounded bg-background border text-[10px]">
+                        <div key={i} className="flex items-center justify-between p-2 rounded bg-background border text-[10px] card-content-safe">
                           <div className="flex items-center gap-2">
                             <User className="w-3 h-3 text-primary" />
                             <span className="font-bold">{seg.speaker}</span>

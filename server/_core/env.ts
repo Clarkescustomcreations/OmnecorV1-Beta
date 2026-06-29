@@ -1,5 +1,10 @@
 export const ENV = {
-  appId: process.env.VITE_APP_ID ?? "",
+  // App identity baked into every session token. MUST be non-empty: verifySession()
+  // rejects tokens whose `appId` is blank ("Session payload missing required fields"),
+  // so an empty value makes EVERY local/desktop session invalid → "Please login" on
+  // all authenticated calls. Local-first / Sovereign installs (desktop deb, server
+  // deb) don't set VITE_APP_ID, so default to a stable identifier.
+  appId: process.env.VITE_APP_ID || "omnecor",
   cookieSecret: process.env.JWT_SECRET ?? "",
   // Session lifetime in milliseconds. Defaults to one year for local-first /
   // sovereign desktop installs (long-lived convenience). Network deployments
@@ -17,12 +22,12 @@ export const ENV = {
   isProduction: process.env.NODE_ENV === "production",
   forgeApiUrl: process.env.BUILT_IN_FORGE_API_URL ?? "",
   forgeApiKey: process.env.BUILT_IN_FORGE_API_KEY ?? "",
-  ollamaUrl: process.env.OLLAMA_URL ?? "http://localhost:11434",
+  ollamaUrl: process.env.OLLAMA_URL ?? "http://127.0.0.1:11434",
   openaiApiKey: process.env.OPENAI_API_KEY ?? "",
   anthropicApiKey: process.env.ANTHROPIC_API_KEY ?? "",
   geminiApiKey: process.env.GEMINI_API_KEY ?? "",
   xaiApiKey: process.env.XAI_API_KEY ?? "",
-  n8nUrl: process.env.N8N_URL ?? "http://localhost:5678",
+  n8nUrl: process.env.N8N_URL ?? "http://127.0.0.1:5678",
   notionClientId: process.env.NOTION_CLIENT_ID ?? "",
   notionClientSecret: process.env.NOTION_CLIENT_SECRET ?? "",
   slackClientId: process.env.SLACK_CLIENT_ID ?? "",
@@ -31,18 +36,19 @@ export const ENV = {
   virtualCardProvider: process.env.VIRTUAL_CARD_PROVIDER ?? "lithic",
   sovereignMode: process.env.SOVEREIGN_MODE === "true",
   zeroLoginMode: process.env.ZERO_LOGIN_MODE === "true",
-  // Execution mode the zero-login local-admin runs under. Defaults to "sovereign"
-  // so air-gapped/classified installs cannot silently leak inference to cloud
-  // providers (the README markets zero-login as the air-gapped mode). Set to
-  // "scrapper" (or "big_spender") to opt this local-admin session into cloud
-  // calls for testing — cloud is then allowed and spend-tracked. The flag is the
-  // single source of truth and overrides any stale value persisted on the
-  // local-zero-login user (see server/_core/context.ts).
+  // Seed execution mode for the zero-login local-admin on FIRST creation.
+  // Defaults to "scrapper" (cloud allowed + spend-tracked) — the middle-ground
+  // starting point most installs want, and the only sane default for testing
+  // (sovereign-by-default blocked everything). Sovereign mode is opt-in: the
+  // user switches it on in Settings, which persists executionMode to their DB
+  // record. Because the persisted value is the source of truth (see
+  // server/_core/context.ts), this env var only seeds the mode the first time
+  // the local-zero-login user is created; afterward the Settings toggle wins.
   zeroLoginExecutionMode: ((): "sovereign" | "scrapper" | "big_spender" => {
     const raw = process.env.ZERO_LOGIN_EXECUTION_MODE;
     return raw === "scrapper" || raw === "big_spender" || raw === "sovereign"
       ? raw
-      : "sovereign";
+      : "scrapper";
   })(),
   googleClientId: process.env.GOOGLE_CLIENT_ID ?? "",
   googleClientSecret: process.env.GOOGLE_CLIENT_SECRET ?? "",

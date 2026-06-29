@@ -1,0 +1,6 @@
+{
+  "name": "omnecor-backend",
+  "version": "2.4.1~beta.1",
+  "private": true,
+  "type": "module"
+}

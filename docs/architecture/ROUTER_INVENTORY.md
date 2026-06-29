@@ -61,6 +61,8 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 | platforms | platformsRouter.ts | Social platform account management (safe columns only) | 3+ | protected |
 | analytics | analyticsRouter.ts | Platform analytics summaries (impressions, engagement) | 2+ | protected |
 | settings | agentSettingsRouter.ts | Agent posting schedule configuration (getScheduleConfig, updateScheduleConfig) | 2 | protected |
+| penpot | penpotRouter.ts | TRPC endpoints for fetching design tokens and components from Penpot | 3+ | protected |
+| dataset | datasetRouter.ts | LLM dataset curation, discovery, and JSONL compilation | 6+ | protected |
 | oauth | oauthRouter.ts | OAuth flow (authorization, callback, token exchange) | 3+ | protected |
 | attachments | attachmentsRouter.ts | File upload with sanitization (max 10 MB base64) | 1+ | protected |
 | neuralMaps | neuralMapsRouter.ts | Neural brain map persistence (settings, metadata) | 4+ | protected |
@@ -323,6 +325,20 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 - **File**: `server/routers/agentSettingsRouter.ts`
 - **Description**: Agent posting schedule configuration per platform (posts per day, auto-approval flags).
 - **Key Procedures**: `getScheduleConfig`, `updateScheduleConfig`
+- **Procedure Types**: `protectedProcedure`
+
+### Penpot Router
+- **Namespace**: `penpot`
+- **File**: `server/routers/penpotRouter.ts`
+- **Description**: Exposes the headless Penpot Bridge for pulling design tokens (colors, typography) and generating AI UI components from source.
+- **Key Procedures**: `getDesignTokens`, `fetchComponents`
+- **Procedure Types**: `protectedProcedure`
+
+### Dataset Router
+- **Namespace**: `dataset`
+- **File**: `server/routers/datasetRouter.ts`
+- **Description**: Handles the LLM Builder Dataset Discovery & Curation pipeline. Crawls local files and search queries, and compiles curated JSONL for Unsloth.
+- **Key Procedures**: `discoverSources`, `listUnprocessedSources`, `curateSourceItem`, `compileDataset`
 - **Procedure Types**: `protectedProcedure`
 
 ### OAuth Router

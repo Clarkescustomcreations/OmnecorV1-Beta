@@ -53,8 +53,17 @@ import { PromptSanitizer } from "../phase2/services/PromptSanitizer.js";
 import { ElevenLabsService } from "../phase2/services/ElevenLabsService.js";
 import { MCPClientService } from "../phase2/services/MCPClientService.js";
 import { PipelineEngineService } from "../phase2/services/PipelineEngineService.js";
-
-// ─────────────────────────────────────────────────────────────────────────────
+import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { DatasetDiscoveryService } from "../phase2/services/DatasetDiscoveryService.js";
+import { DatasetCurationService } from "../phase2/services/DatasetCurationService.js";
+import { PCBWayService } from "../phase2/services/PCBWayService.js";
+import { ModelManagementService } from "../phase2/services/ModelManagementService.js";
+import { VirtualCardService } from "../phase2/services/VirtualCardService.js";
+import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
+import { NotificationService } from "./NotificationService.js";
+import { SettingsService } from "../phase2/services/SettingsService.js";
+import { OpenArtService } from "../phase2/services/OpenArtService.js";
+import { AsyncJobService } from "../phase2/services/AsyncJobService.js";
 // Unified Context Type
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -100,6 +109,17 @@ export type TrpcContext = {
     elevenLabs: ElevenLabsService;
     mcpClient: MCPClientService;
     pipeline: PipelineEngineService;
+    auditLog: AuditLogService;
+    datasetDiscovery: DatasetDiscoveryService;
+    datasetCuration: DatasetCurationService;
+    pcbWay: PCBWayService;
+    modelManagement: ModelManagementService;
+    virtualCard: VirtualCardService;
+    valetRouter: ValetRouterService;
+    notification: NotificationService;
+    settings: SettingsService;
+    openArt: OpenArtService;
+    asyncJob: AsyncJobService;
   };
 };
 
@@ -121,42 +141,35 @@ export async function createContext(
   let user: User | null = null;
 
   if (ENV.zeroLoginMode) {
-    // ZERO_LOGIN_EXECUTION_MODE is the single source of truth (defaults to
-    // "sovereign"). It overrides whatever is persisted on the local-zero-login
-    // user, so toggling the flag takes effect immediately even on installs that
-    // already created this user under an older default.
-    const mode = ENV.zeroLoginExecutionMode;
+    const defaultMode = ENV.zeroLoginExecutionMode;
     let dbUser = await getUserByOpenId("local-zero-login");
     if (!dbUser) {
       await upsertUser({
         openId: "local-zero-login",
         name: "Local Admin",
         role: "admin",
-        executionMode: mode,
+        executionMode: defaultMode,
       });
       dbUser = await getUserByOpenId("local-zero-login");
       if (!dbUser) {
         throw new Error("Failed to create zero-login user: row not found after upsert");
       }
-    } else if (dbUser.executionMode !== mode) {
-      // Keep the persisted record in sync with the flag (one-time write until
-      // they match) so anything reading the DB user sees the same mode.
-      await upsertUser({ openId: "local-zero-login", executionMode: mode });
     }
+    const executionMode = dbUser.executionMode;
     user = {
-      id: dbUser?.id ?? 0,
+      id: dbUser.id,
       openId: "local-zero-login",
       name: "Local Admin",
       email: null,
       loginMethod: "zero-login",
       passwordHash: null,
       role: "admin",
-      executionMode: mode,
-      tosAcceptedAt: dbUser?.tosAcceptedAt ?? null,
-      tosAcceptedVersion: dbUser?.tosAcceptedVersion ?? null,
-      createdAt: dbUser?.createdAt ?? new Date(),
-      updatedAt: dbUser?.updatedAt ?? new Date(),
-      lastSignedIn: dbUser?.lastSignedIn ?? new Date(),
+      executionMode,
+      tosAcceptedAt: dbUser.tosAcceptedAt ?? null,
+      tosAcceptedVersion: dbUser.tosAcceptedVersion ?? null,
+      createdAt: dbUser.createdAt ?? new Date(),
+      updatedAt: dbUser.updatedAt ?? new Date(),
+      lastSignedIn: dbUser.lastSignedIn ?? new Date(),
     } satisfies User;
   } else {
     try {
@@ -202,6 +215,17 @@ export async function createContext(
       elevenLabs: ElevenLabsService.getInstance(),
       mcpClient: MCPClientService.getInstance(),
       pipeline: PipelineEngineService.getInstance(),
+      auditLog: AuditLogService.getInstance(),
+      datasetDiscovery: DatasetDiscoveryService.getInstance(),
+      datasetCuration: DatasetCurationService.getInstance(),
+      pcbWay: PCBWayService.getInstance(),
+      modelManagement: ModelManagementService.getInstance(),
+      virtualCard: VirtualCardService.getInstance(),
+      valetRouter: ValetRouterService.getInstance(),
+      notification: NotificationService.getInstance(),
+      settings: SettingsService.getInstance(),
+      openArt: OpenArtService.getInstance(),
+      asyncJob: AsyncJobService.getInstance(),
     },
   };
 }

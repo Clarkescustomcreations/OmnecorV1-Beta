@@ -12,8 +12,10 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Brain, Box, Zap, Play, Settings, Plus, Trash2, Cloud, CheckCircle2, AlertCircle } from "lucide-react";
+import { Brain, Box, Zap, Play, Settings, Plus, Cloud, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
 import {
   getModuleInfo,
@@ -52,6 +54,10 @@ export function SpecializedModuleLauncher({
     onSuccess: (d) => { toast.success(`Kaggle job queued: ${d.kernelSlug}`); },
     onError: (e) => toast.error("Kaggle launch failed: " + e.message),
   });
+  const startTrainingMutation = trpc.training.startTraining.useMutation({
+    onSuccess: (d) => toast.success(`Training job started (${d.jobId.slice(0, 8)}). Monitor in Jobs panel.`),
+    onError: (e) => toast.error("Training failed: " + e.message),
+  });
 
   const openInBlenderMutation = trpc.blender.openFile.useMutation({
     onSuccess: (d) => {
@@ -85,8 +91,20 @@ export function SpecializedModuleLauncher({
 
   const handleStartTraining = () => {
     if (!llmSession) return;
+    if (!llmSession.loraConfigs.length) {
+      toast.warning("Add at least one LoRA config before training.");
+      return;
+    }
+    const cfg = llmSession.loraConfigs[0];
+    startTrainingMutation.mutate({
+      modelName: llmSession.baseModel,
+      datasetPath: cfg.datasetPath || "/path/to/dataset.jsonl",
+      r: cfg.rank,
+      loraAlpha: cfg.alpha,
+      epochs: cfg.epochs,
+      saveMethod: "gguf",
+    });
     setLLMSession({ ...llmSession, status: "training" });
-    toast.success("Training started!");
   };
 
   const handleNewProject = (type: "3d" | "pcb") => {
@@ -167,27 +185,32 @@ export function SpecializedModuleLauncher({
           </CardContent>
         </Card>
 
-        {/* Progress */}
+        {/* Training Status */}
         <Card className="bg-muted/50">
           <CardHeader className="pb-3">
-            <CardTitle className="text-sm">Training Progress</CardTitle>
+            <CardTitle className="text-sm">Training Status</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div>
-              <div className="flex justify-between text-xs mb-1">
-                <span>Overall Progress</span>
-                <span className="font-semibold">{llmSession.progress}%</span>
+          <CardContent className="space-y-2">
+            {llmSession.status === "training" ? (
+              <div className="flex items-center gap-2 text-sm text-accent-cyan">
+                <Loader2 className="size-4 animate-spin shrink-0" />
+                <span>Training in progress — monitor in Jobs panel</span>
               </div>
-              <div className="w-full bg-muted rounded-full h-2">
-                <div
-                  className="bg-primary/10 h-2 rounded-full transition-all"
-                  style={{ width: `${llmSession.progress}%` }}
-                />
+            ) : llmSession.status === "completed" ? (
+              <div className="flex items-center gap-2 text-sm text-accent-success">
+                <CheckCircle2 className="size-4 shrink-0" />
+                <span>
+                  Training complete
+                  {llmSession.trainingMetrics.length > 0 && ` · ${llmSession.trainingMetrics.length} epochs`}
+                </span>
               </div>
-            </div>
-            <div className="text-xs text-muted-foreground">
-              {llmSession.trainingMetrics.length} epochs completed
-            </div>
+            ) : (
+              <p className="text-xs text-muted-foreground">
+                {llmSession.loraConfigs.length === 0
+                  ? "Add a LoRA config, then click Start Training."
+                  : "Ready — click Start Training to begin."}
+              </p>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -287,21 +310,21 @@ export function SpecializedModuleLauncher({
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Config Name</label>
-                <input type="text" value={editingLoraConfig.name} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, name: e.target.value })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="lora-edit-name" className="text-xs font-semibold text-foreground">Config Name</Label>
+                <Input id="lora-edit-name" type="text" value={editingLoraConfig.name} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, name: e.target.value })} className="text-sm" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Rank</label>
-                <input type="number" min="4" max="256" value={editingLoraConfig.rank} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, rank: Number(e.target.value) })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="lora-edit-rank" className="text-xs font-semibold text-foreground">Rank</Label>
+                <Input id="lora-edit-rank" type="number" min={4} max={256} value={editingLoraConfig.rank} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, rank: Number(e.target.value) })} className="text-sm font-mono" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Alpha</label>
-                <input type="number" min="1" max="256" value={editingLoraConfig.alpha} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, alpha: Number(e.target.value) })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="lora-edit-alpha" className="text-xs font-semibold text-foreground">Alpha</Label>
+                <Input id="lora-edit-alpha" type="number" min={1} max={256} value={editingLoraConfig.alpha} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, alpha: Number(e.target.value) })} className="text-sm font-mono" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Epochs</label>
-                <input type="number" min="1" max="100" value={editingLoraConfig.epochs} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, epochs: Number(e.target.value) })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="lora-edit-epochs" className="text-xs font-semibold text-foreground">Epochs</Label>
+                <Input id="lora-edit-epochs" type="number" min={1} max={100} value={editingLoraConfig.epochs} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, epochs: Number(e.target.value) })} className="text-sm font-mono" />
               </div>
             </div>
             <Button className="w-full" size="sm" onClick={() => {
@@ -326,9 +349,9 @@ export function SpecializedModuleLauncher({
           <Play className="w-4 h-4 mr-2" aria-hidden="true" />
           Start Training
         </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure LLM training" onClick={() => setLocation("/settings?tab=valet")}>
+        <Button variant="outline" className="flex-1" aria-label="Open full LLM Builder" onClick={() => setLocation("/llm-builder")}>
           <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
-          Configure
+          Open LLM Builder
         </Button>
       </div>
 
@@ -361,22 +384,30 @@ export function SpecializedModuleLauncher({
               <p className="text-accent-cyan">Once connected, come back here to launch a training run with one click.</p>
             </div>
           ) : (
-            <Button
-              className="w-full"
-              size="sm"
-              onClick={() => startKaggle.mutate({
-                datasetPath: "data/valet",
-                modelName: llmSession?.name || undefined,
-                epochs: 1.5,
-                maxSeqLength: 3072,
-                r: 8,
-                loraAlpha: 16,
-              })}
-              disabled={startKaggle.isPending}
-            >
-              <Cloud className="w-4 h-4 mr-2" />
-              {startKaggle.isPending ? "Launching..." : "Train on Kaggle GPU"}
-            </Button>
+            <>
+              <Button
+                className="w-full"
+                size="sm"
+                onClick={() => {
+                  const cfg = llmSession.loraConfigs[0];
+                  startKaggle.mutate({
+                    datasetPath: cfg?.datasetPath || "data/valet",
+                    modelName: llmSession.baseModel,
+                    epochs: cfg?.epochs ?? 1,
+                    maxSeqLength: 3072,
+                    r: cfg?.rank ?? 8,
+                    loraAlpha: cfg?.alpha ?? 16,
+                  });
+                }}
+                disabled={startKaggle.isPending || llmSession.loraConfigs.length === 0}
+              >
+                <Cloud className="w-4 h-4 mr-2" />
+                {startKaggle.isPending ? "Launching..." : "Train on Kaggle GPU"}
+              </Button>
+              {llmSession.loraConfigs.length === 0 && (
+                <p className="text-[10px] text-accent-warning">Add a LoRA config above before launching a Kaggle job.</p>
+              )}
+            </>
           )}
           <p className="text-[10px] text-muted-foreground">Monitor training progress and import the finished model via <strong>Settings → Valet Router → Kaggle Training</strong>.</p>
         </CardContent>
@@ -510,36 +541,36 @@ export function SpecializedModuleLauncher({
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
-              <label className="text-xs font-semibold mb-1 block">Name</label>
-              <input type="text" value={selectedObject.name} onChange={(e) => setSelectedObject({ ...selectedObject, name: e.target.value })} className="w-full px-2 py-1 border rounded text-sm" />
+            <div className="space-y-1.5">
+              <Label htmlFor="obj-edit-name" className="text-xs font-semibold text-foreground">Name</Label>
+              <Input id="obj-edit-name" type="text" value={selectedObject.name} onChange={(e) => setSelectedObject({ ...selectedObject, name: e.target.value })} className="text-sm" />
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Position X</label>
-                <input type="number" step="0.1" value={selectedObject.position[0]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [Number(e.target.value), selectedObject.position[1], selectedObject.position[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="obj-pos-x" className="text-xs font-semibold text-foreground">Position X</Label>
+                <Input id="obj-pos-x" type="number" step={0.1} value={selectedObject.position[0]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [Number(e.target.value), selectedObject.position[1], selectedObject.position[2]] })} className="text-sm font-mono" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Position Y</label>
-                <input type="number" step="0.1" value={selectedObject.position[1]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [selectedObject.position[0], Number(e.target.value), selectedObject.position[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="obj-pos-y" className="text-xs font-semibold text-foreground">Position Y</Label>
+                <Input id="obj-pos-y" type="number" step={0.1} value={selectedObject.position[1]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [selectedObject.position[0], Number(e.target.value), selectedObject.position[2]] })} className="text-sm font-mono" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Position Z</label>
-                <input type="number" step="0.1" value={selectedObject.position[2]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [selectedObject.position[0], selectedObject.position[1], Number(e.target.value)] })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="obj-pos-z" className="text-xs font-semibold text-foreground">Position Z</Label>
+                <Input id="obj-pos-z" type="number" step={0.1} value={selectedObject.position[2]} onChange={(e) => setSelectedObject({ ...selectedObject, position: [selectedObject.position[0], selectedObject.position[1], Number(e.target.value)] })} className="text-sm font-mono" />
               </div>
             </div>
             <div className="grid grid-cols-3 gap-2">
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Scale X</label>
-                <input type="number" step="0.1" min="0.1" value={selectedObject.scale[0]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [Number(e.target.value), selectedObject.scale[1], selectedObject.scale[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="obj-scale-x" className="text-xs font-semibold text-foreground">Scale X</Label>
+                <Input id="obj-scale-x" type="number" step={0.1} min={0.1} value={selectedObject.scale[0]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [Number(e.target.value), selectedObject.scale[1], selectedObject.scale[2]] })} className="text-sm font-mono" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Scale Y</label>
-                <input type="number" step="0.1" min="0.1" value={selectedObject.scale[1]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [selectedObject.scale[0], Number(e.target.value), selectedObject.scale[2]] })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="obj-scale-y" className="text-xs font-semibold text-foreground">Scale Y</Label>
+                <Input id="obj-scale-y" type="number" step={0.1} min={0.1} value={selectedObject.scale[1]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [selectedObject.scale[0], Number(e.target.value), selectedObject.scale[2]] })} className="text-sm font-mono" />
               </div>
-              <div>
-                <label className="text-xs font-semibold mb-1 block">Scale Z</label>
-                <input type="number" step="0.1" min="0.1" value={selectedObject.scale[2]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [selectedObject.scale[0], selectedObject.scale[1], Number(e.target.value)] })} className="w-full px-2 py-1 border rounded text-sm" />
+              <div className="space-y-1.5">
+                <Label htmlFor="obj-scale-z" className="text-xs font-semibold text-foreground">Scale Z</Label>
+                <Input id="obj-scale-z" type="number" step={0.1} min={0.1} value={selectedObject.scale[2]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [selectedObject.scale[0], selectedObject.scale[1], Number(e.target.value)] })} className="text-sm font-mono" />
               </div>
             </div>
             <Button className="w-full" size="sm" onClick={() => {

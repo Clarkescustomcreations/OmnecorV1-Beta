@@ -75,11 +75,30 @@ export class ValetServerService {
     }
 
     const artifact = await ValetArtifactRegistry.read();
-    if (artifact.status !== "ready" || !artifact.artifact_path) {
+    let missingModel = false;
+
+    if (artifact.status === "ready" && artifact.artifact_path && artifact.gguf_file) {
+      const ggufPath = path.join(artifact.artifact_path, artifact.gguf_file);
+      if (!existsSync(ggufPath)) {
+        missingModel = true;
+      }
+    }
+
+    if (missingModel && artifact.source === "github-release" && artifact.tag && artifact.gguf_file && artifact.artifact_path) {
+      log.info(`[ValetServer] Model missing locally. Downloading ${artifact.gguf_file} from GitHub release ${artifact.tag}...`);
+      try {
+        await ValetArtifactRegistry.downloadGithubRelease(artifact.tag, artifact.gguf_file, artifact.artifact_path);
+        missingModel = false;
+      } catch (err) {
+        log.error(`[ValetServer] Failed to download model: ${(err as Error).message}`);
+      }
+    }
+
+    if (artifact.status !== "ready" || !artifact.artifact_path || missingModel) {
       log.info(
-        "[ValetServer] No registered artifact — inference server not started " +
+        "[ValetServer] No usable artifact found locally — inference server not started " +
           "(rule-based keyword fallback active). " +
-          "Run 'pnpm valet:fetch' or 'pnpm valet:build' to get a model."
+          "Run 'pnpm valet:fetch' or 'pnpm valet:build' to get a model manually."
       );
       return;
     }

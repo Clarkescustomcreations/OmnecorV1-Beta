@@ -105,7 +105,20 @@ export function MapManager() {
   const folderInputRef = useRef<HTMLInputElement>(null);
 
   const pickFolder = async () => {
-    if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
+    const api = (window as any).api;
+    if (api?.selectFolder) {
+      try {
+        const folder = await api.selectFolder();
+        if (folder) {
+          addLocalFolder(folder);
+          setFolderInput(folder);
+          toast.success(`Folder selected: ${folder}`);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to select folder");
+      }
+    } else if (typeof window !== "undefined" && "showDirectoryPicker" in window) {
       try {
         const handle = await (window as Window & { showDirectoryPicker?: (opts?: { mode?: string }) => Promise<{ name: string }> }).showDirectoryPicker?.({ mode: "read" });
         if (!handle) return;
@@ -361,6 +374,11 @@ export function MapManager() {
                         Add
                       </Button>
                     </div>
+                    {!(window as any).api?.selectFolder && (
+                      <p className="text-[10px] text-muted-foreground mt-1">
+                        Running in browser sandbox. Please type or paste the absolute server path manually.
+                      </p>
+                    )}
 
                     {localFolders.length > 0 && (
                       <ul className="space-y-1">

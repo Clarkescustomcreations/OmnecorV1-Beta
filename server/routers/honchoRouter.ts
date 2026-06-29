@@ -9,13 +9,13 @@
  */
 
 import { z } from "zod";
-import { protectedProcedure, router } from "../_core/trpc.js";
+import { externalServiceProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { honchoService } from "../phase2/services/HonchoService.js";
 
 export const honchoRouter = router({
   /** Sync one message to Honcho (fire-and-forget from the client). */
-  addMessage: protectedProcedure
+  addMessage: externalServiceProcedure
     .input(z.object({
       openId: z.string().min(1).max(256),
       sessionId: z.string().min(1).max(256),
@@ -31,7 +31,7 @@ export const honchoRouter = router({
     }),
 
   /** Persist a /btw note as a long-term fact. */
-  addFact: protectedProcedure
+  addFact: externalServiceProcedure
     .input(z.object({
       openId: z.string().min(1).max(256),
       content: z.string().min(1).max(2000),
@@ -45,7 +45,7 @@ export const honchoRouter = router({
     }),
 
   /** Retrieve recent facts to prepend to the system prompt. */
-  getFacts: protectedProcedure
+  getFacts: externalServiceProcedure
     .input(z.object({
       openId: z.string().min(1).max(256),
       limit: z.number().int().min(1).max(50).optional(),

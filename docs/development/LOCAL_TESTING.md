@@ -1,5 +1,7 @@
 # Local Testing — Authenticated Sessions Without Friction
 
+> **Note:** Before running the dev server, you must download the local Valet Router model: `pnpm valet:fetch`.
+
 How to get an authenticated session for local development and automated tests,
 and what each option actually gives you. Read the
 [background](#background-the-zero-login-discrepancy) first if you've ever been
@@ -10,7 +12,7 @@ There are **three** ways to get a session. Pick by what you're testing:
 
 | Option | Real login flow? | Cloud calls work? | Best for |
 |---|---|---|---|
-| **Zero-login** (`ZERO_LOGIN_MODE=true`) | No (bypasses auth) | Only if `ZERO_LOGIN_EXECUTION_MODE` ≠ `sovereign` | Fastest path; UI/feature work that doesn't care about the login flow |
+| **Zero-login** (`ZERO_LOGIN_MODE=true`) | No (bypasses auth) | Yes by default (`scrapper`); blocked only if the user is in `sovereign` mode | Fastest path; UI/feature work that doesn't care about the login flow |
 | **A — Emulated OAuth** | Yes (full Google/Microsoft flow, fake provider) | Yes (session is real, scrapper by default) | Testing the actual sign-in + session/redirect flow locally |
 | **B — Seed script** | No (mints a cookie directly) | Yes | Headless/automated tests (Playwright, curl) that need a token instantly |
 
@@ -25,19 +27,23 @@ Sovereign Mode" (cloud **blocked**). Code and docs said opposite things, so
 nobody could trust which mode a zero-login session was really in — the root of a
 lot of "is cloud supposed to work here?" testing confusion.
 
-**Resolution:** the zero-login execution mode is now controlled by
-`ZERO_LOGIN_EXECUTION_MODE`, which **defaults to `sovereign`** (true air-gap,
-cloud blocked — matching how zero-login is marketed for classified/offline use).
-The flag is authoritative: it overrides any value previously persisted on the
-`local-zero-login` user, and the in-app banner now reports the *actual* mode.
+**Resolution (updated 2026-06-28):** the zero-login execution mode is seeded
+from `ZERO_LOGIN_EXECUTION_MODE`, which **defaults to `scrapper`** (cloud allowed
++ spend-tracked) — the middle-ground starting point most installs want, and the
+only sane default for testing (sovereign-by-default blocked everything). The
+persisted value on the `local-zero-login` user is the source of truth: the env
+var seeds the mode only when that user is first created, after which the
+in-Settings toggle wins (and the in-app banner reports the *actual* mode).
+**Sovereign mode is opt-in** — turn it on in Settings, or seed a fresh install
+air-gapped with `ZERO_LOGIN_EXECUTION_MODE=sovereign`.
 
 ```bash
-# Air-gapped (default): cloud inference blocked
+# Default: cloud allowed + spend-tracked under the local-admin session
 ZERO_LOGIN_MODE=true
 
-# Testing: allow spend-tracked cloud calls under the local-admin session
+# Seed a fresh install air-gapped (cloud inference blocked until changed)
 ZERO_LOGIN_MODE=true
-ZERO_LOGIN_EXECUTION_MODE=scrapper      # or big_spender
+ZERO_LOGIN_EXECUTION_MODE=sovereign
 ```
 
 > Remember: `.env` is read once at startup via `dotenv/config`, so **restart the

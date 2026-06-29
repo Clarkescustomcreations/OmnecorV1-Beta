@@ -180,9 +180,9 @@ export function OmnecorDashboardLayout({
                 <Brain className={cn("w-5 h-5", isFictionMode ? "text-accent-purple" : "text-accent-foreground")} />
               </div>
               {sidebarOpen && (
-                <h1 className="text-xl font-bold text-sidebar-foreground animate-in fade-in slide-in-from-left-2 duration-300">
+                <span className="text-xl font-bold text-sidebar-foreground animate-in fade-in slide-in-from-left-2 duration-300">
                   Omnecor
-                </h1>
+                </span>
               )}
             </Link>
             

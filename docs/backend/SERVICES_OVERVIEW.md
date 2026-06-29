@@ -64,6 +64,7 @@ graph TD
     -   Integrating with cloud AI APIs (e.g., OpenAI, Anthropic, Gemini, Fal.ai).
     -   Implementing logic for intelligent inference routing based on task, cost, and resource availability.
     -   Handling model loading and unloading.
+    -   **Context Overflow Protection**: Explicitly calculates token estimations before prompting; throws `ContextOverflowError` to prevent out-of-memory (OOM) crashes, seamlessly downgrading or rejecting oversized payloads.
 
 ### 2.6. `FileSystemWatcherService` (`server/phase2/services/FileSystemWatcherService.ts`)
 
@@ -86,8 +87,8 @@ graph TD
 -   **Purpose**: Integrates Human-In-The-Loop (HITL) approval workflows into AI-driven tasks.
 -   **Key Responsibilities**:
     -   Pausing AI workflows at critical junctures for human review.
-    -   Managing approval requests and decisions.
-    -   Resuming workflows based on human input.
+    -   Managing approval requests and decisions via a live polling queue accessible through `security.getPendingHitlActions` and `security.resolveHitlAction`.
+    -   Resuming workflows based on human input (Approve/Reject).
 
 ### 2.9. `HashTrackerService` (`server/phase2/services/HashTrackerService.ts`)
 
@@ -182,6 +183,28 @@ graph TD
     -   Removing PEM-encoded private keys and hex-encoded secrets.
     -   Sanitizing long opaque authentication tokens and `.env` file contents.
     -   Applied to: Lithic card operations, API error messages, audit logs, and service logs.
+
+### 2.15d. `PublishingService` (`server/phase2/services/PublishingService.ts`)
+
+-   **Purpose**: Executes outbound social media publishing requests to connected external platforms.
+-   **Key Responsibilities**:
+    -   Dispatches scheduled or direct posts to APIs like Twitter, LinkedIn, etc.
+    -   Handles API communication using decrypted OAuth tokens from the secure integrations store.
+    -   Catches external HTTP errors (e.g., 403 Forbidden) and writes honest status failure messages back to the database.
+
+### 2.15e. `BirdClawService` (`server/phase2/services/BirdClawService.ts`)
+
+-   **Purpose**: A Playwright-based scraper specialized in fetching and rendering JavaScript-heavy web pages and social media platforms.
+-   **Key Responsibilities**:
+    -   Utilizes stealth plugins to bypass basic bot-mitigation techniques naturally.
+    -   Integrates with `ArticleDiscoveryService` to pull deep content where standard fetch requests fail or get blocked.
+
+### 2.15f. `PenpotService` (`server/phase2/services/PenpotService.ts`)
+
+-   **Purpose**: A headless bridge integrating the open-source Penpot design tool into Omnecor's frontend generation.
+-   **Key Responsibilities**:
+    -   Fetches and parses raw design tokens (colors, typography, spacing) directly from Penpot.
+    -   Assists AI UI builder agents in generating React components that perfectly match the design source-of-truth.
 
 ### 2.16. `UpdateCheckerService` (`server/phase2/services/UpdateCheckerService.ts`)
 

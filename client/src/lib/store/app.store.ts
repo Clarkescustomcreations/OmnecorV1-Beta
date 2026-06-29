@@ -6,14 +6,24 @@ export interface AppState {
   wsStatus: 'connecting' | 'connected' | 'reconnecting' | 'offline';
   setWsStatus: (status: AppState['wsStatus']) => void;
 
+  // Chat Display Settings (Global)
+  chatDisplaySettings: {
+    showTimestamps: boolean;
+    showTokenCounts: boolean;
+    showModelName: boolean;
+    showLatency: boolean;
+    autoStoreMemory: boolean;
+    showThinkingQuotes: boolean;
+    quoteStyle: "random" | "funny" | "serious";
+  };
+  setChatDisplaySettings: (settings: Partial<AppState['chatDisplaySettings']>) => void;
+
   // Command Palette
   commandPaletteOpen: boolean;
   setCommandPaletteOpen: (open: boolean) => void;
   toggleCommandPalette: () => void;
 
   // AI & Models
-  selectedModelId: string | null;
-  setSelectedModelId: (id: string | null) => void;
   valetFallbackModel: { providerId: string; modelId: string } | null;
   setValetFallbackModel: (model: { providerId: string; modelId: string } | null) => void;
 
@@ -74,12 +84,22 @@ export const useAppStore = create<AppState>()(
   wsStatus: 'connecting',
   setWsStatus: (status) => set({ wsStatus: status }),
 
+  chatDisplaySettings: {
+    showTimestamps: true,
+    showTokenCounts: true,
+    showModelName: true,
+    showLatency: false,
+    autoStoreMemory: true,
+    showThinkingQuotes: true,
+    quoteStyle: "random",
+  },
+  setChatDisplaySettings: (settings) => set((state) => ({ 
+    chatDisplaySettings: { ...state.chatDisplaySettings, ...settings } 
+  })),
+
   commandPaletteOpen: false,
   setCommandPaletteOpen: (open) => set({ commandPaletteOpen: open }),
   toggleCommandPalette: () => set((state) => ({ commandPaletteOpen: !state.commandPaletteOpen })),
-
-  selectedModelId: null,
-  setSelectedModelId: (id) => set({ selectedModelId: id }),
 
   valetFallbackModel: { providerId: "ollama", modelId: "llama3.2:latest" },
   setValetFallbackModel: (model) => set({ valetFallbackModel: model }),
@@ -133,8 +153,8 @@ export const useAppStore = create<AppState>()(
         brainMapRightCollapsed: state.brainMapRightCollapsed,
         brainMapToolbarCollapsed: state.brainMapToolbarCollapsed,
         executionMode: state.executionMode,
-        selectedModelId: state.selectedModelId,
         valetFallbackModel: state.valetFallbackModel,
+        chatDisplaySettings: state.chatDisplaySettings,
       }),
     }
   )

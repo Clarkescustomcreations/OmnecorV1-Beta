@@ -9,7 +9,6 @@ import { VisualContextMap } from "@/components/VisualContextMap";
 import { ConversationList } from "@/components/chat/ConversationList";
 import { MemoryArchiverPanel } from "@/components/chat/MemoryArchiverPanel";
 import { TerminalPanel } from "@/components/chat/TerminalPanel";
-import { CliTerminalWindow } from "@/components/chat/CliTerminalWindow";
 import { EmbeddedTerminal } from "@/components/terminal/EmbeddedTerminal";
 import { HITLCommandApproval } from "@/components/terminal/HITLCommandApproval";
 import { vanillaTrpc, trpc } from "@/lib/trpc";
@@ -122,6 +121,16 @@ function readFileAsDataURL(file: File): Promise<string> {
 // ---------------------------------------------------------------------------
 export function Chat() {
   const [, setLocation] = useLocation();
+  // ── Filter scope ─────────────────────────────────────────────────────────
+  const [filterScope, setFilterScope] = useState<"project" | "global">(
+    () => (localStorage.getItem("omnecor:chat_filter_scope") as "project" | "global") ?? "project"
+  );
+
+  const handleFilterScopeChange = useCallback((scope: "project" | "global") => {
+    setFilterScope(scope);
+    localStorage.setItem("omnecor:chat_filter_scope", scope);
+  }, []);
+
   // ── Model selection ──────────────────────────────────────────────────────
   const [selectedModel, setSelectedModel] = useState<SelectedModel | undefined>(
     () => {
@@ -174,25 +183,20 @@ export function Chat() {
     { openId, limit: 15 },
     { enabled: !!me && !!openId, staleTime: 60_000 }
   );
-  const addHonchoFact = trpc.honcho.addFact.useMutation({
-    onError: (err) => console.error("[Honcho] addFact failed:", err.message),
-  });
-  const addHonchoMessage = trpc.honcho.addMessage.useMutation({
-    onError: (err) => console.error("[Honcho] addMessage failed:", err.message),
-  });
+  const addHonchoFact = trpc.honcho.addFact.useMutation();
+  const addHonchoMessage = trpc.honcho.addMessage.useMutation();
 
   // ── DB-backed chat persistence ────────────────────────────────────────────
   const chatUtils = trpc.useUtils();
-  const { data: dbSessions = [], isSuccess: dbSessionsLoaded } = trpc.chat.listSessions.useQuery(undefined, {
-    enabled: !IS_DEMO,
-    refetchOnWindowFocus: false,
-  });
-  const createDbSession = trpc.chat.createSession.useMutation({
-    onError: (err) => console.error("[Chat] Failed to create DB session:", err.message),
-  });
-  const addDbMessage = trpc.chat.addMessage.useMutation({
-    onError: (err) => console.error("[Chat] Failed to save message to DB:", err.message),
-  });
+  const { data: dbSessions = [], isSuccess: dbSessionsLoaded } = trpc.chat.listSessions.useQuery(
+    filterScope === "project" && activeMap?.id ? { projectId: activeMap.id } : {},
+    {
+      enabled: !IS_DEMO,
+      refetchOnWindowFocus: false,
+    }
+  );
+  const createDbSession = trpc.chat.createSession.useMutation();
+  const addDbMessage = trpc.chat.addMessage.useMutation();
   const updateDbSession = trpc.chat.updateSession.useMutation();
   const deleteDbSession = trpc.chat.deleteSession.useMutation();
   const bulkImportDb = trpc.chat.bulkImport.useMutation();
@@ -312,12 +316,22 @@ export function Chat() {
     return createConversation("New Conversation", "default");
   });
 
+  const conversationRef = useRef(conversation);
+  useEffect(() => {
+    conversationRef.current = conversation;
+  }, [conversation]);
+
+  const isStreamingRef = useRef(isStreaming);
+  useEffect(() => {
+    isStreamingRef.current = isStreaming;
+  }, [isStreaming]);
+
   const sidebarCollapsed = useAppStore((s) => s.chatHistoryCollapsed);
   const setSidebarCollapsed = useAppStore((s) => s.setChatHistoryCollapsed);
 
   // When DB sessions load, use them as the authoritative sidebar list
   useEffect(() => {
-    if (IS_DEMO || !dbSessionsLoaded || dbSessions.length === 0) return;
+    if (IS_DEMO || !dbSessionsLoaded) return;
     setConversationIndex(dbSessions.map(s => ({
       id: s.id,
       title: s.title,
@@ -326,6 +340,8 @@ export function Chat() {
       messageCount: 0,
     })));
   }, [dbSessions, dbSessionsLoaded]);
+
+
 
   // One-time migration: if DB is empty on first load and localStorage has conversations, import them
   const migrationRanRef = useRef(false);
@@ -420,9 +436,10 @@ export function Chat() {
 
   // ── Saved Scripts (server-backed, syncs across devices/projects) ──────────
   const scriptsUtils = trpc.useUtils();
-  const { data: scripts = [] } = trpc.scripts.list.useQuery(undefined, {
-    enabled: !IS_DEMO,
-  });
+  const { data: scripts = [] } = trpc.scripts.list.useQuery(
+    activeMap?.id ? { mapId: activeMap.id } : undefined,
+    { enabled: !IS_DEMO }
+  );
 
   const deleteScriptMutation = trpc.scripts.delete.useMutation({
     onSuccess: () => {
@@ -472,7 +489,10 @@ export function Chat() {
       let migrated = 0;
       for (const s of legacy) {
         try {
-          await createScriptMutation.mutateAsync(s);
+          await createScriptMutation.mutateAsync({
+            ...s,
+            mapId: activeMap?.id
+          });
           migrated++;
         } catch (e) {
           console.warn("Saved-script migration failed for script", s.name, e);
@@ -538,6 +558,30 @@ export function Chat() {
     }
     if (loaded) setConversation(loaded);
   }, [conversation, chatUtils]);
+
+  // Auto-switch conversation when activeMap or filterScope changes to align with project isolation
+  useEffect(() => {
+    if (IS_DEMO || !dbSessionsLoaded) return;
+
+    if (filterScope === "project" && activeMap?.id) {
+      const projectSessions = dbSessions; // already filtered at API layer
+      if (projectSessions.length > 0) {
+        const currentConvId = conversation.id;
+        const currentBelongsToProject = projectSessions.some(s => s.id === currentConvId);
+
+        if (!currentBelongsToProject) {
+          handleSelectConversation(projectSessions[0].id);
+        }
+      } else {
+        const hasMessages = conversation.messages.length > 0;
+        const isDbSession = dbSessionIds.current.has(conversation.id);
+
+        if (isDbSession || (hasMessages && !isDbSession)) {
+          handleNewConversation();
+        }
+      }
+    }
+  }, [activeMap?.id, filterScope, dbSessionsLoaded, dbSessions, conversation.id, handleSelectConversation, handleNewConversation]);
 
   const handleDeleteConversation = useCallback(
     (id: string) => {
@@ -724,11 +768,11 @@ export function Chat() {
               setIsStreaming(false);
               streamRef.current = null;
               // Sync both sides of the exchange to Honcho (background, non-blocking)
-              const sid = conversation.id;
+              const sid = conversationRef.current.id;
               addHonchoMessage.mutate({ openId, sessionId: sid, role: "user", content: userMsg.content });
               addHonchoMessage.mutate({ openId, sessionId: sid, role: "ai", content: assistantContent });
               // Persist to DB (fire-and-forget — also creates session if not yet tracked)
-              persistToDbRef.current(conversation.id, conversation.title, userMsg, assistantId, assistantContent);
+              persistToDbRef.current(conversationRef.current.id, conversationRef.current.title, userMsg, assistantId, assistantContent);
               // Rolling buffer: auto-compress when conversation exceeds 50 messages
               setConversation(prev => {
                 const ROLLING_BUFFER_LIMIT = 50;
@@ -776,8 +820,10 @@ export function Chat() {
         const fallback = useAppStore.getState().valetFallbackModel;
         vanillaTrpc.valet.testRoute.mutate({ task: userMsg.content })
           .then(decision => {
-            setValetRoutedModel(`${decision.primaryProvider}/${decision.primaryModel}`);
-            startStream(decision.primaryProvider as SelectedModel["providerId"], decision.primaryModel);
+            const providerId = decision.primaryProvider || fallback?.providerId || "ollama";
+            const modelId = decision.primaryModel || fallback?.modelId || "llama3.2:latest";
+            setValetRoutedModel(`${providerId}/${modelId}`);
+            startStream(providerId as SelectedModel["providerId"], modelId);
           })
           .catch(err => {
             console.warn("[Chat] Valet route failed, using fallback:", err);
@@ -790,7 +836,7 @@ export function Chat() {
         startStream(selectedModel.providerId, selectedModel.modelId);
       }
     },
-    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, conversation.id, excludedMessageIds, activeMap?.id, activeMap?.settings.enableAIContext]
+    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, excludedMessageIds, activeMap?.id, activeMap?.settings.enableAIContext]
   );
 
   // ── Send message ─────────────────────────────────────────────────────────
@@ -1037,7 +1083,7 @@ export function Chat() {
           if (mode === "restore") {
             try {
               const res = await vanillaTrpc.workflow.rememberRestore.query({
-                projectId: "default",
+                projectId: activeMap?.id ?? "default",
               });
               if (!res.hasMemory || !res.memory) {
                 toast.info("No saved memory found for this project.");
@@ -1064,7 +1110,7 @@ export function Chat() {
             toast.info("Saving session memory…", { duration: 10_000 });
             try {
               const res = await vanillaTrpc.workflow.rememberSave.mutate({
-                projectId: "default",
+                projectId: activeMap?.id ?? "default",
                 providerId: selectedModel.providerId,
                 modelId: selectedModel.modelId,
                 apiKey: selectedModel.apiKey,
@@ -1137,7 +1183,7 @@ export function Chat() {
           toast.info("Imprinting UI patterns…", { duration: 8000 });
           try {
             const res = await vanillaTrpc.workflow.imprint.mutate({
-              projectId: "default",
+              projectId: activeMap?.id ?? "default",
               filePath,
             });
             injectSystem(`[Imprinted → ui-registry.md]\n\n${res.entry}`);
@@ -1193,7 +1239,7 @@ export function Chat() {
           break;
       }
     },
-    [handleClearHistory, handleNewConversation, conversation, setConversation, selectedModel]
+    [handleClearHistory, handleNewConversation, conversation, setConversation, selectedModel, handleBtw, activeMap?.id]
   );
 
   // ── Command Palette → workflow bridge ────────────────────────────────────
@@ -1250,7 +1296,10 @@ export function Chat() {
       }, 2000);
     };
     window.addEventListener("omnecor:terminal_output", handler);
-    return () => window.removeEventListener("omnecor:terminal_output", handler);
+    return () => {
+      window.removeEventListener("omnecor:terminal_output", handler);
+      if (terminalFlushTimer.current) clearTimeout(terminalFlushTimer.current);
+    };
   }, []);
 
   // ── Async background-job results → conversation continuation ──────────────
@@ -1262,14 +1311,6 @@ export function Chat() {
   //
   // Refs keep the socket handler stable (so the WS doesn't reconnect every
   // render) while still reading the latest conversation / streaming / sender.
-  const conversationRef = useRef(conversation);
-  useEffect(() => {
-    conversationRef.current = conversation;
-  }, [conversation]);
-  const isStreamingRef = useRef(isStreaming);
-  useEffect(() => {
-    isStreamingRef.current = isStreaming;
-  }, [isStreaming]);
   const handleSendMessageRef = useRef(handleSendMessage);
   useEffect(() => {
     handleSendMessageRef.current = handleSendMessage;
@@ -1356,6 +1397,8 @@ export function Chat() {
           onRename={handleRenameConversation}
           collapsed={sidebarCollapsed}
           onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
+          filterScope={filterScope}
+          onFilterScopeChange={handleFilterScopeChange}
           scripts={scripts}
           onSelectScript={handleSelectScript}
           onDeleteScript={handleDeleteScript}
@@ -1371,9 +1414,9 @@ export function Chat() {
                 {btwNotes.map((note, i) => (
                   <div
                     key={`btw-${i}`}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/40 border border-border text-xs max-w-xs"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/40 border border-border text-xs max-w-xs card-content-safe"
                   >
-                    <span className="font-semibold text-accent-foreground opacity-70">btw</span>
+                    <span className="font-semibold text-accent opacity-70">btw</span>
                     <span className="text-muted-foreground truncate">{note}</span>
                     <button
                       onClick={() => removeBtwNote(i)}
@@ -1393,7 +1436,7 @@ export function Chat() {
                 {identityMap.map((note, i) => (
                   <div
                     key={`id-${i}`}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/20 border border-border text-xs max-w-xs"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-primary/20 border border-border text-xs max-w-xs card-content-safe"
                   >
                     <span className="font-semibold text-primary opacity-70">me</span>
                     <span className="text-muted-foreground truncate">{note}</span>
@@ -1415,7 +1458,7 @@ export function Chat() {
                 {gotchas.map((note, i) => (
                   <div
                     key={`gotcha-${i}`}
-                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/20 border border-border text-xs max-w-xs"
+                    className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-destructive/20 border border-border text-xs max-w-xs card-content-safe"
                   >
                     <span className="font-semibold text-destructive opacity-70">gotcha</span>
                     <span className="text-muted-foreground truncate">{note}</span>
@@ -1490,7 +1533,7 @@ export function Chat() {
           {showMemoryArchiver && conversation.id && (
             <MemoryArchiverPanel 
               sessionId={conversation.id} 
-              projectId="default" 
+              projectId={activeMap?.id ?? "default"} 
               selectedModel={selectedModel}
             />
           )}
@@ -1679,14 +1722,14 @@ export function Chat() {
       <TerminalPanel
         isOpen={showTerminal}
         onToggle={() => setShowTerminal(v => !v)}
-        projectId={conversation.id}
+        projectId={activeMap?.id ?? "default"}
       />
     )}
     {!isFictionMode && (
       <EmbeddedTerminal
         isOpen={showCliTerminal}
         onClose={() => setShowCliTerminal(false)}
-        projectId={conversation.id}
+        projectId={activeMap?.id ?? "default"}
       />
     )}
     {/* HITL command approval dialog — rendered at root so it floats above everything */}

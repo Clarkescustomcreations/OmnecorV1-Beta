@@ -1,0 +1,9 @@
+{
+  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
+  "format": "gguf",
+  "gguf_file": "valet-router-q8_0.gguf",
+  "source": "github-release",
+  "tag": "valet-router-v2-q8",
+  "eval_scores": {},
+  "created_at": "2026-06-28T16:37:54Z"
+}

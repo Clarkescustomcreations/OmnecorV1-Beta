@@ -20,7 +20,6 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useCommandAllowlistStore } from "@/lib/stores/commandAllowlistStore";
-import { HITLCommandApproval } from "@/components/terminal/HITLCommandApproval";
 import { toast } from "sonner";
 
 interface LogEntry {
@@ -245,7 +244,7 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
               size="sm"
               type="submit"
               variant="ghost"
-              className="h-7 gap-1 text-[10px] text-muted-foreground hover:text-white flex-shrink-0"
+              className="h-7 gap-1 text-[10px] text-muted-foreground hover:text-foreground flex-shrink-0"
               disabled={isRunning || !command.trim()}
             >
               {isRunning
@@ -262,9 +261,6 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
           </div>
         </div>
       </FloatingWindow>
-
-      {/* HITL dialog — shown above everything when sandbox approval is pending */}
-      <HITLCommandApproval />
     </>
   );
 }

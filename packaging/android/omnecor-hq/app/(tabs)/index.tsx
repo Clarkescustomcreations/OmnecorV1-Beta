@@ -1,6 +1,7 @@
 import { Text, View, TextInput, FlatList, ActivityIndicator, Image, Share, Modal } from "react-native";
 import { Pressable } from "@/components/pressable";
 import { useState, useRef, useCallback, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import Markdown from "react-native-markdown-display";
 import * as Clipboard from "expo-clipboard";
 import { ScreenContainer } from "@/components/screen-container";
@@ -15,6 +16,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { loadChats, saveChats, type StoredChatSession } from "@/lib/_core/chat-store";
+import { LoadingQuote } from "@/components/loading-quote";
+import { useChatDisplaySettings } from "@/hooks/use-chat-display-settings";
 
 interface ChatMessage {
   id: string;
@@ -33,6 +36,7 @@ export default function ChatScreen() {
   const colors = useColors();
   const voice  = useVoice();
   const flatListRef = useRef<FlatList>(null);
+  const { settings: chatDisplaySettings } = useChatDisplaySettings();
 
   const [hydrated, setHydrated] = useState(false);
   const [sessions, setSessions] = useState<ChatSession[]>([
@@ -107,14 +111,63 @@ export default function ChatScreen() {
     saveChats({ sessions: serialized, activeSessionId });
   }, [sessions, activeSessionId, hydrated]);
 
+  // Load saved neural map and persona from AsyncStorage on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const savedMapId = await AsyncStorage.getItem("omnecor:selected_map_id");
+        const savedPersonaId = await AsyncStorage.getItem("omnecor:selected_persona_id");
+        if (savedMapId) {
+          setSelectedNeuralMapId(savedMapId);
+        }
+        if (savedPersonaId) {
+          setSelectedPersonaId(savedPersonaId);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (selectedNeuralMapId !== null) {
+      AsyncStorage.setItem("omnecor:selected_map_id", selectedNeuralMapId).catch(console.error);
+    } else {
+      AsyncStorage.removeItem("omnecor:selected_map_id").catch(console.error);
+    }
+  }, [selectedNeuralMapId]);
+
+  useEffect(() => {
+    if (selectedPersonaId !== null) {
+      AsyncStorage.setItem("omnecor:selected_persona_id", selectedPersonaId).catch(console.error);
+    } else {
+      AsyncStorage.removeItem("omnecor:selected_persona_id").catch(console.error);
+    }
+  }, [selectedPersonaId]);
+
+  useEffect(() => {
+    if (selectedNeuralMapId && neuralMapList.length) {
+      const found = neuralMapList.find(m => m.id === selectedNeuralMapId);
+      if (found) setSelectedNeuralMap(found.name);
+    }
+  }, [selectedNeuralMapId, neuralMapList]);
+
+  useEffect(() => {
+    if (selectedPersonaId && personaList.length) {
+      const found = personaList.find(p => p.id === selectedPersonaId);
+      if (found) setSelectedAgent(found.name);
+    }
+  }, [selectedPersonaId, personaList]);
+
   useEffect(() => {
     if (!isServerConfigured()) return;
     (async () => {
       try {
-        const [maps, personas, providerList] = await Promise.all([
+        const [maps, personas, providerList, activeMapId] = await Promise.all([
           trpcQuery<{ id: string; name: string; mode: string }[]>("neuralMaps.list"),
           trpcQuery<{ id: string; name: string }[]>("personas.list"),
           trpcQuery<{ id: string; name: string }[]>("ai.getProviders"),
+          trpcQuery<string | null>("neuralMaps.getActiveMapId"),
         ]);
         if (maps?.length)        setNeuralMapList(maps);
         if (personas?.length)    setPersonaList(personas);
@@ -123,6 +176,14 @@ export default function ChatScreen() {
           // Default to a real provider (prefer a non-mesh one for direct chat).
           const pick = providerList.find((p) => p.id !== "ommesh") ?? providerList[0];
           if (pick) setSelectedProviderId((cur) => cur ?? pick.id);
+        }
+        if (activeMapId) {
+          setSelectedNeuralMapId(activeMapId);
+          await AsyncStorage.setItem("omnecor:selected_map_id", activeMapId);
+          const found = maps?.find(m => m.id === activeMapId);
+          if (found) {
+            setSelectedNeuralMap(found.name);
+          }
         }
       } catch {
         // Server offline — leave lists empty; the UI shows truthful empty states.
@@ -510,6 +571,15 @@ export default function ChatScreen() {
         )}
         contentContainerStyle={{ flexGrow: 1 }}
         ListEmptyComponent={<View className="flex-1 items-center justify-center"><Text className="text-muted">No messages yet</Text></View>}
+        ListFooterComponent={isSending ? (
+          <View className="px-4 py-3 items-start">
+            {chatDisplaySettings.showThinkingQuotes ? (
+              <LoadingQuote quoteStyle={chatDisplaySettings.quoteStyle} />
+            ) : (
+              <ActivityIndicator size="small" color={colors.primary} />
+            )}
+          </View>
+        ) : null}
       />
 
       {/* ── Long-press Action Sheet ── */}

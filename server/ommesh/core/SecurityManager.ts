@@ -9,7 +9,7 @@ import { EventEmitter } from 'events';
 import os from 'os';
 import { createLogger } from "../../_core/logger.js";
 import { PATHS } from "../../_core/paths.js";
-import { getDb } from "../../db.js";
+import { getDb } from "../../db.factory.js";
 import { ommeshTrustedPeers } from "../../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 const log = createLogger("OMMESH:Security");

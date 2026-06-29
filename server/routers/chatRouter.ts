@@ -223,14 +223,28 @@ export const chatRouter = router({
     }),
 
   /** List all sessions for the current user, newest first. */
-  listSessions: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    return db
-      .select()
-      .from(chatSessions)
-      .where(eq(chatSessions.userId, ctx.user.id))
-      .orderBy(desc(chatSessions.updatedAt));
-  }),
+  listSessions: protectedProcedure
+    .input(z.object({ projectId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      if (input?.projectId) {
+        return db
+          .select()
+          .from(chatSessions)
+          .where(
+            and(
+              eq(chatSessions.userId, ctx.user.id),
+              eq(chatSessions.projectId, input.projectId)
+            )
+          )
+          .orderBy(desc(chatSessions.updatedAt));
+      }
+      return db
+        .select()
+        .from(chatSessions)
+        .where(eq(chatSessions.userId, ctx.user.id))
+        .orderBy(desc(chatSessions.updatedAt));
+    }),
 
   /** Update session metadata (title, model, system prompt). */
   updateSession: protectedProcedure

@@ -1,18 +1,9 @@
 import { useState, useMemo } from "react";
-import {
-  Card,
-  CardContent,
-} from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Switch } from "@/components/ui/switch";
 import {
   Download,
   Trash2,
@@ -22,11 +13,17 @@ import {
   Server,
   Search,
   RefreshCw,
+  PlusCircle,
+  Info,
+  Sliders,
+  Play
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
-  getAllModels,
-  convertToAIModel,
+  getActiveModels,
+  toggleActiveModel,
+  isModelActive,
+  API_MODEL_CATALOG,
   type AIModel,
   type ModelMarketplaceItem,
 } from "@/lib/aiModels";
@@ -38,362 +35,582 @@ interface ModelHubPanelProps {
   onModelDownload?: (item: ModelMarketplaceItem) => void;
 }
 
+/** Capability matrix for a cloud API model, derived from its provider. */
+function apiModelCapabilities(providerId: string): NonNullable<AIModel["capabilities"]> {
+  return {
+    chat: true,
+    completion: true,
+    embedding: providerId === "openai",
+    vision: providerId === "openai" || providerId === "gemini",
+    functionCalling: providerId === "openai" || providerId === "anthropic",
+  };
+}
+
 export function ModelHubPanel({
   onModelSelect,
   onModelDownload,
 }: ModelHubPanelProps) {
   const [selectedModelId, setSelectedModelId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<string>("active");
   const [searchQuery, setSearchQuery] = useState("");
-  const [filterType, setFilterType] = useState<"all" | "local" | "api">("all");
-  const [activeTab, setActiveTab] = useState<"models" | "marketplace">("models");
   const [marketplaceSearch, setMarketplaceSearch] = useState("");
+  const [customModelId, setCustomModelId] = useState("");
+  const [toggleCounter, setToggleCounter] = useState(0);
 
   // Role gate — deleteModel is admin-only on the server
   const { data: me } = trpc.auth.me.useQuery();
   const isAdmin = me?.role === "admin" || me?.role === "owner";
 
-  // Real marketplace data from ollamadb.dev via server proxy
-  const marketplaceQuery = trpc.ollama.searchModels.useQuery(
-    { query: marketplaceSearch, limit: 30 },
-    { enabled: activeTab === "marketplace" }
-  );
+  // Load configured API providers from Settings
+  const { data: aiProviders } = trpc.system.aiProviders.useQuery();
 
-  const deleteMutation = trpc.ollama.deleteModel.useMutation({
-    onSuccess: ({ name }) => toast.success(`Deleted model: ${name}`),
-    onError: (err) => toast.error("Delete failed: " + err.message),
-  });
+  // Dynamic tabs list depending on active keys
+  const activeTabsList = useMemo(() => {
+    const list = [
+      { id: "active", label: "Active Models" },
+      { id: "ollama", label: "Ollama" },
+    ];
+    if (aiProviders?.openai) list.push({ id: "openai", label: "OpenAI" });
+    if (aiProviders?.anthropic) list.push({ id: "anthropic", label: "Claude" });
+    if (aiProviders?.gemini) list.push({ id: "gemini", label: "Google Gemini" });
+    if (aiProviders?.grok) list.push({ id: "grok", label: "Grok" });
+    if (aiProviders?.huggingface) list.push({ id: "huggingface", label: "Hugging Face" });
+    return list;
+  }, [aiProviders]);
 
-  // Discover real models from Ollama and configured API providers
-  const { data: ollamaRaw = [], isLoading: ollamaLoading } =
+  // Discover real models from Ollama
+  const { data: ollamaRaw = [], isLoading: ollamaLoading, refetch: refetchOllama } =
     trpc.aiProvider.discoverOllamaModels.useQuery(undefined, {
       refetchInterval: 30_000,
     });
 
-  const { data: providerList = [] } = trpc.aiProvider.getProviders.useQuery(
-    undefined,
-    { refetchInterval: 60_000 }
+  // Dynamic discovery for API models
+  const providerModelsQuery = trpc.aiProvider.discoverProviderModels.useQuery(
+    { providerId: activeTab as any },
+    {
+      enabled: ["openai", "anthropic", "gemini", "grok", "huggingface"].includes(activeTab),
+      retry: false,
+      staleTime: 60_000,
+    }
   );
 
-  // Convert Ollama discovery results to AIModel format
-  const fetchedModels = useMemo<AIModel[]>(() => {
-    const ollama: AIModel[] = ollamaRaw.map((m) => ({
+  // Real marketplace search from server proxy
+  const marketplaceQuery = trpc.ollama.searchModels.useQuery(
+    { query: marketplaceSearch, limit: 12 },
+    { enabled: activeTab === "ollama" }
+  );
+
+  const deleteMutation = trpc.ollama.deleteModel.useMutation({
+    onSuccess: ({ name }) => {
+      toast.success(`Deleted local model: ${name}`);
+      refetchOllama();
+    },
+    onError: (err) => toast.error("Delete failed: " + err.message),
+  });
+
+  // List of active models for the "Active Models" tab
+  const activeModelsList = useMemo<AIModel[]>(() => {
+    // 1. Downloaded local Ollama models are always considered active
+    const local: AIModel[] = ollamaRaw.map((m) => ({
       id: m.name ?? m.model,
       name: m.name ?? m.model,
       displayName: `${m.name ?? m.model} (Ollama)`,
       source: "ollama" as const,
       type: "local" as const,
       status: "available" as const,
-      contextWindow: m.details?.parameter_size ? undefined : undefined,
       metadata: {
         size: m.size ? Math.round(m.size / 1024 / 1024) : undefined,
         quantization: m.details?.quantization_level,
-        endpoint: "http://localhost:11434",
+        endpoint: aiProviders?.ollamaUrl ?? "http://localhost:11434",
       },
       capabilities: { chat: true, completion: true, embedding: false, vision: false, functionCalling: false },
     }));
 
-    const apiModels: AIModel[] = providerList
-      .filter((p) => p.id !== "ollama")
-      .map((p) => ({
-        id: p.id,
-        name: p.name,
-        displayName: p.name,
-        source: p.id as AIModel["source"],
-        type: "api" as const,
-        status: (p.status === "online" ? "available" : "offline") as AIModel["status"],
-        capabilities: {
-          chat: true,
-          completion: true,
-          embedding: p.id === "openai",
-          vision: p.id === "openai" || p.id === "gemini",
-          functionCalling: p.id === "openai" || p.id === "anthropic",
-        },
+    // 2. Activated cloud models from localStorage
+    const activeCloudItems = getActiveModels();
+    const cloud: AIModel[] = activeCloudItems
+      .filter((item) => {
+        // Ensure provider key is configured
+        if (item.providerId === "openai") return !!aiProviders?.openai;
+        if (item.providerId === "anthropic") return !!aiProviders?.anthropic;
+        if (item.providerId === "gemini") return !!aiProviders?.gemini;
+        if (item.providerId === "grok") return !!aiProviders?.grok;
+        if (item.providerId === "huggingface") return !!aiProviders?.huggingface;
+        return false;
+      })
+      .map((item) => {
+        const catalogItem = API_MODEL_CATALOG[item.providerId as keyof typeof API_MODEL_CATALOG]?.find(
+          (m) => m.id === item.modelId
+        );
+        const name = catalogItem?.name ?? item.modelId;
+        return {
+          id: item.modelId,
+          name,
+          displayName: `${name} (${item.providerId})`,
+          source: item.providerId as AIModel["source"],
+          type: "api" as const,
+          status: "available" as const,
+          costPer1kTokens: catalogItem?.costPer1kTokens,
+          capabilities: apiModelCapabilities(item.providerId),
+        };
+      });
+
+    return [...local, ...cloud];
+  }, [ollamaRaw, aiProviders, toggleCounter]);
+
+  // Compute models to show in dynamic provider tabs
+  const providerTabModels = useMemo(() => {
+    if (!["openai", "anthropic", "gemini", "grok", "huggingface"].includes(activeTab)) return [];
+
+    const provId = activeTab as keyof typeof API_MODEL_CATALOG;
+    const isOffline = providerModelsQuery.isError || !providerModelsQuery.data || providerModelsQuery.data.length === 0;
+
+    if (providerModelsQuery.data && providerModelsQuery.data.length > 0) {
+      return providerModelsQuery.data.map((m) => ({
+        id: m.id,
+        name: m.name,
+        isFallback: false,
       }));
-
-    return [...ollama, ...apiModels];
-  }, [ollamaRaw, providerList]);
-
-  const allModels = useMemo(
-    () => getAllModels(selectedModelId || undefined, fetchedModels),
-    [selectedModelId, fetchedModels]
-  );
-
-  const filteredModels = useMemo(() => {
-    let models = allModels;
-    if (filterType !== "all") {
-      models = models.filter(m => m.type === filterType);
     }
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      models = models.filter(
-        m =>
-          m.name.toLowerCase().includes(q) ||
-          m.displayName.toLowerCase().includes(q) ||
-          m.description?.toLowerCase().includes(q)
-      );
-    }
-    return models;
-  }, [allModels, filterType, searchQuery]);
+
+    // Return static catalog as fallback
+    const fallbackList = API_MODEL_CATALOG[provId] || [];
+    return fallbackList.map((m) => ({
+      id: m.id,
+      name: m.name,
+      isFallback: true,
+    }));
+  }, [activeTab, providerModelsQuery.data, providerModelsQuery.isError]);
+
+  // Filtered models for Active Models search
+  const filteredActiveModels = useMemo(() => {
+    if (!searchQuery) return activeModelsList;
+    const q = searchQuery.toLowerCase();
+    return activeModelsList.filter(
+      (m) =>
+        m.name.toLowerCase().includes(q) ||
+        m.displayName.toLowerCase().includes(q) ||
+        m.id.toLowerCase().includes(q)
+    );
+  }, [activeModelsList, searchQuery]);
 
   const handleModelSelect = (model: AIModel) => {
     setSelectedModelId(model.id);
     onModelSelect?.(model);
   };
 
+  const handleToggleActive = (providerId: string, modelId: string, active: boolean) => {
+    toggleActiveModel(providerId, modelId, active);
+    setToggleCounter((prev) => prev + 1);
+    toast.success(`${active ? "Activated" : "Deactivated"} model: ${modelId}`);
+  };
+
+  const handleAddCustomModel = (provider: string) => {
+    if (!customModelId.trim()) return;
+    const model = customModelId.trim();
+    toggleActiveModel(provider, model, true);
+    setToggleCounter((prev) => prev + 1);
+    setCustomModelId("");
+    toast.success(`Custom model "${model}" added and activated!`);
+  };
+
   const handleDeleteModel = (model: AIModel, e: React.MouseEvent) => {
     e.stopPropagation();
-    if (model.type !== "local") {
-      toast.info("Only locally installed models can be deleted.");
-      return;
-    }
+    if (model.type !== "local") return;
     deleteMutation.mutate({ name: model.id });
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "available": return <Check className="w-4 h-4 text-accent-success" />;
-      case "loading":   return <Zap className="w-4 h-4 text-accent-warning animate-pulse" />;
-      case "error":     return <AlertCircle className="w-4 h-4 text-destructive" />;
-      default:          return <AlertCircle className="w-4 h-4 text-muted-foreground" />;
-    }
-  };
-
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case "available": return "Available";
-      case "loading":   return "Loading";
-      case "error":     return "Error";
-      case "offline":   return "Offline";
-      default:          return "Unknown";
-    }
   };
 
   return (
     <div className="w-full h-full flex flex-col gap-4">
-      {/* Search and Filter Bar */}
-      <div className="flex gap-2">
-        <div className="flex-1 relative">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-          <Input
-            placeholder={activeTab === "models" ? "Search active models..." : "Search Ollama library..."}
-            value={activeTab === "models" ? searchQuery : marketplaceSearch}
-            onChange={e =>
-              activeTab === "models"
-                ? setSearchQuery(e.target.value)
-                : setMarketplaceSearch(e.target.value)
-            }
-            className="pl-10"
-          />
-        </div>
-        {activeTab === "models" && (
-          <Select value={filterType} onValueChange={(v) => setFilterType(v as "all" | "local" | "api")}>
-            <SelectTrigger className="w-32">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Models</SelectItem>
-              <SelectItem value="local">Local Only</SelectItem>
-              <SelectItem value="api">API Only</SelectItem>
-            </SelectContent>
-          </Select>
-        )}
-        {activeTab === "marketplace" && (
-          <Button
-            variant="outline"
-            size="icon"
-            onClick={() => marketplaceQuery.refetch()}
-            disabled={marketplaceQuery.isFetching}
-            title="Refresh marketplace"
+      {/* Dynamic Tab Selector */}
+      <div className="flex flex-wrap gap-1.5 border-b border-border pb-2">
+        {activeTabsList.map((tab) => (
+          <button
+            key={tab.id}
+            id={`tab-selector-${tab.id}`}
+            onClick={() => {
+              setActiveTab(tab.id);
+              setSearchQuery("");
+            }}
+            className={cn(
+              "px-3 py-1.5 font-mono text-xs rounded transition-all cursor-pointer",
+              activeTab === tab.id
+                ? "bg-primary/20 border border-primary/40 text-primary font-semibold shadow-[0_0_8px_rgba(168,85,247,0.2)]"
+                : "bg-transparent border border-transparent text-muted-foreground hover:text-foreground hover:bg-primary/5"
+            )}
           >
-            <RefreshCw className={`w-4 h-4 ${marketplaceQuery.isFetching ? "animate-spin" : ""}`} />
-          </Button>
-        )}
+            {tab.label}
+          </button>
+        ))}
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-2 border-b border-border">
-        <button
-          onClick={() => setActiveTab("models")}
-          className={cn(
-            "px-4 py-2 font-medium text-sm border-b-2 transition-colors",
-            activeTab === "models"
-              ? "border-primary/30 text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Server className="w-4 h-4 inline mr-2" />
-          Active Models
-        </button>
-        <button
-          onClick={() => setActiveTab("marketplace")}
-          className={cn(
-            "px-4 py-2 font-medium text-sm border-b-2 transition-colors",
-            activeTab === "marketplace"
-              ? "border-primary/30 text-primary"
-              : "border-transparent text-muted-foreground hover:text-foreground"
-          )}
-        >
-          <Download className="w-4 h-4 inline mr-2" />
-          Marketplace
-        </button>
-      </div>
+      {/* Main Content Pane */}
+      <div className="min-h-0 flex-1 overflow-auto pr-1">
+        {/* TAB 1: ACTIVE MODELS */}
+        {activeTab === "active" && (
+          <div className="space-y-4">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+              <Input
+                id="active-models-search"
+                placeholder="Search activated models..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-10 h-9"
+              />
+            </div>
 
-      {/* Content Area */}
-      <div className="min-h-0 flex-1 overflow-auto">
-        {activeTab === "models" ? (
-          <div role="list" className="space-y-3">
-            {ollamaLoading ? (
-              <div className="flex items-center justify-center h-48 text-muted-foreground">
-                <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                <p>Discovering models…</p>
-              </div>
-            ) : filteredModels.length === 0 ? (
-              <div className="flex items-center justify-center h-48 text-muted-foreground">
-                <p>No models found</p>
-              </div>
-            ) : (
-              filteredModels.map(model => (
-                <Card
-                  key={model.id}
-                  role="listitem"
-                  className={cn(
-                    "cursor-pointer transition-all hover:border-primary/30",
-                    selectedModelId === model.id && "border-primary/30 bg-primary/5"
-                  )}
-                  onClick={() => handleModelSelect(model)}
-                >
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-sm truncate">{model.displayName}</h3>
-                          <Badge variant="outline" className="text-xs">
+            <div className="space-y-3" role="list">
+              {filteredActiveModels.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-32 border border-dashed border-border rounded-lg text-muted-foreground p-4">
+                  <Info className="w-6 h-6 mb-2 opacity-60" />
+                  <p className="text-xs">No active models matching search criteria.</p>
+                </div>
+              ) : (
+                filteredActiveModels.map((model) => (
+                  <Card
+                    key={`${model.source}-${model.id}`}
+                    role="listitem"
+                    className={cn(
+                      "cursor-pointer transition-all hover:border-primary/30",
+                      selectedModelId === model.id && "border-primary/30 bg-primary/5 shadow-[0_0_12px_rgba(168,85,247,0.05)]"
+                    )}
+                    onClick={() => handleModelSelect(model)}
+                  >
+                    <CardContent className="p-4 flex items-center justify-between gap-4 card-content-safe">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 mb-1 flex-wrap">
+                          <h3 className="font-semibold text-sm truncate">{model.name}</h3>
+                          <Badge variant="outline" className="text-[10px] capitalize">
+                            {model.source}
+                          </Badge>
+                          <Badge variant="secondary" className="text-[10px]">
                             {model.type === "local" ? "Local" : "API"}
                           </Badge>
-                          {model.isSelected && (
-                            <Badge className="text-xs bg-accent-success/20 text-accent-success border-accent-success/30">
-                              Selected
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mt-2">
+                          {model.capabilities?.chat && <Badge className="text-[9px] bg-accent-purple/10 text-accent-purple border-accent-purple/20">Chat</Badge>}
+                          {model.capabilities?.vision && <Badge className="text-[9px] bg-accent-cyan/10 text-accent-cyan border-accent-cyan/20">Vision</Badge>}
+                          {model.capabilities?.functionCalling && <Badge className="text-[9px] bg-accent-success/10 text-accent-success border-accent-success/20">Functions</Badge>}
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        {model.type === "api" ? (
+                          <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                            <span className="text-[10px] text-muted-foreground font-mono">Active</span>
+                            <Switch
+                              id={`switch-active-${model.source}-${model.id}`}
+                              checked={isModelActive(model.source, model.id)}
+                              onCheckedChange={(checked) => handleToggleActive(model.source, model.id, checked)}
+                            />
+                          </div>
+                        ) : (
+                          <Badge className="bg-accent-success/20 text-accent-success border-accent-success/30 font-semibold text-[10px]">
+                            Local Weight
+                          </Badge>
+                        )}
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* TAB 2: OLLAMA LOCAL & MARKETPLACE */}
+        {activeTab === "ollama" && (
+          <div className="space-y-6">
+            {/* Part A: Local Library */}
+            <div className="space-y-3">
+              <h2 className="text-xs uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Server className="w-3.5 h-3.5" /> Local Library
+              </h2>
+              {ollamaLoading ? (
+                <div className="flex items-center justify-center py-8 text-muted-foreground text-xs">
+                  <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                  Loading local library...
+                </div>
+              ) : ollamaRaw.length === 0 ? (
+                <div className="flex flex-col items-center justify-center h-24 border border-dashed border-border rounded-lg text-muted-foreground p-4">
+                  <p className="text-xs">No local weights found on Ollama server.</p>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 gap-2.5">
+                  {ollamaRaw.map((m) => {
+                    const model: AIModel = {
+                      id: m.name,
+                      name: m.name,
+                      displayName: `${m.name} (Ollama)`,
+                      source: "ollama",
+                      type: "local",
+                      status: "available",
+                      metadata: {
+                        size: m.size ? Math.round(m.size / 1024 / 1024) : undefined,
+                        quantization: m.details?.quantization_level,
+                      },
+                    };
+                    return (
+                      <Card
+                        key={m.name}
+                        className={cn(
+                          "cursor-pointer hover:border-primary/30 transition-all",
+                          selectedModelId === m.name && "border-primary/30 bg-primary/5"
+                        )}
+                        onClick={() => handleModelSelect(model)}
+                      >
+                        <CardContent className="p-3.5 flex items-center justify-between gap-4 card-content-safe">
+                          <div className="min-w-0">
+                            <h3 className="font-semibold text-xs truncate">{m.name}</h3>
+                            <div className="flex gap-3 text-[10px] text-muted-foreground mt-1">
+                              {m.size && <span>Size: {Math.round(m.size / 1024 / 1024).toLocaleString()} MB</span>}
+                              {m.details?.quantization_level && <span>Quant: {m.details.quantization_level}</span>}
+                            </div>
+                          </div>
+                          {isAdmin && (
+                            <Button
+                              id={`btn-delete-ollama-${m.name}`}
+                              size="sm"
+                              variant="ghost"
+                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                              onClick={(e) => handleDeleteModel(model, e)}
+                              disabled={deleteMutation.isPending}
+                            >
+                              <Trash2 className="w-3.5 h-3.5" />
+                            </Button>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+
+            {/* Part B: Marketplace Search & Pull */}
+            <div className="space-y-3 pt-4 border-t border-border">
+              <h2 className="text-xs uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+                <Download className="w-3.5 h-3.5" /> Library Marketplace
+              </h2>
+              <div className="flex gap-2">
+                <div className="relative flex-1">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+                  <Input
+                    id="marketplace-search-input"
+                    placeholder="Search library or enter tags (e.g. llama3, mistral)..."
+                    value={marketplaceSearch}
+                    onChange={(e) => setMarketplaceSearch(e.target.value)}
+                    className="pl-10 h-9 text-xs"
+                  />
+                </div>
+                <Button
+                  id="btn-pull-custom-input"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    if (marketplaceSearch.trim()) {
+                      onModelDownload?.({
+                        id: marketplaceSearch.trim(),
+                        name: marketplaceSearch.trim(),
+                        provider: "ollama",
+                        description: `Ollama Model ${marketplaceSearch.trim()}`,
+                        size: 0,
+                        quantizations: [],
+                        popularity: 0,
+                        rating: 0,
+                        downloads: 0,
+                        tags: [],
+                        releaseDate: new Date(),
+                        latestVersion: "latest",
+                      });
+                    } else {
+                      toast.info("Enter a model name in the search box to pull directly.");
+                    }
+                  }}
+                >
+                  Pull Custom
+                </Button>
+              </div>
+
+              {/* Search Results */}
+              <div className="space-y-2">
+                {marketplaceQuery.isLoading ? (
+                  <div className="flex items-center justify-center py-8 text-muted-foreground text-xs">
+                    <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                    Searching registry...
+                  </div>
+                ) : (marketplaceQuery.data?.models ?? []).length === 0 ? (
+                  <div className="text-center py-6 text-xs text-muted-foreground">
+                    No models found. Try searching for "llama" or "gemma".
+                  </div>
+                ) : (
+                  (marketplaceQuery.data?.models ?? []).map((item: { id: string; name: string; description: string; tags: string[]; pulls: number }) => (
+                    <Card key={item.id} className="hover:border-primary/20 transition-all">
+                      <CardContent className="p-3 flex items-start justify-between gap-4 card-content-safe">
+                        <div className="min-w-0 flex-1">
+                          <h4 className="font-semibold text-xs">{item.name}</h4>
+                          <p className="text-[10px] text-muted-foreground mt-0.5 line-clamp-2">
+                            {item.description || "No description available"}
+                          </p>
+                          <div className="flex flex-wrap gap-1 mt-1.5">
+                            {item.tags.slice(0, 3).map((tag: string) => (
+                              <Badge key={tag} variant="secondary" className="text-[8px] px-1 py-0">
+                                {tag}
+                              </Badge>
+                            ))}
+                            {item.pulls > 0 && (
+                              <Badge variant="outline" className="text-[8px] px-1 py-0">
+                                ↓ {(item.pulls / 1000).toFixed(0)}K pulls
+                              </Badge>
+                            )}
+                          </div>
+                        </div>
+                        <Button
+                          id={`btn-pull-marketplace-${item.id}`}
+                          size="sm"
+                          className="h-7 text-[10px] px-2.5 flex-shrink-0"
+                          onClick={() => onModelDownload?.({
+                            id: item.id,
+                            name: item.name,
+                            provider: "ollama",
+                            description: item.description,
+                            size: 0,
+                            quantizations: [],
+                            popularity: 0,
+                            rating: 0,
+                            downloads: item.pulls,
+                            tags: item.tags,
+                            releaseDate: new Date(),
+                            latestVersion: "latest",
+                          })}
+                        >
+                          <Download className="w-3 h-3 mr-1" /> Pull
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* TAB 3: DYNAMIC API PROVIDERS */}
+        {!["active", "ollama"].includes(activeTab) && (
+          <div className="space-y-4">
+            {/* Status & Fallback Banner */}
+            <div className="flex items-center justify-between border border-border p-2.5 rounded bg-muted/20 text-xs">
+              <span className="text-muted-foreground font-mono">Status Telemetry</span>
+              <div className="flex items-center gap-2">
+                {providerModelsQuery.isLoading ? (
+                  <span className="flex items-center gap-1.5 text-accent-cyan font-medium animate-pulse">
+                    <RefreshCw className="w-3.5 h-3.5 animate-spin" /> Fetching live API...
+                  </span>
+                ) : providerModelsQuery.isError ? (
+                  <span className="flex items-center gap-1 text-accent-warning font-semibold">
+                    <AlertCircle className="w-3.5 h-3.5" /> Offline Catalog Fallback
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-accent-success font-medium">
+                    <Check className="w-3.5 h-3.5" /> Connected Live API
+                  </span>
+                )}
+              </div>
+            </div>
+
+            {/* Error detail message if any */}
+            {providerModelsQuery.isError && (
+              <div className="p-2 border border-destructive/20 bg-destructive/10 rounded text-[10px] text-destructive-foreground flex items-start gap-1.5">
+                <AlertCircle className="w-3.5 h-3.5 mt-0.5 flex-shrink-0" />
+                <div>
+                  <p className="font-semibold">Live connection offline or blocked.</p>
+                  <p className="opacity-80">Displaying cache templates for {activeTab}.</p>
+                </div>
+              </div>
+            )}
+
+            {/* Models selection checklist */}
+            <div className="space-y-2.5">
+              {providerTabModels.map((model: { id: string; name: string; isFallback: boolean }) => {
+                const isActive = isModelActive(activeTab, model.id);
+                const catalogItem = API_MODEL_CATALOG[activeTab as keyof typeof API_MODEL_CATALOG]?.find(m => m.id === model.id);
+                const mockModel: AIModel = {
+                  id: model.id,
+                  name: model.name,
+                  displayName: `${model.name} (${activeTab})`,
+                  source: activeTab as AIModel["source"],
+                  type: "api",
+                  status: "available",
+                  costPer1kTokens: catalogItem?.costPer1kTokens,
+                  capabilities: apiModelCapabilities(activeTab),
+                };
+
+                return (
+                  <Card
+                    key={model.id}
+                    className={cn(
+                      "hover:border-primary/20 transition-all cursor-pointer",
+                      isActive && "border-primary/30 bg-primary/5",
+                      selectedModelId === model.id && "ring-1 ring-primary/40"
+                    )}
+                    onClick={() => handleModelSelect(mockModel)}
+                  >
+                    <CardContent className="p-3.5 flex items-center justify-between gap-4 card-content-safe">
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <h4 className="font-semibold text-xs truncate">{model.name}</h4>
+                          {model.isFallback && (
+                            <Badge variant="outline" className="text-[8px] text-muted-foreground/60 border-muted-foreground/20">
+                              Cache Template
                             </Badge>
                           )}
                         </div>
-                        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                          {model.description || "No description available"}
-                        </p>
-                        <div className="flex flex-wrap gap-2 mb-2">
-                          {model.capabilities?.chat && <Badge variant="secondary" className="text-xs">Chat</Badge>}
-                          {model.capabilities?.vision && <Badge variant="secondary" className="text-xs">Vision</Badge>}
-                          {model.capabilities?.embedding && <Badge variant="secondary" className="text-xs">Embedding</Badge>}
-                          {model.capabilities?.functionCalling && <Badge variant="secondary" className="text-xs">Functions</Badge>}
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          {model.contextWindow && (
-                            <span>Context: {model.contextWindow.toLocaleString()} tokens</span>
-                          )}
-                          {model.costPer1kTokens && (
-                            <span>
-                              Cost: ${model.costPer1kTokens.input}/1k in, ${model.costPer1kTokens.output}/1k out
-                            </span>
-                          )}
-                          {model.metadata?.size && (
-                            <span>Size: {(model.metadata.size as number).toLocaleString()} MB</span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="flex flex-col items-end gap-2">
-                        <div className="flex items-center gap-2">
-                          {getStatusIcon(model.status)}
-                          <span className="text-xs font-medium">{getStatusLabel(model.status)}</span>
-                        </div>
-                        {model.type === "local" && isAdmin && (
-                          <Button
-                            size="sm"
-                            variant="ghost"
-                            className="text-destructive hover:text-destructive"
-                            aria-label={`Delete model ${model.displayName}`}
-                            onClick={(e) => handleDeleteModel(model, e)}
-                            disabled={deleteMutation.isPending}
-                          >
-                            <Trash2 className="w-4 h-4" aria-hidden="true" />
-                          </Button>
+                        {catalogItem?.costPer1kTokens && (
+                          <p className="text-[9px] text-muted-foreground mt-1">
+                            Pricing: ${catalogItem.costPer1kTokens.input}/1k in, ${catalogItem.costPer1kTokens.output}/1k out
+                          </p>
                         )}
                       </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
-          </div>
-        ) : (
-          <div role="list" className="space-y-3">
-            {marketplaceQuery.isLoading ? (
-              <div className="flex items-center justify-center h-48 text-muted-foreground">
-                <RefreshCw className="w-5 h-5 animate-spin mr-2" />
-                Loading Ollama library...
-              </div>
-            ) : marketplaceQuery.isError ? (
-              <div className="flex flex-col items-center justify-center h-48 text-muted-foreground gap-2">
-                <AlertCircle className="w-6 h-6 text-destructive" />
-                <p className="text-sm">Failed to load marketplace</p>
-                <p className="text-xs">{marketplaceQuery.error.message}</p>
-                <Button size="sm" variant="outline" onClick={() => marketplaceQuery.refetch()}>
-                  Retry
+                      <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
+                        <span className="text-[10px] text-muted-foreground font-mono">Active</span>
+                        <Switch
+                          id={`switch-activate-${activeTab}-${model.id}`}
+                          checked={isActive}
+                          onCheckedChange={(checked) => handleToggleActive(activeTab, model.id, checked)}
+                        />
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
+            </div>
+
+            {/* Custom Model Form */}
+            <div className="mt-4 pt-4 border-t border-border space-y-2.5">
+              <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-wider block">
+                Add Custom Model Identifier
+              </span>
+              <div className="flex gap-2">
+                <Input
+                  id="custom-model-id-input"
+                  placeholder="Enter exact model ID (e.g. gpt-4.5-preview)"
+                  value={customModelId}
+                  onChange={(e) => setCustomModelId(e.target.value)}
+                  className="h-9 text-xs"
+                />
+                <Button
+                  id="btn-add-custom-model"
+                  size="sm"
+                  onClick={() => handleAddCustomModel(activeTab)}
+                  disabled={!customModelId.trim()}
+                >
+                  <PlusCircle className="w-3.5 h-3.5 mr-1" /> Add
                 </Button>
               </div>
-            ) : (marketplaceQuery.data?.models ?? []).length === 0 ? (
-              <div className="flex items-center justify-center h-48 text-muted-foreground">
-                <p>No models found in marketplace</p>
-              </div>
-            ) : (
-              (marketplaceQuery.data?.models ?? []).map(item => (
-                <Card key={item.id} role="listitem" className="cursor-pointer transition-all hover:border-primary/30">
-                  <CardContent className="pt-4">
-                    <div className="flex items-start justify-between gap-4">
-                      <div className="flex-1 min-w-0">
-                        <div className="flex items-center gap-2 mb-1">
-                          <h3 className="font-semibold text-sm">{item.name}</h3>
-                        </div>
-                        <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-                          {item.description || "No description available"}
-                        </p>
-                        <div className="flex flex-wrap gap-1 mb-2">
-                          {(item.tags as string[]).slice(0, 6).map(tag => (
-                            <Badge key={tag} variant="secondary" className="text-xs">{tag}</Badge>
-                          ))}
-                        </div>
-                        <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                          <span>↓ {(item.pulls as number / 1000).toFixed(0)}K pulls</span>
-                          <span>{item.variantCount as number} variants</span>
-                          {item.lastUpdated && (
-                            <span>Updated: {new Date(item.lastUpdated as string).toLocaleDateString()}</span>
-                          )}
-                        </div>
-                      </div>
-                      <Button
-                        size="sm"
-                        aria-label={`Download model ${item.name}`}
-                        onClick={() => onModelDownload?.({
-                          id: item.id,
-                          name: item.name,
-                          provider: "ollama",
-                          description: item.description,
-                          size: 0,
-                          quantizations: [],
-                          popularity: 0,
-                          rating: 0,
-                          downloads: item.pulls as number,
-                          tags: item.tags as string[],
-                          releaseDate: new Date(),
-                          latestVersion: "latest",
-                        })}
-                      >
-                        <Download className="w-4 h-4 mr-2" aria-hidden="true" />
-                        Pull
-                      </Button>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))
-            )}
+              <p className="text-[10px] text-muted-foreground">
+                Enter any new model ID deployed by the provider. Useful for launching preview or experimental releases immediately.
+              </p>
+            </div>
           </div>
         )}
       </div>

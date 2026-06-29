@@ -72,7 +72,9 @@ export async function injectMapRagContext<M extends ChatMsg>(args: {
 
     const memory = MemoryArchitectService.getInstance();
     if (!memory.isOnline()) {
-      await memory.init().catch(() => {});
+      await memory.init().catch(error => {
+        log.warn("ChromaDB initialization failed in RAG context:", error instanceof Error ? error.message : String(error));
+      });
       if (!memory.isOnline()) return passthrough; // ChromaDB offline → degrade
     }
 

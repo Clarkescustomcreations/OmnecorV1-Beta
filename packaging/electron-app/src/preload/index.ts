@@ -1,5 +1,16 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Sandbox-safe preload.
+//
+// The BrowserWindow runs with `sandbox: true`, and a sandboxed preload may only
+// `require()` the built-in `electron` module plus a few Node builtins — it CANNOT
+// load external npm packages. Importing `@electron-toolkit/preload` here would
+// therefore throw at runtime, aborting the whole preload before `window.api` is
+// exposed and leaving the renderer with "Desktop bridge not ready". So this file
+// intentionally depends on `electron` ONLY. The renderer never used
+// `window.electron`, so it is not re-exposed.
+// ─────────────────────────────────────────────────────────────────────────────
 
 const BACKEND_PORT = 37291
 
@@ -27,18 +38,19 @@ const api = {
   // it as a Bearer token in localStorage.
   openOAuthPopup: (url: string): Promise<{ token?: string; error?: string }> =>
     ipcRenderer.invoke('oauth-start', url),
+  selectFolder: (): Promise<string | null> => ipcRenderer.invoke('select-folder'),
 }
+
+export type DesktopApi = typeof api
 
 if (process.contextIsolated) {
   try {
-    contextBridge.exposeInMainWorld('electron', electronAPI)
     contextBridge.exposeInMainWorld('api', api)
   } catch (error) {
-    console.error(error)
+    // Surfaced to the renderer console; the wizard shows "Desktop bridge not
+    // ready" if window.api is missing.
+    console.error('[preload] Failed to expose window.api:', error)
   }
 } else {
-  // @ts-ignore (define in dts)
-  window.electron = electronAPI
-  // @ts-ignore (define in dts)
-  window.api = api
+  ;(window as unknown as { api: DesktopApi }).api = api
 }

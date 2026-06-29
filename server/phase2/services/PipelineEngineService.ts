@@ -37,16 +37,29 @@ function _staticPhaseOutput(phase: PhaseName, goal: string): string {
 
 async function generatePhaseOutput(phase: PhaseName, goal: string): Promise<string> {
   try {
-    const result = await AiProviderService.getInstance().chat({
-      providerId: "ollama",
-      modelId: "llama3.2:latest",
-      systemPrompt: PHASE_SYSTEM_PROMPTS[phase],
-      messages: [{ role: "user", content: goal }],
-      maxTokens: 800,
-      temperature: 0.3,
-    });
-    if (result && result.trim().length > 0) {
-      return `## ${phase} Phase\n\n${result.trim()}`;
+    if (phase === "EXECUTE") {
+      const { LocalSubAgentWorker } = await import("./LocalSubAgentWorker.js");
+      const result = await LocalSubAgentWorker.getInstance().executeTask({
+        goal: `Execute the following plan as a lead engineer. Follow these constraints: ${PHASE_SYSTEM_PROMPTS[phase]}\n\nPlan:\n${goal}`,
+        providerId: "ollama",
+        modelId: "llama3.2:latest",
+        maxRetries: 3
+      });
+      if (result && result.trim().length > 0) {
+        return `## ${phase} Phase\n\n${result.trim()}`;
+      }
+    } else {
+      const result = await AiProviderService.getInstance().chat({
+        providerId: "ollama",
+        modelId: "llama3.2:latest",
+        systemPrompt: PHASE_SYSTEM_PROMPTS[phase],
+        messages: [{ role: "user", content: goal }],
+        maxTokens: 800,
+        temperature: 0.3,
+      });
+      if (result && result.trim().length > 0) {
+        return `## ${phase} Phase\n\n${result.trim()}`;
+      }
     }
   } catch {
     // Ollama unavailable or model not loaded — fall through to static output
@@ -64,13 +77,14 @@ export class PipelineEngineService {
     return PipelineEngineService.instance;
   }
 
-  async createPipeline(name: string, goal: string, ownerId: number): Promise<Pipeline> {
+  async createPipeline(name: string, goal: string, ownerId: number, projectId?: string): Promise<Pipeline> {
     const sanitized = PromptSanitizer.getInstance().sanitize(goal).clean;
     const db = await getDb();
     const id = randomUUID();
 
     const newPipeline: Pipeline = {
       id,
+      projectId: projectId || null,
       name,
       goal: sanitized,
       status: "running",
@@ -97,6 +111,7 @@ export class PipelineEngineService {
 
     await db.insert(pipelines).values({
       id,
+      projectId: projectId || null,
       name,
       goal: sanitized,
       status: "running",

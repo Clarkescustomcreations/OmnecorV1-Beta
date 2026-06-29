@@ -36,6 +36,7 @@ import { Switch } from "@/components/ui/switch";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
+import type { Query } from "@tanstack/react-query";
 import { useVisualControlStore } from "@/lib/stores/visualControlStore";
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle } from "@/components/ui/alert-dialog";
 
@@ -330,7 +331,7 @@ function remoteSourceLabel(uri: string): string {
  * Extracted to use contexts provided in the main BrainMap export
  */
 function BrainMapContent() {
-  const [viewMode, setViewMode] = useState<"graph" | "tree">("graph");
+  const [viewMode, setViewMode] = useState<"graph" | "tree" | "mcp3d">("graph");
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null);
   const { maps, activeMap, updateMap } = useNeuralMap();
   const { setFictionMode, isFictionMode } = useFictionMode();
@@ -516,7 +517,10 @@ function BrainMapContent() {
     {
       enabled: !!activeMap && hasRemoteSources,
       // Poll while a run is in flight; stop once it settles.
-      refetchInterval: (q: any) => (q?.state?.data?.state === "running" ? 1500 : false),
+      refetchInterval: (q: any) => {
+        const data = q?.state?.data as { state?: string } | null;
+        return data?.state === "running" ? 1500 : false;
+      },
     },
   );
   const indexStatus = indexStatusQuery.data;
@@ -776,7 +780,7 @@ function BrainMapContent() {
                 <div className="flex items-center gap-3 min-w-0">
                   <Brain className="w-6 h-6 text-primary flex-shrink-0" />
                   <div className="min-w-0">
-                    <h1 className="text-xl font-bold flex flex-wrap items-center gap-2">
+                    <h1 className="text-4xl font-bold tracking-tight flex flex-wrap items-center gap-2">
                       {activeMap?.name ?? "Omnecor Demo"}
                       {isFictionMode && (
                         <Badge variant="outline" className="text-primary border-primary/30 text-[10px] py-0">
@@ -816,6 +820,19 @@ function BrainMapContent() {
                         onClick={() => setViewMode("tree")}
                       >
                         <List className="w-3.5 h-3.5 mr-1.5" /> Tree
+                      </Button>
+                    </HowToTooltip>
+                    
+                    <div className="w-px bg-border mx-1 self-stretch" />
+                    
+                    <HowToTooltip title="Codebase Memory 3D" description="Deep semantic 3D graph visualization powered by Codebase Memory MCP (requires MCP server to be running).">
+                      <Button
+                        size="sm"
+                        variant={viewMode === "mcp3d" ? "default" : "ghost"}
+                        className="h-7 px-2 text-xs"
+                        onClick={() => setViewMode("mcp3d")}
+                      >
+                        <MapIcon className="w-3.5 h-3.5 mr-1.5" /> 3D Memory
                       </Button>
                     </HowToTooltip>
 
@@ -939,13 +956,24 @@ function BrainMapContent() {
                                   onNodeClick={setSelectedNodeId}
                                   onRequestExpand={masterView ? undefined : handleRequestExpand}
                                 />
-                              ) : (
+                              ) : viewMode === "tree" ? (
                                 <NeuralTreeView
                                   network={displayNetwork}
                                   onNodeClick={setSelectedNodeId}
                                   onRequestExpand={masterView ? undefined : handleRequestExpand}
                                 />
-                              )}
+                              ) : viewMode === "mcp3d" ? (
+                                <div className="flex-1 w-full h-full relative bg-black/90">
+                                  <iframe 
+                                    src="http://localhost:9749" 
+                                    className="w-full h-full border-0 absolute inset-0" 
+                                    title="Codebase Memory MCP 3D Graph"
+                                  />
+                                  <div className="absolute top-4 left-4 bg-background/80 backdrop-blur text-foreground px-3 py-1.5 rounded-md text-xs border border-border shadow-md">
+                                    <strong>Note:</strong> Codebase Memory MCP must be running for this view to work.
+                                  </div>
+                                </div>
+                              ) : null}
                             </div>
                             <details className="absolute bottom-2 left-14 z-10 text-xs bg-card/90 border border-border rounded p-1">
                               <summary className="cursor-pointer text-muted-foreground select-none">Text view</summary>

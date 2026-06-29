@@ -57,6 +57,7 @@ export interface ChatInput {
   providerId: string;
   modelId: string;
   messages: Message[];
+  tools?: any[];
   apiKey?: string;
   baseUrl?: string;
   systemPrompt?: string;
@@ -77,6 +78,19 @@ export interface ChatChunk {
   done: boolean;
   totalTokens?: number;
 }
+
+/**
+ * Conservative token ceiling for the local fallback model. When a hard budget
+ * cap forces local inference, a conversation estimated above this many tokens
+ * is treated as too large to fit a typical local context window, so we block
+ * with a clear message instead of silently truncating or overflowing.
+ */
+const LOCAL_CONTEXT_TOKEN_BUDGET = 8000;
+
+/** Network timeout for a streaming chat completion (long-running). */
+const CHAT_NETWORK_TIMEOUT_MS = 300_000; // 5 minutes
+/** Network timeout for quick model-discovery calls. */
+const DISCOVERY_TIMEOUT_MS = 10_000; // 10 seconds
 
 class SignalAsyncQueue<T> {
   private queue: T[] = [];
@@ -221,6 +235,28 @@ export class AiProviderService {
     if (messages) chatInput.messages = messages;
     if (systemPrompt) chatInput.systemPrompt = systemPrompt;
 
+    // Sub-Agent Harness Auto-Wrap:
+    // If auto-routing is off (api_direct) or if Valet routed to sub_agent_harness,
+    // and the model is local, wrap it in the sub-agent harness loop, UNLESS we are already inside it.
+    const isLocalProvider = chatInput.providerId === "ollama" || chatInput.providerId === "llamacpp";
+    if (
+      isLocalProvider &&
+      chatInput.routingMode !== "sub_agent_internal" &&
+      (chatInput.routingMode === "api_direct" || chatInput.routingMode === "sub_agent_harness")
+    ) {
+      log.info("[SubAgent Wrap] Intercepting local model execution to run through Try-Fail-Fix harness");
+      const { LocalSubAgentWorker } = await import("./LocalSubAgentWorker.js");
+      const userMessage = [...chatInput.messages].reverse().find(m => m.role === "user")?.content ?? "Execute task";
+      const result = await LocalSubAgentWorker.getInstance().executeTask({
+        goal: userMessage,
+        providerId: chatInput.providerId,
+        modelId: chatInput.modelId,
+        maxRetries: 3
+      });
+      yield { content: result, delta: result, done: true };
+      return;
+    }
+
     // Workstation Optimization — apply GPU Bypass if enabled
     const settings = SettingsService.getInstance().getSettings();
     if (settings.gpuBypass && chatInput.providerId === "ollama") {
@@ -230,50 +266,75 @@ export class AiProviderService {
       // Future: add num_gpu: 0 to Ollama options if supported via API
     }
     if (chatInput.projectId) {
+      // Set inside the try when a hard cap is hit but the conversation is too
+      // large to safely continue on a local model. Acted on AFTER the non-fatal
+      // try/catch, so a genuine block reaches the user while a mere budget
+      // *lookup* failure stays non-fatal and never blocks the call.
+      let budgetBlockMessage: string | null = null;
       try {
         const db = await getDb();
-        if (db) {
-          const { eq, sum } = await import("drizzle-orm");
-          const { spendLog: spendLogTable } = await import("../../../drizzle/schema.js");
+        const { eq, sum } = await import("drizzle-orm");
+        const { spendLog: spendLogTable } = await import("../../../drizzle/schema.js");
 
-          const budgetRows = await db
-            .select()
-            .from(projectBudgets)
-            .where(eq(projectBudgets.projectId, chatInput.projectId))
-            .limit(1);
+        const budgetRows = await db
+          .select()
+          .from(projectBudgets)
+          .where(eq(projectBudgets.projectId, chatInput.projectId))
+          .limit(1);
 
-          const budget = budgetRows[0];
-          if (budget && budget.limitCents > 0) {
-            const spentRows = await db
-              .select({ total: sum(spendLogTable.estimatedCostMicrocents) })
-              .from(spendLogTable)
-              .where(eq(spendLogTable.projectId, chatInput.projectId));
+        const budget = budgetRows[0];
+        if (budget && budget.limitCents > 0) {
+          const spentRows = await db
+            .select({ total: sum(spendLogTable.estimatedCostMicrocents) })
+            .from(spendLogTable)
+            .where(eq(spendLogTable.projectId, chatInput.projectId));
 
-            const spentMicrocents = Number(spentRows[0]?.total ?? 0);
-            const spentCents = spentMicrocents / 1_000_000;
-            const pct = (spentCents / budget.limitCents) * 100;
+          const spentMicrocents = Number(spentRows[0]?.total ?? 0);
+          const spentCents = spentMicrocents / 1_000_000;
+          const pct = (spentCents / budget.limitCents) * 100;
 
-            // Agentic Wallet alerts → Notifications feed (deduped per level).
-            const alertUserId = chatInput.sessionId ?? chatInput.projectId;
-            if (pct >= 100) {
-              void this.raiseWalletAlert(chatInput.projectId, alertUserId, "over",
-                `Budget reached: $${spentCents.toFixed(2)} of $${budget.limitCents} on this project.`);
-            } else if (pct >= (budget.alertThreshold ?? 80)) {
-              void this.raiseWalletAlert(chatInput.projectId, alertUserId, "threshold",
-                `Budget ${Math.round(pct)}% used: $${spentCents.toFixed(2)} of $${budget.limitCents}.`);
-            }
+          // Agentic Wallet alerts → Notifications feed (deduped per level).
+          const alertUserId = chatInput.sessionId ?? chatInput.projectId;
+          if (pct >= 100) {
+            void this.raiseWalletAlert(chatInput.projectId, alertUserId, "over",
+              `Budget reached: $${spentCents.toFixed(2)} of $${budget.limitCents} on this project.`);
+          } else if (pct >= (budget.alertThreshold ?? 80)) {
+            void this.raiseWalletAlert(chatInput.projectId, alertUserId, "threshold",
+              `Budget ${Math.round(pct)}% used: $${spentCents.toFixed(2)} of $${budget.limitCents}.`);
+          }
 
-            if (spentCents >= budget.limitCents && budget.mode === "hard") {
-              // Auto-downgrade to Ollama — never silently drop the request
+          if (spentCents >= budget.limitCents && budget.mode === "hard") {
+            // Hard cap reached. Prefer a local model so spend stops without
+            // dropping the request. If the history is too large for a local
+            // context window we can't safely downgrade — record a block to act
+            // on below, and never fall through to the paid cloud provider.
+            const estTokens = chatInput.messages.reduce(
+              (acc, m) => acc + Math.ceil(m.content.length / 4),
+              0,
+            );
+            if (estTokens > LOCAL_CONTEXT_TOKEN_BUDGET) {
+              budgetBlockMessage =
+                "Cloud budget exhausted for this project, and the conversation history is too large to continue on a local model. Clear the history or start a new branch to keep going locally.";
+            } else {
+              // Auto-downgrade to a locally-available model — never silently
+              // drop the request or keep billing the cloud provider.
               chatInput.providerId = "ollama";
-              chatInput.modelId = "llama3.2:latest";
+              chatInput.modelId = await this.pickLocalFallbackModel();
               chatInput.apiKey = undefined;
             }
           }
         }
       } catch (err) {
-        // Non-fatal — budget check must never break the AI call
+        // Non-fatal — a budget *lookup* failure must never break the AI call.
         log.warn("[AiProviderService] budget pre-flight failed:", err);
+      }
+
+      if (budgetBlockMessage) {
+        // Deliver in-band as a terminal chunk so it renders in the chat bubble
+        // and the stream completes cleanly, then stop (no cloud call).
+        const msg = `Error: ${budgetBlockMessage}`;
+        yield { content: msg, delta: msg, done: true };
+        return;
       }
     }
 
@@ -336,6 +397,10 @@ export class AiProviderService {
 
     // High-performance Signal-driven Async Queue for chunks
     const queue = new SignalAsyncQueue<ChatChunk>();
+    // Track whether a terminal (done) chunk was emitted and whether the
+    // producer errored, so we can guarantee completion and gate spend logging.
+    let terminalEmitted = false;
+    let streamError: unknown = null;
 
     const onChunk = (chunk: { content: string; done?: boolean }) => {
       const item = {
@@ -343,6 +408,7 @@ export class AiProviderService {
         delta: chunk.content,
         done: !!chunk.done,
       };
+      if (item.done) terminalEmitted = true;
       queue.push(item);
       if (chunk.done) queue.close();
     };
@@ -481,16 +547,27 @@ export class AiProviderService {
               chatInput.messages.map((m: any) => m.content).join("\n"),
               modelPath,
             );
-            onChunk({ content: text, done: false });
+            // done:true — llama.cpp returns the full text in one shot, so this
+            // is the terminal chunk; without it the consumer never completes.
+            onChunk({ content: text, done: true });
             break;
           }
           default:
             throw new Error(`Unsupported provider: ${providerId}`);
         }
       } catch (err) {
-        onChunk({ content: `Error: ${(err as Error).message}`, done: true });
+        // Deliver the error in-band as a terminal chunk so it renders in the
+        // chat bubble and the stream still completes cleanly, rather than
+        // throwing out of the generator and surfacing only via onError.
+        streamError = err;
+        log.warn("[AiProviderService] stream producer error:", err);
+        const message = err instanceof Error ? err.message : String(err);
+        if (!terminalEmitted) onChunk({ content: `Error: ${message}`, done: true });
       } finally {
-        onChunk({ content: "", done: true });
+        // Guarantee a terminal chunk on every path so the consumer's for-await
+        // always observes completion and the client never hangs open.
+        if (!terminalEmitted) onChunk({ content: "", done: true });
+        queue.close();
       }
     })();
 
@@ -502,8 +579,10 @@ export class AiProviderService {
     }
     await promise;
 
-    // Agentic Wallet — log spend after stream completes
-    if (chatInput.projectId) {
+    // Agentic Wallet — log spend only after a *successful* stream completes.
+    // A failed request (delivered as an in-band error chunk above) recorded no
+    // real provider usage, so it must not be billed against the budget.
+    if (chatInput.projectId && !streamError) {
       const promptTokens = chatInput.messages.reduce(
         (acc, m) => acc + Math.ceil(m.content.length / 4),
         0
@@ -586,18 +665,16 @@ export class AiProviderService {
 
     try {
       const db = await getDb();
-      if (db) {
-        await db.insert(spendLog).values({
-          id: uuidv4(),
-          projectId: params.projectId,
-          provider: params.provider,
-          modelId: params.modelId,
-          promptTokens: params.promptTokens,
-          completionTokens: params.completionTokens,
-          estimatedCostMicrocents: costMicrocents,
-          sessionId: params.sessionId ?? null,
-        });
-      }
+      await db.insert(spendLog).values({
+        id: uuidv4(),
+        projectId: params.projectId,
+        provider: params.provider,
+        modelId: params.modelId,
+        promptTokens: params.promptTokens,
+        completionTokens: params.completionTokens,
+        estimatedCostMicrocents: costMicrocents,
+        sessionId: params.sessionId ?? null,
+      });
     } catch (err) {
       // Non-fatal — spend logging must never break the AI call
       log.warn("[AiProviderService] logSpend failed:", err);
@@ -686,6 +763,7 @@ export class AiProviderService {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ json: input }),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok)
@@ -730,6 +808,7 @@ export class AiProviderService {
         messages: input.messages,
         stream: !!onChunk,
       }),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -781,6 +860,7 @@ export class AiProviderService {
         max_tokens: input.maxTokens,
         temperature: input.temperature,
       }),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -819,11 +899,13 @@ export class AiProviderService {
         model: input.modelId,
         messages: input.messages,
         stream: !!onChunk,
+        tools: input.tools,
         options: {
           num_predict: input.maxTokens,
           temperature: input.temperature,
         },
       }),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -832,7 +914,17 @@ export class AiProviderService {
 
     if (!onChunk) {
       const data = await response.json();
-      return data.message.content;
+      let content = data.message.content || "";
+      if (data.message.tool_calls && data.message.tool_calls.length > 0) {
+        // Shim native tools to our string format for LocalSubAgentWorker
+        for (const tc of data.message.tool_calls) {
+          const fn = tc.function;
+          if (fn) {
+            content += `\n<tool_call>\n${JSON.stringify({ action: fn.name, ...fn.arguments }, null, 2)}\n</tool_call>\n`;
+          }
+        }
+      }
+      return content;
     }
 
     return this.handleStream(
@@ -870,6 +962,7 @@ export class AiProviderService {
         max_tokens: input.maxTokens,
         temperature: input.temperature,
       }),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -918,6 +1011,7 @@ export class AiProviderService {
         max_tokens: input.maxTokens,
         temperature: input.temperature,
       }),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -970,6 +1064,7 @@ export class AiProviderService {
         max_tokens: input.maxTokens || 4096,
         temperature: input.temperature,
       }),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -1040,6 +1135,7 @@ export class AiProviderService {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(body),
+      signal: AbortSignal.timeout(CHAT_NETWORK_TIMEOUT_MS),
     });
 
     if (!response.ok) {
@@ -1145,15 +1241,121 @@ export class AiProviderService {
   /**
    * Discover available local Ollama models.
    */
+  /**
+   * Pick a locally-available Ollama model to downgrade to when a hard budget
+   * cap forces local inference. Prefers an explicit `localFallbackModel`
+   * setting, then a model the user has actually pulled (so the downgrade can't
+   * fail on a missing tag), and only falls back to a default tag if discovery
+   * yields nothing.
+   */
+  private async pickLocalFallbackModel(): Promise<string> {
+    const configured = SettingsService.getInstance().get<string>("localFallbackModel", "");
+    if (configured) return configured;
+    try {
+      const models = await this.discoverOllamaModels();
+      const first = models.find((m) => typeof m?.name === "string" && m.name)?.name;
+      if (first) return first as string;
+    } catch {
+      // Discovery failed — fall through to the default tag.
+    }
+    return "llama3.2:latest";
+  }
+
   async discoverOllamaModels(): Promise<any[]> {
     const baseUrl = this.getOllamaUrl();
     try {
-      const res = await fetch(`${baseUrl}/api/tags`);
+      const res = await fetch(`${baseUrl}/api/tags`, {
+        signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+      });
       if (!res.ok) return [];
       const data = await res.json();
       return data.models || [];
     } catch {
       return [];
     }
+  }
+
+  /**
+   * Discover available models for a given provider via its live API.
+   */
+  async discoverProviderModels(
+    providerId: string,
+    customApiKey?: string,
+    customBaseUrl?: string
+  ): Promise<Array<{ id: string; name: string }>> {
+    const apiKey = this.getProviderKey(providerId, customApiKey);
+    if (!apiKey && providerId !== "ollama" && providerId !== "llamacpp") {
+      throw new Error(`API key for ${providerId} is not configured.`);
+    }
+
+    try {
+      if (providerId === "openai") {
+        const customUrl = this.getProviderBaseUrl("openai", customBaseUrl) || "https://api.openai.com";
+        const baseUrl = `${customUrl.replace(/\/$/, "")}/v1/models`;
+        const res = await fetch(baseUrl, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+        });
+        if (!res.ok) throw new Error(`OpenAI models fetch failed: ${res.status}`);
+        const data = (await res.json()) as { data: Array<{ id: string }> };
+        return (data.data ?? []).map((m) => ({ id: m.id, name: m.id }));
+      }
+
+      if (providerId === "anthropic") {
+        const customUrl = this.getProviderBaseUrl("anthropic", customBaseUrl) || "https://api.anthropic.com";
+        const baseUrl = `${customUrl.replace(/\/$/, "")}/v1/models`;
+        const res = await fetch(baseUrl, {
+          headers: {
+            "x-api-key": apiKey,
+            "anthropic-version": "2023-06-01",
+          },
+          signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+        });
+        if (!res.ok) throw new Error(`Anthropic models fetch failed: ${res.status}`);
+        const data = (await res.json()) as { data: Array<{ id: string; display_name?: string }> };
+        return (data.data ?? []).map((m) => ({ id: m.id, name: m.display_name ?? m.id }));
+      }
+
+      if (providerId === "gemini") {
+        const customUrl = this.getProviderBaseUrl("gemini", customBaseUrl) || "https://generativelanguage.googleapis.com";
+        const baseUrl = `${customUrl.replace(/\/$/, "")}/v1beta/models?key=${apiKey}`;
+        const res = await fetch(baseUrl, {
+          signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+        });
+        if (!res.ok) throw new Error(`Gemini models fetch failed: ${res.status}`);
+        const data = (await res.json()) as { models?: Array<{ name: string; displayName?: string }> };
+        return (data.models ?? []).map((m) => {
+          const id = m.name.startsWith("models/") ? m.name.substring("models/".length) : m.name;
+          return { id, name: m.displayName ?? id };
+        });
+      }
+
+      if (providerId === "grok") {
+        const customUrl = this.getProviderBaseUrl("grok", customBaseUrl) || "https://api.x.ai";
+        const baseUrl = `${customUrl.replace(/\/$/, "")}/v1/models`;
+        const res = await fetch(baseUrl, {
+          headers: { Authorization: `Bearer ${apiKey}` },
+          signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+        });
+        if (!res.ok) throw new Error(`Grok models fetch failed: ${res.status}`);
+        const data = (await res.json()) as { data: Array<{ id: string }> };
+        return (data.data ?? []).map((m) => ({ id: m.id, name: m.id }));
+      }
+
+      if (providerId === "huggingface") {
+        const baseUrl = `https://huggingface.co/api/models?pipeline_tag=text-generation&sort=downloads&direction=-1&limit=25`;
+        const res = await fetch(baseUrl, {
+          signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+        });
+        if (!res.ok) throw new Error(`HuggingFace models fetch failed: ${res.status}`);
+        const data = (await res.json()) as Array<{ id: string }>;
+        return data.map((m) => ({ id: m.id, name: m.id }));
+      }
+    } catch (err: any) {
+      log.error(`[discoverProviderModels] Failed to fetch models for ${providerId}:`, err);
+      throw new Error(`Failed to fetch models for ${providerId}: ${err.message || err}`);
+    }
+
+    return [];
   }
 }

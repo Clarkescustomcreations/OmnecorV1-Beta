@@ -92,25 +92,52 @@ export function SetupWizard() {
   // scrolled to the bottom of the agreement. Already-accepted users (back-nav)
   // and content short enough not to overflow are treated as read.
   const tosViewportRef = useRef<HTMLDivElement>(null);
+  const tosSentinelRef = useRef<HTMLDivElement>(null);
   const [tosScrolledToEnd, setTosScrolledToEnd] = useState(false);
   const tosReadable = tosScrolledToEnd || hasAcceptedCurrentTos(me?.tosAcceptedVersion);
   useEffect(() => {
     if (STEPS[currentStep].id !== "terms") return;
     const el = tosViewportRef.current;
-    if (!el) return;
+    const markRead = () => setTosScrolledToEnd(true);
+
+    // Primary detection: an IntersectionObserver on a 1px sentinel at the very
+    // end of the agreement. It fires when the sentinel scrolls into view — or is
+    // already visible because the content is short — with no scroll-position math.
+    // This is robust to Radix's nested viewport, sub-pixel rounding, browser zoom,
+    // and content/viewport resizes that the raw scrollTop check stumbles on.
+    let observer: IntersectionObserver | undefined;
+    const sentinel = tosSentinelRef.current;
+    if (sentinel && typeof IntersectionObserver !== "undefined") {
+      observer = new IntersectionObserver(
+        (entries) => { if (entries.some((e) => e.isIntersecting)) markRead(); },
+        { root: el ?? null },
+      );
+      observer.observe(sentinel);
+    }
+
+    // Fallback: classic scroll-position check, in case the observer never fires
+    // (e.g. the viewport ref is unavailable). Either path can satisfy the gate.
     const check = () => {
-      if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) {
-        setTosScrolledToEnd(true);
-      }
+      if (!el) return;
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 24) markRead();
     };
     check(); // content may fit without scrolling — nothing left to read
-    el.addEventListener("scroll", check, { passive: true });
-    return () => el.removeEventListener("scroll", check);
+    el?.addEventListener("scroll", check, { passive: true });
+
+    return () => {
+      observer?.disconnect();
+      el?.removeEventListener("scroll", check);
+    };
   }, [currentStep]);
 
   // --- Backend Data ---
   const { data: aiProviders, refetch: refetchAiProviders } = trpc.system.aiProviders.useQuery();
   const { data: settings, refetch: refetchSettings } = trpc.system.getSettings.useQuery();
+  // Social sign-in only works once an OAuth app's credentials are configured
+  // (Settings → Social Login). Until then the buttons are dead, so we hide them
+  // and offer only the local account on first run. Configure creds and they
+  // reappear automatically. (public query — safe before authentication.)
+  const { data: loginProviders } = trpc.system.loginProviders.useQuery();
   const executionMode = useAppStore((s) => s.executionMode);
   const setExecutionMode = useAppStore((s) => s.setExecutionMode);
 
@@ -130,6 +157,22 @@ export function SetupWizard() {
     onError: (e) => toast.error(e.message),
   });
 
+  const installCbmMcpMutation = trpc.system.installCodebaseMemoryMCP.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(data.message);
+      setTimeout(() => utils.system.checkDependencies.invalidate(), 4000);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
+  const fetchValetModelMutation = trpc.system.fetchValetModel.useMutation({
+    onSuccess: (data: any) => {
+      toast.success(data.message);
+      setTimeout(() => utils.system.checkDependencies.invalidate(), 4000);
+    },
+    onError: (e) => toast.error(e.message),
+  });
+
   // --- Mutations ---
   const detectHardwareMutation = trpc.system.detectHardware.useMutation();
   const setModeMutation = trpc.system.setExecutionMode.useMutation({
@@ -137,8 +180,22 @@ export function SetupWizard() {
     onError: (e) => toast.error(e.message),
   });
 
-  const handleBrowse = () => {
-    folderInputRef.current?.click();
+  const handleBrowse = async () => {
+    const api = (window as any).api;
+    if (api?.selectFolder) {
+      try {
+        const folder = await api.selectFolder();
+        if (folder) {
+          setKbPath(folder);
+          toast.success(`Folder selected: ${folder}`);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to select folder");
+      }
+    } else {
+      folderInputRef.current?.click();
+    }
   };
 
   const handleFolderSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -329,8 +386,6 @@ export function SetupWizard() {
   // --- Step States ---
   const [selectedMode, setSelectedMode] = useState<"sovereign" | "scrapper" | "big_spender">("scrapper");
   const [keys, setKeys] = useState({ openai: "", anthropic: "", gemini: "", grok: "", huggingface: "", elevenlabs: "", falai: "", forge: "" });
-  const [kaggleUsername, setKaggleUsername] = useState("");
-  const [kaggleApiKey, setKaggleApiKey] = useState("");
   const [ollamaUrl, setOllamaUrl] = useState("http://localhost:11434");
   const [kbPath, setKbPath] = useState("");
   const [vram, setVram] = useState(8);
@@ -446,6 +501,7 @@ export function SetupWizard() {
                   Choose how you want to sign in. Your account unlocks all workstation features and keeps your settings secure.
                 </p>
                 <div className="grid gap-3">
+                  {loginProviders?.google && (
                   <Button
                     variant="outline"
                     disabled={authBusy}
@@ -455,6 +511,8 @@ export function SetupWizard() {
                     <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
                     {authBusy ? "Signing in…" : "Continue with Google"}
                   </Button>
+                  )}
+                  {loginProviders?.microsoft && (
                   <Button
                     variant="outline"
                     disabled={authBusy}
@@ -464,7 +522,10 @@ export function SetupWizard() {
                     <svg className="w-5 h-5" viewBox="0 0 24 24"><path fill="#F25022" d="M1 1h10v10H1z"/><path fill="#7FBA00" d="M13 1h10v10H13z"/><path fill="#00A4EF" d="M1 13h10v10H1z"/><path fill="#FFB900" d="M13 13h10v10H13z"/></svg>
                     {authBusy ? "Signing in…" : "Continue with Microsoft"}
                   </Button>
+                  )}
+                  {(loginProviders?.google || loginProviders?.microsoft) && (
                   <div className="relative my-2"><div className="absolute inset-0 flex items-center"><div className="w-full border-t" /></div><div className="relative flex justify-center"><span className="bg-card px-3 text-xs text-muted-foreground">or</span></div></div>
+                  )}
                   <Button
                     variant="outline"
                     className="w-full h-14 gap-3 text-base font-semibold justify-start px-5 border-2 hover:border-primary/30 hover:bg-primary/5"
@@ -578,6 +639,9 @@ export function SetupWizard() {
                     {TOS_FOOTER}
                   </p>
                 </div>
+                {/* End-of-agreement sentinel: when this scrolls into view the
+                    reader has reached the bottom (see the IntersectionObserver). */}
+                <div ref={tosSentinelRef} aria-hidden="true" className="h-px w-full" />
               </div>
             </ScrollArea>
 
@@ -732,36 +796,75 @@ export function SetupWizard() {
                 <p>🎓 Train your Valet Router on free Kaggle T4 GPUs — no credit card needed.</p>
                 <p>1. Create a free account at <strong>kaggle.com</strong> and verify your phone number (required for GPU access).</p>
                 <p>2. Go to <strong>kaggle.com/settings</strong> → API → <strong>Create New Token</strong> → download <code className="font-mono">kaggle.json</code>.</p>
-                <p>3. Copy the <strong>username</strong> and <strong>key</strong> from that file into the fields below.</p>
+                <p>3. Drop your <code className="font-mono">kaggle.json</code> file below to securely connect.</p>
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">🐎 Kaggle Username</Label>
-                <Input
-                  placeholder="your_kaggle_username"
-                  value={kaggleUsername}
-                  onChange={(e) => setKaggleUsername(e.target.value)}
-                  className="bg-background/50 focus-visible:ring-primary/30 font-mono text-xs"
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label className="text-sm">🔑 Kaggle API Key</Label>
-                <div className="flex gap-2">
-                  <Input
-                    type="password"
-                    placeholder="xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-                    value={kaggleApiKey}
-                    onChange={(e) => setKaggleApiKey(e.target.value)}
-                    className="bg-background/50 focus-visible:ring-primary/30 font-mono text-xs"
-                  />
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    disabled={!kaggleUsername || !kaggleApiKey || saveKaggleMutation.isPending}
-                    onClick={() => saveKaggleMutation.mutate({ username: kaggleUsername, key: kaggleApiKey })}
-                  >
-                    {saveKaggleMutation.isPending ? "Saving..." : "Connect"}
-                  </Button>
+
+              <div
+                className="relative border-2 border-dashed border-border rounded-xl p-8 flex flex-col items-center justify-center gap-3 text-center transition-colors hover:border-primary hover:bg-primary/5"
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.currentTarget.classList.add("border-primary", "bg-primary/10");
+                }}
+                onDragLeave={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.currentTarget.classList.remove("border-primary", "bg-primary/10");
+                }}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.currentTarget.classList.remove("border-primary", "bg-primary/10");
+                  const file = e.dataTransfer.files[0];
+                  if (!file) return;
+                  const reader = new FileReader();
+                  reader.onload = (ev) => {
+                    try {
+                      const data = JSON.parse(ev.target?.result as string);
+                      if (data.username && data.key) {
+                        saveKaggleMutation.mutate({ username: data.username, key: data.key });
+                      } else {
+                        toast.error("Invalid kaggle.json format");
+                      }
+                    } catch (err) {
+                      toast.error("Failed to parse kaggle.json");
+                    }
+                  };
+                  reader.readAsText(file);
+                }}
+              >
+                {saveKaggleMutation.isPending ? (
+                  <Loader2 className="w-8 h-8 text-primary animate-spin" />
+                ) : (
+                  <FileText className="w-8 h-8 text-muted-foreground" />
+                )}
+                <div>
+                  <p className="text-sm font-semibold">Drop kaggle.json here</p>
+                  <p className="text-xs text-muted-foreground">or click to browse</p>
                 </div>
+                <input
+                  type="file"
+                  accept=".json"
+                  className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (ev) => {
+                      try {
+                        const data = JSON.parse(ev.target?.result as string);
+                        if (data.username && data.key) {
+                          saveKaggleMutation.mutate({ username: data.username, key: data.key });
+                        } else {
+                          toast.error("Invalid kaggle.json format");
+                        }
+                      } catch (err) {
+                        toast.error("Failed to parse kaggle.json");
+                      }
+                    };
+                    reader.readAsText(file);
+                  }}
+                />
               </div>
             </div>
 
@@ -823,6 +926,11 @@ export function SetupWizard() {
                    <Input value={kbPath} onChange={(e) => setKbPath(e.target.value)} placeholder={navigator.userAgent.includes("Windows") ? "C:\\Users\\you\\Documents\\Omnecor" : "/home/you/Documents/Omnecor"} className="font-mono text-xs" />
                    <Button variant="outline" onClick={handleBrowse}>Browse</Button>
                  </div>
+                 {!(window as any).api?.selectFolder && (
+                   <p className="text-xs text-muted-foreground mt-1">
+                     Running in browser sandbox. Please type or paste the absolute server path manually.
+                   </p>
+                 )}
                </div>
                <div className="p-4 rounded-xl border bg-muted/30 space-y-4">
                  <div className="flex items-center justify-between">
@@ -1072,11 +1180,61 @@ export function SetupWizard() {
           </div>
         );
 
+        const cbmMcpInstallNode = (
+          <div className="flex items-center gap-1.5">
+            <button
+              id="checklist-install-cbm-mcp"
+              disabled={installCbmMcpMutation.isPending}
+              onClick={() => installCbmMcpMutation.mutate()}
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-accent-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+            >
+              {installCbmMcpMutation.isPending
+                ? <><Loader2 className="w-3 h-3 animate-spin" />Installing…</>
+                : <><Download className="w-3 h-3" />Install Now</>}
+            </button>
+            <button
+              id="checklist-get-cbm-mcp"
+              onClick={() => openUrl("https://github.com/DeusData/codebase-memory-mcp")}
+              className="inline-flex items-center gap-1 text-[10px] text-muted-foreground hover:text-foreground px-1.5 py-1 transition-colors"
+            >
+              <ExternalLink className="w-3 h-3" />
+            </button>
+          </div>
+        );
+
+        const valetRouterInstallNode = (
+          <div className="flex items-center gap-1.5">
+            <button
+              id="checklist-install-valet"
+              disabled={fetchValetModelMutation.isPending}
+              onClick={() => fetchValetModelMutation.mutate()}
+              className="inline-flex items-center gap-1 text-[10px] font-bold px-2.5 py-1 rounded-md bg-primary/10 text-accent-foreground hover:bg-primary/90 disabled:opacity-60 transition-colors"
+            >
+              {fetchValetModelMutation.isPending
+                ? <><Loader2 className="w-3 h-3 animate-spin" />Downloading…</>
+                : <><Download className="w-3 h-3" />Download Now</>}
+            </button>
+          </div>
+        );
+
         return (
           <div className="space-y-3 animate-in fade-in duration-300">
             <p className="text-sm text-muted-foreground pb-1">
               Optional tools extend what Omnecor can do. Install anything that looks useful — you can always add them later from <strong>Settings → Hardware</strong>.
             </p>
+
+            {/* ── Valet Router ────────────────────────── */}
+            <DepsGroup
+              icon={<BrainCircuit className="w-4 h-4" />}
+              label="Valet Router"
+              groupKey="valetRouter"
+              tools={[
+                { key: "valetRouter", name: "Valet Router Model", desc: "1.5B routing classifier (GGUF) required for local routing" },
+              ]}
+              installNode={!deps?.valetRouter ? valetRouterInstallNode : undefined}
+              getItUrl="https://github.com/Clarkescustomcreations/OmnecorV1-Beta"
+              getItLabel="View Repo"
+            />
 
             {/* ── Core AI ──────────────────────────────── */}
             <DepsGroup
@@ -1101,6 +1259,18 @@ export function SetupWizard() {
               ]}
               getItUrl="https://github.com/openai/whisper"
               getItLabel="View Docs"
+            />
+
+            {/* ── Agents & Memory ────────────────────────────── */}
+            <DepsGroup
+              icon={<Bot className="w-4 h-4" />}
+              label="Agents & Memory"
+              groupKey="cbmMcp"
+              tools={[
+                { key: "cbmMcp", name: "Codebase Memory MCP", desc: "Tree-sitter knowledge graph for AI coding agents" },
+              ]}
+              installNode={!deps?.cbmMcp ? cbmMcpInstallNode : undefined}
+              getItUrl="https://github.com/DeusData/codebase-memory-mcp"
             />
 
             {/* ── Podcast / TTS ─────────────────────────── */}

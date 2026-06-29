@@ -9,7 +9,7 @@
 import React, { useMemo } from 'react';
 import DOMPurify from 'dompurify';
 import { Handle, Position, NodeProps } from 'reactflow';
-import { Component } from '@/lib/componentLibrary';
+import { Component, componentLibrary } from '@/lib/componentLibrary';
 type ComponentSymbol = Component;
 
 export interface PCBNodeData {
@@ -24,13 +24,20 @@ export const PCBNode: React.FC<NodeProps<PCBNodeData>> = ({
   data,
   selected = false,
 }) => {
-  const { component, reference, rotation, layer } = data;
+  // Old saved designs may store the component ID string instead of the full object.
+  const raw = data.component as unknown;
+  const component: ComponentSymbol | undefined =
+    typeof raw === 'string'
+      ? componentLibrary.find(c => c.id === raw)
+      : (raw as ComponentSymbol | undefined);
+  const { reference, rotation, layer } = data;
 
   // Calculate transform based on rotation
   const rotationDeg = rotation || 0;
 
   // Render handles for each pad
   const handles = useMemo(() => {
+    if (!component?.handles) return [];
     return component.handles.map((handle: { id: string; position?: string; x?: number; y?: number }, index: number) => {
       // Map position to React Flow Position enum
       const positionMap: Record<string, Position> = {
@@ -53,7 +60,15 @@ export const PCBNode: React.FC<NodeProps<PCBNodeData>> = ({
         />
       );
     });
-  }, [component.handles]);
+  }, [component?.handles]);
+
+  if (!component) {
+    return (
+      <div className="relative p-1 rounded border-2 border-destructive bg-destructive/10 text-xs text-destructive w-24 h-12 flex items-center justify-center">
+        Unknown component
+      </div>
+    );
+  }
 
   return (
     <div

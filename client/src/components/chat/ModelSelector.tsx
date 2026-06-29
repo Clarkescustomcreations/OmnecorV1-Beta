@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { ChevronDown, Cpu, Cloud, Check, Sparkles } from "lucide-react";
-import { getAllModels, API_MODEL_CATALOG, type AIModel } from "@/lib/aiModels";
+import { getActiveModels, getAllModels, API_MODEL_CATALOG, type AIModel } from "@/lib/aiModels";
 import { cn } from "@/lib/utils";
 import type { SelectedModel } from "@/lib/chatContext";
 import { trpc } from "@/lib/trpc";
@@ -61,22 +61,24 @@ export function ModelSelector({
     },
   }));
 
-  // Expand each online cloud provider into its concrete models (one row per
-  // model), gated by live provider health. Providers not representable as a
-  // chat providerId (forge/huggingface/llamacpp/custom) are intentionally
-  // excluded — they aren't selectable as a chat model.
-  const apiModels: AIModel[] = providerHealth
-    .filter(p => p.status === "online" && p.id in API_MODEL_CATALOG)
-    .flatMap(p => {
-      const source = p.id as keyof typeof API_MODEL_CATALOG;
-      return API_MODEL_CATALOG[source].map<AIModel>(model => ({
-        id: model.id,
-        name: model.name,
-        displayName: model.name,
+  const activeList = getActiveModels();
+  const apiModels: AIModel[] = activeList
+    .filter(al => {
+      const provider = providerHealth.find(p => p.id === al.providerId);
+      return provider && provider.status === "online";
+    })
+    .map<AIModel>(al => {
+      const catalogItem = API_MODEL_CATALOG[al.providerId as keyof typeof API_MODEL_CATALOG]?.find(m => m.id === al.modelId);
+      const name = catalogItem?.name ?? al.modelId;
+      const source = al.providerId as AIModel["source"];
+      return {
+        id: al.modelId,
+        name,
+        displayName: name,
         type: "api" as const,
         source,
         status: "available" as const,
-        costPer1kTokens: model.costPer1kTokens,
+        costPer1kTokens: catalogItem?.costPer1kTokens,
         capabilities: {
           chat: true,
           completion: true,
@@ -84,7 +86,7 @@ export function ModelSelector({
           vision: source === "openai" || source === "gemini",
           functionCalling: source === "openai" || source === "anthropic",
         },
-      }));
+      };
     });
 
   const fetchedModels = [...localModels, ...apiModels];

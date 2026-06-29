@@ -10,7 +10,7 @@
  */
 
 import { z } from "zod";
-import { router, protectedProcedure } from "../_core/trpc.js";
+import { router, protectedProcedure, externalServiceProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { VirtualCardService, CardOperationError, type LithicTransaction } from "../phase2/services/VirtualCardService.js";
 import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
@@ -60,7 +60,7 @@ export const virtualCardRouter = router({
     }),
 
   /** Decrypt and return the full PAN for display (short-lived, never logged). */
-  revealCardPan: protectedProcedure
+  revealCardPan: externalServiceProcedure
     .input(z.object({ cardToken: z.string().min(1) }))
     .mutation(async ({ input, ctx }) => {
       const service = VirtualCardService.getInstance();
@@ -70,7 +70,7 @@ export const virtualCardRouter = router({
     }),
 
   /** List the 25 most-recent transactions for a card via the Lithic API. */
-  listTransactions: protectedProcedure
+  listTransactions: externalServiceProcedure
     .input(z.object({ cardToken: z.string().min(1) }))
     .query(async ({ input, ctx }) => {
       const service = VirtualCardService.getInstance();
@@ -116,7 +116,7 @@ export const virtualCardRouter = router({
     }),
 
   /** Issue a virtual card. Rate-limited to 1/60s per user. Requires LITHIC_API_KEY. */
-  issueCard: protectedProcedure
+  issueCard: externalServiceProcedure
     .input(issueCardSchema)
     .mutation(async ({ input, ctx }) => {
       const userId = ctx.user.id;

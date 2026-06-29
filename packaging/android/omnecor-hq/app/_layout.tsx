@@ -115,7 +115,7 @@ export default function RootLayout() {
   }, []);
 
   // Receive models SHARED into the app ("Share → Omnecor HQ" from e.g. Google
-  // AI Edge Gallery). Copies any shared .gguf/.task model into the models dir
+  // AI Edge Gallery). Copies any shared .gguf/.litertlm model into the models dir
   // so it can be loaded in Settings — no document-picker / adb step needed.
   const { hasShareIntent, shareIntent, resetShareIntent } = useShareIntent({ resetOnBackground: true });
   useEffect(() => {

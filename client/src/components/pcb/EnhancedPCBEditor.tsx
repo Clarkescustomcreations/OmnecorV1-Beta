@@ -14,6 +14,7 @@
 
 import React, { useCallback, useMemo, useState, useEffect, useRef } from 'react';
 import { useTheme } from '@/contexts/ThemeContext';
+import { useNeuralMap } from '@/contexts/NeuralMapContext';
 import ReactFlow, {
   Background,
   Controls,
@@ -43,8 +44,12 @@ import { PropertiesPanel } from './PropertiesPanel';
 import { AIAssistantPanel } from './AIAssistantPanel';
 import { NetlistPanel } from './NetlistPanel';
 import { trpc } from '@/lib/trpc';
+import { componentLibrary } from '@/lib/componentLibrary';
 import { toast } from 'sonner';
 import { useDesignerStore } from '@/lib/stores/designerStore';
+
+// Stable empty-array default — inline `= []` creates a new reference every render → infinite loop. See TD-046.
+const EMPTY_PROJECTS: { id: number; name: string; mode: string }[] = [];
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -62,7 +67,8 @@ interface EnhancedPCBEditorProps {
 const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }) => {
   const { theme } = useTheme();
   const isDark = theme === 'dark';
-  const { setActivePCBContext } = useDesignerStore();
+  // Selector — unselectored useDesignerStore() re-renders on every set(), causing an infinite loop. See TD-046.
+  const setActivePCBContext = useDesignerStore((s) => s.setActivePCBContext);
 
   // Canvas state
   const [nodes, setNodes, onNodesChange] = useNodesState([]);
@@ -119,7 +125,11 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
 
   const trpcUtils = trpc.useUtils();
 
-  const { data: pcbProjects = [] } = trpc.pcbEditor.getProjects.useQuery(undefined, {
+  // Active neural map — new PCB projects are linked to it so they scope to the
+  // current map (the mobile viewer filters projects by mapId).
+  const { activeMapId } = useNeuralMap();
+
+  const { data: pcbProjects = EMPTY_PROJECTS, isLoading: projectsLoading } = trpc.pcbEditor.getProjects.useQuery(undefined, {
     staleTime: 30_000,
   });
 
@@ -140,15 +150,18 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
     }
   }, [pcbProjects, pcbProjectId]);
 
-  // Auto-create "Default Design" if user has no projects yet
+  // Auto-create "Default Design" if user has no projects yet.
+  // Guard on !projectsLoading so we never fire during the initial mount frame
+  // (which overlaps with ThreeViewer's R3F Canvas cleanup and causes a React
+  // "maximum update depth exceeded" error on first boot).
   useEffect(() => {
     if (autoCreatedRef.current) return;
-    if (pcbProjects.length === 0 && pcbProjectId === null) {
+    if (!projectsLoading && pcbProjects.length === 0 && pcbProjectId === null) {
       autoCreatedRef.current = true;
-      createProjectMutation.mutate({ name: 'Default Design', mode: 'schematic' });
+      createProjectMutation.mutate({ name: 'Default Design', mode: 'schematic', mapId: activeMapId ?? undefined });
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pcbProjects]);
+  }, [pcbProjects, projectsLoading]);
 
   // Close project dropdown on outside click
   useEffect(() => {
@@ -183,11 +196,15 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
   useEffect(() => { pcbProjectIdRef.current = pcbProjectId; }, [pcbProjectId]);
   useEffect(() => { modeRef.current = mode; }, [mode]);
 
-  // Reset canvas when active project switches
+  // Reset canvas when active project switches.
+  // Skip setNodes/setEdges when already empty — avoids spurious state updates
+  // that compound with R3F cleanup renders on first boot.
   useEffect(() => {
     if (pcbProjectId !== null && loadedProjectRef.current !== pcbProjectId) {
-      setNodes([]);
-      setEdges([]);
+      const currentNodes = getNodes();
+      const currentEdges = getEdges();
+      if (currentNodes.length > 0) setNodes([]);
+      if (currentEdges.length > 0) setEdges([]);
       historyRef.current = [];
       setHistoryIndex(-1);
     }
@@ -320,12 +337,14 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
 
   const handleAddComponent = useCallback(
     (componentId: string, position: { x: number; y: number }) => {
+      const component = componentLibrary.find(c => c.id === componentId);
+      if (!component) return;
       const newNode: Node = {
         id: `node-${Date.now()}`,
         type: mode === 'schematic' ? 'schematic' : 'pcb',
         position,
         data: {
-          component: componentId,
+          component,
           reference: `U${nodes.length + 1}`,
           value: '',
           rotation: 0,
@@ -519,7 +538,7 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
   const handleCreateProject = () => {
     const name = newProjectName.trim();
     if (!name) return;
-    createProjectMutation.mutate({ name, mode: 'schematic' });
+    createProjectMutation.mutate({ name, mode: 'schematic', mapId: activeMapId ?? undefined });
     setNewProjectName('');
     setShowNewProjectInput(false);
     setShowProjectDropdown(false);

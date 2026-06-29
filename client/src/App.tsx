@@ -28,6 +28,7 @@ const Notifications = lazy(() => import("@/pages/Notifications").then(m => ({ de
 const SetupWizard = lazy(() => import("@/pages/SetupWizard").then(m => ({ default: m.SetupWizard })));
 const ExternalBrainMapWindow = lazy(() => import("./components/window-system/ExternalBrainMapWindow").then(m => ({ default: m.ExternalBrainMapWindow })));
 const TermsPage = lazy(() => import("@/pages/Terms").then(m => ({ default: m.TermsPage })));
+const LLMBuilder = lazy(() => import("@/pages/LLMBuilder").then(m => ({ default: m.LLMBuilder })));
 
 /** Per-route error boundary that renders RouteErrorBoundary on failure. */
 class RouteBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -91,6 +92,7 @@ function RouterRoutes() {
         <Route path="/wallet" component={withBoundary(AgenticWallet)} />
         <Route path="/notifications" component={withBoundary(Notifications)} />
         <Route path="/settings" component={withBoundary(SettingsPage)} />
+        <Route path="/llm-builder" component={withBoundary(LLMBuilder)} />
         <Route path="/terms" component={withBoundary(TermsPage)} />
         <Route path="/404" component={withBoundary(NotFound)} />
         {/* Final fallback route */}

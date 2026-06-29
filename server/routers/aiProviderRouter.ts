@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
+import { router, publicProcedure, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
 import { observable } from "@trpc/server/observable";
 import { AiProviderService } from "../phase2/services/AiProviderService.js";
 import { injectMapRagContext } from "../_core/ragContext.js";
@@ -78,5 +78,15 @@ export const aiProviderRouter = router({
     )
     .query(async ({ input }) => {
       return AiProviderService.getInstance().checkHealth(input);
+    }),
+
+  discoverProviderModels: cloudProcedure
+    .input(
+      z.object({
+        providerId: z.enum(["ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      return ctx.services.aiProvider.discoverProviderModels(input.providerId);
     }),
 });

@@ -40,7 +40,7 @@ export const CustomEdge: React.FC<EdgeProps> = ({
         path={edgePath}
         style={{
           ...style,
-          stroke: selected ? '#3b82f6' : '#f59e0b',
+          stroke: selected ? 'var(--primary)' : 'var(--accent-warning)',
           strokeWidth: selected ? 3 : 2,
           opacity: 0.8,
         }}
@@ -53,10 +53,10 @@ export const CustomEdge: React.FC<EdgeProps> = ({
               transform: `translate(-50%, -50%) translate(${labelX}px,${labelY}px)`,
               fontSize: 12,
               fontWeight: 500,
-              background: '#fff',
+              background: 'var(--card)',
               padding: '2px 6px',
               borderRadius: '4px',
-              border: '1px solid #d1d5db',
+              border: '1px solid var(--border)',
               pointerEvents: 'none',
             }}
             className="nodrag nopan"

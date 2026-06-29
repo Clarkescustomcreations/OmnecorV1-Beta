@@ -1,0 +1,10 @@
+[Desktop Entry]
+Name=Omnecor HMCI
+Comment=Context-Aware AI Infrastructure Workstation
+Exec=/usr/bin/omnecor
+Icon=omnecor
+Terminal=false
+Type=Application
+Categories=Development;Science;
+Keywords=AI;LLM;MachineLearning;Automation;
+StartupWMClass=omnecor

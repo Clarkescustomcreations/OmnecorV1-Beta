@@ -986,7 +986,9 @@ const isRemoteRoot = (r: string) => r.startsWith("github://") || r.startsWith("i
 async function runMapIndexJob(mapId: string, userId: number, remoteRoots: string[]): Promise<void> {
   const status = indexJobs.get(mapId)!;
   const memory = MemoryArchitectService.getInstance();
-  await memory.init().catch(() => {});
+  await memory.init().catch(error => {
+    log.warn("ChromaDB initialization failed in integrations sync:", error instanceof Error ? error.message : String(error));
+  });
 
   for (const uri of remoteRoots) {
     const result: IndexedSourceResult = { uri, ok: false, items: 0, chunks: 0 };

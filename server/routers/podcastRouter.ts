@@ -22,6 +22,7 @@ const dialogueTurnSchema = z.object({
   text: z.string(),
   emotion: z.string().optional(),
   referenceWav: z.string().optional(),
+  engine: z.string().optional(),
 });
 
 const podcastConfigSchema = z.object({

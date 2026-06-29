@@ -43,6 +43,8 @@ const synthesizeInputSchema = z.object({
   speakerWavPath: z.string().min(1, "Speaker WAV path is required"),
   /** BCP-47 language code */
   language: z.string().default("en"),
+  /** TTS Engine override */
+  engine: z.string().optional(),
 });
 
 const rvcConvertInputSchema = z.object({
@@ -213,6 +215,7 @@ export const voiceRouter = router({
           text: input.text,
           speakerWavPath: validatedPath,
           language: input.language,
+          engine: input.engine,
         });
 
         return {
@@ -314,6 +317,26 @@ export const voiceRouter = router({
       return [];
     }
   }),
+
+  uploadVoice: protectedProcedure
+    .input(z.object({
+      voiceName: z.string().min(1).max(128),
+      // Bound the payload so one request can't exhaust memory/disk. ~34M base64
+      // chars ≈ 25 MB of decoded audio — ample for a voice sample.
+      base64Audio: z.string().min(1).max(34_000_000),
+    }))
+    .mutation(async ({ input }) => {
+      const fs = await import("fs/promises");
+      const { PATHS } = await import("../_core/paths.js");
+      const voicesDir = path.join(PATHS.data, "voices");
+      await fs.mkdir(voicesDir, { recursive: true });
+      const targetPath = await validatePath(path.join(voicesDir, `${input.voiceName}.wav`), voicesDir);
+      
+      const buffer = Buffer.from(input.base64Audio, "base64");
+      await fs.writeFile(targetPath, buffer);
+      
+      return { success: true, path: targetPath };
+    }),
 
   downloadVoice: cloudProcedure
     .input(z.object({ voiceUrl: z.string().url(), voiceName: z.string().min(1) }))

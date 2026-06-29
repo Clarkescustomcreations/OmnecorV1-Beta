@@ -11,6 +11,8 @@
 
 This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
 
+## Start All Sessions by reading AGENTS.md for project context 
+
 ## Commands
 
 ```bash

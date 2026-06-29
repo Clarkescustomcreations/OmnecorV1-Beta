@@ -1,8 +1,11 @@
 import fs from "fs/promises";
+import { createWriteStream } from "fs";
 import path from "path";
 import { createHash } from "crypto";
 import { fileURLToPath } from "url";
 import { PATHS } from "../../_core/paths.js";
+import { pipeline } from "stream/promises";
+import { Readable } from "stream";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -31,6 +34,7 @@ export interface ArtifactRecord {
   git_sha?: string;
   created_at?: string;
   source?: "trained" | "github-release";
+  tag?: string;
   note?: string;
 }
 
@@ -110,6 +114,25 @@ export class ValetArtifactRegistry {
   static async write(record: ArtifactRecord): Promise<void> {
     await fs.mkdir(REGISTRY_ROOT, { recursive: true });
     await fs.writeFile(CURRENT_JSON, JSON.stringify(record, null, 2) + "\n", "utf-8");
+  }
+
+  static async downloadGithubRelease(tag: string, filename: string, destDir: string): Promise<void> {
+    const url = `https://github.com/clarkescustomcreations/omnecorv1-beta/releases/download/${tag}/${filename}`;
+    await fs.mkdir(destDir, { recursive: true });
+    const destPath = path.join(destDir, filename);
+    const res = await fetch(url);
+    
+    if (!res.ok) {
+      throw new Error(`Failed to download ${url}: ${res.statusText}`);
+    }
+    
+    if (!res.body) {
+      throw new Error("No response body received");
+    }
+    
+    // Node 18+ native fetch body is a web ReadableStream
+    // @ts-ignore - TS types might not fully map web ReadableStream to node's Readable.fromWeb
+    await pipeline(Readable.fromWeb(res.body), createWriteStream(destPath));
   }
 
   static async hashFile(filePath: string): Promise<string> {

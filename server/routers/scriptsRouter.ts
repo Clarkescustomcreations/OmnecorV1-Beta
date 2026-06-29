@@ -28,6 +28,7 @@ const createScriptSchema = z.object({
   description: z.string().max(2000).default(""),
   language: z.string().min(1).max(40).default("python"),
   project: z.string().max(120).default("Default"),
+  mapId: z.string().optional(),
 });
 
 const updateScriptSchema = z.object({
@@ -37,6 +38,7 @@ const updateScriptSchema = z.object({
   description: z.string().max(2000).optional(),
   language: z.string().min(1).max(40).optional(),
   project: z.string().max(120).optional(),
+  mapId: z.string().optional(),
 });
 
 const idSchema = z.object({ id: z.number() });
@@ -46,28 +48,40 @@ const idSchema = z.object({ id: z.number() });
 // ─────────────────────────────────────────────────────────────────────────────
 
 export const scriptsRouter = router({
-  /** List every saved script for the current user (newest first). */
-  list: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    return db
-      .select()
-      .from(savedScripts)
-      .where(eq(savedScripts.userId, ctx.user.id))
-      .orderBy(desc(savedScripts.updatedAt));
-  }),
+  /** List every saved script for the current user (newest first). Scoped to mapId if provided. */
+  list: protectedProcedure
+    .input(z.object({ mapId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      let condition = eq(savedScripts.userId, ctx.user.id);
+      if (input?.mapId) {
+        condition = and(condition, eq(savedScripts.mapId, input.mapId))!;
+      }
+      return db
+        .select()
+        .from(savedScripts)
+        .where(condition)
+        .orderBy(desc(savedScripts.updatedAt));
+    }),
 
-  /** Distinct project/folder names the user has scripts in (for grouping). */
-  listProjects: protectedProcedure.query(async ({ ctx }) => {
-    const db = await getDb();
-    const rows = await db
-      .selectDistinct({ project: savedScripts.project })
-      .from(savedScripts)
-      .where(eq(savedScripts.userId, ctx.user.id));
-    return rows
-      .map((r) => r.project)
-      .filter(Boolean)
-      .sort((a, b) => a.localeCompare(b));
-  }),
+  /** Distinct project/folder names the user has scripts in (for grouping). Scoped to mapId. */
+  listProjects: protectedProcedure
+    .input(z.object({ mapId: z.string().optional() }).optional())
+    .query(async ({ ctx, input }) => {
+      const db = await getDb();
+      let condition = eq(savedScripts.userId, ctx.user.id);
+      if (input?.mapId) {
+        condition = and(condition, eq(savedScripts.mapId, input.mapId))!;
+      }
+      const rows = await db
+        .selectDistinct({ project: savedScripts.project })
+        .from(savedScripts)
+        .where(condition);
+      return rows
+        .map((r) => r.project)
+        .filter(Boolean)
+        .sort((a, b) => a.localeCompare(b));
+    }),
 
   /** Save a new script to the user's library. */
   create: protectedProcedure
@@ -83,6 +97,7 @@ export const scriptsRouter = router({
           description: input.description,
           language: input.language,
           project: input.project || "Default",
+          mapId: input.mapId || null,
         })
         .returning();
 
@@ -107,6 +122,7 @@ export const scriptsRouter = router({
       if (rest.description !== undefined) patch.description = rest.description;
       if (rest.language !== undefined)    patch.language = rest.language;
       if (rest.project !== undefined)     patch.project = rest.project;
+      if (rest.mapId !== undefined)       patch.mapId = rest.mapId;
 
       const [row] = await db
         .update(savedScripts)

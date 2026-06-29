@@ -140,22 +140,22 @@ export async function saveOAuthState(
   state: string,
   data: Omit<OAuthStateData, "timestamp">
 ): Promise<void> {
+  // getDb() always returns a live instance; the try/catch falls back to the
+  // in-memory store on any DB error.
   const db = await getDb();
-  if (db) {
-    try {
-      await db.insert(oauthStates).values({
-        state,
-        platform: data.platform,
-        userId: data.userId,
-        codeVerifier: data.codeVerifier ?? null,
-        expiresAt: new Date(Date.now() + OAUTH_STATE_TTL),
-      });
-      // Opportunistic sweep of expired rows.
-      await db.delete(oauthStates).where(lt(oauthStates.expiresAt, new Date()));
-      return;
-    } catch (error) {
-      warnFallback(error);
-    }
+  try {
+    await db.insert(oauthStates).values({
+      state,
+      platform: data.platform,
+      userId: data.userId,
+      codeVerifier: data.codeVerifier ?? null,
+      expiresAt: new Date(Date.now() + OAUTH_STATE_TTL),
+    });
+    // Opportunistic sweep of expired rows.
+    await db.delete(oauthStates).where(lt(oauthStates.expiresAt, new Date()));
+    return;
+  } catch (error) {
+    warnFallback(error);
   }
   memoryStore.set(state, { ...data, timestamp: Date.now() });
   for (const [key, value] of memoryStore.entries()) {
@@ -166,28 +166,26 @@ export async function saveOAuthState(
 /** Fetch a non-expired OAuth state, or undefined. Expired rows are pruned. */
 export async function getOAuthState(state: string): Promise<OAuthStateData | undefined> {
   const db = await getDb();
-  if (db) {
-    try {
-      const rows = await db
-        .select()
-        .from(oauthStates)
-        .where(eq(oauthStates.state, state))
-        .limit(1);
-      const row = rows[0];
-      if (!row) return undefined;
-      if (row.expiresAt.getTime() < Date.now()) {
-        await db.delete(oauthStates).where(eq(oauthStates.state, state));
-        return undefined;
-      }
-      return {
-        platform: row.platform,
-        userId: row.userId,
-        codeVerifier: row.codeVerifier ?? undefined,
-        timestamp: row.expiresAt.getTime() - OAUTH_STATE_TTL,
-      };
-    } catch (error) {
-      warnFallback(error);
+  try {
+    const rows = await db
+      .select()
+      .from(oauthStates)
+      .where(eq(oauthStates.state, state))
+      .limit(1);
+    const row = rows[0];
+    if (!row) return undefined;
+    if (row.expiresAt.getTime() < Date.now()) {
+      await db.delete(oauthStates).where(eq(oauthStates.state, state));
+      return undefined;
     }
+    return {
+      platform: row.platform,
+      userId: row.userId,
+      codeVerifier: row.codeVerifier ?? undefined,
+      timestamp: row.expiresAt.getTime() - OAUTH_STATE_TTL,
+    };
+  } catch (error) {
+    warnFallback(error);
   }
   const data = memoryStore.get(state);
   if (!data) return undefined;
@@ -201,13 +199,11 @@ export async function getOAuthState(state: string): Promise<OAuthStateData | und
 /** Delete an OAuth state (single-use consumption). */
 export async function deleteOAuthState(state: string): Promise<void> {
   const db = await getDb();
-  if (db) {
-    try {
-      await db.delete(oauthStates).where(eq(oauthStates.state, state));
-      return;
-    } catch (error) {
-      warnFallback(error);
-    }
+  try {
+    await db.delete(oauthStates).where(eq(oauthStates.state, state));
+    return;
+  } catch (error) {
+    warnFallback(error);
   }
   memoryStore.delete(state);
 }

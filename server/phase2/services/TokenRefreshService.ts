@@ -46,15 +46,20 @@ export function decryptToken(stored: string): string {
     const dec = Buffer.concat([decipher.update(Buffer.from(cipherB64, "base64")), decipher.final()]);
     return dec.toString("utf8");
   }
-  // Legacy plain-base64 token.
+  // Legacy plain-base64 token (no JWT_SECRET was set when it was written).
+  // Warn so operators know unencrypted tokens are still in the database.
+  warnNoSecret("legacy token decrypted — set JWT_SECRET and re-auth to re-encrypt");
   return Buffer.from(stored, "base64").toString("utf-8");
 }
 
-let _warnedNoSecret = false;
-function warnNoSecret(): void {
-  if (_warnedNoSecret) return;
-  _warnedNoSecret = true;
-  log.warn("JWT_SECRET not set — OAuth tokens stored with weak base64 obfuscation. Set JWT_SECRET for encryption at rest.");
+function warnNoSecret(context?: string): void {
+  // Warn every time — unlike a one-shot flag this ensures the message
+  // appears in startup logs AND on every subsequent write/read so it is
+  // not buried under other boot noise and missed by operators who tail
+  // logs only after the server is already running.
+  log.warn(
+    `JWT_SECRET not set — OAuth tokens stored with weak base64 obfuscation. Set JWT_SECRET for encryption at rest.${context ? ` (context: ${context})` : ""}`
+  );
 }
 
 export class TokenRefreshService {
@@ -74,9 +79,12 @@ export class TokenRefreshService {
 
   start(): void {
     if (this.intervalHandle) return;
+    // Warn at startup so the JWT_SECRET-absent condition is visible in
+    // the server boot log, not only when the first token is written.
+    if (!ENV.cookieSecret) warnNoSecret("service startup");
     this.intervalHandle = setInterval(() => this.checkExpiring(), 15 * 60 * 1000);
     this.checkExpiring().catch(err =>
-      log.error("Initial check failed", { error: (err as Error)?.message })
+      log.error("Initial token-expiry check failed", { error: (err as Error)?.message })
     );
   }
 

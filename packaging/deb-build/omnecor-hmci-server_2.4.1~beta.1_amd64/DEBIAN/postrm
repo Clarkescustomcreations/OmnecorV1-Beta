@@ -1,0 +1,14 @@
+#!/bin/bash
+set -e
+if [ -d /run/systemd/system ]; then
+  systemctl daemon-reload 2>/dev/null || true
+fi
+if [ "$1" = "purge" ]; then
+  rm -rf /var/lib/omnecor /var/log/omnecor
+  rm -f  /etc/omnecor/omnecor.env
+  rmdir  /etc/omnecor 2>/dev/null || true
+  if id omnecor >/dev/null 2>&1; then
+    userdel omnecor 2>/dev/null || true
+  fi
+fi
+exit 0

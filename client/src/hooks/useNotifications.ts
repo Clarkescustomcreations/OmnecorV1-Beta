@@ -23,8 +23,8 @@ export function useNotifications() {
   const { subscribe, unsubscribe } = useOmnecorSocket({
     onEvent: type => {
       if (type === "notification") {
-        // Authoritative refetch — covers every kind (chat/task/hitl/wallet/agent).
         utils.notifications.list.invalidate();
+        utils.notifications.unreadCount.invalidate();
       }
     },
   });
@@ -34,15 +34,14 @@ export function useNotifications() {
     return () => unsubscribe("notifications");
   }, [subscribe, unsubscribe]);
 
-  const markRead = trpc.notifications.markRead.useMutation({
-    onSuccess: () => utils.notifications.list.invalidate(),
-  });
-  const markAllRead = trpc.notifications.markAllRead.useMutation({
-    onSuccess: () => utils.notifications.list.invalidate(),
-  });
-  const clear = trpc.notifications.clear.useMutation({
-    onSuccess: () => utils.notifications.list.invalidate(),
-  });
+  const invalidateAll = () => {
+    utils.notifications.list.invalidate();
+    utils.notifications.unreadCount.invalidate();
+  };
+
+  const markRead = trpc.notifications.markRead.useMutation({ onSuccess: invalidateAll });
+  const markAllRead = trpc.notifications.markAllRead.useMutation({ onSuccess: invalidateAll });
+  const clear = trpc.notifications.clear.useMutation({ onSuccess: invalidateAll });
 
   return {
     notifications: listQuery.data?.notifications ?? [],

@@ -35,7 +35,7 @@
 ### Ollama
 - **Port**: Configurable — `OLLAMA_URL` env var (default `http://localhost:11434`)
 - **Detection**: `trpc.system.checkDependencies` probes `GET ${OLLAMA_URL}/api/tags` in parallel with all other checks; `trpc.system.installOllama` (adminProcedure) — platform-aware installer (Windows: `OllamaSetup.exe /S`; Linux: `install.sh`; macOS: opens download page); SetupWizard Launch Checklist shows detected/not-found badge with Re-check button
-- **Fallback**: Valet Router falls back to rule-based keyword routing when Ollama unreachable; `PipelineEngineService` falls back to static phase output strings; `AiProviderService` falls back to next configured provider
+- **Fallback**: Valet Router falls back to dynamic LLM intent classification (via AiProviderService) when local model is unreachable; `PipelineEngineService` falls back to static phase output strings; `AiProviderService` falls back to next configured provider
 - **Failure Handling**: All Ollama calls wrapped in try/catch; unresponsive Ollama logged as `ollama_unavailable` in AuditLog; `ValetServerService` sets 45 s timeout on first model load (cold boot)
 - **Known State (2026-06-16)**: Linux Ollama returning 500s on all models (local issue — not mesh/code bug); Windows node (`192.168.1.78:11434`) verified working
 - **Special**: `ollama_proxy.py` — `OLLAMA_BIND_ADDRESS`/`OLLAMA_PROXY_TOKEN` proxy; `ollama create omnecor-valet-router:v2-q8 -f Modelfile` required for Valet Ollama backend on each node; `docker-compose.ollama.yml` available
@@ -122,7 +122,7 @@
 - **Port**: 8010 (FastAPI — `valet_router_inference.py`)
 - **Service Files**: `server/python_bridges/valet_router_inference.py`, `server/phase2/services/ValetServerService.ts`, `server/phase2/services/ValetArtifactRegistry.ts`, `server/phase2/services/ValetRouterService.ts`
 - **Detection**: `trpc.valet.status` → `GET :8010/health`; `ValetServerService` auto-starts on server boot; registry seeded from repo `current.json` by `ValetArtifactRegistry.seedFromRepoIfMissing()` (checks `process.cwd()`, Electron `process.resourcesPath`, bundle-relative paths)
-- **Fallback**: Rule-based keyword routing when model not loaded (returns `"Rule-based fallback — Valet Router model not loaded"`)
+- **Fallback**: Dynamic LLM intent classification via AiProviderService when model not loaded
 - **Failure Handling**: 45 s cold-load timeout (raised from 10 s to prevent premature fallback on first boot); `ValetRouterService` catches HTTP errors; pre-routing in `AiProviderService.streamChat()` uses result or skips routing on error
 - **Model**: `omnecor-valet-router:v2-q8` (Qwen2.5-1.5B-Instruct Q8_0, ~1.6 GB); `gguf_sha256: b0398f857ffb1dc6d9ae562304201c24e64ec4422cfb6b1b1391d66e21138eee`; route accuracy 0.7385 (Kaggle P100 eval — beats keyword baseline ~2.7×; below 0.85 config gate — sign-off pending GPU box)
 - **Packaging Gap (BLOCKER)**: `electron-builder.yml` `extraResources` must include `server/python_bridges/valet_router_inference.py` + `docs/ai-agents/valet-training/VALET_SYSTEM_PROMPT.md` + `routing_manifest.json`; Python + deps required in packaged app

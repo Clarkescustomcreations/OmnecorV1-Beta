@@ -21,6 +21,7 @@
 import { ScrollView, Text, View, TextInput, ActivityIndicator } from "react-native";
 import { Pressable } from "@/components/pressable";
 import { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { WebView } from "react-native-webview";
 import Svg, { Rect, Line, Text as SvgText, G } from "react-native-svg";
 import { ScreenContainer } from "@/components/screen-container";
@@ -134,12 +135,53 @@ interface FileTreeNode {
   children?: FileTreeNode[];
 }
 interface ProjectItem { id: string; name: string; projectId: string; rootDir: string }
-interface PcbProject { id: number; name: string; mode?: string }
+interface PcbProject { id: number; name: string; mode?: string; mapId?: string | null }
 interface PcbDesign { id: number; name: string; canvasData: { nodes: any[]; edges: any[]; metadata?: any }; componentCount?: number; connectionCount?: number }
 
 export default function Viewer3DScreen() {
   const colors = useColors();
   const [viewMode, setViewMode] = useState<ViewMode>("3d");
+  const configured = isServerConfigured();
+
+  const [selectedNeuralMapId, setSelectedNeuralMapId] = useState<string | null>(null);
+  const [neuralMaps, setNeuralMaps] = useState<{ id: string; name: string }[]>([]);
+
+  // Load from AsyncStorage on mount and check server active map ID
+  useEffect(() => {
+    (async () => {
+      try {
+        const savedMapId = await AsyncStorage.getItem("omnecor:selected_map_id");
+        if (savedMapId) {
+          setSelectedNeuralMapId(savedMapId);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, []);
+
+  useEffect(() => {
+    if (!configured) return;
+    (async () => {
+      try {
+        const activeMapId = await trpcQuery<string | null>("neuralMaps.getActiveMapId");
+        if (activeMapId) {
+          setSelectedNeuralMapId(activeMapId);
+          await AsyncStorage.setItem("omnecor:selected_map_id", activeMapId);
+        }
+        const mapsList = await trpcQuery<{ id: string; name: string }[]>("neuralMaps.list");
+        if (mapsList) {
+          setNeuralMaps(mapsList);
+        }
+      } catch (e) {
+        console.error(e);
+      }
+    })();
+  }, [configured]);
+
+  const activeNeuralMap = useMemo(() => {
+    return neuralMaps.find(m => m.id === selectedNeuralMapId) || null;
+  }, [neuralMaps, selectedNeuralMapId]);
 
   // ── shared AI / action state ──
   const [aiInput, setAiInput] = useState("");
@@ -172,7 +214,29 @@ export default function Viewer3DScreen() {
   const [fileDirty, setFileDirty] = useState(false);
   const [codeLoading, setCodeLoading] = useState(false);
 
-  const configured = isServerConfigured();
+  const filteredCodeProjects = useMemo(() => {
+    if (!selectedNeuralMapId) return codeProjects;
+    return codeProjects.filter(p => p.projectId === selectedNeuralMapId);
+  }, [codeProjects, selectedNeuralMapId]);
+
+  // Scope PCB projects to the active map by their real mapId foreign key — no
+  // name-substring heuristic and no "show everything" fallback, which would
+  // leak other maps' projects into the active map's view.
+  const filteredPcbProjects = useMemo(() => {
+    if (!selectedNeuralMapId) return pcbProjects;
+    return pcbProjects.filter(p => p.mapId === selectedNeuralMapId);
+  }, [pcbProjects, selectedNeuralMapId]);
+
+  // 3D models are filesystem files with no DB row to carry a mapId, so we
+  // associate them to a map by name. When nothing matches we show none (rather
+  // than falling back to every model) to avoid cross-map leakage.
+  const filteredModels = useMemo(() => {
+    if (!selectedNeuralMapId || !activeNeuralMap) return models;
+    const mapName = activeNeuralMap.name.toLowerCase();
+    return models.filter(m => m.name.toLowerCase().includes(mapName));
+  }, [models, selectedNeuralMapId, activeNeuralMap]);
+
+
 
   // Load project / model lists when entering the relevant mode
   useEffect(() => {
@@ -462,13 +526,13 @@ export default function Viewer3DScreen() {
                 className={`mr-2 px-3 py-1.5 rounded-lg ${activeModel === null ? "bg-primary" : "bg-background border border-border"}`}>
                 <Text className={`text-xs ${activeModel === null ? "text-background" : "text-foreground"}`}>Demo scene</Text>
               </Pressable>
-              {models.map((m) => (
+              {filteredModels.map((m) => (
                 <Pressable key={m.name} onPress={() => selectModel(m)}
                   className={`mr-2 px-3 py-1.5 rounded-lg ${activeModel === m.name ? "bg-primary" : "bg-background border border-border"}`}>
                   <Text className={`text-xs ${activeModel === m.name ? "text-background" : "text-foreground"}`}>{m.name}</Text>
                 </Pressable>
               ))}
-              {models.length === 0 && (
+              {filteredModels.length === 0 && (
                 <Text className="text-xs text-muted p-2">No models in the library — export one from the desktop Blender bridge.</Text>
               )}
             </ScrollView>
@@ -505,8 +569,8 @@ export default function Viewer3DScreen() {
           <View className="bg-surface border-b border-border p-2">
             <Text className="text-xs text-muted mb-1">Project</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-              {pcbProjects.length === 0 && <Text className="text-xs text-muted p-2">No PCB projects on the desktop.</Text>}
-              {pcbProjects.map((p) => (
+              {filteredPcbProjects.length === 0 && <Text className="text-xs text-muted p-2">No PCB projects on the desktop.</Text>}
+              {filteredPcbProjects.map((p) => (
                 <Pressable key={p.id} onPress={() => loadPcbProject(p)}
                   className={`mr-2 px-3 py-1.5 rounded-lg ${pcbProject?.id === p.id ? "bg-primary" : "bg-background border border-border"}`}>
                   <Text className={`text-xs ${pcbProject?.id === p.id ? "text-background" : "text-foreground"}`}>{p.name}</Text>
@@ -532,8 +596,8 @@ export default function Viewer3DScreen() {
           <View className="bg-surface border-b border-border p-2">
             <Text className="text-xs text-muted mb-1">Project</Text>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
-              {codeProjects.length === 0 && <Text className="text-xs text-muted p-2">No watched projects on the desktop.</Text>}
-              {codeProjects.map((p) => (
+              {filteredCodeProjects.length === 0 && <Text className="text-xs text-muted p-2">No watched projects on the desktop.</Text>}
+              {filteredCodeProjects.map((p) => (
                 <Pressable key={p.id} onPress={() => loadCodeProject(p)}
                   className={`mr-2 px-3 py-1.5 rounded-lg ${codeProject?.id === p.id ? "bg-primary" : "bg-background border border-border"}`}>
                   <Text className={`text-xs ${codeProject?.id === p.id ? "text-background" : "text-foreground"}`}>{p.name}</Text>

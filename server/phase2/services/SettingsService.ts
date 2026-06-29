@@ -1,8 +1,13 @@
-import { readFileSync, existsSync, statSync } from "fs";
-import { join } from "path";
+import { readFileSync, existsSync, statSync, writeFileSync, mkdirSync } from "fs";
+import { join, dirname } from "path";
 import { homedir } from "os";
 
-const SETTINGS_PATH = join(homedir(), ".omnecor", "settings.json");
+export function getSettingsPath(): string {
+  if (typeof globalThis !== "undefined" && (globalThis as any).__testSettingsPath) {
+    return (globalThis as any).__testSettingsPath;
+  }
+  return join(homedir(), ".omnecor", "settings.json");
+}
 
 export interface OmnecorSettings {
   openaiApiKey?: string;
@@ -55,14 +60,16 @@ export class SettingsService {
 
   getSettings(): OmnecorSettings {
     try {
-      if (!existsSync(SETTINGS_PATH)) {
+      const path = getSettingsPath();
+      if (!existsSync(path)) {
         this.cache = {};
         this.cacheMtimeMs = -1;
         return this.cache;
       }
-      const mtime = statSync(SETTINGS_PATH).mtimeMs;
-      if (mtime === this.cacheMtimeMs) return this.cache;
-      this.cache = JSON.parse(readFileSync(SETTINGS_PATH, "utf-8"));
+      const isTest = typeof globalThis !== "undefined" && !!(globalThis as any).__testSettingsPath;
+      const mtime = statSync(path).mtimeMs;
+      if (!isTest && mtime === this.cacheMtimeMs) return this.cache;
+      this.cache = JSON.parse(readFileSync(path, "utf-8"));
       this.cacheMtimeMs = mtime;
       return this.cache;
     } catch {
@@ -92,9 +99,26 @@ export class SettingsService {
     }
     return v as T;
   }
+  update(key: string, value: any): void {
+    const path = getSettingsPath();
+    const settings = this.getSettings();
+    settings[key] = value;
+    // Write synchronously so the value is durably persisted before this method
+    // returns — callers (e.g. PenpotService) rely on the setting being saved.
+    // A failure throws to the caller rather than vanishing in a detached promise.
+    mkdirSync(dirname(path), { recursive: true });
+    writeFileSync(path, JSON.stringify(settings, null, 2), "utf-8");
+    this.cache = settings;
+    this.cacheMtimeMs = statSync(path).mtimeMs;
+  }
 }
 
 /** Convenience accessor — `SettingsService.getInstance().get(key, fallback)`. */
 export function getSetting<T>(key: string, fallback: T): T {
   return SettingsService.getInstance().get(key, fallback);
+}
+
+/** Convenience mutator — updates the file and cache. */
+export function setSetting(key: string, value: any): void {
+  SettingsService.getInstance().update(key, value);
 }

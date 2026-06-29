@@ -40,6 +40,11 @@ export function useOmnecorSocket(
   } = {}
 ) {
   const { projectId, jobId, listenForLoops, onEvent } = options;
+
+  // Keep onEvent in a ref so callers can pass inline functions without causing
+  // the socket to reconnect on every render (onEvent was in connect's dep array).
+  const onEventRef = useRef(onEvent);
+  useEffect(() => { onEventRef.current = onEvent; });
   const [connected, setConnected] = useState(false);
   const [fileEvents, setFileEvents] = useState<FileEvent[]>([]);
   const [jobProgress, setJobProgress] = useState<JobProgressEvent | null>(null);
@@ -133,8 +138,8 @@ export function useOmnecorSocket(
           if (message.type === "pong") return;
 
           // Dispatch to generic onEvent if provided
-          if (onEvent && message.type) {
-            onEvent(message.type as OmnecorEventType, message.data);
+          if (onEventRef.current && message.type) {
+            onEventRef.current(message.type as OmnecorEventType, message.data);
           }
 
           if (message.type === "fileEvent" || message.type === "FILE_CREATED" || message.type === "FILE_UPDATED") {
@@ -169,7 +174,7 @@ export function useOmnecorSocket(
         }, reconnectDelay);
       };
     },
-    [WS_URL, listenForLoops, onEvent, projectId]
+    [WS_URL, listenForLoops, projectId]
   );
 
   useEffect(() => {

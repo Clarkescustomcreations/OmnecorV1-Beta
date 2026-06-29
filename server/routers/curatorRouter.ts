@@ -47,18 +47,25 @@ export const curatorRouter = router({
   listByStatus: protectedProcedure
     .input(z.object({
       status: z.enum(["draft", "pending_review", "approved", "scheduled", "published", "failed"]),
+      projectId: z.string().optional(),
       limit: z.number().default(20),
       offset: z.number().default(0),
     }))
     .query(async ({ input, ctx }) => {
       const db = await getDb();
 
+      const whereConditions = [
+        eq(curatedPosts.status, input.status),
+        eq(curatedPosts.createdByUserId, ctx.user.id),
+      ];
+
+      if (input.projectId) {
+        whereConditions.push(eq(curatedPosts.projectId, input.projectId));
+      }
+
       const posts = await db.select()
         .from(curatedPosts)
-        .where(and(
-          eq(curatedPosts.status, input.status),
-          eq(curatedPosts.createdByUserId, ctx.user.id),
-        ))
+        .where(and(...whereConditions))
         .limit(input.limit)
         .offset(input.offset);
 

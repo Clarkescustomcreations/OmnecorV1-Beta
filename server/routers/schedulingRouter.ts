@@ -8,9 +8,16 @@ import { publishScheduledPostIds } from "../phase2/services/publishExecutor.js";
 
 export const schedulingRouter = router({
   listScheduledPosts: protectedProcedure
-    .input(z.object({ limit: z.number().default(50) }))
+    .input(z.object({
+      projectId: z.string().optional(),
+      limit: z.number().default(50),
+    }))
     .query(async ({ input }) => {
       const db = await getDb();
+      const conditions = [];
+      if (input.projectId) {
+        conditions.push(eq(scheduledPosts.projectId, input.projectId));
+      }
       const posts = await db.select({
         id: scheduledPosts.id,
         curatedPostId: scheduledPosts.curatedPostId,
@@ -27,6 +34,7 @@ export const schedulingRouter = router({
       })
         .from(scheduledPosts)
         .leftJoin(curatedPosts, eq(curatedPosts.id, scheduledPosts.curatedPostId))
+        .where(conditions.length > 0 ? and(...conditions) : undefined)
         .orderBy(desc(scheduledPosts.scheduledAt))
         .limit(input.limit);
       return posts;

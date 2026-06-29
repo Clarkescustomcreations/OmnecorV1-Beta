@@ -83,8 +83,8 @@ These are singleton classes that encapsulate specific business logic and resourc
 The `MeshNode` is the core component of the OMMESH distributed mesh intelligence layer. It enables an Omnecor instance to participate in a network of other Omnecor nodes.
 
 -   **Node Discovery**: Utilizes Bonjour for local network service discovery.
--   **Secure Communication**: Employs mTLS for secure, authenticated communication between nodes.
--   **Distributed Task Routing**: Facilitates the routing of AI inference requests and other tasks across the mesh based on resource availability.
+-   **Secure Communication**: Employs strict mTLS (Mutual TLS) over HTTPS on the advertised `MESH_PORT` (default 3001) for secure, authenticated communication. Rejects any MITM attempts via certificate pinning.
+-   **Distributed Task Routing**: Facilitates the routing of AI inference requests and other tasks across the mesh based on resource availability, falling back gracefully to local compute.
 
 ### 2.7. Python Bridges (`server/python_bridges/`)
 
@@ -108,7 +108,13 @@ These are Python scripts that act as interfaces to specialized external tools an
 
 ## 5. External API Resilience & Hardening
 
-Omnecor integrates with 30+ external cloud services. All external API calls are protected by comprehensive resilience patterns:
+Omnecor integrates with 30+ external cloud services. All external API calls are protected by comprehensive resilience patterns and strict execution-mode barriers:
+
+### Sovereign-Mode Central Guard (`server/_core/sovereign.ts`)
+
+-   **Purpose**: Ensures air-gapped security by actively blocking any outbound requests to cloud AI providers when the user's execution mode is set to `sovereign`.
+-   **Mechanism**: The `assertProviderAllowedInMode` central guard intercepts calls in protected procedures (like image generation or external curation) and raises a `FORBIDDEN` exception before any network request is formed.
+-   **Scope**: Protects Anthropic, OpenAI, Fal.ai, OpenArt, and other remote endpoints from accidental API leakage.
 
 ### Resilient Fetch Wrapper (`server/_core/resilientFetch.ts`)
 

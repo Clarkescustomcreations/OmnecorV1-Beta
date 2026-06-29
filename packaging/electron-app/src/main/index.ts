@@ -353,6 +353,17 @@ async function createWindow(): Promise<void> {
     } catch { /* non-url failures (e.g. data: aborted) — ignore */ }
   })
 
+  // Mirror renderer-side warnings/errors (incl. preload/contextBridge failures)
+  // into the main debug log. Without this, a broken preload — e.g. window.api
+  // never exposed ("Desktop bridge not ready") — leaves no trace in the log
+  // because renderer console output doesn't reach the main process by default.
+  mainWindow.webContents.on('console-message', (_event, level, message, line, sourceId) => {
+    if (level >= 2) log(`[Renderer ${level === 3 ? 'ERROR' : 'WARN'}] ${message} (${sourceId}:${line})`)
+  })
+  mainWindow.webContents.on('preload-error', (_event, preloadPath, error) => {
+    log(`[Preload ERROR] ${preloadPath}: ${error.message}\n${error.stack ?? ''}`)
+  })
+
   // Backend readiness gate: wait for /health before loading the real app.
   // The splash is already showing; switch to the app once backend is warm.
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
@@ -482,6 +493,14 @@ app.whenReady().then(async () => {
       })
     })
   })
+
+  ipcMain.handle('select-folder', async () => {
+    const result = await dialog.showOpenDialog({
+      properties: ['openDirectory', 'createDirectory']
+    })
+    return result.canceled ? null : result.filePaths[0]
+  })
+
 
   freePortIfBusy(Number(BACKEND_PORT))
   startBackend()

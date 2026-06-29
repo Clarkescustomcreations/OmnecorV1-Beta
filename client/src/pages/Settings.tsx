@@ -22,6 +22,7 @@ import {
   FileText, ExternalLink
 } from "lucide-react";
 import { useTheme, type Theme } from "../contexts/ThemeContext";
+import { useNeuralMap } from "../contexts/NeuralMapContext";
 import { CloudComputePanel } from "../components/settings/CloudComputePanel";
 import { toast } from "sonner";
 import { useAppStore } from "../lib/store/app.store";
@@ -61,6 +62,7 @@ interface SavedSettings {
 
 export const Settings: React.FC = () => {
   const [, setLocation] = useLocation();
+  const { activeMap } = useNeuralMap();
   const { data: aiProviders, refetch: refetchAiProviders } = trpc.system.aiProviders.useQuery();
   const [keys, setKeys] = useState({
     openai: "",
@@ -614,8 +616,6 @@ export const Settings: React.FC = () => {
                         <RadioGroup
                           value={selectedMode}
                           onValueChange={(v) => setSelectedMode(v as "sovereign" | "scrapper" | "big_spender")}
-                          disabled={isZeroLogin}
-                          className={isZeroLogin ? "opacity-60" : undefined}
                         >
                           <div className="flex items-start gap-3 rounded-md border p-3">
                             <RadioGroupItem value="sovereign" id="mode-sovereign" className="mt-0.5" />
@@ -645,11 +645,7 @@ export const Settings: React.FC = () => {
                             </div>
                           </div>
                         </RadioGroup>
-                        {isZeroLogin && (
-                          <p className="text-xs text-accent-warning">
-                            Zero-login session: the execution mode is fixed by the <code>ZERO_LOGIN_EXECUTION_MODE</code> environment variable and can't be changed here. Set it in <code>.env</code> and restart the server.
-                          </p>
-                        )}
+
                         <div className="flex items-start justify-between gap-4 rounded-md border border-accent-danger/30 bg-accent-danger/5 p-3">
                           <div className="space-y-0.5">
                             <Label htmlFor="sovereign-ai-only" className="font-medium">In Sovereign mode, block AI providers only</Label>
@@ -755,10 +751,7 @@ export const Settings: React.FC = () => {
                             if (sovereignBlockAiOnly !== !!(settings as SavedSettings | undefined)?.sovereignBlockAiOnly) {
                               setSovereignAiOnlyMutation.mutate({ enabled: sovereignBlockAiOnly });
                             }
-                            // In zero-login the mode is fixed by the server env
-                            // var; firing this would write a value that's instantly
-                            // overridden and show a misleading toast.
-                            if (!isZeroLogin) setModeMutation.mutate({ mode: selectedMode });
+                            setModeMutation.mutate({ mode: selectedMode });
                           }}
                           disabled={setModeMutation.isPending || saveSettingsMutation.isPending}
                           className="gap-2"
@@ -2355,6 +2348,7 @@ const GeneralPanel: React.FC = () => {
 const KnowledgePanel: React.FC = () => {
   const [folderPath, setFolderPath] = React.useState("");
   const [showAddForm, setShowAddForm] = React.useState(false);
+  const { activeMap } = useNeuralMap();
   const { data: kbSettings, refetch: refetchKb } = trpc.system.getSettings.useQuery();
   const saveKbMutation = trpc.system.saveSettings.useMutation({
     onSuccess: () => { toast.success("Knowledge settings saved"); refetchKb(); },
@@ -2373,6 +2367,24 @@ const KnowledgePanel: React.FC = () => {
       setMaxFileSize(s.maxFileSize ?? 50);
     }
   }, [kbSettings]);
+
+  const handleBrowse = async () => {
+    const api = (window as any).api;
+    if (api?.selectFolder) {
+      try {
+        const folder = await api.selectFolder();
+        if (folder) {
+          setFolderPath(folder);
+          toast.success(`Folder selected: ${folder}`);
+        }
+      } catch (err) {
+        console.error(err);
+        toast.error("Failed to select folder");
+      }
+    } else {
+      toast.info("Running in browser sandbox. Please type or paste the absolute server path manually.");
+    }
+  };
 
   const ingestMutation = trpc.knowledgeBase.ingestDirectory.useMutation({
     onSuccess: () => { setShowAddForm(false); setFolderPath(""); toast.success("Folder indexed into knowledge base"); },
@@ -2397,20 +2409,35 @@ const KnowledgePanel: React.FC = () => {
             </Button>
           </div>
           {showAddForm && (
-            <div className="mt-3 flex gap-2">
-              <Input
-                placeholder="/path/to/folder"
-                value={folderPath}
-                onChange={(e) => setFolderPath(e.target.value)}
-                className="text-sm"
-              />
-              <Button
-                size="sm"
-                disabled={!folderPath || ingestMutation.isPending}
-                onClick={() => ingestMutation.mutate({ projectId: "default", directoryPath: folderPath, recursive: true })}
-              >
-                {ingestMutation.isPending ? "Indexing..." : "Index"}
-              </Button>
+            <div className="mt-3 space-y-2">
+              <div className="flex gap-2">
+                <Input
+                  placeholder="/path/to/folder"
+                  value={folderPath}
+                  onChange={(e) => setFolderPath(e.target.value)}
+                  className="text-sm"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={handleBrowse}
+                >
+                  Browse
+                </Button>
+                <Button
+                  size="sm"
+                  disabled={!folderPath || ingestMutation.isPending}
+                  onClick={() => ingestMutation.mutate({ projectId: activeMap?.id || "default", directoryPath: folderPath, recursive: true })}
+                >
+                  {ingestMutation.isPending ? "Indexing..." : "Index"}
+                </Button>
+              </div>
+              {!(window as any).api?.selectFolder && (
+                <p className="text-xs text-muted-foreground mt-1">
+                  Running in browser sandbox. Please type or paste the absolute server path manually.
+                </p>
+              )}
             </div>
           )}
         </CardHeader>
@@ -2420,7 +2447,7 @@ const KnowledgePanel: React.FC = () => {
               <div className="p-3 rounded-lg border bg-muted/50 flex items-center justify-between">
                 <div>
                   <p className="text-sm font-semibold">Omnecor Source</p>
-                  <p className="text-xs text-muted-foreground font-mono">/home/linux/Documents/Omnecor</p>
+                  <p className="text-xs text-muted-foreground font-mono">~/Documents/Omnecor</p>
                 </div>
                 <div className="flex items-center gap-2">
                   <Switch checked={autoIndex} onCheckedChange={setAutoIndex} />

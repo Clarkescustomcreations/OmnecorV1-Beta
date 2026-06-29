@@ -9,6 +9,7 @@ import { useLocation } from "wouter";
 import { diffLines } from "diff";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { useNeuralMap } from "@/contexts/NeuralMapContext";
 
 import { ThreeViewer } from "@/components/designer/ThreeViewer";
 import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
@@ -22,12 +23,17 @@ import { HowToTooltip } from "@/components/shell/HowToTooltip";
 type DesignMode = "3d" | "pcb" | "web" | "code";
 
 export function Designer3D() {
+  const { activeMapId, activeMap } = useNeuralMap();
   const [mode, setMode] = useState<DesignMode>("3d");
   const [initialCode, setInitialCode] = useState("");
   const [splitView, setSplitView] = useState(false);
   const [showManufacturing, setShowManufacturing] = useState(false);
   const [isAIPanelOpen, setIsAIPanelOpen] = useState(false);
-  const { windowMode, setWindowMode, windowPosition, windowSize } = useDesignerStore();
+  // Selectors — unselectored useDesignerStore() re-renders on every set(). See TD-046.
+  const windowMode = useDesignerStore((s) => s.windowMode);
+  const setWindowMode = useDesignerStore((s) => s.setWindowMode);
+  const windowPosition = useDesignerStore((s) => s.windowPosition);
+  const windowSize = useDesignerStore((s) => s.windowSize);
 
   const [location, setLocation] = useLocation();
   const isExternalRoute = location === "/3d-designer-external";
@@ -75,7 +81,7 @@ export function Designer3D() {
   };
 
   const [files, setFiles] = useState<{ name: string; content: string; originalContent: string; path?: string }[]>(() => {
-    const saved = localStorage.getItem("omnecor:designer_files");
+    const saved = localStorage.getItem("omnecor:designer_files_" + (activeMapId || "default"));
     if (saved) {
       try {
         return JSON.parse(saved);
@@ -94,9 +100,44 @@ export function Designer3D() {
 
   const [activeFileIndex, setActiveFileIndex] = useState(0);
 
+  const prevMapIdRef = useRef<string | null>(activeMapId);
+  const filesRef = useRef(files);
+
   useEffect(() => {
+    filesRef.current = files;
+  }, [files]);
+
+  useEffect(() => {
+    if (prevMapIdRef.current !== activeMapId) {
+      const oldKey = "omnecor:designer_files_" + (prevMapIdRef.current || "default");
+      localStorage.setItem(oldKey, JSON.stringify(filesRef.current));
+
+      const newKey = "omnecor:designer_files_" + (activeMapId || "default");
+      const saved = localStorage.getItem(newKey);
+      if (saved) {
+        try {
+          setFiles(JSON.parse(saved));
+        } catch (e) {
+          console.error(e);
+        }
+      } else {
+        setFiles([
+          {
+            name: "draft.md",
+            content: "# Welcome to Omnecor Designer\n\nYou can edit this markdown file and see live preview on the right.",
+            originalContent: "# Welcome to Omnecor Designer\n\nYou can edit this markdown file and see live preview on the right."
+          }
+        ]);
+      }
+      setActiveFileIndex(0);
+      prevMapIdRef.current = activeMapId;
+    }
+  }, [activeMapId]);
+
+  useEffect(() => {
+    const targetKey = "omnecor:designer_files_" + (activeMapId || "default");
     const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === "omnecor:designer_files" && e.newValue) {
+      if (e.key === targetKey && e.newValue) {
         try {
           setFiles(JSON.parse(e.newValue));
         } catch (err) {
@@ -106,7 +147,7 @@ export function Designer3D() {
     };
     window.addEventListener("storage", handleStorageChange);
     return () => window.removeEventListener("storage", handleStorageChange);
-  }, []);
+  }, [activeMapId]);
 
   const [isCreatingFile, setIsCreatingFile] = useState(false);
   const [newFileName, setNewFileName] = useState("");
@@ -203,6 +244,10 @@ export function Designer3D() {
   }
 
   const [selectedProjectId, setSelectedProjectId] = useState<string>("");
+
+  useEffect(() => {
+    setSelectedProjectId(activeMapId || "");
+  }, [activeMapId]);
 
   const { data: projects } = trpc.project.list.useQuery();
   const selectedProject = projects?.find(p => p.id === selectedProjectId);
@@ -321,8 +366,9 @@ export function Designer3D() {
 
   // Keep files state persisted in localStorage
   useEffect(() => {
-    localStorage.setItem("omnecor:designer_files", JSON.stringify(files));
-  }, [files]);
+    const key = activeMapId ? `omnecor:designer_files_${activeMapId}` : "omnecor:designer_files_default";
+    localStorage.setItem(key, JSON.stringify(files));
+  }, [files, activeMapId]);
 
   useEffect(() => {
     // Check if we came from chat with a specific payload
@@ -975,7 +1021,7 @@ export function Designer3D() {
               <Box className="w-5 h-5 text-primary" />
             </div>
             <div className="min-w-0">
-              <h1 className="text-xl font-bold flex flex-wrap items-center gap-2">
+              <h1 className="text-4xl font-bold tracking-tight flex flex-wrap items-center gap-2">
                 Multi-Modal Designer
                 <Badge variant="outline" className="text-[10px] py-0 text-primary border-primary/30">Beta</Badge>
               </h1>

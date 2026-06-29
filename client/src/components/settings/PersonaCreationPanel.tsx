@@ -337,7 +337,7 @@ const MODE_COLORS: Record<string, string> = {
   coding:   "bg-accent-success/20 text-accent-success",
   research: "bg-accent-purple/20 text-accent-purple",
   fiction:  "bg-accent-warning/20 text-accent-warning",
-  roleplay: "bg-pink-500/20 text-pink-400",
+  roleplay: "bg-accent-cyan/20 text-accent-cyan",
 };
 
 function IdentityTab({

@@ -32,13 +32,14 @@ export async function createProject(
   userId: number,
   name: string,
   description?: string,
-  mode: "schematic" | "pcb" = "schematic"
+  mode: "schematic" | "pcb" = "schematic",
+  mapId?: string | null
 ): Promise<DesignProject | null> {
   const db = await getDb();
 
   const [row] = await db
     .insert(designProjects)
-    .values({ userId, name, description, mode })
+    .values({ userId, name, description, mode, mapId: mapId ?? null })
     .returning({ id: designProjects.id });
 
   return {
@@ -47,6 +48,7 @@ export async function createProject(
     name,
     description: description ?? null,
     mode,
+    mapId: mapId ?? null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };
@@ -119,7 +121,8 @@ export async function saveDesign(
   userId: number,
   name: string,
   canvasData: unknown,
-  description?: string
+  description?: string,
+  mapId?: string | null
 ): Promise<DesignSave | null> {
   const db = await getDb();
 
@@ -144,6 +147,7 @@ export async function saveDesign(
         connectionCount,
         version: 1,
         isLatest: 1,
+        mapId: mapId ?? null,
       })
       .returning({ id: designSaves.id });
   });
@@ -159,6 +163,7 @@ export async function saveDesign(
     connectionCount,
     version: 1,
     isLatest: 1,
+    mapId: mapId ?? null,
     createdAt: new Date(),
     updatedAt: new Date(),
   };

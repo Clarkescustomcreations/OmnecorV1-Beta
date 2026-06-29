@@ -64,7 +64,7 @@ export function BudgetConfigDialog({ projectId }: BudgetConfigDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button variant="ghost" size="icon" className="h-7 w-7">
+        <Button id="btn-wallet-configure-budget" variant="ghost" size="icon" className="h-7 w-7">
           <Settings2 className="h-4 w-4" />
           <span className="sr-only">Configure budget</span>
         </Button>
@@ -122,7 +122,7 @@ export function BudgetConfigDialog({ projectId }: BudgetConfigDialogProps) {
                 </div>
               </RadioGroup>
             </div>
-            <Button onClick={handleSave} disabled={setBudget.isPending} className="w-full">
+            <Button id="btn-wallet-save-budget" onClick={handleSave} disabled={setBudget.isPending} className="w-full">
               {setBudget.isPending ? "Saving..." : "Save Budget"}
             </Button>
           </TabsContent>

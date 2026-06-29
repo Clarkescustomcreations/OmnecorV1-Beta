@@ -9,7 +9,7 @@ export const VoiceInputButton: React.FC<{
   className?: string;
   size?: "sm" | "md";
 }> = ({ onTranscription, className, size = "md" }) => {
-  const sizeClass = size === "sm" ? "h-7 w-7" : "h-10 w-10";
+  const sizeClass = size === "sm" ? "h-12 w-12 sm:h-7 sm:w-7" : "h-14 w-14 sm:h-10 sm:w-10";
   const [isRecording, setIsRecording] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const mediaRecorder = useRef<MediaRecorder | null>(null);
