@@ -23,15 +23,24 @@ log = logging.getLogger("omnecor.voicebox")
 app = FastAPI(title="Voice Box Bridge")
 
 _ALLOWED_SPEAKER_BASES = [
-    Path(os.environ.get("HOME", "/tmp")) / ".omnecor",
-    Path(os.environ.get("OMNECOR_UPLOADS_DIR", "/tmp/omnecor-uploads")),
+    (Path(os.environ.get("HOME", "/tmp")) / ".omnecor").resolve(),
+    Path(os.environ.get("OMNECOR_UPLOADS_DIR", "/tmp/omnecor-uploads")).resolve(),
 ]
 
 def _validate_speaker_path(raw: str) -> Path:
-    resolved = Path(raw).resolve()
-    if not any(resolved == b or b in resolved.parents for b in _ALLOWED_SPEAKER_BASES):
-        raise HTTPException(status_code=403, detail="Speaker WAV path not allowed")
-    return resolved
+    try:
+        resolved = Path(raw).expanduser().resolve(strict=False)
+    except Exception:
+        raise HTTPException(status_code=400, detail="Invalid speaker WAV path")
+
+    for base in _ALLOWED_SPEAKER_BASES:
+        try:
+            resolved.relative_to(base)
+            return resolved
+        except ValueError:
+            continue
+
+    raise HTTPException(status_code=403, detail="Speaker WAV path not allowed")
 
 class SynthesizeRequest(BaseModel):
     text: str
