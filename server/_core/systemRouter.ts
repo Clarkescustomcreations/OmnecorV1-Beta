@@ -644,6 +644,14 @@ export const systemRouter = router({
       "C:\\Python310\\Scripts\\esptool.exe",
     ]).then(p => p !== null);
 
+    // ── arduino-cli ──
+    const arduinoCliResult = findExecutable([
+      "arduino-cli",
+      "/usr/local/bin/arduino-cli",
+      "/usr/bin/arduino-cli",
+      "C:\\Program Files\\arduino-cli\\arduino-cli.exe",
+    ]).then(p => p !== null);
+
     // ── Codebase Memory MCP ──
     const cbmMcpResult = findExecutable([
       homedir() + "/.local/bin/codebase-memory-mcp",
@@ -656,13 +664,13 @@ export const systemRouter = router({
     // Resolve all in parallel
     const [
       ollama, python, llamaCpp, blender, kicad,
-      whisper, tts, comfyui, esptool, cbmMcp, valetRouter
+      whisper, tts, comfyui, esptool, cbmMcp, valetRouter, arduinoCli
     ] = await Promise.all([
       ollamaResult, pythonResult, llamaCppResult, blenderResult, kicadResult,
-      whisperResult, ttsResult, comfyResult, esptoolResult, cbmMcpResult, valetRouterResult
+      whisperResult, ttsResult, comfyResult, esptoolResult, cbmMcpResult, valetRouterResult, arduinoCliResult
     ]);
 
-    return { ollama, python, llamaCpp, blender, kicad, whisper, tts, comfyui, esptool, cbmMcp, valetRouter };
+    return { ollama, python, llamaCpp, blender, kicad, whisper, tts, comfyui, esptool, cbmMcp, valetRouter, arduinoCli };
   }),
 
   // ---------------------------------------------------------------------------

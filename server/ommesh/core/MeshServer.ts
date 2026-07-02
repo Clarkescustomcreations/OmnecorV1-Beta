@@ -12,7 +12,7 @@
 import * as https from "https";
 import type { IncomingMessage, ServerResponse } from "http";
 import * as tls from "tls";
-import { createHmac, timingSafeEqual } from "crypto";
+import { verifyHmacSig } from "../crypto.js";
 import { securityManager } from "./SecurityManager.js";
 import type { MeshNode } from "./MeshNode.js";
 import { createLogger } from "../../_core/logger.js";
@@ -192,7 +192,7 @@ export class MeshServer {
       return;
     }
 
-    const verified = this.verifyHmacSig(parsed, parsed.sig as string);
+    const verified = verifyHmacSig(parsed, parsed.sig as string, process.env.OMMESH_SECRET);
     if (!verified) {
       log.warn("Sync rejected: signature mismatch", { from: peerCn, nodeId: parsed.nodeId });
       this.sendJson(res, 401, { error: "unauthorized" });
@@ -253,7 +253,7 @@ export class MeshServer {
       return;
     }
 
-    const verified = this.verifyHmacSig(parsed, parsed.sig as string);
+    const verified = verifyHmacSig(parsed, parsed.sig as string, process.env.OMMESH_SECRET);
     if (!verified) {
       log.warn("Discourse rejected: signature mismatch", { from: peerCn });
       this.sendJson(res, 401, { error: "unauthorized" });
@@ -275,35 +275,6 @@ export class MeshServer {
     );
 
     this.sendJson(res, 200, result);
-  }
-
-  /**
-   * Verify an HMAC-SHA256 signature over the canonical payload (all fields
-   * except `sig`) using OMMESH_SECRET. The sender signs the canonical JSON and
-   * appends `sig` to the envelope, so we reconstruct the same canonical string
-   * here before verifying. Fails closed if OMMESH_SECRET is not configured.
-   */
-  private verifyHmacSig(parsedBody: Record<string, unknown>, sig: string): boolean {
-    const secret = process.env.OMMESH_SECRET;
-    if (!secret) return false;
-    try {
-      // Reconstruct canonical payload — same field set the sender signed over
-      // (everything except the `sig` field, in the same key order).
-      const canonical: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(parsedBody)) {
-        if (k !== "sig") canonical[k] = v;
-      }
-      const canonicalStr = JSON.stringify(canonical);
-      const expected = createHmac("sha256", secret).update(canonicalStr).digest("hex");
-      const expectedBuf = Buffer.from(expected, "hex");
-      // Guard against non-hex sig values before timingSafeEqual
-      if (!/^[0-9a-fA-F]{64}$/.test(sig)) return false;
-      const sigBuf = Buffer.from(sig, "hex");
-      if (sigBuf.length !== expectedBuf.length) return false;
-      return timingSafeEqual(expectedBuf, sigBuf);
-    } catch {
-      return false;
-    }
   }
 
   /** Read the request body, enforcing a hard size cap. Returns null if exceeded. */

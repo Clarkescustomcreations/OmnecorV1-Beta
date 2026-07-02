@@ -40,6 +40,10 @@ This is the full map of the `docs/` tree. For top-level project docs
 | Doc | Covers |
 |---|---|
 | [ai-agents/VALET_ROUTER.md](ai-agents/VALET_ROUTER.md) | The 1.5B routing classifier — architecture, serving, fallback behavior |
+| [ai-agents/MOE_CHAIN.md](ai-agents/MOE_CHAIN.md) | Mixture-of-Experts chain — multi-model reasoning pipeline |
+| [ai-agents/LOCAL_MODEL_EMPOWERMENT.md](ai-agents/LOCAL_MODEL_EMPOWERMENT.md) | Empowering small local models (SLMs) with Omnecor tooling |
+| [ai-agents/DATASET_CURATION.md](ai-agents/DATASET_CURATION.md) | LLM Builder dataset discovery & curation |
+| [ai-agents/BIRD_CLAW_SCRAPER.md](ai-agents/BIRD_CLAW_SCRAPER.md) | Bird Claw Scraper (Agent Reach) — data acquisition agent |
 | [ai-agents/WORKFLOW_SEQUENCING.md](ai-agents/WORKFLOW_SEQUENCING.md) | Multi-step pipeline orchestration |
 | [ai-agents/Omnecor AI Agent Responsibilities.md](<ai-agents/Omnecor AI Agent Responsibilities.md>) | Agent roles and decision-making authority |
 | [ai-agents/Omnecor Multi-Agent Collaboration Workflows.md](<ai-agents/Omnecor Multi-Agent Collaboration Workflows.md>) | How agents collaborate and share context |
@@ -57,6 +61,7 @@ generation, build instructions, serving runbook, I/O contract.
 |---|---|
 | [backend/SERVER_ARCHITECTURE.md](backend/SERVER_ARCHITECTURE.md) | Express/tRPC server design |
 | [architecture/DATA_FLOW.md](architecture/DATA_FLOW.md) | How data moves between frontend, backend, AI models, external services |
+| [architecture/OMMESH_NETWORKING.md](architecture/OMMESH_NETWORKING.md) | OMMESH networking & cross-node mTLS routing internals |
 | [architecture/ROUTER_INVENTORY.md](architecture/ROUTER_INVENTORY.md) | Reference for every tRPC router |
 | [architecture/Omnecor System Design.md](<architecture/Omnecor System Design.md>) | High-level system design |
 | [backend/SERVICES_OVERVIEW.md](backend/SERVICES_OVERVIEW.md) | Backend singleton services |
@@ -65,6 +70,7 @@ generation, build instructions, serving runbook, I/O contract.
 | [backend/EXTERNAL_APIS.md](backend/EXTERNAL_APIS.md) | All 30+ external service integrations |
 | [api/TRPC_API.md](api/TRPC_API.md) | tRPC API reference |
 | [api/WEBSOCKET_API.md](api/WEBSOCKET_API.md) | WebSocket events and auth |
+| [api/PENPOT_BRIDGE.md](api/PENPOT_BRIDGE.md) | Penpot design-bridge API |
 
 ---
 
@@ -92,6 +98,9 @@ generation, build instructions, serving runbook, I/O contract.
 | Doc | Covers |
 |---|---|
 | [workflows/DEVELOPMENT_WORKFLOWS.md](workflows/DEVELOPMENT_WORKFLOWS.md) | Local dev setup, branching, migrations |
+| [development/LOCAL_TESTING.md](development/LOCAL_TESTING.md) | Authenticated local testing without friction |
+| [workflows/SOCIAL_PUBLISHING.md](workflows/SOCIAL_PUBLISHING.md) | Social publishing pipeline — architecture & flow |
+| [social-publishing-n8n.md](social-publishing-n8n.md) | Hybrid social publishing (native + n8n webhook) setup |
 | [../CONTRIBUTING.md](../CONTRIBUTING.md) | Contribution guidelines, including the AGENTS.md context system |
 | [../AGENTS.md](../AGENTS.md) | Agent/developer behavioral rules, schema gotchas, skill triggers |
 

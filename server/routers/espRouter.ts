@@ -21,6 +21,11 @@ const espFlashSchema = z.object({
   chip: z
     .enum(["esp32", "esp32s2", "esp32s3", "esp32c3", "esp8266"])
     .optional(),
+  // Hex flash offset (e.g. 0x0 for a merged image, 0x10000 for a bare app).
+  flashOffset: z
+    .string()
+    .regex(/^0x[0-9a-fA-F]+$/, "flashOffset must be a hex address like 0x0")
+    .optional(),
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -58,6 +63,34 @@ export const espRouter = router({
     .mutation(async ({ ctx, input }) => {
       try {
         const jobId = await ctx.services.esp.flashFirmware(input);
+        return { success: true, jobId };
+      } catch (error) {
+        throw new TRPCError({
+          code: "BAD_REQUEST",
+          message: (error as Error).message,
+        });
+      }
+    }),
+
+  /** Compile Arduino firmware to .bin */
+  compile: protectedProcedure
+    .input(
+      z.object({
+        sketchPath: z.string().min(1),
+        fqbn: z.string().optional(),
+        outputDir: z.string().optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const safeSketchPath = await validatePath(input.sketchPath);
+        const safeOutputDir = input.outputDir ? await validatePath(input.outputDir) : undefined;
+        
+        const jobId = await ctx.services.esp.compileFirmware({
+          sketchPath: safeSketchPath,
+          fqbn: input.fqbn,
+          outputDir: safeOutputDir,
+        });
         return { success: true, jobId };
       } catch (error) {
         throw new TRPCError({

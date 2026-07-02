@@ -55,6 +55,15 @@ export class MeshDiscoveryService extends EventEmitter {
         port: ANNOUNCE_PORT,
         txt: { version: "1", capabilities: "llm,tts,stt" },
       });
+      // bonjour emits 'error' asynchronously on the Service EventEmitter (e.g.
+      // "Service name is already in use on the network" when another Omnecor
+      // instance on the same LAN interface already claimed this node name).
+      // With no listener attached, Node rethrows it as an unhandled 'error'
+      // event, which crashes the whole process. Swallow it so mDNS discovery
+      // degrades gracefully instead of taking the server down.
+      this.service?.on("error", (err: Error) => {
+        console.warn("[MeshDiscoveryService] mDNS service registration failed — discovery degraded:", err.message);
+      });
       console.info(`[MeshDiscoveryService] Advertising as "${nodeName}" on port ${ANNOUNCE_PORT}`);
     } catch (err) {
       console.warn("[MeshDiscoveryService] mDNS advertise failed:", (err as Error).message);

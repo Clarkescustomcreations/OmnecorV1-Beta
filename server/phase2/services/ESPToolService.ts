@@ -65,10 +65,24 @@ export interface FlashConfig {
   baud?: number;
   /** Path to the firmware binary */
   firmwarePath: string;
-  /** Flash address offset (default: 0x1000 for ESP32) */
+  /**
+   * Flash write offset (default: `0x0`, i.e. a full/merged image such as an
+   * arduino-cli `*.merged.bin`). Use `0x10000` for a bare app image or `0x1000`
+   * for a raw bootloader. Must match the image type or the board won't boot.
+   */
   flashOffset?: string;
   /** Chip type (default: esp32) */
   chip?: "esp32" | "esp32s2" | "esp32s3" | "esp32c3" | "esp8266";
+}
+
+/** Compile configuration */
+export interface CompileConfig {
+  /** Path to the .ino file or project directory */
+  sketchPath: string;
+  /** Fully Qualified Board Name (e.g., "esp32:esp32:esp32") */
+  fqbn?: string;
+  /** Output directory for the compiled .bin (default: alongside the sketch) */
+  outputDir?: string;
 }
 
 /** Esptool installation info */
@@ -101,12 +115,27 @@ export interface ESPToolInfo {
  *   firmwarePath: "/firmware/app.bin",
  *   baud: 921600,
  * });
+ * 
+ * // Compile firmware
+ * const compileJobId = await esp.compileFirmware({
+ *   sketchPath: "/home/linux/OmnecorBleTest.ino",
+ *   fqbn: "esp32:esp32:esp32",
+ * });
  * ```
  */
 export class ESPToolBridge extends EventEmitter {
   private static instance: ESPToolBridge | null = null;
   private processManager: ProcessManagerService;
   private pythonBin: string;
+  /** Cached result of the first successful checkInstallation() call (esptool
+   *  doesn't get uninstalled mid-session, so this stays valid indefinitely). */
+  private cachedInstallInfo: ESPToolInfo | null = null;
+  /** Short-lived cache of a *negative* probe + its expiry (epoch ms). Bounds the
+   *  probe cost when the ESP status is polled while esptool is absent, but still
+   *  re-detects a mid-session install once the TTL lapses. */
+  private negativeInstallInfo: ESPToolInfo | null = null;
+  private negativeInstallExpiry = 0;
+  private static readonly NEGATIVE_TTL_MS = 30_000;
 
   private constructor() {
     super();
@@ -127,48 +156,62 @@ export class ESPToolBridge extends EventEmitter {
   // -------------------------------------------------------------------------
 
   /**
+   * Probe each Python candidate in order for esptool. Returns the first
+   * working binary together with the version stdout so checkInstallation()
+   * can parse the version without a second spawn.
+   */
+  private async discoverAndCheck(): Promise<{ bin: string; stdout: string } | null> {
+    const candidates = [PYTHON_SCRIPTS.pythonBin, "python3", "python"];
+    const seen = new Set<string>();
+    for (const candidate of candidates) {
+      if (seen.has(candidate)) continue;
+      seen.add(candidate);
+      const result = await new Promise<{ stdout: string } | null>(resolve => {
+        let stdout = "";
+        const p = spawn(candidate, ["-m", "esptool", "version"], { timeout: 10_000 });
+        p.stdout?.on("data", (chunk: Buffer) => { stdout += chunk.toString(); });
+        p.stderr?.resume();
+        p.on("close", code => resolve(code === 0 ? { stdout } : null));
+        p.on("error", () => resolve(null));
+      });
+      if (result) return { bin: candidate, stdout: result.stdout };
+    }
+    return null;
+  }
+
+  /**
    * Check if esptool is installed and accessible.
+   * A *positive* result is cached for the singleton's lifetime (esptool doesn't
+   * get uninstalled during a session). A *negative* result is cached only
+   * briefly (NEGATIVE_TTL_MS) — long enough to bound the probe cost under
+   * frequent polling, short enough that a mid-session install is still detected
+   * — instead of being pinned for the whole process lifetime.
    */
   async checkInstallation(): Promise<ESPToolInfo> {
-    return new Promise(resolve => {
-      const proc = spawn(this.pythonBin, ["-m", "esptool", "version"], {
-        timeout: 10000,
-      });
+    if (this.cachedInstallInfo) return this.cachedInstallInfo;
+    if (this.negativeInstallInfo && Date.now() < this.negativeInstallExpiry) {
+      return this.negativeInstallInfo;
+    }
 
-      let stdout = "";
-      proc.stdout?.on("data", (chunk: Buffer) => {
-        stdout += chunk.toString();
-      });
+    const found = await this.discoverAndCheck();
+    if (!found) {
+      // Not found — cache the negative for a short window so a later install is
+      // still picked up once the TTL lapses.
+      this.negativeInstallInfo = { isInstalled: false, version: null, pythonPath: PYTHON_SCRIPTS.pythonBin };
+      this.negativeInstallExpiry = Date.now() + ESPToolBridge.NEGATIVE_TTL_MS;
+      return this.negativeInstallInfo;
+    }
 
-      proc.on("close", code => {
-        if (code === 0) {
-          const versionMatch = stdout.match(
-            /esptool\.py\s+v?(\d+\.\d+[\.\d]*)/i
-          );
-          resolve({
-            isInstalled: true,
-            version: versionMatch
-              ? versionMatch[1]
-              : stdout.trim().split("\n")[0],
-            pythonPath: this.pythonBin,
-          });
-        } else {
-          resolve({
-            isInstalled: false,
-            version: null,
-            pythonPath: this.pythonBin,
-          });
-        }
-      });
-
-      proc.on("error", () => {
-        resolve({
-          isInstalled: false,
-          version: null,
-          pythonPath: this.pythonBin,
-        });
-      });
-    });
+    this.pythonBin = found.bin;
+    // esptool ≤4.x prints "esptool.py v4.x"; esptool ≥5.x prints "esptool v5.3.1"
+    // (no ".py"). Make the suffix optional so both banners parse to a clean number.
+    const versionMatch = found.stdout.match(/esptool(?:\.py)?\s+v?(\d+\.\d+[\.\d]*)/i);
+    this.cachedInstallInfo = {
+      isInstalled: true,
+      version: versionMatch ? versionMatch[1] : found.stdout.trim().split("\n")[0],
+      pythonPath: found.bin,
+    };
+    return this.cachedInstallInfo;
   }
 
   /**
@@ -307,8 +350,41 @@ export class ESPToolBridge extends EventEmitter {
   }
 
   // -------------------------------------------------------------------------
-  // Flash Operations
+  // Compile & Flash Operations
   // -------------------------------------------------------------------------
+
+  /**
+   * Compile an Arduino sketch (.ino) to a .bin firmware using arduino-cli.
+   * 
+   * @param config - Compile configuration
+   * @returns Job ID for tracking via ProcessManagerService
+   */
+  async compileFirmware(config: CompileConfig): Promise<string> {
+    const { sketchPath, fqbn = "esp32:esp32:esp32", outputDir } = config;
+
+    await this.validatePathExists(sketchPath, "Sketch path");
+
+    const args = ["compile", "--fqbn", fqbn];
+    if (outputDir) {
+      await fs.mkdir(outputDir, { recursive: true });
+      args.push("--output-dir", outputDir);
+    }
+    args.push(sketchPath);
+
+    // Use ProcessManagerService for unified job tracking
+    const jobId = await this.processManager.spawn({
+      type: "custom", // Using custom process type for arduino-cli
+      command: "arduino-cli",
+      args,
+      label: `ESP Compile: ${path.basename(sketchPath)}`,
+      timeoutMs: 300000, // 5 minute timeout for compilation
+      captureMode: "raw", // Raw capture so we get full build logs
+    });
+
+    log.info("Compile job started", { jobId, sketch: path.basename(sketchPath), fqbn });
+
+    return jobId;
+  }
 
   /**
    * Flash firmware to an ESP device.
@@ -318,7 +394,7 @@ export class ESPToolBridge extends EventEmitter {
    * @returns Job ID for tracking via ProcessManagerService
    */
   async flashFirmware(config: FlashConfig): Promise<string> {
-    const { port, baud, firmwarePath, chip } = config;
+    const { port, baud, firmwarePath, chip, flashOffset } = config;
 
     // Validate inputs
     this.validatePort(port);
@@ -336,6 +412,10 @@ export class ESPToolBridge extends EventEmitter {
         String(baud || 921600),
         "--firmware_path",
         firmwarePath,
+        "--flash_offset",
+        flashOffset || "0x0",
+        "--chip",
+        chip || "esp32",
       ],
       label: `ESP Flash: ${path.basename(firmwarePath)} → ${port}`,
       timeoutMs: 120000, // 2 minute timeout for flashing
@@ -415,6 +495,15 @@ export class ESPToolBridge extends EventEmitter {
     // Basic path traversal check
     if (port.includes("..")) {
       throw new Error(`[Omnecor ESP] Invalid port path: ${port}`);
+    }
+  }
+
+  /** Validate that a file or directory exists */
+  private async validatePathExists(filePath: string, label: string): Promise<void> {
+    try {
+      await fs.access(filePath);
+    } catch {
+      throw new Error(`[Omnecor ESP] ${label} not found: ${filePath}`);
     }
   }
 

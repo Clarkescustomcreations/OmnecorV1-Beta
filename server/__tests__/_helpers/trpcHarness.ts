@@ -19,6 +19,7 @@ import * as schema from "../../../drizzle/schema.js";
 import { users, type User } from "../../../drizzle/schema.js";
 import type { Db } from "../../db.js";
 import type { TrpcContext } from "../../_core/context.js";
+import { ProcessManagerService } from "../../phase2/services/ProcessManagerService.js";
 
 const MIGRATIONS_DIR = path.resolve(
   import.meta.dirname,
@@ -66,6 +67,27 @@ export async function seedUser(
  * a stub `req`/`res`, and any `services` the test supplies). Routers that reach
  * into `ctx.services.*` should pass mocked services in via `services`.
  */
+/**
+ * Poll ProcessManagerService until a job reaches a terminal state or the
+ * timeout expires. Use this in bridge tests that spawn background jobs via
+ * ProcessManagerService (Blender, ESP flash/erase, etc.).
+ */
+export async function waitForJob(
+  jobId: string,
+  timeoutMs: number
+): Promise<ReturnType<ProcessManagerService["getJobStatus"]>> {
+  const pm = ProcessManagerService.getInstance();
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const status = pm.getJobStatus(jobId);
+    if (status && ["completed", "failed", "cancelled"].includes(status.state)) {
+      return status;
+    }
+    await new Promise(r => setTimeout(r, 300));
+  }
+  throw new Error(`Job ${jobId} did not finish within ${timeoutMs}ms`);
+}
+
 export function makeContext(
   user: User | null,
   db: Db,

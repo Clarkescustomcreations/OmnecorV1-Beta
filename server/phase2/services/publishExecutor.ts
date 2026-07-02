@@ -8,7 +8,7 @@
  * errorMessage). Refreshed tokens are persisted to platformAccounts.
  */
 import { getDb } from "../../db.factory.js";
-import { scheduledPosts, curatedPosts, platformAccounts } from "../../../drizzle/schema.js";
+import { scheduledPosts, curatedPosts, platformAccounts, users } from "../../../drizzle/schema.js";
 import { eq, inArray, and, lte } from "drizzle-orm";
 import { PublishingService, RateLimitError, type PublishAccount } from "./PublishingService.js";
 import { createLogger } from "../../_core/logger.js";
@@ -71,10 +71,20 @@ async function publishOne(
     accountMetadata: account.accountMetadata,
   };
 
+  // Resolve the account owner's execution mode so the webhook publisher can
+  // fail closed on non-local n8n egress when the user is sovereign (air-gapped).
+  const owner = await db
+    .select({ executionMode: users.executionMode })
+    .from(users)
+    .where(eq(users.id, account.userId))
+    .limit(1);
+  const sovereign = owner[0]?.executionMode === "sovereign";
+
   try {
     const result = await PublishingService.getInstance().publish(pubAccount, {
       content: row.content,
       mediaUrls: mediaUrlsFrom(row.metadata),
+      sovereign,
     });
 
     // Persist a refreshed token if one was issued during publish.

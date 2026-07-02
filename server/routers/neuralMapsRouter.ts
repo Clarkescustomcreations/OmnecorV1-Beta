@@ -1,7 +1,18 @@
 import { protectedProcedure, router } from "../_core/trpc.js";
 import { z } from "zod";
 import { getDb } from "../db.factory.js";
-import { neuralMaps } from "../../drizzle/schema.js";
+import {
+  neuralMaps,
+  savedScripts,
+  designProjects,
+  designSaves,
+  curatedPosts,
+  scheduledPosts,
+  discoveredArticles,
+  discoveredDatasetItems,
+  curatedTrainingExamples,
+  virtualCards,
+} from "../../drizzle/schema.js";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
@@ -175,9 +186,40 @@ export const neuralMapsRouter = router({
       const userId = ctx.user?.id;
       if (!userId) throw new TRPCError({ code: "UNAUTHORIZED" });
 
-      await db
-        .delete(neuralMaps)
-        .where(and(eq(neuralMaps.id, input.id), eq(neuralMaps.userId, userId)));
+      // Verify ownership up front so a non-owner can neither delete rows nor
+      // (previously a small IDOR) trigger the vector-collection wipe by guessing
+      // a map id. Stay idempotent for an unowned/missing id: no-op success.
+      const owned = await db
+        .select({ id: neuralMaps.id })
+        .from(neuralMaps)
+        .where(and(eq(neuralMaps.id, input.id), eq(neuralMaps.userId, userId)))
+        .limit(1);
+      if (!owned[0]) return { success: true };
+
+      // Belt + suspenders. Migration 0014 makes every neural_maps child FK
+      // ON DELETE CASCADE at the DB layer (the inline-FK tables already had it),
+      // so deleting the map row alone cleans up. We ALSO delete the children
+      // explicitly — atomically, via a libsql batch (single BEGIN/COMMIT) —
+      // so cleanup is correct even on a DB whose FK actions drifted (the bug this
+      // fixed). Children are deleted before the map so the batch succeeds with or
+      // without the DB-level cascade. `db.batch` (not `db.transaction`) is used
+      // deliberately: it runs on one connection, so it also works under the
+      // in-memory libsql test harness. This list mirrors the FK children of
+      // neural_maps; dbSchema.test.ts guards the DB-cascade side, so a newly
+      // added child table missed here is still cleaned by the cascade and the
+      // schema test flags the divergence.
+      await db.batch([
+        db.delete(savedScripts).where(eq(savedScripts.mapId, input.id)),
+        db.delete(designSaves).where(eq(designSaves.mapId, input.id)),
+        db.delete(designProjects).where(eq(designProjects.mapId, input.id)),
+        db.delete(curatedPosts).where(eq(curatedPosts.projectId, input.id)),
+        db.delete(scheduledPosts).where(eq(scheduledPosts.projectId, input.id)),
+        db.delete(discoveredArticles).where(eq(discoveredArticles.projectId, input.id)),
+        db.delete(discoveredDatasetItems).where(eq(discoveredDatasetItems.projectId, input.id)),
+        db.delete(curatedTrainingExamples).where(eq(curatedTrainingExamples.projectId, input.id)),
+        db.delete(virtualCards).where(eq(virtualCards.projectId, input.id)),
+        db.delete(neuralMaps).where(and(eq(neuralMaps.id, input.id), eq(neuralMaps.userId, userId))),
+      ]);
 
       // Drop the map's entire vector collection so its indexed content (local
       // + remote) doesn't linger after the map is gone.

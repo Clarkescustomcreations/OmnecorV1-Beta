@@ -21,7 +21,7 @@ numpy>=1.26.0
 soundfile>=0.12.1
 
 # Fine-tuning bridge (localLLMfine-tuning.py):
-transformers>=4.40.0
+transformers>=4.57,<5  # coqui-tts 0.27.x uses isin_mps_friendly (removed in 5.x)
 trl>=0.8.0
 datasets>=2.19.0
 
@@ -42,3 +42,6 @@ fal-client>=0.5.0
 
 # Unsloth accelerated fine-tuning (localLLMfine-tuning.py, GPU only):
 # pip install "unsloth[colab-new] @ git+https://github.com/unslothai/unsloth.git"
+python-multipart>=0.0.9
+torchaudio>=2.2.0
+torchcodec  # coqui-tts audio IO on torch>=2.9

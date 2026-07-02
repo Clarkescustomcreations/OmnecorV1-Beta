@@ -54,7 +54,7 @@ To enhance the security of your Omnecor installation, we recommend the following
 
 ## 3. Production-Readiness Hardening (2026-06-12)
 
-The V1-Beta production-readiness sweep (see `Beta-Code-Sweep.md`) added the following protections:
+The V1-Beta production-readiness sweep (archived in `Context/Progress-Tracker.md`, Archive B) added the following protections:
 
 -   **WebSocket upgrade authentication**: `/ws` connections now verify a session credential — the session cookie (browser SPA), an `Authorization: Bearer` header, or a `?token=` query parameter (mobile APK). Unauthenticated LAN sockets may only attempt `mobile_node_register`, and only when `OMMESH_SECRET` is configured.
 -   **Timing-safe OMMESH secret comparison**: mobile node registration compares secrets with SHA-256 + `crypto.timingSafeEqual` (no timing or length leak), and registration **fails closed** when `OMMESH_SECRET` is unset (loopback and zero-login excepted).

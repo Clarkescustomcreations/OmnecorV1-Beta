@@ -1332,12 +1332,13 @@ export function SetupWizard() {
             {/* ── Hardware Flash ────────────────────────── */}
             <DepsGroup
               icon={<Radio className="w-4 h-4" />}
-              label="Hardware Flash"
+              label="Hardware & Compile"
               groupKey="esptool"
               tools={[
+                { key: "arduinoCli", name: "arduino-cli", desc: "Arduino code compilation" },
                 { key: "esptool", name: "esptool", desc: "ESP32/ESP8266 firmware flashing" },
               ]}
-              getItUrl="https://github.com/espressif/esptool"
+              getItUrl="https://arduino.cc/pro/cli"
             />
 
             <p className="text-[10px] text-muted-foreground pt-1">

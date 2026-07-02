@@ -63,8 +63,11 @@ const CHAR_LIMITS: Record<string, number> = {
   linkedin: 3000,
   instagram: 2200,
   facebook: 63206,
-  youtube: 5000,
-  tiktok: 2200,
+  // Native platforms
+  bluesky: 300,
+  mastodon: 500,
+  discord: 2000,
+  telegram: 4096,
 };
 
 /** Resolve the character limit for a platform key, or null if unknown. */
@@ -709,7 +712,11 @@ export function AgentNetworking() {
             <Card>
               <CardHeader>
                 <CardTitle>Connected Platforms</CardTitle>
-                <CardDescription>Connect your social media accounts via OAuth for instant setup.</CardDescription>
+                <CardDescription>
+                  Registration-heavy platforms (X, LinkedIn, Facebook, Instagram) publish through your local
+                  n8n — connect them once there, no developer app required. Bluesky, Mastodon, Discord and Telegram
+                  connect natively below.
+                </CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
                 {/* Connected Accounts */}
@@ -721,35 +728,38 @@ export function AgentNetworking() {
                     ) : accountsData?.length === 0 ? (
                       <p className="col-span-2 text-center py-8 text-muted-foreground text-sm">No platforms connected yet. Connect one below to get started.</p>
                     ) : (
-                      accountsData?.map((account) => (
-                        <div key={account.id} className="p-4 border rounded-lg flex items-center justify-between hover:bg-bg-elevated transition-colors">
-                          <div className="flex items-center gap-4">
-                            <div className={`w-2 h-2 rounded-full ${account.isActive ? 'bg-accent-success' : 'bg-destructive'}`} />
-                            <div>
-                              <p className="font-medium uppercase">{account.platform}</p>
-                              <p className="text-xs text-muted-foreground">{account.accountName || 'Active Account'}</p>
+                      accountsData?.map((account) => {
+                        const viaN8n = WEBHOOK_PLATFORM_IDS.includes((account.platform ?? "").toLowerCase());
+                        return (
+                          <div key={account.id} className="p-4 border rounded-lg flex items-center justify-between hover:bg-bg-elevated transition-colors">
+                            <div className="flex items-center gap-4">
+                              <div className={`w-2 h-2 rounded-full ${account.isActive ? 'bg-accent-success' : 'bg-destructive'}`} />
+                              <div>
+                                <p className="font-medium uppercase">{account.platform}</p>
+                                <p className="text-xs text-muted-foreground">
+                                  {viaN8n ? "via n8n" : (account.accountName || 'Active Account')}
+                                </p>
+                              </div>
                             </div>
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => disconnectAccountMutation.mutate({ accountId: account.id })}
+                              disabled={disconnectAccountMutation.isPending}
+                            >
+                              {disconnectAccountMutation.isPending ? "Disconnecting..." : "Disconnect"}
+                            </Button>
                           </div>
-                          <Button 
-                            variant="ghost" 
-                            size="sm" 
-                            className="text-destructive hover:text-destructive"
-                            onClick={() => disconnectAccountMutation.mutate({ accountId: account.id })}
-                            disabled={disconnectAccountMutation.isPending}
-                          >
-                            {disconnectAccountMutation.isPending ? "Disconnecting..." : "Disconnect"}
-                          </Button>
-                        </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
 
-                {/* OAuth Connect Buttons */}
-                <div className="space-y-3">
-                  <p className="text-sm font-medium">Add More Platforms</p>
-                  <PlatformOAuthButtons accountsData={accountsData} refetch={refetchScheduled} />
-                </div>
+                {/* Hybrid connect: n8n webhook platforms + native platforms */}
+                <WebhookPublishingPanel accountsData={accountsData} refetchAccounts={refetchAccounts} />
+                <NativeConnectPanel accountsData={accountsData} refetchAccounts={refetchAccounts} />
               </CardContent>
             </Card>
           </TabsContent>
@@ -1051,62 +1061,251 @@ function MeshFederationPanel() {
   );
 }
 
-const OAUTH_PLATFORMS = [
-  { id: "twitter", label: "X (Twitter)", icon: "𝕏", color: "bg-black hover:bg-gray-800" },
-  { id: "linkedin", label: "LinkedIn", icon: "in", color: "bg-blue-600 hover:bg-blue-700" },
-  { id: "instagram", label: "Instagram", icon: "📷", color: "bg-pink-600 hover:bg-pink-700" },
-  { id: "tiktok", label: "TikTok", icon: "♪", color: "bg-black hover:bg-gray-800" },
-  { id: "facebook", label: "Facebook", icon: "f", color: "bg-blue-600 hover:bg-blue-700" },
-  { id: "youtube", label: "YouTube", icon: "▶", color: "bg-red-600 hover:bg-red-700" },
+// Platforms routed through the n8n webhook workflow (dev-app registration heavy).
+// Includes the "x" alias so connected-account rows render as "via n8n".
+const WEBHOOK_PLATFORM_IDS = ["twitter", "x", "linkedin", "facebook", "instagram"];
+const WEBHOOK_PLATFORMS_UI = [
+  { id: "twitter", label: "X (Twitter)", icon: "𝕏" },
+  { id: "linkedin", label: "LinkedIn", icon: "in" },
+  { id: "facebook", label: "Facebook", icon: "f" },
+  { id: "instagram", label: "Instagram", icon: "📷" },
 ];
 
-function PlatformOAuthButtons({
+const BLUEPRINT_URL = "/n8n/omnecor-social-publish.blueprint.json";
+
+type PanelAccounts = { id: number; platform: string; [key: string]: unknown }[] | undefined;
+
+/**
+ * n8n publishing — the registration-heavy platforms. Shows the live webhook
+ * target, the importable blueprint + steps, and per-platform "Enable via n8n"
+ * toggles (each creates a lightweight platform account so posts can be scheduled
+ * against it; the actual credentials live in n8n).
+ */
+function WebhookPublishingPanel({
   accountsData,
-  refetch,
+  refetchAccounts,
 }: {
-  accountsData: { platform: string; [key: string]: unknown }[] | undefined;
-  refetch: () => void;
+  accountsData: PanelAccounts;
+  refetchAccounts: () => void;
 }) {
-  const getAuthUrlMutation = trpc.oauth.getAuthorizationUrl.useMutation({
-    onSuccess: (data) => {
-      window.location.href = data.authUrl;
-    },
-    onError: (error) => toast.error(`OAuth failed: ${error.message}`),
+  const { data: routing, isLoading, refetch: refetchRouting } = trpc.platforms.getPublishingRouting.useQuery();
+  const [pathInput, setPathInput] = useState<string | null>(null);
+
+  const enableMutation = trpc.platforms.addAccount.useMutation({
+    onSuccess: () => { toast.success("Platform enabled via n8n"); refetchAccounts(); },
+    onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+  const savePathMutation = trpc.platforms.setWebhookPath.useMutation({
+    onSuccess: () => { toast.success("Webhook path saved"); setPathInput(null); refetchRouting(); },
+    onError: (e) => toast.error(`Could not save path (owner only): ${e.message}`),
   });
 
-  const connectedPlatforms = new Set(
-    accountsData?.map((a) => a.platform?.toLowerCase() ?? "") || []
-  );
+  const connected = new Set((accountsData ?? []).map((a) => a.platform?.toLowerCase() ?? ""));
+  const path = pathInput ?? routing?.webhook.webhookPath ?? "omnecor-social-publish";
 
-  const handleConnect = (platform: string) => {
-    getAuthUrlMutation.mutate({ platform: platform as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] });
+  return (
+    <div className="space-y-3 rounded-lg border p-4">
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <div>
+          <p className="text-sm font-medium flex items-center gap-2"><Server className="w-4 h-4 text-primary" /> Publish via n8n</p>
+          <p className="text-xs text-muted-foreground">X, LinkedIn, Facebook &amp; Instagram — no developer app needed.</p>
+        </div>
+        <a
+          href={BLUEPRINT_URL}
+          download
+          className="text-xs inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md border hover:bg-bg-elevated"
+        >
+          <ExternalLink className="w-3.5 h-3.5" /> Download n8n blueprint
+        </a>
+      </div>
+
+      {/* Webhook target status */}
+      {isLoading ? (
+        <div className="flex justify-center p-4"><Loader2 className="w-5 h-5 animate-spin text-primary" /></div>
+      ) : (
+        <>
+          <div className="text-xs space-y-2">
+            <div className="flex items-center gap-2 flex-wrap">
+              <span className="text-muted-foreground">Endpoint:</span>
+              <code className="px-1.5 py-0.5 rounded bg-muted font-mono text-[11px] break-all">{routing?.webhook.webhookUrl}</code>
+              {routing?.webhook.isLoopback ? (
+                <Badge variant="secondary" className="bg-accent-success/10 text-accent-success text-[10px]">
+                  <Shield className="w-3 h-3 mr-1" /> local · air-gap safe
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="text-[10px]">remote n8n</Badge>
+              )}
+            </div>
+            {routing?.webhook.sovereignBlocked && (
+              <p className="text-[11px] text-destructive">
+                Sovereign mode blocks publishing through a remote n8n. Point <code>N8N_URL</code> at a local instance
+                (http://127.0.0.1:5678) or disable sovereign mode.
+              </p>
+            )}
+            <div className="flex items-end gap-2">
+              <div className="space-y-1 flex-1 max-w-xs">
+                <Label className="text-[11px]">Webhook path</Label>
+                <Input
+                  value={path}
+                  onChange={(e) => setPathInput(e.target.value)}
+                  className="h-8 text-xs font-mono"
+                  placeholder="omnecor-social-publish"
+                />
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={pathInput === null || savePathMutation.isPending}
+                onClick={() => savePathMutation.mutate({ webhookPath: path })}
+              >
+                {savePathMutation.isPending ? "Saving…" : "Save"}
+              </Button>
+            </div>
+          </div>
+
+          {/* Import steps */}
+          <ol className="text-[11px] text-muted-foreground list-decimal pl-4 space-y-0.5">
+            <li>Download the blueprint and import it in n8n (<span className="font-mono">Workflows → Import from File</span>).</li>
+            <li>Open each platform node and connect your social account (consumer login — no developer app).</li>
+            <li>Activate the workflow. Its webhook path must match the value above.</li>
+            <li>Click <span className="font-medium">Enable via n8n</span> below for each platform you connected.</li>
+          </ol>
+
+          {/* Enable toggles */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 pt-1">
+            {WEBHOOK_PLATFORMS_UI.map((p) => {
+              const isOn = connected.has(p.id) || (p.id === "twitter" && connected.has("x"));
+              return (
+                <button
+                  key={p.id}
+                  disabled={isOn || enableMutation.isPending}
+                  onClick={() => enableMutation.mutate({
+                    platform: p.id,
+                    accountName: "via n8n",
+                    oauthToken: "n8n",
+                    accountMetadata: { routing: "n8n" },
+                  })}
+                  className={cn(
+                    "p-3 rounded-lg border flex flex-col items-center gap-1 transition-all text-xs",
+                    isOn ? "border-accent-success/30 bg-accent-success/5 opacity-70 cursor-default" : "hover:bg-bg-elevated",
+                  )}
+                >
+                  <span className="text-lg">{p.icon}</span>
+                  <span className="text-center">{p.label}</span>
+                  {isOn ? (
+                    <Badge variant="secondary" className="text-[10px]"><CheckCircle2 className="w-3 h-3 mr-1" /> Enabled</Badge>
+                  ) : (
+                    <span className="text-[10px] text-muted-foreground">Enable via n8n</span>
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+// Native, registration-free platforms — each connects with a single secret.
+const NATIVE_PLATFORMS_UI: Record<string, { label: string; fields: { key: string; label: string; placeholder: string; secret?: boolean }[] }> = {
+  bluesky: { label: "Bluesky", fields: [
+    { key: "identifier", label: "Handle", placeholder: "you.bsky.social" },
+    { key: "appPassword", label: "App password", placeholder: "xxxx-xxxx-xxxx-xxxx", secret: true },
+  ] },
+  mastodon: { label: "Mastodon", fields: [
+    { key: "instanceUrl", label: "Instance URL", placeholder: "https://mastodon.social" },
+    { key: "accessToken", label: "Access token", placeholder: "Settings → Development → New application", secret: true },
+  ] },
+  discord: { label: "Discord", fields: [
+    { key: "webhookUrl", label: "Channel webhook URL", placeholder: "https://discord.com/api/webhooks/…", secret: true },
+  ] },
+  telegram: { label: "Telegram", fields: [
+    { key: "botToken", label: "Bot token", placeholder: "123456:ABC-DEF…", secret: true },
+    { key: "chatId", label: "Chat / channel id", placeholder: "@mychannel or -1001234567890" },
+  ] },
+};
+
+/** Native connect — Bluesky, Mastodon, Discord, Telegram. */
+function NativeConnectPanel({
+  accountsData,
+  refetchAccounts,
+}: {
+  accountsData: PanelAccounts;
+  refetchAccounts: () => void;
+}) {
+  const [platform, setPlatform] = useState<keyof typeof NATIVE_PLATFORMS_UI>("bluesky");
+  const [values, setValues] = useState<Record<string, string>>({});
+
+  const addMutation = trpc.platforms.addAccount.useMutation({
+    onSuccess: () => { toast.success("Platform connected"); setValues({}); refetchAccounts(); },
+    onError: (e) => toast.error(`Failed: ${e.message}`),
+  });
+
+  const connected = new Set((accountsData ?? []).map((a) => a.platform?.toLowerCase() ?? ""));
+  const spec = NATIVE_PLATFORMS_UI[platform];
+  const ready = spec.fields.every((f) => (values[f.key] ?? "").trim().length > 0);
+
+  const connect = () => {
+    // Map the per-platform form into { oauthToken, accountName, accountMetadata }.
+    let oauthToken = "";
+    let accountName = "";
+    let accountMetadata: Record<string, unknown> = {};
+    if (platform === "bluesky") {
+      oauthToken = values.appPassword; accountName = values.identifier;
+      accountMetadata = { identifier: values.identifier, service: "https://bsky.social" };
+    } else if (platform === "mastodon") {
+      oauthToken = values.accessToken; accountName = values.instanceUrl;
+      accountMetadata = { instanceUrl: values.instanceUrl };
+    } else if (platform === "discord") {
+      oauthToken = values.webhookUrl; accountName = "Discord channel";
+    } else if (platform === "telegram") {
+      oauthToken = values.botToken; accountName = values.chatId;
+      accountMetadata = { chatId: values.chatId };
+    }
+    addMutation.mutate({ platform, accountName, oauthToken, accountMetadata });
   };
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-      {OAUTH_PLATFORMS.map((platform) => (
-        <button
-          key={platform.id}
-          onClick={() => handleConnect(platform.id)}
-          disabled={getAuthUrlMutation.isPending || connectedPlatforms.has(platform.id)}
-          className={`p-4 rounded-lg border-2 transition-all flex flex-col items-center gap-2 ${
-            connectedPlatforms.has(platform.id)
-              ? "border-accent-success/30 bg-accent-success/5 cursor-not-allowed opacity-60"
-              : `border-border ${platform.color} text-white font-medium`
-          }`}
-        >
-          <span className="text-lg">{platform.icon}</span>
-          <span className="text-xs text-center">{platform.label}</span>
-          {connectedPlatforms.has(platform.id) && (
-            <Badge variant="secondary" className="text-[10px] mt-1">
-              ✓ Connected
-            </Badge>
-          )}
-          {getAuthUrlMutation.isPending && (
-            <Loader2 className="w-3 h-3 animate-spin" />
-          )}
-        </button>
-      ))}
+    <div className="space-y-3 rounded-lg border p-4">
+      <div>
+        <p className="text-sm font-medium">Connect a native platform</p>
+        <p className="text-xs text-muted-foreground">Bluesky, Mastodon, Discord &amp; Telegram — no developer app, published directly.</p>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {Object.entries(NATIVE_PLATFORMS_UI).map(([id, s]) => (
+          <button
+            key={id}
+            onClick={() => { setPlatform(id as keyof typeof NATIVE_PLATFORMS_UI); setValues({}); }}
+            className={cn(
+              "px-3 py-1.5 rounded-md border text-xs transition-colors",
+              platform === id ? "border-primary bg-primary/10 text-primary" : "hover:bg-bg-elevated",
+            )}
+          >
+            {s.label}
+            {connected.has(id) && <CheckCircle2 className="w-3 h-3 ml-1.5 inline text-accent-success" />}
+          </button>
+        ))}
+      </div>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        {spec.fields.map((f) => (
+          <div key={f.key} className="space-y-1">
+            <Label className="text-[11px]">{f.label}</Label>
+            <Input
+              type={f.secret ? "password" : "text"}
+              value={values[f.key] ?? ""}
+              onChange={(e) => setValues((v) => ({ ...v, [f.key]: e.target.value }))}
+              placeholder={f.placeholder}
+              className="h-8 text-xs"
+            />
+          </div>
+        ))}
+      </div>
+      <div className="flex justify-end">
+        <Button size="sm" disabled={!ready || addMutation.isPending} onClick={connect}>
+          {addMutation.isPending ? "Connecting…" : `Connect ${spec.label}`}
+        </Button>
+      </div>
     </div>
   );
 }

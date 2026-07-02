@@ -30,8 +30,8 @@ This guide provides comprehensive instructions for installing and setting up Omn
 | **RAM** | 8 GB | 16 GB+ |
 | **Disk Space** | 20 GB free (NVMe SSD) | 50 GB+ (NVMe SSD) |
 | **Network** | Stable connection for API provider calls | Stable connection |
-| **Node.js** | 22+ | 24.15.0 (pinned for beta) |
-| **pnpm** | 10.x | 10.34.1 (pinned for beta) |
+| **Node.js** | 22+ | 22.x LTS (CI-pinned; 24.x also supported) |
+| **pnpm** | 11.x | 11.8.0 (pinned for beta) |
 | **GPU** | Optional | NVIDIA 8 GB+ VRAM (RTX 3060 or higher) for local LLMs |
 
 ---
@@ -41,11 +41,11 @@ This guide provides comprehensive instructions for installing and setting up Omn
 Before proceeding with the installation, ensure the following are installed:
 
 - **Git** — for cloning the repository.
-- **Node.js v24.15.0** (minimum v22) — download from [nodejs.org](https://nodejs.org/en/download/).
-- **pnpm v10.34.1** (minimum 10.x):
+- **Node.js 22+** (24.x also supported) — download from [nodejs.org](https://nodejs.org/en/download/).
+- **pnpm v11.8.0** (minimum 11.x):
 
   ```bash
-  npm install -g pnpm@10.34.1
+  npm install -g pnpm@11.8.0
   ```
 
 ---
@@ -266,7 +266,7 @@ Omnecor ships a Windows installer built with NSIS via Electron.
 **System requirements for Windows:**
 
 - Windows 10 / 11 (x64)
-- Node.js v24.15.0 (the installer will prompt if missing)
+- Node.js 22+ (the installer will prompt if missing)
 - C++ Build Tools (Visual Studio "Desktop development with C++") — required for native modules (`better-sqlite3`, `onnxruntime-node`)
 
 **Uninstall:**

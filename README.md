@@ -3,6 +3,8 @@
 
 <img src="assets/logo.png" alt="Omnecor Logo" width="600" />
 
+# Omnecor
+
 **The Sovereign AI Workstation. Where imagination becomes infrastructure.**
 
 </div>
@@ -119,8 +121,8 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **Image Generation Hub** — Unified interface for ComfyUI, Fal.ai, OpenArt, and Replicate with batch support and version history.
 
 ### Agent Networking & Social Media Automation
-- **Multi-Platform Publishing** — Schedule and publish content across Twitter/X, LinkedIn, Instagram, TikTok, Facebook, and YouTube from one interface.
-- **OAuth 2.0 Platform Connection** — One-click connection to all 6 platforms via OAuth; tokens stored securely with auto-refresh.
+- **Hybrid Multi-Platform Publishing** — Schedule and publish from one interface across **Bluesky, Mastodon, Discord, and Telegram natively** (direct API, no developer app) plus **X (Twitter), LinkedIn, Facebook, and Instagram via a local n8n webhook**. YouTube is intentionally unsupported (no text/community-post API) and returns a clear "not supported" error rather than failing silently. See [docs/social-publishing-n8n.md](docs/social-publishing-n8n.md).
+- **Air-Gap-Safe Connection Model** — Native platforms store a single per-account secret (app password / access token / channel webhook / bot token); the four review-gated platforms authenticate **once inside n8n**, so Omnecor never registers a developer app. Stays sovereign as long as n8n runs locally (`N8N_URL` defaults to `http://127.0.0.1:5678`); a non-loopback `N8N_URL` is refused in Sovereign mode.
 - **Content Discovery Engine** — AI-curated content from RSS feeds, keyword searches, and trending topics.
 - **Character Persona Studio** — Create branded social identities with custom bios, tone, hashtags, and posting schedules.
 - **Approval Workflows** — Review and approve AI-generated content drafts before publishing.

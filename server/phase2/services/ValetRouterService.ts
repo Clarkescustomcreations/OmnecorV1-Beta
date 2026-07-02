@@ -54,8 +54,18 @@ export class ValetRouterService {
   private readonly baseUrl: string;
   private available: boolean | null = null; // cached availability
 
+  // Timeout for a single /route classification. The default fast fine-tuned
+  // router answers in well under a second, but when the backend is a general
+  // *reasoning* model (e.g. an Ollama thinking model), classification emits a
+  // long chain of thought first — a short timeout would time out on every call
+  // and silently fall back to rule-based routing. Generous by default, and
+  // env-tunable (VALET_ROUTE_TIMEOUT_MS) for slow/fast backends.
+  private readonly routeTimeoutMs: number;
+
   private constructor() {
     this.baseUrl = ENV.valetRouterUrl;
+    const parsed = Number(process.env.VALET_ROUTE_TIMEOUT_MS);
+    this.routeTimeoutMs = Number.isFinite(parsed) && parsed > 0 ? parsed : 60_000;
   }
 
   public static getInstance(): ValetRouterService {
@@ -93,7 +103,7 @@ export class ValetRouterService {
           execution_mode: request.executionMode ?? "scrapper",
           task_type: request.taskType ?? "chat",
         }),
-        signal: AbortSignal.timeout(5000),
+        signal: AbortSignal.timeout(this.routeTimeoutMs),
       });
       if (!res.ok) throw new Error(`Valet Router HTTP ${res.status}`);
       const data = await res.json() as {

@@ -2,6 +2,10 @@ import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 
 // LITHIC_API_KEY must be present at import time so ENV.lithicApiKey is truthy.
 process.env.LITHIC_API_KEY = process.env.LITHIC_API_KEY || "test_lithic_key";
+// In-suite Lithic mock: pin the API base so tests hit a fake host (never real
+// Lithic) and can assert the env-switch (LITHIC_API_BASE) resolves into the URL.
+// Captured at module load, so it must be set before the dynamic import below.
+process.env.LITHIC_API_BASE = "https://lithic.mock.test";
 
 vi.mock("../db.factory.js", () => {
   return {
@@ -107,5 +111,56 @@ describe("VirtualCardService.issueCard", () => {
     );
     expect(closeCall).toBeTruthy();
     expect(String((closeCall![1] as RequestInit).body)).toContain("CLOSED");
+  });
+});
+
+describe("VirtualCardService.listTransactions (in-suite Lithic mock)", () => {
+  // getDb stub whose ownership select resolves to `rows`.
+  const dbReturning = (rows: unknown[]) => ({
+    select: () => ({ from: () => ({ where: () => ({ limit: async () => rows }) }) }),
+  });
+
+  beforeEach(() => {
+    __resetCircuitBreakers();
+    vi.restoreAllMocks();
+  });
+  afterEach(() => vi.restoreAllMocks());
+
+  it("hits the env-configured LITHIC_API_BASE and maps the Lithic response", async () => {
+    vi.mocked(getDb).mockResolvedValue(dbReturning([{ token: "card_x" }]) as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      jsonResponse({
+        data: [
+          { token: "txn_1", amount: 1299, currency: "USD", status: "SETTLED", merchant: { descriptor: "OPENAI" }, created: "2026-06-30T00:00:00Z" },
+        ],
+      })
+    );
+
+    const svc = VirtualCardService.getInstance();
+    const txns = await svc.listTransactions("card_x", 1);
+
+    expect(txns).toEqual([
+      { token: "txn_1", amount: 1299, currency: "USD", status: "SETTLED", merchantDescriptor: "OPENAI", created: "2026-06-30T00:00:00Z" },
+    ]);
+    // Env-switch resolved into the request URL (never real Lithic).
+    const url = String(fetchSpy.mock.calls[0]?.[0]);
+    expect(url).toContain("https://lithic.mock.test/transactions?card_token=card_x");
+  });
+
+  it("returns [] and makes no external call when the card is not owned by the user", async () => {
+    vi.mocked(getDb).mockResolvedValue(dbReturning([]) as never);
+    const fetchSpy = vi.spyOn(globalThis, "fetch");
+    const svc = VirtualCardService.getInstance();
+    expect(await svc.listTransactions("card_not_mine", 1)).toEqual([]);
+    expect(fetchSpy).not.toHaveBeenCalled();
+  });
+
+  it("returns [] on a non-OK Lithic response (never throws to the caller)", async () => {
+    vi.mocked(getDb).mockResolvedValue(dbReturning([{ token: "card_x" }]) as never);
+    // 404 is a non-retryable client error, so resilientFetch returns it immediately
+    // (a 429/5xx would trip the backoff/retry path); the service maps any !ok → [].
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(jsonResponse({ error: "not_found" }, 404));
+    const svc = VirtualCardService.getInstance();
+    expect(await svc.listTransactions("card_x", 1)).toEqual([]);
   });
 });

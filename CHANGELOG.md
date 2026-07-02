@@ -2,6 +2,27 @@
 
 ## [Unreleased]
 
+### 2026-07-01 — Hybrid social publishing, neural-map cascade fix, ESP32 hardware verification, stream-crash fix, full router test coverage
+
+#### Added
+
+- **Hybrid social publishing.** `PublishingService` rebuilt to publish two ways: **native** — Bluesky, Mastodon, Discord, Telegram (one per-account secret: app password / access token / channel webhook / bot token; no developer app) — and **webhook → n8n** — X (Twitter), LinkedIn, Facebook, Instagram (n8n holds the managed OAuth, connected once inside n8n). New `WebhookPublisher`; `N8N_URL` defaults to `http://127.0.0.1:5678`, and a non-loopback `N8N_URL` is refused in **Sovereign** mode. **YouTube** is intentionally unsupported (no text/community-post API → returns a clear "not supported" error). Blueprint served at `/n8n/omnecor-social-publish.blueprint.json` (source in `client/public/n8n/`). See `docs/social-publishing-n8n.md`. In passing: fixed a `publishNow` IDOR and made `addAccount` idempotent per (user, platform).
+- **ESP32 hardware verification (2026-06-30).** `esp.compile` (arduino-cli) + `esp.flash` were driven through the real tRPC router against a physical **ESP32-D0WD-V3** on `/dev/ttyUSB0`: the merged image flashed at `0x0`, the board rebooted and BLE-advertised `OMNECOR_TEST_OK` (serial-confirmed).
+- **Real STT/TTS bridge tests.** `voiceBridges.test.ts` runs `voice.transcribe` (faster-whisper) and `voice.synthesize` (XTTS-v2) through the real router, with the ComfyUI-style auto-skip when the servers are absent.
+- **Full route-level router coverage.** Every namespace registered in `server/routers.ts` now has a dedicated route-level test. The suite grew to **1128 passing + 1 skipped (1129 total) across 103 files** (up from 412).
+
+#### Fixed
+
+- **Migration 0014 — neural-map cascade FKs.** Six child tables of `neural_maps` had NO-ACTION foreign keys in the actual DB (added via `ALTER … ADD COLUMN … REFERENCES`, which silently drops the ON DELETE action) despite `drizzle/schema.ts` declaring `onDelete: cascade` — so deleting a non-empty project/map threw an FK error and orphaned its child rows. `0014_fix_map_cascades.sql` rebuilds the six tables with real `ON DELETE cascade`, backed by an atomic app-level `db.batch` cascade in `neuralMaps.delete` (belt + suspenders).
+- **TD-047 — AI stream disconnect crashed the server.** A stream timeout/disconnect threw `ERR_INVALID_STATE: Controller is already closed`, taking down the whole process. Now guarded via `guardedEmit` across all three `chatStream` subscriptions (`aiProvider.chatStream` + `aiRouter.chatStream` ommesh/main), with 6 regression tests.
+- **`esptool_bridge.py` flash offset.** A hardcoded `0x1000` (bootloader slot) left any app image unbootable; offset + chip are now plumbed params (default `0x0`).
+- **Valet routing timeouts too short.** The 5s route timeout caused constant keyword fallback for local/"thinking" models; now configurable via `VALET_ROUTE_TIMEOUT_MS` (default 60000 ms) and the bridge's `VALET_OLLAMA_TIMEOUT` (default 120 s).
+- **`requirements.txt`** — added four deps surfaced by the live voice bridges: `python-multipart`, `torchaudio`, `transformers>=4.57,<5`, `torchcodec`.
+
+**Gates:** root `tsc` 0 · `vitest` **1128 passing / 1 skipped** (103 files; `comfyRouter` auto-skips without ComfyUI — 1129/0 with it running).
+
+---
+
 ### 2026-06-24 — Coverage tooling + first route-level tRPC tests; aiRouter IDOR fix
 
 #### Added
@@ -140,7 +161,7 @@
 #### Changed
 
 - **Consolidated all working/planning docs into a single local-only `Context/` folder.** Twelve scattered markdown files were merged into the ten thematic Context documents and then removed: `input-tracker.md` + `ui_audit_report.md` + `APK-input-tracker.md` → `UI-Registry.md`; `master-feature-plan.md` → `Project-Overview.md`; `jun14-review.md` (detailed findings) + `BUILD.md` + `APK-feature-plan.md` + `APK-todo.md` → `Build-Plan.md` (appendices A–D); `master-todo.md` + `FUNCTIONAL-AUDIT.md` + `Beta-Code-Sweep.md` → `Progress-Tracker.md` (archives A–C). No information was lost in the merge.
-- **`Context/` is now git-ignored** (consolidated working docs are local-only), alongside the agent/session files `CHANGELOG.md`, `CLAUDE.md`, `AGENTS.md`, `memory.md`, and `.claude/`.
+- **Consolidated working/planning docs now live in a single `Context/` folder**, alongside the agent/session files (`CLAUDE.md`, `AGENTS.md`, `memory.md`, `.claude/`). These remain in the repo as working docs — treat them as the local source of project context.
 
 ## [2.4.1-beta.1] - 2026-06-12 — Production-Readiness Sweep & Audit Log Retention
 

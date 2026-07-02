@@ -71,22 +71,36 @@ def main():
         help="Path to firmware binary"
     )
 
+    parser.add_argument(
+        "--flash_offset",
+        default="0x0",
+        help="Flash write offset. 0x0 for a full/merged image (arduino-cli "
+             "*.merged.bin), 0x10000 for a bare app image, 0x1000 for a bootloader."
+    )
+
+    parser.add_argument(
+        "--chip",
+        default="esp32",
+        help="Target chip (esp32, esp32s2, esp32s3, esp32c3, esp8266)"
+    )
+
     args = parser.parse_args()
 
-    # Construct esptool command
-    # Modify flash address if needed for your MCU/platform.
+    # Construct esptool command. The offset MUST match the image being flashed:
+    # a full merged image is 0x0-based, a bare app image lives at 0x10000. The
+    # previous hardcoded 0x1000 (bootloader slot) left the board unbootable.
     command = [
         sys.executable,
         "-m",
         "esptool",
         "--chip",
-        "esp32",
+        args.chip,
         "--port",
         args.port,
         "--baud",
         str(args.baud),
         "write_flash",
-        "0x1000",
+        args.flash_offset,
         args.firmware_path
     ]
 

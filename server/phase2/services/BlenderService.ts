@@ -305,6 +305,38 @@ export class BlenderBridge extends EventEmitter {
   }
 
   /**
+   * Export a scene to glTF/GLB using the bridge's native export_gltf action.
+   * Works without a .blend file — Blender's default scene (cube) is exported
+   * when blendFile is omitted. Faster than render() since no rendering occurs.
+   *
+   * @param outputPath - Output .glb file path (defaults to scene.glb in cwd)
+   * @param blendFile  - Optional .blend file to load before exporting
+   * @param label      - Optional job label
+   * @returns Job ID for tracking via ProcessManagerService
+   */
+  async exportScene(outputPath?: string, blendFile?: string, label?: string): Promise<string> {
+    const args: string[] = ["-b"];
+    if (blendFile) {
+      const resolvedBlend = path.resolve(blendFile);
+      await fs.access(resolvedBlend);
+      args.push(resolvedBlend);
+    }
+    args.push("-P", this.bridgeScript);
+    args.push("--");
+    args.push("--action", "export_gltf");
+    if (outputPath) {
+      args.push("--filepath", path.resolve(outputPath));
+    }
+    return this.processManager.spawn({
+      type: "blender",
+      command: this.blenderBin,
+      args,
+      label: label ?? `Blender GLB Export${blendFile ? `: ${path.basename(blendFile)}` : ": default scene"}`,
+      timeoutMs: 120_000,
+    });
+  }
+
+  /**
    * Export a .blend file to a specific format (e.g., GLB, FBX, OBJ).
    *
    * @param blendFile  - Path to the .blend file

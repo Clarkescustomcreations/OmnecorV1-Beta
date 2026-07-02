@@ -28,6 +28,7 @@ import { getWsInstance } from "../phase2/websocket/WebSocketServer.js";
 import { NotificationService } from "../_core/NotificationService.js";
 import { assertProviderAllowedInMode } from "../_core/sovereign.js";
 import { injectMapRagContext } from "../_core/ragContext.js";
+import { guardedEmit } from "../_core/streamEmit.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Sovereign-mode enforcement
@@ -349,28 +350,30 @@ ${transcript}
     .subscription(({ ctx, input }) => {
       if (input.providerId === "ommesh") {
         return observable<{ content: string; delta: string; done: boolean }>(emit => {
+          const g = guardedEmit(emit);
           const ws = getWsInstance();
           if (!ws || !ws.hasMobileWorker()) {
-            emit.error(new TRPCError({ code: "PRECONDITION_FAILED", message: "No phone worker available" }));
-            return () => {};
+            g.error(new TRPCError({ code: "PRECONDITION_FAILED", message: "No phone worker available" }));
+            return () => g.close();
           }
           const prompt = input.messages.map(m => `${m.role}: ${m.content}`).join("\n");
           ws.routeInferenceToMobile(prompt, {
             maxTokens: input.maxTokens,
             onToken: (token, done) => {
-              emit.next({ content: token, delta: token, done });
-              if (done) emit.complete();
+              g.next({ content: token, delta: token, done });
+              if (done) g.complete();
             },
           }).catch(err => {
-            emit.error(err);
+            g.error(err);
           });
-          return () => {};
+          return () => g.close();
         });
       }
 
       assertProviderAllowedInMode(input.providerId, ctx.user?.executionMode);
 
       return observable(emit => {
+        const g = guardedEmit(emit);
         const stream = ctx.services.aiProvider.streamChat({
           ...input,
           userId: ctx.user?.id,
@@ -378,19 +381,18 @@ ${transcript}
         });
         (async () => {
           for await (const chunk of stream) {
-            emit.next(chunk);
+            if (g.closed) break; // client disconnected — stop pulling tokens
+            g.next(chunk);
             if (chunk.done) {
-              emit.complete();
+              g.complete();
               break;
             }
           }
         })().catch(err => {
-          emit.error(err);
+          g.error(err);
         });
 
-        return () => {
-          // Cleanup logic if needed
-        };
+        return () => g.close();
       });
     }),
 

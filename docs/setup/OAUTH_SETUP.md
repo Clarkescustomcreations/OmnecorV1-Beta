@@ -2,6 +2,13 @@
 
 This guide explains how to set up OAuth for social media platforms in Agent Networking.
 
+> **Scope of this guide.** These OAuth apps connect accounts for **content discovery,
+> account linking, and analytics**. **Publishing** is separate and hybrid: X/LinkedIn/
+> Facebook/Instagram publish through a locally-run **n8n** webhook (credentials held in
+> n8n — you do *not* need Omnecor OAuth apps for those to post), Bluesky/Mastodon/
+> Discord/Telegram publish **natively** with a single per-account secret, and TikTok/
+> YouTube have no publish path. See **[Social publishing — hybrid (native + n8n)](../social-publishing-n8n.md)**.
+
 ## Overview
 
 Agent Networking supports OAuth 2.0 integration with major social media platforms for fast, secure setup without manual token entry.

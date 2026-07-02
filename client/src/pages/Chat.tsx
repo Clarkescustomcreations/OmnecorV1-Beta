@@ -11,6 +11,7 @@ import { MemoryArchiverPanel } from "@/components/chat/MemoryArchiverPanel";
 import { TerminalPanel } from "@/components/chat/TerminalPanel";
 import { EmbeddedTerminal } from "@/components/terminal/EmbeddedTerminal";
 import { HITLCommandApproval } from "@/components/terminal/HITLCommandApproval";
+import { extractTerminalCommand } from "@/lib/terminalDirective";
 import { vanillaTrpc, trpc } from "@/lib/trpc";
 import { IS_DEMO } from "@/lib/demo";
 import {
@@ -173,6 +174,10 @@ export function Chat() {
     () => localStorage.getItem("omnecor:systemPrompt") ?? ""
   );
   const [showSystemPrompt, setShowSystemPrompt] = useState(false);
+
+  // ── Live Terminal (declared early — buildFullSystemPrompt below reads it to
+  // decide whether to disclose the <terminal_command> directive to the model) ──
+  const [showCliTerminal, setShowCliTerminal] = useState(false);
 
   // ── Identity (for Honcho memory sync) ────────────────────────────────────
   const { data: me } = trpc.auth.me.useQuery();
@@ -699,8 +704,14 @@ export function Chat() {
     const fictionGuardrail = isFictionMode
       ? `<fiction_mode_guardrails>\nYou are operating in FICTION MODE. Your role is limited to creative storytelling, roleplay, fiction writing, song lyrics, and poetry.\n\nYou MUST:\n- Stay in character and maintain the current roleplay/fiction narrative at all times\n- Keep all creative work grounded in the active story/fiction world\n- Support the user's storytelling, worldbuilding, and creative writing goals\n\nYou MUST NOT (these capabilities are disabled for this session):\n- Execute terminal commands or access the local filesystem outside the neural fiction map\n- Perform agent networking, post to social media, or run autonomous agents\n- Access wallets, make financial transactions, or manage budgets\n- Spin up cloud compute jobs or perform cloud-side automation\n- Perform system administration tasks on the host machine\n\nWeb search IS permitted to support research for the story.\nFile saves are permitted only within the active neural fiction map.\n\nIf asked to perform any blocked action, gently redirect back to the creative fiction context.\n</fiction_mode_guardrails>`
       : "";
-    return [peerCardContext, systemPrompt.trim(), btwContext, identityContext, gotchaContext, honchoContext, neuralContext, personaContext, fictionGuardrail].filter(Boolean).join("\n\n");
-  }, [btwNotes, identityMap, gotchas, honchoFacts, neuralContextFiles, isFictionMode, fictionPersonaId, fictionPersonas, peerCardContext, systemPrompt]);
+    // Only disclose the terminal-execution directive once the user has actually
+    // opened the live terminal — keeps the capability opt-in and avoids spending
+    // tokens describing it in ordinary chats that never touch a shell.
+    const terminalCapabilityContext = !isFictionMode && showCliTerminal
+      ? `<terminal_capability>\nThe user has a live terminal (a real shell on their own machine) open in this session. If running a shell command would help complete the user's request, you may execute ONE by wrapping the exact command like this:\n<terminal_command>the exact shell command</terminal_command>\nThe user must approve every command before it runs (human-in-the-loop) — it will not run silently. Its output will be added back into this conversation as a system message. Issue at most one <terminal_command> per reply and wait for its output before issuing another. Do not use this tag for illustrative or example code that isn't meant to actually run.\n</terminal_capability>`
+      : "";
+    return [peerCardContext, systemPrompt.trim(), btwContext, identityContext, gotchaContext, honchoContext, neuralContext, personaContext, fictionGuardrail, terminalCapabilityContext].filter(Boolean).join("\n\n");
+  }, [btwNotes, identityMap, gotchas, honchoFacts, neuralContextFiles, isFictionMode, fictionPersonaId, fictionPersonas, peerCardContext, systemPrompt, showCliTerminal]);
 
   // ── Streaming core ───────────────────────────────────────────────────────
   const streamResponse = useCallback(
@@ -767,6 +778,26 @@ export function Chat() {
             if (chunk.done) {
               setIsStreaming(false);
               streamRef.current = null;
+
+              // AI-initiated terminal command directive — parsed only once the
+              // message is complete (never mid-stream, so a partial tag can't fire).
+              // Gated through EmbeddedTerminal's own HITL requestApproval() flow —
+              // this dispatch alone never executes anything.
+              const { command: terminalCommand, stripped: strippedAssistantContent } =
+                extractTerminalCommand(assistantContent);
+              if (terminalCommand) {
+                assistantContent = strippedAssistantContent;
+                setConversation(prev => ({
+                  ...prev,
+                  messages: prev.messages.map(m =>
+                    m.id === assistantId ? { ...m, content: strippedAssistantContent } : m
+                  ),
+                }));
+                window.dispatchEvent(new CustomEvent("omnecor:cli_command", {
+                  detail: { command: terminalCommand, cwd: activeMap?.rootDirectories[0] },
+                }));
+              }
+
               // Sync both sides of the exchange to Honcho (background, non-blocking)
               const sid = conversationRef.current.id;
               addHonchoMessage.mutate({ openId, sessionId: sid, role: "user", content: userMsg.content });
@@ -1263,7 +1294,6 @@ export function Chat() {
   const [previewCode, setPreviewCode] = useState<string>("");
   const [showMemoryArchiver, setShowMemoryArchiver] = useState(false);
   const [showTerminal, setShowTerminal] = useState(false);
-  const [showCliTerminal, setShowCliTerminal] = useState(false);
 
   // ── Terminal output → chat context bridge ────────────────────────────────
   const terminalOutputBuf = useRef<string[]>([]);
@@ -1729,6 +1759,7 @@ export function Chat() {
       <EmbeddedTerminal
         isOpen={showCliTerminal}
         onClose={() => setShowCliTerminal(false)}
+        onRequestOpen={() => setShowCliTerminal(true)}
         projectId={activeMap?.id ?? "default"}
       />
     )}

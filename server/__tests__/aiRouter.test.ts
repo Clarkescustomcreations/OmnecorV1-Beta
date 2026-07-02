@@ -32,6 +32,14 @@ vi.mock("../_core/NotificationService.js", () => ({
   NotificationService: { getInstance: () => ({ notify: notifyHolder.notify }) },
 }));
 
+// Map RAG read-side injection. Default impl is a passthrough (no ragMapId →
+// messages unchanged, matching the real helper's early return) so the other chat
+// tests are unaffected; the RAG test overrides it to return augmented context.
+const ragHolder = vi.hoisted(() => ({ injectMapRagContext: vi.fn() }));
+vi.mock("../_core/ragContext.js", () => ({
+  injectMapRagContext: ragHolder.injectMapRagContext,
+}));
+
 // Audit middleware runs on every protectedProcedure; stub it so nothing touches
 // the real file DB. `.log()` must return a promise — the middleware calls
 // `.catch()` on it.
@@ -117,6 +125,10 @@ beforeEach(() => {
   auditHolder.log.mockClear();
   notifyHolder.notify.mockClear();
   for (const fn of Object.values(dbHelpers)) fn.mockReset();
+  ragHolder.injectMapRagContext.mockReset();
+  ragHolder.injectMapRagContext.mockImplementation(
+    async ({ messages, systemPrompt }: { messages: unknown; systemPrompt?: unknown }) => ({ messages, systemPrompt })
+  );
 });
 
 describe("aiRouter.getProviders", () => {
@@ -186,6 +198,31 @@ describe("aiRouter.chat — Sovereign-mode provider gate", () => {
       executionMode: "scrapper",
     });
     expect(notifyHolder.notify).toHaveBeenCalledOnce();
+  });
+});
+
+describe("aiRouter.chat — map RAG injection", () => {
+  it("injects the active map's retrieved context and forwards it to the provider", async () => {
+    const augmented = [
+      { role: "system" as const, content: "[map knowledge] retrieved snippet" },
+      ...baseChat.messages,
+    ];
+    ragHolder.injectMapRagContext.mockResolvedValueOnce({
+      messages: augmented,
+      systemPrompt: "augmented-system",
+    });
+    const { caller: c, ai } = caller(makeUser("scrapper"), "answer");
+    await c.ai.chat({ ...baseChat, providerId: "openai", ragMapId: "map-1" });
+
+    // The active map + caller were threaded into the retrieval call…
+    expect(ragHolder.injectMapRagContext).toHaveBeenCalledWith(
+      expect.objectContaining({ mapId: "map-1", userId: 1 })
+    );
+    // …and the RAG-augmented messages/systemPrompt (not the raw input) reached the provider.
+    expect(ai.chat.mock.calls[0]?.[0]).toMatchObject({
+      messages: augmented,
+      systemPrompt: "augmented-system",
+    });
   });
 });
 

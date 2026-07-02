@@ -77,6 +77,9 @@ export const oauthRouter = router({
 
         return { authUrl, state };
       } catch (error) {
+        // Preserve an already-typed TRPCError (e.g. UNAUTHORIZED) instead of
+        // flattening every failure into BAD_REQUEST.
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: "BAD_REQUEST",
           message: `Failed to generate OAuth URL for ${input.platform}: ${error instanceof Error ? error.message : "Unknown error"}`,
@@ -158,6 +161,9 @@ export const oauthRouter = router({
           platform: input.platform,
         };
       } catch (error) {
+        // Preserve an already-typed TRPCError (UNAUTHORIZED / invalid-state
+        // BAD_REQUEST) rather than masking it as a 500.
+        if (error instanceof TRPCError) throw error;
         throw new TRPCError({
           code: "INTERNAL_SERVER_ERROR",
           message: `OAuth callback failed: ${error instanceof Error ? error.message : "Unknown error"}`,

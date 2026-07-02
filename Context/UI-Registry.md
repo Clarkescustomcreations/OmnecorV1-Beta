@@ -24,6 +24,63 @@ The `Status` column above records *what the handler is wired to*. The new **Veri
 
 ---
 
+## Session 28 (2026-06-30) — Hybrid Social Publishing Panels
+
+### Publishing connect panels (`AgentNetworking.tsx`)
+
+File: `client/src/pages/AgentNetworking.tsx`
+Last updated: 2026-06-30
+
+Two new sibling components in the Platforms tab — `WebhookPublishingPanel` (n8n
+webhook config + per-platform "Enable via n8n" toggles + blueprint download) and
+`NativeConnectPanel` (platform-pill selector + credential inputs). They share one
+container pattern, captured here as the **bordered inline panel** standard.
+
+| Property         | Class           |
+| ---------------- | --------------- |
+| Background       | none (transparent on card) |
+| Container panel  | `rounded-lg border p-4 space-y-3` |
+| Border           | `border` (default `border-border`) |
+| Border radius    | `rounded-lg` (panels + toggle tiles), `rounded-md` (pills, download link), `rounded` (inline `<code>`) |
+| Text — primary   | `text-sm font-medium` |
+| Text — secondary | `text-xs text-muted-foreground` |
+| Text — caption   | `text-[11px]` (labels/steps), `text-[10px]` (badges) |
+| Spacing          | panel `p-4`; internal `space-y-3` / `space-y-2`; grids `gap-2` / `gap-3`; pills `px-3 py-1.5` |
+| Hover state      | `hover:bg-bg-elevated` |
+| Selected state   | `border-primary bg-primary/10 text-primary` (active pill) |
+| Success state    | tile `border-accent-success/30 bg-accent-success/5`; badge `bg-accent-success/10 text-accent-success` |
+| Warning text     | `text-destructive` (sovereign-blocked notice) |
+| Input            | `h-8 text-xs` (+`font-mono` for the webhook path); `<Label>` `text-[11px]` |
+| Inline code      | `px-1.5 py-0.5 rounded bg-muted font-mono text-[11px] break-all` |
+| Icon sizes       | header `w-4 h-4 text-primary`; link `w-3.5 h-3.5`; badge `w-3 h-3` |
+| Shadow           | none |
+
+**Pattern notes:**
+- The **bordered inline panel** (`rounded-lg border p-4 space-y-3`) is the same shape
+  as the existing connected-account rows (`p-4 border rounded-lg`) — reuse it for any
+  in-card grouped section rather than nesting another `<Card>`.
+- Reuses the established state colors already in this file: `border-accent-success/30
+  bg-accent-success/5` for connected/enabled (matches the old OAuth-button connected
+  state) and `bg-accent-success/10 text-accent-success` for "connected" badges (matches
+  the mesh Federation panel). No new accent colors introduced.
+- Selectable chips/pills use `border-primary bg-primary/10 text-primary` when active —
+  the standard selected-token treatment; match this for any future segmented selector.
+- Captions intentionally step down `text-xs → text-[11px] → text-[10px]` for
+  description → label/step → badge. Keep that ladder for dense config panels.
+- Status badges are `<Badge variant="secondary">` (success) / `variant="outline">`
+  (neutral), never hardcoded color divs.
+
+**Interactive elements (connection status):**
+
+| Element | Type | Status | API / tRPC Call | Notes |
+|---|---|---|---|---|
+| Publish via n8n — Download blueprint | Link | **LOCAL** | — | `<a download>` to `/n8n/omnecor-social-publish.blueprint.json` (static asset). |
+| Publish via n8n — Webhook path / Save | Input + Button | **CONNECTED** | `platforms.setWebhookPath` (admin) | Persists `socialPublishWebhookPath` via SettingsService. |
+| Publish via n8n — endpoint status badges | Query-driven | **CONNECTED** | `platforms.getPublishingRouting` | Drives endpoint URL, loopback/air-gap badge, sovereign-blocked notice. |
+| Publish via n8n — Enable \<platform\> | Button | **CONNECTED** | `platforms.addAccount` | Creates sentinel `oauthToken:"n8n"` row; idempotent per (user,platform). |
+| Native connect — platform pills | Toggle | **LOCAL** | — | Selects active native platform; resets the field map. |
+| Native connect — Connect \<platform\> | Button | **CONNECTED** | `platforms.addAccount` | Maps per-platform fields → `oauthToken`/`accountMetadata`. |
+
 ## Session 27 (2026-06-28) — AI Response Loading Quotes
 
 ### Chat Loading Quote (`LoadingQuote.tsx`)
@@ -579,7 +636,7 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 - `node-pty` — native shell PTY spawning on the server
 
 **New server features:**
-- `WebSocketServer.ts` — `pty:spawn`, `pty:input`, `pty:resize`, `pty:kill` message handlers; `handlePtySpawn()` spawns real shell via node-pty; `killPtySession()` cleans up on disconnect; `chat:toTerminal` routes AI-initiated commands to PTY
+- `WebSocketServer.ts` — `pty:spawn`, `pty:input`, `pty:resize`, `pty:kill` message handlers (typed via `shared/types/terminal.types.ts`, imported by both client and server so the wire contract can't silently drift); `handlePtySpawn()` spawns real shell via node-pty; `killPtySession()` cleans up on disconnect. AI-initiated commands do **not** get a separate WS message type — Chat.tsx dispatches `omnecor:cli_command`, which EmbeddedTerminal gates through the same client-side `requestApproval()` HITL flow as manual typing before sending a normal `pty:input`. (The previous `chat:toTerminal` WS type bypassed HITL entirely and was never sent by any code path — removed.)
 
 **New stores:**
 - `client/src/lib/stores/commandAllowlistStore.ts` — Zustand+persist store; `requestApproval(cmd, cwd, projectId)` returns a Promise; allowlist entries keyed by normalised executable name; scopes: `once | project | global`
@@ -600,7 +657,7 @@ Ground-truth audit cross-checked all DEAD/PARTIAL entries against actual source 
 9. **HITLCommandApproval — "Deny" button**: `_resolvePending(null)` — blocks command, prints `[HITL] Command denied.` in terminal
 10. **HITLCommandApproval — Escape key handler**: same as Deny button
 11. **Chat.tsx — Terminal output → chat bridge**: listens for `omnecor:terminal_output` events, debounces 2 s, injects terminal output as `[system]` message into current conversation
-12. **Chat.tsx — `chat:toTerminal` WS messages**: AI-initiated commands routed through HITL approval before execution
+12. **Chat.tsx — `<terminal_command>` directive → `omnecor:cli_command` event**: once an assistant message finishes streaming, `extractTerminalCommand()` (`client/src/lib/terminalDirective.ts`) scans it for a `<terminal_command>` tag (only disclosed to the model via system prompt when the live terminal is open, non-fiction-mode only), strips the tag from the displayed/persisted message, and dispatches `omnecor:cli_command`; EmbeddedTerminal's listener runs it through `requestApproval()` — same HITL gate as manual typing — before writing to the PTY, auto-opening the terminal window via `onRequestOpen` if it wasn't already visible
 13. **commandAllowlistStore — `clearProjectEntries` / `clearAllEntries`**: management actions for the persistent allowlist
 
 **New CONNECTED inputs (+2):**

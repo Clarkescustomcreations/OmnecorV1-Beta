@@ -1,9 +1,16 @@
-import { protectedProcedure, router } from "../_core/trpc";
+import { protectedProcedure, adminProcedure, router } from "../_core/trpc";
 import { z } from "zod";
 import { getDb } from "../db.factory.js";
 import { platformAccounts } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
+import { ENV } from "../_core/env.js";
+import { getSetting, setSetting } from "../phase2/services/SettingsService.js";
+import {
+  SOCIAL_WEBHOOK_PATH_KEY,
+  DEFAULT_SOCIAL_WEBHOOK_PATH,
+  isLoopbackUrl,
+} from "../phase2/services/WebhookPublisher.js";
 
 /**
  * Columns that are safe to return to the client. The OAuth access/refresh
@@ -65,6 +72,30 @@ export const platformsRouter = router({
       const db = await getDb();
       if (!ctx.user) throw new TRPCError({ code: "UNAUTHORIZED" });
 
+      // Connect is idempotent per (user, platform): re-connecting refreshes the
+      // existing row (and reactivates it) rather than leaving an orphaned
+      // isActive:0 duplicate behind from a prior disconnect.
+      const [existing] = await db.select({ id: platformAccounts.id })
+        .from(platformAccounts)
+        .where(and(
+          eq(platformAccounts.userId, ctx.user.id),
+          eq(platformAccounts.platform, input.platform),
+        ))
+        .limit(1);
+
+      if (existing) {
+        await db.update(platformAccounts)
+          .set({
+            accountName: input.accountName,
+            oauthToken: input.oauthToken,
+            oauthRefreshToken: input.oauthRefreshToken,
+            accountMetadata: input.accountMetadata,
+            isActive: 1,
+          })
+          .where(eq(platformAccounts.id, existing.id));
+        return { success: true, accountId: existing.id };
+      }
+
       const [created] = await db.insert(platformAccounts).values({
         userId: ctx.user.id,
         platform: input.platform,
@@ -121,6 +152,41 @@ export const platformsRouter = router({
         ));
 
       return { success: true };
+    }),
+
+  /**
+   * Publishing routing — which platforms go through the n8n webhook (dev-app
+   * registration required) vs. publish natively, plus the live webhook config.
+   * Drives the Platforms tab so the UI renders the correct connect flow per
+   * platform and can warn when a sovereign install points n8n at a remote host.
+   */
+  getPublishingRouting: protectedProcedure.query(({ ctx }) => {
+    const webhookPath = getSetting(SOCIAL_WEBHOOK_PATH_KEY, DEFAULT_SOCIAL_WEBHOOK_PATH);
+    const n8nUrl = ENV.n8nUrl.replace(/\/$/, "");
+    const loopback = isLoopbackUrl(n8nUrl);
+    const sovereign = ctx.user?.executionMode === "sovereign";
+    return {
+      webhook: {
+        n8nUrl,
+        webhookPath,
+        webhookUrl: `${n8nUrl}/webhook/${webhookPath}`,
+        isLoopback: loopback,
+        /** True when this sovereign install would refuse webhook egress (remote n8n). */
+        sovereignBlocked: sovereign && !loopback,
+      },
+    };
+  }),
+
+  /**
+   * Set the n8n webhook path (the segment after `/webhook/`). Server-wide
+   * config, so owner/admin only. Empty restores the shipped-blueprint default.
+   */
+  setWebhookPath: adminProcedure
+    .input(z.object({ webhookPath: z.string().trim().max(200) }))
+    .mutation(({ input }) => {
+      const path = input.webhookPath.replace(/^\/+|\/+$/g, "") || DEFAULT_SOCIAL_WEBHOOK_PATH;
+      setSetting(SOCIAL_WEBHOOK_PATH_KEY, path);
+      return { success: true, webhookPath: path };
     }),
 });
 

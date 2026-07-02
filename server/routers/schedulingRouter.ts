@@ -152,10 +152,31 @@ export const schedulingRouter = router({
     }),
   publishNow: protectedProcedure
     .input(z.object({ postIds: z.array(z.number()) }))
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
+      const db = await getDb();
+
+      // Ownership gate — every requested post must belong to the caller
+      // (ownership flows through the connected platform account). Without this,
+      // any authenticated user could publish another user's posts by id.
+      if (input.postIds.length === 0) {
+        return { success: true, publishedCount: 0, rescheduledCount: 0, failedCount: 0, results: [] };
+      }
+      // Dedupe first so a repeated id can't (a) fail the ownership count below
+      // or (b) publish the same post twice.
+      const requestedIds = [...new Set(input.postIds)];
+      const owned = await db
+        .select({ id: scheduledPosts.id, ownerId: platformAccounts.userId })
+        .from(scheduledPosts)
+        .leftJoin(platformAccounts, eq(platformAccounts.id, scheduledPosts.platformAccountId))
+        .where(inArray(scheduledPosts.id, requestedIds));
+      const ownedIds = new Set(owned.filter((p) => p.ownerId === ctx.user.id).map((p) => p.id));
+      if (ownedIds.size !== requestedIds.length) {
+        throw new TRPCError({ code: "FORBIDDEN", message: "One or more posts do not belong to you" });
+      }
+
       // Actually publish to the connected platforms (X/LinkedIn/Facebook/IG),
       // writing real outcomes (published/failed + platformPostId/errorMessage).
-      const outcomes = await publishScheduledPostIds(input.postIds);
+      const outcomes = await publishScheduledPostIds(requestedIds);
       const published = outcomes.filter((o) => o.ok);
       const rescheduled = outcomes.filter((o) => !o.ok && o.rateLimited);
       const failed = outcomes.filter((o) => !o.ok && !o.rateLimited);

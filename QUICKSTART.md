@@ -8,7 +8,7 @@ Ensure you have the following installed:
 
 - **Git**
 - **Node.js (v22 or higher)**
-- **pnpm** (install with `npm install -g pnpm@10.34.1`)
+- **pnpm** (install with `npm install -g pnpm@11.8.0`)
 
 ## Quick Start Steps (5-10 Minutes)
 
@@ -62,7 +62,7 @@ Follow these steps to launch Omnecor and access its user interface:
 
 Once the application starts, you will see output in your terminal indicating the URL. Typically, Omnecor will be accessible at:
 
-```
+```text
 http://localhost:3000/
 ```
 

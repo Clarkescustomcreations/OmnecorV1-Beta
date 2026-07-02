@@ -1,60 +1,51 @@
 /**
- * PublishingService — posts content to real social platforms.
+ * PublishingService — posts content to real social platforms, split by how
+ * painful the platform is to set up:
  *
- * Replaces the previous DB-only shell (scheduling just flipped a status flag).
- * Each platform method makes the actual provider API call using the OAuth
- * token stored on the platformAccounts row, resolving any extra identifiers
- * (LinkedIn author URN, Facebook Page token/id, Instagram business id) at
- * publish time. On a 401 it transparently refreshes the token once.
+ *  • Webhook-routed (X/Twitter, LinkedIn, Facebook, Instagram) — the platforms
+ *    that require developer-app registration + review. These are published
+ *    through a self-hosted n8n workflow (see WebhookPublisher), so n8n holds the
+ *    credentials and Omnecor never touches their OAuth dev apps. (YouTube is not
+ *    included — it needs resumable video upload, handled by the media uploader,
+ *    not a text webhook post.)
+ *
+ *  • Native (Bluesky, Mastodon, Discord, Telegram) — registration-free
+ *    platforms reachable with a single authenticated request. These publish
+ *    directly from here, keeping the air-gap intact (no third party involved).
  *
  * Returns { platformPostId, url } on success and throws a descriptive error on
- * failure — callers persist that to scheduledPosts.errorMessage / status.
+ * failure — callers persist that to scheduledPosts.errorMessage / status. A
+ * RateLimitError signals a transient, self-resolving failure so the executor
+ * reschedules instead of marking the post failed.
  */
 import { createLogger } from "../../_core/logger.js";
-import { refreshOAuthToken } from "../../oauth/oauthClients.js";
+import { ENV } from "../../_core/env.js";
+import { getSetting } from "./SettingsService.js";
+import {
+  WebhookPublisher,
+  SOCIAL_WEBHOOK_PATH_KEY,
+  DEFAULT_SOCIAL_WEBHOOK_PATH,
+} from "./WebhookPublisher.js";
+import {
+  RateLimitError,
+  WEBHOOK_PLATFORMS,
+  NATIVE_PLATFORMS,
+  type PublishAccount,
+  type PublishInput,
+  type PublishResult,
+} from "./publishTypes.js";
+
+// Re-export shared types/sets so existing importers keep their import path.
+export {
+  RateLimitError,
+  WEBHOOK_PLATFORMS,
+  NATIVE_PLATFORMS,
+  type PublishAccount,
+  type PublishInput,
+  type PublishResult,
+};
 
 const log = createLogger("PublishingService");
-
-/**
- * Thrown when a platform rate-limits the request (HTTP 429, or a Graph API
- * rate-limit error code). Carries the number of seconds to wait before
- * retrying (parsed from `Retry-After` / `x-rate-limit-reset`, clamped to a sane
- * window) so the publish executor can reschedule rather than hard-fail — rate
- * limits are transient and self-resolving, unlike a 4xx auth/permission error.
- */
-export class RateLimitError extends Error {
-  constructor(
-    public readonly platform: string,
-    public readonly retryAfterSec: number,
-    message: string,
-  ) {
-    super(message);
-    this.name = "RateLimitError";
-  }
-}
-
-export interface PublishAccount {
-  id: number;
-  platform: string;
-  oauthToken: string;
-  oauthRefreshToken?: string | null;
-  accountMetadata?: unknown;
-}
-
-export interface PublishInput {
-  content: string;
-  /** Optional media URLs (required for Instagram, and for YouTube video upload). */
-  mediaUrls?: string[];
-  /** Optional title (used by YouTube). */
-  title?: string;
-}
-
-export interface PublishResult {
-  platformPostId: string;
-  url: string;
-  /** Updated token, when a refresh occurred — caller should persist it. */
-  refreshedToken?: { accessToken: string; refreshToken?: string; expiresInSec?: number };
-}
 
 type Json = Record<string, unknown>;
 
@@ -65,21 +56,29 @@ export class PublishingService {
     return PublishingService.instance;
   }
 
+  private readonly webhook = new WebhookPublisher();
+
   /** Publish to whichever platform the account belongs to. */
   async publish(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
     const platform = account.platform.toLowerCase();
+
+    if (WEBHOOK_PLATFORMS.has(platform)) {
+      return this.webhook.publish(platform, input, {
+        n8nUrl: ENV.n8nUrl,
+        webhookPath: getSetting(SOCIAL_WEBHOOK_PATH_KEY, DEFAULT_SOCIAL_WEBHOOK_PATH),
+        sovereign: input.sovereign === true,
+      });
+    }
+
     switch (platform) {
-      case "twitter":
-      case "x":
-        return this.publishTwitter(account, input);
-      case "linkedin":
-        return this.publishLinkedIn(account, input);
-      case "facebook":
-        return this.publishFacebook(account, input);
-      case "instagram":
-        return this.publishInstagram(account, input);
-      case "youtube":
-        return this.publishYouTube(account, input);
+      case "bluesky":
+        return this.publishBluesky(account, input);
+      case "mastodon":
+        return this.publishMastodon(account, input);
+      case "discord":
+        return this.publishDiscord(account, input);
+      case "telegram":
+        return this.publishTelegram(account, input);
       default:
         throw new Error(`Publishing not supported for platform "${account.platform}"`);
     }
@@ -87,46 +86,14 @@ export class PublishingService {
 
   // ── Helpers ────────────────────────────────────────────────────────────────
 
-  /**
-   * Run a request with the account's token; on 401, refresh once (if a refresh
-   * token exists) and retry. Returns the parsed JSON and, when refreshed, the
-   * new token so the caller can persist it.
-   */
-  private async withAuth(
-    account: PublishAccount,
-    run: (token: string) => Promise<Response>,
-  ): Promise<{ res: Response; refreshed?: PublishResult["refreshedToken"] }> {
-    let res = await run(account.oauthToken);
-    if (res.status !== 401 || !account.oauthRefreshToken) return { res };
-
-    log.info(`Token expired for ${account.platform}, refreshing`);
-    const refreshed = await refreshOAuthToken(account.platform, account.oauthRefreshToken);
-    if (!refreshed.access_token) return { res };
-    res = await run(refreshed.access_token);
-    return {
-      res,
-      refreshed: {
-        accessToken: refreshed.access_token,
-        refreshToken: refreshed.refresh_token,
-        expiresInSec: refreshed.expires_in,
-      },
-    };
-  }
-
   private async ensureOk(res: Response, platform: string): Promise<Json> {
     const text = await res.text();
     let body: Json = {};
     try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
     if (!res.ok) {
       const detail = JSON.stringify(body).slice(0, 500);
-      // Treat HTTP 429 — and Meta Graph API rate-limit error codes (4 = app
-      // rate limit, 17 = user rate limit, 32 = page rate limit, 613 = custom
-      // rate limit), which Graph returns as HTTP 400 — as a transient rate
-      // limit so the executor reschedules instead of marking the post failed.
-      const graphCode = ((body.error as Json | undefined)?.code);
-      const isGraphRateLimit = typeof graphCode === "number" && [4, 17, 32, 613].includes(graphCode);
-      if (res.status === 429 || isGraphRateLimit) {
-        throw new RateLimitError(platform, this.parseRetryAfter(res), `${platform} API rate limited (${res.status}): ${detail}`);
+      if (res.status === 429) {
+        throw new RateLimitError(platform, this.parseRetryAfter(res), `${platform} API rate limited (429): ${detail}`);
       }
       throw new Error(`${platform} API ${res.status}: ${detail}`);
     }
@@ -135,9 +102,9 @@ export class PublishingService {
 
   /**
    * Seconds to wait before retrying a rate-limited request. Honors `Retry-After`
-   * (delta-seconds or an HTTP date), then Twitter's `x-rate-limit-reset` (epoch
-   * seconds), defaulting to 15 min. Clamped to [30 s, 6 h] so a bogus header
-   * can't park a post for days or hammer the API instantly.
+   * (delta-seconds or an HTTP date), then an `x-rate-limit-reset` epoch header,
+   * defaulting to 15 min. Clamped to [30 s, 6 h] so a bogus header can't park a
+   * post for days or hammer the API instantly.
    */
   private parseRetryAfter(res: Response): number {
     const DEFAULT_SEC = 15 * 60;
@@ -151,7 +118,7 @@ export class PublishingService {
       if (Number.isFinite(asDate)) return clamp((asDate - Date.now()) / 1000);
     }
 
-    const reset = res.headers.get("x-rate-limit-reset"); // Twitter v2 — epoch seconds
+    const reset = res.headers.get("x-rate-limit-reset"); // epoch seconds
     if (reset) {
       const epoch = Number(reset);
       if (Number.isFinite(epoch)) return clamp(epoch - Date.now() / 1000);
@@ -160,152 +127,139 @@ export class PublishingService {
     return DEFAULT_SEC;
   }
 
-  // ── X / Twitter ──────────────────────────────────────────────────────────
-  // POST https://api.twitter.com/2/tweets  { text }
-  private async publishTwitter(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
-    const { res, refreshed } = await this.withAuth(account, (token) =>
-      fetch("https://api.twitter.com/2/tweets", {
-        method: "POST",
-        headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
-        body: JSON.stringify({ text: input.content }),
-      }),
-    );
-    const body = await this.ensureOk(res, "Twitter");
-    const id = (body.data as Json | undefined)?.id as string | undefined;
-    if (!id) throw new Error("Twitter: no tweet id returned");
-    return { platformPostId: id, url: `https://x.com/i/web/status/${id}`, refreshedToken: refreshed };
+  private meta(account: PublishAccount): Json {
+    return (account.accountMetadata ?? {}) as Json;
   }
 
-  // ── LinkedIn ───────────────────────────────────────────────────────────────
-  // Resolve author urn via /v2/me, then POST /v2/ugcPosts (UGC share).
-  private async publishLinkedIn(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
-    // Resolve the member id → author URN.
-    const meRes = await fetch("https://api.linkedin.com/v2/me", {
-      headers: { Authorization: `Bearer ${account.oauthToken}` },
-    });
-    const me = await this.ensureOk(meRes, "LinkedIn(/me)");
-    const personId = me.id as string | undefined;
-    if (!personId) throw new Error("LinkedIn: could not resolve member id");
-    const authorUrn = `urn:li:person:${personId}`;
+  // ── Bluesky (AT Protocol) ──────────────────────────────────────────────────
+  // Auth: create a session from identifier + app password, then create a post
+  // record. oauthToken holds the app password; metadata holds { identifier, service }.
+  private async publishBluesky(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
+    const meta = this.meta(account);
+    const identifier = meta.identifier as string | undefined;
+    if (!identifier) throw new Error("Bluesky: account identifier (handle/email) is required in account metadata.");
+    const service = ((meta.service as string | undefined) ?? "https://bsky.social").replace(/\/$/, "");
 
-    const payload = {
-      author: authorUrn,
-      lifecycleState: "PUBLISHED",
-      specificContent: {
-        "com.linkedin.ugc.ShareContent": {
-          shareCommentary: { text: input.content },
-          shareMediaCategory: "NONE",
-        },
-      },
-      visibility: { "com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC" },
-    };
-
-    const { res, refreshed } = await this.withAuth(account, (token) =>
-      fetch("https://api.linkedin.com/v2/ugcPosts", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "application/json",
-          "X-Restli-Protocol-Version": "2.0.0",
-        },
-        body: JSON.stringify(payload),
-      }),
-    );
-    const body = await this.ensureOk(res, "LinkedIn");
-    const id = (body.id as string | undefined) ?? (res.headers.get("x-restli-id") ?? undefined);
-    if (!id) throw new Error("LinkedIn: no post id returned");
-    return { platformPostId: id, url: `https://www.linkedin.com/feed/update/${id}`, refreshedToken: refreshed };
-  }
-
-  // ── Facebook Page ────────────────────────────────────────────────────────
-  // Resolve a managed Page (token + id) via /me/accounts, then POST /{page}/feed.
-  private async publishFacebook(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
-    const page = await this.resolveFacebookPage(account);
-    const params = new URLSearchParams({ message: input.content, access_token: page.accessToken });
-    const res = await fetch(`https://graph.facebook.com/v18.0/${page.id}/feed`, {
+    const sessionRes = await fetch(`${service}/xrpc/com.atproto.server.createSession`, {
       method: "POST",
-      body: params,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ identifier, password: account.oauthToken }),
     });
-    const body = await this.ensureOk(res, "Facebook");
+    const session = await this.ensureOk(sessionRes, "Bluesky(session)");
+    const accessJwt = session.accessJwt as string | undefined;
+    const did = session.did as string | undefined;
+    if (!accessJwt || !did) throw new Error("Bluesky: authentication failed (no session token returned).");
+
+    const postRes = await fetch(`${service}/xrpc/com.atproto.repo.createRecord`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${accessJwt}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        repo: did,
+        collection: "app.bsky.feed.post",
+        record: { $type: "app.bsky.feed.post", text: input.content, createdAt: new Date().toISOString() },
+      }),
+    });
+    const body = await this.ensureOk(postRes, "Bluesky");
+    const uri = body.uri as string | undefined;
+    if (!uri) throw new Error("Bluesky: no post uri returned.");
+    const rkey = uri.split("/").pop() ?? "";
+    return { platformPostId: uri, url: `https://bsky.app/profile/${identifier}/post/${rkey}` };
+  }
+
+  // ── Mastodon ───────────────────────────────────────────────────────────────
+  // oauthToken = access token; metadata.instanceUrl = the home instance.
+  private async publishMastodon(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
+    const meta = this.meta(account);
+    const instance = (meta.instanceUrl as string | undefined)?.replace(/\/$/, "");
+    if (!instance) throw new Error("Mastodon: instanceUrl is required in account metadata (e.g. https://mastodon.social).");
+
+    const res = await fetch(`${instance}/api/v1/statuses`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${account.oauthToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ status: input.content }),
+    });
+    const body = await this.ensureOk(res, "Mastodon");
     const id = body.id as string | undefined;
-    if (!id) throw new Error("Facebook: no post id returned");
-    return { platformPostId: id, url: `https://www.facebook.com/${id}` };
+    if (!id) throw new Error("Mastodon: no status id returned.");
+    const url = (body.url as string | undefined) ?? `${instance}/@me/${id}`;
+    return { platformPostId: id, url };
   }
 
-  private async resolveFacebookPage(account: PublishAccount): Promise<{ id: string; accessToken: string }> {
-    // Prefer a page pinned in account metadata; otherwise use the first managed page.
-    const meta = (account.accountMetadata ?? {}) as Json;
-    const res = await fetch(
-      `https://graph.facebook.com/v18.0/me/accounts?fields=id,name,access_token&access_token=${encodeURIComponent(account.oauthToken)}`,
-    );
-    const body = await this.ensureOk(res, "Facebook(/me/accounts)");
-    const pages = (body.data as Array<Json> | undefined) ?? [];
-    if (pages.length === 0) {
-      throw new Error("Facebook: no managed Pages found for this account (a Page is required to publish).");
+  // ── Discord (incoming webhook) ─────────────────────────────────────────────
+  // oauthToken = the channel's incoming webhook URL. `?wait=true` makes Discord
+  // return the created message so we can record its id.
+  private async publishDiscord(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
+    const webhookUrl = account.oauthToken;
+    if (!/^https:\/\/discord(app)?\.com\/api\/webhooks\//.test(webhookUrl)) {
+      throw new Error("Discord: a channel webhook URL (https://discord.com/api/webhooks/…) is required.");
     }
-    const pinnedId = meta.pageId as string | undefined;
-    const page = (pinnedId ? pages.find((p) => p.id === pinnedId) : undefined) ?? pages[0];
-    return { id: page.id as string, accessToken: page.access_token as string };
-  }
-
-  // ── Instagram (requires media; text-only is not supported by the API) ──────
-  private async publishInstagram(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
-    const imageUrl = input.mediaUrls?.[0];
-    if (!imageUrl) {
-      throw new Error("Instagram requires an image/video URL — the Graph API does not support text-only posts.");
-    }
-    const igUserId = await this.resolveInstagramUserId(account);
-    // 1) Create a media container.
-    const createParams = new URLSearchParams({
-      image_url: imageUrl,
-      caption: input.content,
-      access_token: account.oauthToken,
-    });
-    const createRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media`, {
+    const sep = webhookUrl.includes("?") ? "&" : "?";
+    const res = await fetch(`${webhookUrl}${sep}wait=true`, {
       method: "POST",
-      body: createParams,
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: input.content }),
     });
-    const created = await this.ensureOk(createRes, "Instagram(create)");
-    const creationId = created.id as string | undefined;
-    if (!creationId) throw new Error("Instagram: no creation id returned");
-    // 2) Publish the container.
-    const pubParams = new URLSearchParams({ creation_id: creationId, access_token: account.oauthToken });
-    const pubRes = await fetch(`https://graph.facebook.com/v18.0/${igUserId}/media_publish`, {
-      method: "POST",
-      body: pubParams,
-    });
-    const published = await this.ensureOk(pubRes, "Instagram(publish)");
-    const id = published.id as string | undefined;
-    if (!id) throw new Error("Instagram: no media id returned");
-    return { platformPostId: id, url: `https://www.instagram.com/p/${id}` };
+    const body = await this.ensureOk(res, "Discord");
+    const id = body.id as string | undefined;
+    const channelId = body.channel_id as string | undefined;
+    const guildId = body.guild_id as string | undefined;
+    if (!id) throw new Error("Discord: no message id returned (was ?wait=true honored?).");
+    // A valid Discord jump link is /channels/{guild}/{channel}/{message}. A
+    // webhook execute response often omits guild_id, and a 2-segment link 404s,
+    // so only build the URL when both ids are present — otherwise leave it empty
+    // (platformPostId is authoritative).
+    const url = guildId && channelId ? `https://discord.com/channels/${guildId}/${channelId}/${id}` : "";
+    return { platformPostId: id, url };
   }
 
-  private async resolveInstagramUserId(account: PublishAccount): Promise<string> {
-    const meta = (account.accountMetadata ?? {}) as Json;
-    if (meta.instagramUserId) return meta.instagramUserId as string;
-    // IG business account is attached to a Facebook Page.
-    const page = await this.resolveFacebookPage(account);
-    const res = await fetch(
-      `https://graph.facebook.com/v18.0/${page.id}?fields=instagram_business_account&access_token=${encodeURIComponent(page.accessToken)}`,
-    );
-    const body = await this.ensureOk(res, "Instagram(resolve)");
-    const ig = (body.instagram_business_account as Json | undefined)?.id as string | undefined;
-    if (!ig) throw new Error("Instagram: no business account linked to the connected Facebook Page.");
-    return ig;
-  }
-
-  // ── YouTube (community/text posts are not exposed by the Data API) ─────────
-  private async publishYouTube(_account: PublishAccount, input: PublishInput): Promise<PublishResult> {
-    const hasVideo = input.mediaUrls?.some((u) => /\.(mp4|mov|webm|mkv|avi)$/i.test(u));
-    if (!hasVideo) {
-      throw new Error(
-        "YouTube publishing requires a video file — the Data API does not support text-only community posts. " +
-        "Attach a video to publish to YouTube.",
-      );
+  // ── Telegram (Bot API) ─────────────────────────────────────────────────────
+  // oauthToken = bot token; metadata.chatId = target chat/channel (@name or id).
+  // Returns 200 with { ok:false } on error; 429 carries parameters.retry_after.
+  private async publishTelegram(account: PublishAccount, input: PublishInput): Promise<PublishResult> {
+    const meta = this.meta(account);
+    const chatId = meta.chatId as string | number | undefined;
+    if (chatId === undefined || chatId === "") {
+      throw new Error("Telegram: chatId is required in account metadata (@channel or numeric id).");
     }
-    // Video upload is a resumable, multi-step flow handled by the dedicated
-    // YouTube uploader; routing here keeps the contract explicit rather than
-    // silently succeeding.
-    throw new Error("YouTube video upload is handled by the media uploader; text scheduling to YouTube is not applicable.");
+    const image = input.mediaUrls?.[0];
+    const method = image ? "sendPhoto" : "sendMessage";
+    const payload = image
+      ? { chat_id: chatId, photo: image, caption: input.content }
+      : { chat_id: chatId, text: input.content };
+
+    const res = await fetch(`https://api.telegram.org/bot${account.oauthToken}/${method}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+    });
+    const text = await res.text();
+    let body: Json = {};
+    try { body = text ? JSON.parse(text) : {}; } catch { body = { raw: text }; }
+
+    if (body.ok !== true) {
+      const retryAfter = ((body.parameters as Json | undefined)?.retry_after) as number | undefined;
+      const desc = (body.description as string | undefined) ?? `HTTP ${res.status}`;
+      if (res.status === 429 || (retryAfter && retryAfter > 0)) {
+        throw new RateLimitError("Telegram", Math.min(6 * 60 * 60, Math.max(30, Math.round(retryAfter ?? 900))), `Telegram rate limited: ${desc}`);
+      }
+      throw new Error(`Telegram API: ${desc}`);
+    }
+
+    const result = (body.result ?? {}) as Json;
+    const messageId = result.message_id;
+    if (messageId === undefined) throw new Error("Telegram: no message_id returned.");
+    // Public message link: @username channels → t.me/<name>/<id>; supergroups/
+    // channels with a -100… numeric id → t.me/c/<internal>/<id>; private chats
+    // have no public link (leave url empty — platformPostId is authoritative).
+    const username = ((result.chat as Json | undefined)?.username) as string | undefined;
+    let url = "";
+    if (username) {
+      url = `https://t.me/${username}/${messageId}`;
+    } else {
+      const supergroup = String(chatId).match(/^-100(\d+)$/);
+      if (supergroup) url = `https://t.me/c/${supergroup[1]}/${messageId}`;
+    }
+    log.info("Published to Telegram", { messageId });
+    return { platformPostId: String(messageId), url };
   }
 }

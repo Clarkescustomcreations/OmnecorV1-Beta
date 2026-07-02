@@ -38,7 +38,19 @@ export class CardOperationError extends Error {
   }
 }
 
-const LITHIC_API_BASE = "https://api.lithic.com/v1";
+// Base URL is env-switchable so the same code path can run against Lithic's
+// sandbox (real card issuance + transaction simulation, no money) or a local
+// Lithic mock server, without touching production. Defaults to production —
+// set LITHIC_ENVIRONMENT=sandbox, or point LITHIC_API_BASE at any host (e.g.
+// the `./scripts/mock` server) to test the full VCC lifecycle non-billably.
+// Note: use `||`, not `??`, on the trimmed override — an empty/whitespace-only
+// LITHIC_API_BASE (a blank line in .env/compose) must fall through to the
+// sandbox/production default rather than collapse the base URL to "".
+const LITHIC_API_BASE =
+  process.env.LITHIC_API_BASE?.replace(/\/+$/, "").trim() ||
+  (process.env.LITHIC_ENVIRONMENT === "sandbox"
+    ? "https://sandbox.lithic.com/v1"
+    : "https://api.lithic.com/v1");
 const ALGORITHM = "aes-256-gcm" as const;
 const IV_LENGTH = 16;
 

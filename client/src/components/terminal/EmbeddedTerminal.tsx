@@ -2,15 +2,19 @@
  * EmbeddedTerminal
  *
  * A live in-browser terminal powered by xterm.js + node-pty on the server.
- * Communication is over the existing /ws WebSocket using the pty:* protocol.
+ * Communication is over the existing /ws WebSocket using the pty:* protocol
+ * defined in shared/types/terminal.types.ts (imported by both this component
+ * and WebSocketServer.ts so the wire contract can't silently drift apart).
  *
  * Features:
  * - Shell selector (bash, zsh, sh, python3, node)
  * - HITL command approval: pressing Enter intercepts the buffer, requests
  *   approval, then either sends to PTY or prints "[Denied]"
- * - Bidirectional chat bridge: the chat can send "chat:toTerminal" WS messages
- *   that are written directly into the PTY; terminal output fires a
- *   "terminal:output" CustomEvent so the chat can capture context
+ * - Bidirectional chat bridge: Chat.tsx dispatches an "omnecor:cli_command"
+ *   CustomEvent when the AI's response contains a <terminal_command> directive;
+ *   this component gates it through the same requestApproval() HITL flow as
+ *   manual typing, then writes it into the PTY. Terminal output fires an
+ *   "omnecor:terminal_output" CustomEvent so the chat can capture context.
  */
 
 import { useEffect, useRef, useState, useCallback } from "react";
@@ -23,32 +27,34 @@ import { useCommandAllowlistStore } from "@/lib/stores/commandAllowlistStore";
 import { cn } from "@/lib/utils";
 import { Loader2, RefreshCw, Terminal } from "lucide-react";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
+import type { PtyClientMessage, PtyServerMessage } from "@shared/types/terminal.types";
 
 // ── Types matching the server's WS protocol ────────────────────────────────
 
-type ClientMsg =
-  | { type: "pty:spawn"; shell: string; cwd?: string; cols: number; rows: number }
-  | { type: "pty:input"; data: string }
-  | { type: "pty:resize"; cols: number; rows: number }
-  | { type: "pty:kill" };
+type ClientMsg = PtyClientMessage;
 
 type ServerMsg =
-  | { type: "pty:ready"; sessionId: string }
-  | { type: "pty:output"; data: string }
-  | { type: "pty:exit"; code: number }
-  | { type: "chat:toTerminal"; command: string; cwd?: string; projectId?: string }
-  | { type: string; [key: string]: unknown };
+  | PtyServerMessage
+  | { type: "error"; data?: { message: string } }
+  | { type: string; data?: unknown };
 
 const SHELLS = ["bash", "zsh", "sh", "fish", "python3", "node"] as const;
 type Shell = (typeof SHELLS)[number];
+
+interface AiCliCommandDetail {
+  command: string;
+  cwd?: string;
+}
 
 interface EmbeddedTerminalProps {
   isOpen: boolean;
   onClose: () => void;
   projectId?: string;
+  /** Called when an AI-initiated command needs the terminal window visible/spawned. */
+  onRequestOpen?: () => void;
 }
 
-export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTerminalProps) {
+export function EmbeddedTerminal({ isOpen, onClose, projectId, onRequestOpen }: EmbeddedTerminalProps) {
   const termRef = useRef<HTMLDivElement>(null);
   const xtermRef = useRef<XTerm | null>(null);
   const fitRef = useRef<FitAddon | null>(null);
@@ -57,6 +63,7 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
   const [shell, setShell] = useState<Shell>("bash");
   const [status, setStatus] = useState<"idle" | "connecting" | "ready" | "exited" | "error">("idle");
   const inputBufRef = useRef(""); // accumulates typed chars for HITL intercept
+  const pendingAiCommandRef = useRef<string | null>(null); // AI command queued until the PTY session is ready
 
   const { activeMap } = useNeuralMap();
   const { requestApproval } = useCommandAllowlistStore();
@@ -120,7 +127,7 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
         if (inputBufRef.current.length > 0) {
           inputBufRef.current = inputBufRef.current.slice(0, -1);
         }
-        send(ws, { type: "pty:input", data });
+        send(ws, { type: "pty:input", data: { input: data } });
         return;
       }
 
@@ -130,7 +137,7 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
         inputBufRef.current = "";
 
         if (!cmd) {
-          send(ws, { type: "pty:input", data });
+          send(ws, { type: "pty:input", data: { input: data } });
           return;
         }
 
@@ -141,12 +148,12 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
           // Denied — print feedback, don't send to PTY
           term.write("\r\n\x1b[31m[HITL] Command denied.\x1b[0m\r\n");
           // Re-print the prompt character by sending a blank line followed by Ctrl-U (clear line)
-          send(ws, { type: "pty:input", data: "\x15" }); // Ctrl-U: clear line
+          send(ws, { type: "pty:input", data: { input: "\x15" } }); // Ctrl-U: clear line
           return;
         }
 
         // Approved — forward Enter
-        send(ws, { type: "pty:input", data });
+        send(ws, { type: "pty:input", data: { input: data } });
         return;
       }
 
@@ -160,7 +167,7 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
         inputBufRef.current = "";
       }
 
-      send(ws, { type: "pty:input", data });
+      send(ws, { type: "pty:input", data: { input: data } });
     });
 
     return term;
@@ -186,7 +193,7 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
         if (!term || !fitRef.current) return;
         const { cols, rows } = term;
         const cwd = activeMap?.rootDirectories[0] ?? undefined;
-        send(ws, { type: "pty:spawn", shell: selectedShell, cwd, cols, rows });
+        send(ws, { type: "pty:spawn", data: { shell: selectedShell, cwd, cols, rows } });
       };
 
       ws.onmessage = (ev) => {
@@ -201,25 +208,28 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
           setStatus("ready");
           term?.write("\x1b[2J\x1b[H"); // clear
           term?.write(`\x1b[32m● Session started (${selectedShell})\x1b[0m\r\n`);
+          // Flush an AI-initiated command that was approved before the session finished spawning
+          if (pendingAiCommandRef.current) {
+            const cmd = pendingAiCommandRef.current;
+            pendingAiCommandRef.current = null;
+            send(ws, { type: "pty:input", data: { input: cmd + "\r" } });
+          }
         } else if (msg.type === "pty:output") {
-          const out = msg.data as string;
+          const out = (msg.data as { output?: string } | undefined)?.output ?? "";
+          if (!out) return;
           term?.write(out);
           // Fire CustomEvent so chat can observe terminal output
           window.dispatchEvent(new CustomEvent("omnecor:terminal_output", { detail: out }));
         } else if (msg.type === "pty:exit") {
           sessionReadyRef.current = false;
           setStatus("exited");
-          term?.write(`\r\n\x1b[33m● Process exited (code ${msg.code as number})\x1b[0m\r\n`);
-        } else if (msg.type === "chat:toTerminal") {
-          // AI-initiated command — run through HITL approval
-          const { command, cwd, projectId: pid } = msg as { type: string; command: string; cwd?: string; projectId?: string };
-          if (!command) return;
-          (async () => {
-            const scope = await requestApproval(command, cwd, pid ?? projectId);
-            if (scope !== null && wsRef.current?.readyState === WebSocket.OPEN) {
-              send(wsRef.current, { type: "pty:input", data: command + "\r" });
-            }
-          })();
+          const { exitCode, signal } = (msg.data as { exitCode?: number; signal?: number } | undefined) ?? {};
+          const reason = signal ? `signal ${signal}` : `code ${exitCode ?? "unknown"}`;
+          term?.write(`\r\n\x1b[33m● Process exited (${reason})\x1b[0m\r\n`);
+        } else if (msg.type === "error") {
+          setStatus("error");
+          const message = (msg.data as { message?: string } | undefined)?.message ?? "Unknown terminal error";
+          term?.write(`\r\n\x1b[31m[Error] ${message}\x1b[0m\r\n`);
         }
       };
 
@@ -241,7 +251,7 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
       const term = xtermRef.current;
       const ws = wsRef.current;
       if (term && ws?.readyState === WebSocket.OPEN && sessionReadyRef.current) {
-        send(ws, { type: "pty:resize", cols: term.cols, rows: term.rows });
+        send(ws, { type: "pty:resize", data: { cols: term.cols, rows: term.rows } });
       }
     });
     if (termRef.current) obs.observe(termRef.current);
@@ -260,6 +270,35 @@ export function EmbeddedTerminal({ isOpen, onClose, projectId }: EmbeddedTermina
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isOpen]);
+
+  // ── AI-initiated command bridge ─────────────────────────────────────────
+  // Chat.tsx dispatches this once an assistant message finishes streaming and
+  // contains a <terminal_command> directive. Gated through the exact same
+  // requestApproval() HITL flow as manual typing before anything reaches the
+  // PTY — an AI-initiated command is never trusted more than a typed one.
+  useEffect(() => {
+    const handler = async (e: Event) => {
+      const detail = (e as CustomEvent<AiCliCommandDetail>).detail;
+      const command = detail?.command?.trim();
+      if (!command) return;
+
+      const cwd = detail.cwd ?? activeMap?.rootDirectories[0];
+      const scope = await requestApproval(command, cwd, projectId);
+      if (scope === null) return; // denied — nothing further to do
+
+      const ws = wsRef.current;
+      if (ws?.readyState === WebSocket.OPEN && sessionReadyRef.current) {
+        send(ws, { type: "pty:input", data: { input: command + "\r" } });
+      } else {
+        // No live PTY session yet — queue it and ask the parent to open/spawn one;
+        // pty:ready flushes pendingAiCommandRef once the session comes up.
+        pendingAiCommandRef.current = command;
+        onRequestOpen?.();
+      }
+    };
+    window.addEventListener("omnecor:cli_command", handler);
+    return () => window.removeEventListener("omnecor:cli_command", handler);
+  }, [requestApproval, projectId, activeMap, onRequestOpen]);
 
   // ── Cleanup on unmount ─────────────────────────────────────────────────
 

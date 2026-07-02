@@ -42,6 +42,10 @@ export interface OmnecorSettings {
   dropboxClientSecret?: string;
   oneDriveClientId?: string;
   oneDriveClientSecret?: string;
+  // n8n Webhook node path used to publish the registration-heavy social
+  // platforms (X/LinkedIn/Facebook/Instagram). Defaults to
+  // "omnecor-social-publish" — the path baked into the shipped n8n blueprint.
+  socialPublishWebhookPath?: string;
   [key: string]: any;
 }
 

@@ -29,6 +29,19 @@ graph LR
 | Facebook | Pages, posts | Text, images, links |
 | YouTube | Upload, channel | Videos, community posts |
 
+> **Publishing vs. connecting (updated 2026-06).** The table above governs account
+> **connection, discovery, and analytics** via Omnecor's OAuth flow. The **publish**
+> transport is now hybrid and does not map 1:1 to it:
+> - **Native publish** (direct from Omnecor, no developer app): **Bluesky, Mastodon,
+>   Discord, Telegram**.
+> - **Webhook → n8n publish**: **X (Twitter), LinkedIn, Facebook, Instagram** —
+>   authenticated once inside a locally-run n8n instance.
+> - **TikTok** has no publish path, and **YouTube** is intentionally unsupported (no
+>   text/community-post API — scheduling one returns a clear "not supported" error).
+>
+> See **[Social publishing — hybrid (native + n8n)](../social-publishing-n8n.md)** for
+> the full setup, the webhook contract, and Sovereign-mode behavior.
+
 ---
 
 ## 2. First-Time Setup

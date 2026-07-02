@@ -4,6 +4,7 @@ import { observable } from "@trpc/server/observable";
 import { AiProviderService } from "../phase2/services/AiProviderService.js";
 import { injectMapRagContext } from "../_core/ragContext.js";
 import { assertProviderAllowedInMode } from "../_core/sovereign.js";
+import { guardedEmit } from "../_core/streamEmit.js";
 
 const chatInputSchema = z.object({
   providerId: z.enum(["system", "ollama", "anthropic", "openai", "gemini", "grok", "huggingface", "forge", "llamacpp"]),
@@ -42,6 +43,9 @@ export const aiProviderRouter = router({
       return observable<{ delta: string; done: boolean; totalTokens?: number }>(
         emit => {
           const svc = AiProviderService.getInstance();
+          // Guard against emitting to a controller the client already closed
+          // (disconnect / abort) — an unguarded late emit crashes the process.
+          const g = guardedEmit(emit);
           (async () => {
             // Read-side map RAG: inject the active map's indexed knowledge before
             // streaming. Local retrieval, so it runs even in Sovereign mode.
@@ -56,13 +60,15 @@ export const aiProviderRouter = router({
               rag.messages,
               rag.systemPrompt
             )) {
-              emit.next(chunk);
+              if (g.closed) break; // client gone — stop pulling from the model
+              g.next(chunk);
               if (chunk.done) {
-                emit.complete();
+                g.complete();
                 break;
               }
             }
-          })().catch(err => emit.error(err));
+          })().catch(err => g.error(err));
+          return () => g.close();
         }
       );
     }),

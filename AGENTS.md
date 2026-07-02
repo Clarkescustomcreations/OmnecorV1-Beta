@@ -231,11 +231,12 @@ Use the correct tier. Wrong tier = either a security hole or a broken Sovereign 
 |---|---|
 | `publicProcedure` | Unauthenticated bootstrap only (Setup Wizard, health checks) |
 | `protectedProcedure` | Standard authenticated user actions |
-| `cloudProcedure` | **Any** call to an external API. Blocks in Sovereign mode. |
+| `cloudProcedure` | Cloud **AI / model inference** (OpenAI, Anthropic, Gemini, Fal, voice, training). Meta `cloudKind: "ai"` — **always** blocked in Sovereign mode. |
+| `externalServiceProcedure` | **Non-AI** external service calls (GitHub/Notion/Drive sync, Gmail send, OAuth code exchange, Lithic VCC). Meta `cloudKind: "service"` — blocked in Sovereign mode **unless** the operator enables `sovereignBlockAiOnly` (so research/email/sync keep working air-gapped from cloud AI). |
 | `adminProcedure` | Config changes, credential rotation, log deletion |
 | `ownerProcedure` | Owner-only operations |
 
-**Note:** The exact tier name is `cloudProcedure`. Do not use deprecated or incorrect names like `externalServiceProcedure` when gating external API calls to enforce Sovereign mode.
+**Note:** Any procedure that calls an external API must use one of the two cloud-gated tiers so Sovereign mode is enforced — never `protectedProcedure` for an external call. Pick by *what* it talks to: **`cloudProcedure`** for cloud AI inference (the data that must never reach a cloud model); **`externalServiceProcedure`** for non-AI services (email, repo/doc sync, OAuth, payments). Both are current, exported from `server/_core/trpc.ts`, and differ only in whether the `sovereignBlockAiOnly` sub-mode lets them through. Do **not** downgrade an `externalServiceProcedure` to `cloudProcedure` — that would wrongly block non-AI services (e.g. Gmail send) even when the operator has chosen "block AI providers only".
 
 Import all from `server/_core/trpc.ts`. The legacy `server/phase2/routers/trpc.ts`
 shim was deleted — do not recreate it.
@@ -310,6 +311,8 @@ Every entry here is a real problem that was hit and solved in this codebase.
 | Integration OAuth creds ignored / "Missing OAuth credentials" despite Settings wizard | `oauthClients.ts` captured `process.env.*` once at module load | Resolve per-call via `SettingsService.getSecret(settingsKey, envVar)` — env→settings-file precedence, like AI keys. Never re-capture env at module load |
 | OAuth callback never lands in packaged desktop app | Redirect URI hardcoded `localhost:5173`; backend listens on `:37291` | Build it from one source: `getRedirectUri()` = `PUBLIC_URL` or `http://localhost:${OMNECOR_PORT\|\|PORT\|\|3000}`. Desktop is spawned with `PORT=37291` |
 | Gmail/email header injection via subject | Free-text header interpolated raw into RFC-2822 | Strip `[\r\n]` from header values (see `gmailRouter.encodeHeaderValue`); RFC-2047 base64 encoded-word for non-ASCII |
+| `onDelete: "cascade"` silently not enforced in the live DB | The FK column was added via `ALTER TABLE … ADD COLUMN … REFERENCES t(id)`; SQLite **drops the referential action** on ALTER-added columns. `schema.ts` + the drizzle snapshot both say `cascade`, so `drizzle-kit generate` sees no diff and never fixes it → deleting a parent throws a FK error for any non-empty row | Migration `0014_fix_map_cascades.sql` rebuilds the affected tables (SQLite 12-step table-rebuild) with real `ON DELETE cascade`. Verify FK actions with `PRAGMA foreign_key_list(<table>)`, not the snapshot. Never add a cascade FK via ALTER ADD COLUMN |
+| `db.transaction()` fails under the in-memory test harness (`no such table`) | `@libsql/client` `:memory:` opens a **fresh empty DB** for an interactive transaction, so migrated tables aren't visible inside it | Use `db.batch([stmt1, …])` for atomic multi-statement writes — it runs one BEGIN/COMMIT on the same connection and works in-memory and in prod (see `neuralMapsRouter.delete`) |
 
 ---
 

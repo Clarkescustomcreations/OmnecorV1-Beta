@@ -381,6 +381,11 @@ async def _route_via_gguf(task: str, rag_context: str) -> Optional[dict]:
 async def _route_via_ollama(task: str, rag_context: str) -> Optional[dict]:
     system_content = _build_system_content(rag_context)
     ollama_url = os.environ.get("OLLAMA_URL", "http://localhost:11434")
+    # Cold-start load of a fine-tuned router GGUF is ~20-40s; a *reasoning*
+    # ("thinking") model emits a long chain of thought before the routing JSON
+    # and can take well over a minute. Env-tunable so slow/thinking backends
+    # don't fall back on every call. Keep >= the caller's VALET_ROUTE_TIMEOUT_MS.
+    ollama_timeout = float(os.environ.get("VALET_OLLAMA_TIMEOUT", "120"))
 
     def _call():
         payload = json.dumps({
@@ -398,11 +403,7 @@ async def _route_via_ollama(task: str, rag_context: str) -> Optional[dict]:
             headers={"Content-Type": "application/json"},
             method="POST",
         )
-        # First route after the model goes cold has to pay the Ollama load cost
-        # (a 1.5B Q8 GGUF can take 20-40s to page in on modest/LAN nodes). A 10s
-        # timeout guaranteed a rule-based fallback on the very first request; warm
-        # routing is ~2-3s, so a longer ceiling only bites on cold start.
-        with urllib.request.urlopen(req, timeout=45) as resp:
+        with urllib.request.urlopen(req, timeout=ollama_timeout) as resp:
             return json.loads(resp.read())
 
     try:

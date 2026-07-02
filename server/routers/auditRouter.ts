@@ -8,7 +8,7 @@
  */
 
 import { z } from "zod";
-import { router, adminProcedure } from "../_core/trpc.js";
+import { router, adminProcedure, ownerProcedure } from "../_core/trpc.js";
 import { auditList, auditListByActor } from "../db.factory.js";
 import {
   AuditLogService,
@@ -33,7 +33,7 @@ export const auditRouter = router({
       return { entries };
     }),
 
-  exportAuditLog: adminProcedure
+  exportAuditLog: ownerProcedure
     .input(z.object({ limit: z.number().int().min(1).max(5000).default(1000) }))
     .query(async ({ input }) => {
       const { entries } = await auditList(input.limit, 0);

@@ -37,7 +37,7 @@ import { IncomingMessage, Server as HttpServer } from "http";
 import { v4 as uuidv4 } from "uuid";
 import { homedir, cpus as osCpus, totalmem, freemem } from "os";
 import { execFile } from "child_process";
-import { createHash, timingSafeEqual } from "crypto";
+import { secretsMatch } from "../../ommesh/crypto.js";
 import { parse as parseCookieHeader } from "cookie";
 import { ENV } from "../../_core/env.js";
 import { sdk } from "../../_core/sdk.js";
@@ -68,6 +68,7 @@ import { AgentMessengerStore } from "../../_core/AgentMessengerStore.js";
 import { validatePath } from "../../_core/security.js";
 import { PATHS } from "../../_core/paths.js";
 import path from "path";
+import type { PtySpawnData, PtyInputData, PtyResizeData } from "../../../shared/types/terminal.types.js";
 
 
 // Lazy-load node-pty so the server starts even if the native binding isn't built
@@ -90,16 +91,6 @@ function isLoopbackAddress(addr: string | undefined): boolean {
   return a === "127.0.0.1" || a === "::1" || a === "localhost" || a.startsWith("127.");
 }
 
-/**
- * Constant-time comparison of two secrets. Both sides are SHA-256 hashed first
- * so the buffers are always equal length (timingSafeEqual throws on length
- * mismatch) and the comparison never leaks the secret's length.
- */
-function secretsMatch(a: string, b: string): boolean {
-  const ha = createHash("sha256").update(a).digest();
-  const hb = createHash("sha256").update(b).digest();
-  return timingSafeEqual(ha, hb);
-}
 
 function resolveBackend(data: Record<string, unknown>): { providerId: string; modelId: string } {
   const mc = (data?.modelConfig ?? {}) as Record<string, unknown>;
@@ -152,7 +143,6 @@ interface ClientMessage {
     | "pty:input"
     | "pty:resize"
     | "pty:kill"
-    | "chat:toTerminal"
     | "mobile_node_register"
     | "mobile_node_heartbeat"
     | "mobile_inference_response"
@@ -193,7 +183,6 @@ interface ServerMessage {
     | "pty:output"
     | "pty:ready"
     | "pty:exit"
-    | "terminal:toChatOutput"
     | "systemMetrics"
     | "asyncJobResult"
     | "voice:audio_chunk"
@@ -529,29 +518,24 @@ export class OmnecorWebSocketServer {
         );
         break;
 
-      case "pty:input":
-        if (ws.ptySession && message.data?.input !== undefined) {
-          ws.ptySession.proc.write(message.data.input as string);
+      case "pty:input": {
+        const inputData = message.data as PtyInputData | undefined;
+        if (ws.ptySession && inputData?.input !== undefined) {
+          ws.ptySession.proc.write(inputData.input);
         }
         break;
+      }
 
-      case "pty:resize":
-        if (ws.ptySession && message.data) {
-          const { cols, rows } = message.data as { cols: number; rows: number };
-          ws.ptySession.proc.resize(cols, rows);
+      case "pty:resize": {
+        const resizeData = message.data as PtyResizeData | undefined;
+        if (ws.ptySession && resizeData) {
+          ws.ptySession.proc.resize(resizeData.cols, resizeData.rows);
         }
         break;
+      }
 
       case "pty:kill":
         this.killPtySession(ws);
-        break;
-
-      // ── Chat ↔ Terminal Bridge ────────────────────────────────────────────
-      case "chat:toTerminal":
-        // AI/chat sends a command to this client's PTY
-        if (ws.ptySession && message.data?.input) {
-          ws.ptySession.proc.write((message.data.input as string) + "\r");
-        }
         break;
 
       // ── Mobile OMMESH Node Registration ──────────────────────────────────
@@ -990,7 +974,7 @@ export class OmnecorWebSocketServer {
     });
   }
 
-  private async handlePtySpawn(ws: OmnecorSocket, data: any): Promise<void> {
+  private async handlePtySpawn(ws: OmnecorSocket, data: PtySpawnData | undefined): Promise<void> {
     const pty = await getPty();
     if (!pty) {
       this.sendToClient(ws, { type: "error", data: { message: "PTY (node-pty) native binding not available on this server." } });
@@ -1000,10 +984,10 @@ export class OmnecorWebSocketServer {
     // Kill any existing session first
     this.killPtySession(ws);
 
-    const shell = (data?.shell as string) || process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "bash");
-    const cwd = (data?.cwd as string) || homedir();
-    const cols = (data?.cols as number) || 80;
-    const rows = (data?.rows as number) || 24;
+    const shell = data?.shell || process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "bash");
+    const cwd = data?.cwd || homedir();
+    const cols = data?.cols || 80;
+    const rows = data?.rows || 24;
     const sessionId = uuidv4();
 
     const proc = pty.spawn(shell, [], {
