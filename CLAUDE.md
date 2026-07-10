@@ -68,7 +68,7 @@ pnpm format
 - Static files / Vite dev server for the frontend
 - Health check at `/health`
 
-All tRPC routers are composed in `server/routers.ts` into a single `appRouter`. Routers all live in `server/routers/` and must import from `server/_core/trpc.ts` — they share a single `TrpcContext`. (Three routers — `agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter` — were relocated here from the now-empty `server/phase2/routers/`; the services they call still live in `server/phase2/services/`.)
+All tRPC routers are composed in `server/routers.ts` into a single `appRouter`. Routers all live in `server/routers/` and must import from `server/_core/trpc.ts` — they share a single `TrpcContext`. (Three routers — `agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter` — were relocated here from the now-empty `server/core_services/routers/`; the services they call still live in `server/core_services/services/`.)
 
 **tRPC procedure types** (from `server/_core/trpc.ts`):
 - `publicProcedure` — unauthenticated

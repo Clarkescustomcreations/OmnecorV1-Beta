@@ -1,0 +1,39 @@
+name: UI Registry Auto-Imprint
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'client/src/components/**/*.tsx'
+      - 'client/src/components/**/*.ts'
+
+jobs:
+  imprint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Generate UI Registry Imprints
+        run: |
+          pnpm tsx scripts/auto-imprint.ts
+
+      - name: Commit changes
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore(ui): Auto-update ui-registry.md via imprint workflow"
+          file_pattern: "Context/UI-Registry.md"

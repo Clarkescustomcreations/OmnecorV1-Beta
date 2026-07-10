@@ -18,7 +18,7 @@ vi.mock("../db.factory.js", async importActual => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -29,7 +29,7 @@ const mockMemory = {
   deleteCollection: vi.fn().mockResolvedValue(undefined),
 };
 
-vi.mock("../phase2/services/MemoryArchitectService.js", () => ({
+vi.mock("../core_services/services/MemoryArchitectService.js", () => ({
   MemoryArchitectService: {
     getInstance: () => mockMemory,
   },

@@ -2,7 +2,7 @@ import { z } from "zod";
 import { TRPCError } from "@trpc/server";
 import { notifyOwner } from "./notification.js";
 import { adminProcedure, protectedProcedure, publicProcedure, router } from "./trpc.js";
-import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, createWriteStream } from "fs";
+import { readFileSync, writeFileSync, existsSync, mkdirSync, unlinkSync, createWriteStream, openSync, closeSync } from "fs";
 import fsPromises from "fs/promises";
 import { join } from "path";
 import { homedir, platform, cpus, totalmem, freemem, tmpdir, loadavg } from "os";
@@ -13,9 +13,10 @@ import { getDb, updateUserExecutionMode } from "../db.factory.js";
 import { users, mcpServerConfigs } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 import { ENV } from "./env.js";
-import { getPermissionsForRole, type Role } from "../phase2/config/rbac.js";
+import { getPermissionsForRole, type Role } from "../core_services/config/rbac.js";
 import { PATHS } from "./paths.js";
-import { type OmnecorSettings } from "../phase2/services/SettingsService.js";
+import { type OmnecorSettings } from "../core_services/services/SettingsService.js";
+import { LocalLlmRuntimeService } from "../core_services/services/LocalLlmRuntimeService.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -449,7 +450,7 @@ export const systemRouter = router({
   }),
 
   checkForUpdates: publicProcedure.query(async () => {
-    const { UpdateCheckerService } = await import("../phase2/services/UpdateCheckerService.js");
+    const { UpdateCheckerService } = await import("../core_services/services/UpdateCheckerService.js");
     return UpdateCheckerService.getInstance().checkForUpdates();
   }),
 
@@ -597,9 +598,13 @@ export const systemRouter = router({
         : false;
     })();
 
-    // ── llama-cpp ──
+    // ── llama-cpp: the Omnecor-owned managed runtime is the real signal ──
+    // (Model-Fabric Phase 1) — it means the llamacpp provider can actually
+    // serve a chat request right now, not just that a binary exists somewhere.
+    // Fall back to binary/module presence so "installed but not yet started
+    // successfully" still shows something other than a flat "unavailable".
     const llamaCppResult = (async () => {
-      // Check for llama-server binary first, then pip-installed llama_cpp module
+      if (LocalLlmRuntimeService.getInstance().isReady()) return true;
       const hasBinary = await canRun("llama-server", ["--version"]).catch(() => false)
         || await canRun("llama-cpp", ["--version"]).catch(() => false);
       if (hasBinary) return true;
@@ -692,16 +697,30 @@ export const systemRouter = router({
     }
 
     // ── Helper: download a URL to a local tmp file ──
-    const downloadToFile = (url: string, dest: string): Promise<void> =>
+    // Follows every 3xx redirect carrying a Location header — ollama.com now
+    // serves 307s to GitHub releases, which 302 to the CDN (live-verified
+    // 2026-07-03; the old 301/302-only check broke both Linux and Windows).
+    // Redirects are capped and pinned to https so a hop can't loop or
+    // downgrade the transport.
+    const downloadToFile = (url: string, dest: string, maxRedirects = 10): Promise<void> =>
       new Promise((resolve, reject) => {
         const file = createWriteStream(dest);
-        const request = (redirectUrl: string) => {
-          https.get(redirectUrl, (res) => {
-            // Follow HTTP 301/302 redirects (Ollama CDN uses them)
+        let redirects = 0;
+        const request = (requestUrl: string) => {
+          https.get(requestUrl, (res) => {
             const location = res.headers.location;
-            if ((res.statusCode === 301 || res.statusCode === 302) && location) {
-              file.close();
-              return request(location);
+            if (res.statusCode && res.statusCode >= 300 && res.statusCode < 400 && location) {
+              res.resume(); // discard redirect body so the socket is freed
+              if (++redirects > maxRedirects) {
+                reject(new Error("Download failed: too many redirects"));
+                return;
+              }
+              const next = new URL(location, requestUrl);
+              if (next.protocol !== "https:") {
+                reject(new Error(`Download failed: insecure redirect to ${next.protocol}//`));
+                return;
+              }
+              return request(next.toString());
             }
             if (res.statusCode !== 200) {
               reject(new Error(`Download failed: HTTP ${res.statusCode ?? "unknown"}`));
@@ -734,22 +753,64 @@ export const systemRouter = router({
     }
 
     // ── Linux: download official install script, run with sh ──
+    // Pre-flight: install.sh needs root. Detached with no tty, sudo cannot
+    // prompt for a password, so a non-root server without passwordless sudo
+    // would die silently while the UI reports success. Fail loudly instead.
+    if (typeof process.getuid === "function" && process.getuid() !== 0) {
+      const sudoOk = await execFileAsync("sudo", ["-n", "true"]).then(() => true).catch(() => false);
+      if (!sudoOk) {
+        throw new TRPCError({
+          code: "PRECONDITION_FAILED",
+          message:
+            "Installing Ollama needs root privileges and passwordless sudo is not available to the Omnecor server. " +
+            "Run `curl -fsSL https://ollama.com/install.sh | sh` in a terminal (it can prompt for your password), then click Re-check.",
+        });
+      }
+    }
+
+    // Pre-flight: the current install.sh aborts with a `zstd` requirement (it
+    // ships zstd-compressed release tarballs). Missing, the detached installer
+    // dies leaving only a log line, so the UI would report "install started"
+    // then show Ollama still absent on Re-check. Check up front and surface the
+    // exact package to install (mirrors the message the installer itself emits).
+    const hasZstd = await findExecutable(["/usr/bin/zstd", "/usr/local/bin/zstd", "zstd"]);
+    if (!hasZstd) {
+      throw new TRPCError({
+        code: "PRECONDITION_FAILED",
+        message:
+          "Ollama's installer requires `zstd` (for release-archive extraction) and it isn't installed. " +
+          "Install it first — Debian/Ubuntu: `sudo apt-get install zstd`; Fedora/RHEL: `sudo dnf install zstd`; " +
+          "Arch: `sudo pacman -S zstd` — then click Re-check.",
+      });
+    }
+
     const dest = join(tmpdir(), "ollama-install.sh");
     try {
       await downloadToFile("https://ollama.com/install.sh", dest);
     } catch (err) {
-      return {
-        success: false,
+      // Throw (like the Windows branch) — SetupWizard's onSuccess toasts any
+      // resolved mutation as green, so a resolved {success:false} would render
+      // the failure as a success toast.
+      throw new TRPCError({
+        code: "INTERNAL_SERVER_ERROR",
         message: `Ollama download failed: ${(err as Error).message}. Try https://ollama.com manually.`,
-      };
+      });
     }
     // sh with the script path as a discrete argument — no shell string interpolation
-    // spawn supports detached; execFile does not when combined with a callback
-    const proc = spawn("sh", [dest], { detached: true, stdio: "ignore" });
+    // spawn supports detached; execFile does not when combined with a callback.
+    // Installer output goes to a log file so background failures are diagnosable.
+    const logPath = join(tmpdir(), "ollama-install.log");
+    const logFd = openSync(logPath, "w");
+    const proc = spawn("sh", [dest], { detached: true, stdio: ["ignore", logFd, logFd] });
+    closeSync(logFd);
     proc.on("error", (err) => console.warn("[installOllama] Installer error:", err));
+    proc.on("exit", (code) => {
+      if (code === 0) console.log("[installOllama] Ollama installed successfully.");
+      else console.warn(`[installOllama] Installer exited with code ${code} — see ${logPath}`);
+    });
     proc.unref();
 
-    return { success: true, message: "Ollama installation started in the background." };
+    return { success: true, message: `Ollama installation started in the background (log: ${logPath}).` };
   }),
 
   // ---------------------------------------------------------------------------

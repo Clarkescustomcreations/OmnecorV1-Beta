@@ -2,7 +2,7 @@ import fs from "fs";
 import path from "path";
 import os from "os";
 import { PATHS } from "./paths.js";
-import { getSetting } from "../phase2/services/SettingsService.js";
+import { getSetting } from "../core_services/services/SettingsService.js";
 
 type LogLevel = "debug" | "info" | "warn" | "error";
 

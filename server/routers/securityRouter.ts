@@ -18,7 +18,7 @@
 import { z } from "zod";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
+import { TokenRefreshService } from "../core_services/services/TokenRefreshService.js";
 import { validatePath } from "../_core/security.js";
 
 // ---------------------------------------------------------------------------
@@ -224,8 +224,9 @@ export const securityRouter = router({
     }),
   forceRefresh: protectedProcedure
     .input(z.object({ provider: z.string() }))
-    .mutation(async ({ input }) => {
-      await TokenRefreshService.getInstance().forceRefresh(input.provider);
+    .mutation(async ({ ctx, input }) => {
+      // Scope to the caller's own connected account(s) for this platform.
+      await TokenRefreshService.getInstance().forceRefresh(input.provider, ctx.user.id);
       return { ok: true };
     }),
   runVulnerabilityScan: protectedProcedure
@@ -236,7 +237,7 @@ export const securityRouter = router({
     }),
   getIoCFeed: protectedProcedure
     .query(async () => {
-      const { ThreatIntelService } = await import("../phase2/services/ThreatIntelService.js");
+      const { ThreatIntelService } = await import("../core_services/services/ThreatIntelService.js");
       return ThreatIntelService.getInstance().getIoCFeed();
     }),
 

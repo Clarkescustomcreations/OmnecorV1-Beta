@@ -1,5 +1,5 @@
 import { AuthorizationCode } from "simple-oauth2";
-import { SettingsService } from "../phase2/services/SettingsService.js";
+import { SettingsService } from "../core_services/services/SettingsService.js";
 
 interface OAuthEndpoints {
   auth: {
@@ -115,9 +115,29 @@ const PROVIDER_CREDENTIALS: Record<
   onedrive: { idKey: "oneDriveClientId", secretKey: "oneDriveClientSecret", idEnv: "ONEDRIVE_CLIENT_ID", secretEnv: "ONEDRIVE_CLIENT_SECRET" },
 };
 
+// The same provider is referred to by different slugs across the app: the
+// neural-map / integrations UI uses "google-drive", while the social + cloud
+// connect flows and PodcastStudio use "google_drive". Normalise every inbound
+// slug to the single canonical key the endpoint/credential/scope maps are keyed
+// by, so provider resolution — and therefore token refresh — never depends on
+// which surface produced the string. Add new aliases here, in one place.
+const PROVIDER_ALIASES: Record<string, string> = {
+  "google-drive": "google_drive",
+  googledrive: "google_drive",
+  gdrive: "google_drive",
+  "one-drive": "onedrive",
+  one_drive: "onedrive",
+};
+
+/** Canonical provider key (lower-cased, alias-resolved). */
+export function canonicalProvider(platform: string): string {
+  const key = platform.trim().toLowerCase();
+  return PROVIDER_ALIASES[key] ?? key;
+}
+
 /** Resolve a provider's client id/secret from the Settings file, then env. */
 function resolveCredentials(platform: string): { id: string; secret: string } {
-  const map = PROVIDER_CREDENTIALS[platform.toLowerCase()];
+  const map = PROVIDER_CREDENTIALS[canonicalProvider(platform)];
   if (!map) throw new Error(`Unsupported platform: ${platform}`);
   const settings = SettingsService.getInstance();
   return {
@@ -142,7 +162,7 @@ export function listOAuthPlatforms(): string[] {
 }
 
 export function getOAuthClient(platform: string) {
-  const endpoints = OAUTH_ENDPOINTS[platform.toLowerCase()];
+  const endpoints = OAUTH_ENDPOINTS[canonicalProvider(platform)];
   if (!endpoints) throw new Error(`Unsupported platform: ${platform}`);
   const { id, secret } = resolveCredentials(platform);
   if (!id || !secret) {
@@ -267,7 +287,7 @@ export async function refreshOAuthToken(
  *  - Microsoft (OneDrive): the offline_access scope (added in getPlatformScopes)
  */
 function getProviderExtraAuthParams(platform: string): Record<string, string> {
-  switch (platform.toLowerCase()) {
+  switch (canonicalProvider(platform)) {
     // All Google flows need offline access + a forced consent to receive a
     // refresh token for long-lived API access.
     case "google_drive":
@@ -327,14 +347,14 @@ function getPlatformScopes(platform: string): string[] {
     onedrive: ["Files.Read.All", "offline_access"],
   };
 
-  return scopeMap[platform.toLowerCase()] || [];
+  return scopeMap[canonicalProvider(platform)] || [];
 }
 
 export async function fetchUserProfile(
   platform: string,
   accessToken: string
 ): Promise<Record<string, unknown>> {
-  const key = platform.toLowerCase();
+  const key = canonicalProvider(platform);
   if (!OAUTH_ENDPOINTS[key]) throw new Error(`Unsupported platform: ${platform}`);
 
   // Dropbox's account endpoint is POST-only and returns a different shape; map

@@ -37,7 +37,7 @@ vi.mock("../db-pcb.js", async importActual => ({
 
 // Audit middleware runs on every protectedProcedure; stub it so nothing hits
 // the real file DB.
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

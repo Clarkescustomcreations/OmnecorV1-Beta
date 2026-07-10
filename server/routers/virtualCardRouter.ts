@@ -12,8 +12,8 @@
 import { z } from "zod";
 import { router, protectedProcedure, externalServiceProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { VirtualCardService, CardOperationError, type LithicTransaction } from "../phase2/services/VirtualCardService.js";
-import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
+import { VirtualCardService, CardOperationError, type LithicTransaction } from "../core_services/services/VirtualCardService.js";
+import { HITLApprovalService } from "../core_services/services/HITLApprovalService.js";
 import { createLogger } from "../_core/logger.js";
 import { getDb } from "../db.factory.js";
 import { virtualCards } from "../../drizzle/schema.js";

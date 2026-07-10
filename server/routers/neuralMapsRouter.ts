@@ -15,11 +15,11 @@ import {
 } from "../../drizzle/schema.js";
 import { eq, and } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
+import { MemoryArchitectService } from "../core_services/services/MemoryArchitectService.js";
 import { homedir } from "os";
 import { join } from "path";
 import fsPromises from "fs/promises";
-import { SettingsService, getSettingsPath } from "../phase2/services/SettingsService.js";
+import { SettingsService, getSettingsPath } from "../core_services/services/SettingsService.js";
 import { createLogger } from "../_core/logger.js";
 
 const log = createLogger("neural-maps");

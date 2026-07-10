@@ -31,7 +31,7 @@ vi.mock("../db.js", async importActual => {
   return { ...actual, getDb: async () => dbh.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

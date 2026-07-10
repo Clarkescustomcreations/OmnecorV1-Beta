@@ -30,40 +30,41 @@ import type { Db } from "../db.js";
 // ─── Phase 2 Service Imports ────────────────────────────────────────────────
 // These are the singleton services from the Phase 2 backend.
 // They are imported here to provide type information and getInstance() access.
-import { FileSystemWatcherService } from "../phase2/services/FileSystemWatcherService.js";
-import { HashTrackerService } from "../phase2/services/HashTrackerService.js";
-import { VectorDBService } from "../phase2/services/VectorDBService.js";
-import { ProcessManagerService } from "../phase2/services/ProcessManagerService.js";
-import { AgentService } from "../phase2/services/AgentService.js";
-import { VoiceService } from "../phase2/services/VoiceService.js";
-import { AiProviderService } from "../phase2/services/AiProviderService.js";
-import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
-import { SecurityService } from "../phase2/services/SecurityService.js";
-import { BlenderBridge } from "../phase2/services/BlenderService.js";
-import { KiCadBridge } from "../phase2/services/KiCadService.js";
-import { ESPToolBridge } from "../phase2/services/ESPToolService.js";
-import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
-import { MeshDiscoveryService } from "../phase2/services/MeshDiscoveryService.js";
-import { FalApiService } from "../phase2/services/FalApiService.js";
-import { ComfyService } from "../phase2/services/ComfyService.js";
-import { ScraperService } from "../phase2/services/ScraperService.js";
-import { CodingContextService } from "../phase2/services/CodingContextService.js";
-import { DockerService } from "../phase2/services/DockerService.js";
-import { PromptSanitizer } from "../phase2/services/PromptSanitizer.js";
-import { ElevenLabsService } from "../phase2/services/ElevenLabsService.js";
-import { MCPClientService } from "../phase2/services/MCPClientService.js";
-import { PipelineEngineService } from "../phase2/services/PipelineEngineService.js";
-import { AuditLogService } from "../phase2/services/AuditLogService.js";
-import { DatasetDiscoveryService } from "../phase2/services/DatasetDiscoveryService.js";
-import { DatasetCurationService } from "../phase2/services/DatasetCurationService.js";
-import { PCBWayService } from "../phase2/services/PCBWayService.js";
-import { ModelManagementService } from "../phase2/services/ModelManagementService.js";
-import { VirtualCardService } from "../phase2/services/VirtualCardService.js";
-import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
+import { FileSystemWatcherService } from "../core_services/services/FileSystemWatcherService.js";
+import { HashTrackerService } from "../core_services/services/HashTrackerService.js";
+import { VectorDBService } from "../core_services/services/VectorDBService.js";
+import { ProcessManagerService } from "../core_services/services/ProcessManagerService.js";
+import { AgentService } from "../core_services/services/AgentService.js";
+import { VoiceService } from "../core_services/services/VoiceService.js";
+import { AiProviderService } from "../core_services/services/AiProviderService.js";
+import { MemoryArchitectService } from "../core_services/services/MemoryArchitectService.js";
+import { SecurityService } from "../core_services/services/SecurityService.js";
+import { BlenderBridge } from "../core_services/services/BlenderService.js";
+import { KiCadBridge } from "../core_services/services/KiCadService.js";
+import { ESPToolBridge } from "../core_services/services/ESPToolService.js";
+import { HITLApprovalService } from "../core_services/services/HITLApprovalService.js";
+import { MeshDiscoveryService } from "../core_services/services/MeshDiscoveryService.js";
+import { FalApiService } from "../core_services/services/FalApiService.js";
+import { ComfyService } from "../core_services/services/ComfyService.js";
+import { ScraperService } from "../core_services/services/ScraperService.js";
+import { CodingContextService } from "../core_services/services/CodingContextService.js";
+import { DockerService } from "../core_services/services/DockerService.js";
+import { PromptSanitizer } from "../core_services/services/PromptSanitizer.js";
+import { ElevenLabsService } from "../core_services/services/ElevenLabsService.js";
+import { MCPClientService } from "../core_services/services/MCPClientService.js";
+import { PipelineEngineService } from "../core_services/services/PipelineEngineService.js";
+import { AuditLogService } from "../core_services/services/AuditLogService.js";
+import { DatasetDiscoveryService } from "../core_services/services/DatasetDiscoveryService.js";
+import { DatasetCurationService } from "../core_services/services/DatasetCurationService.js";
+import { PCBWayService } from "../core_services/services/PCBWayService.js";
+import { ModelManagementService } from "../core_services/services/ModelManagementService.js";
+import { VirtualCardService } from "../core_services/services/VirtualCardService.js";
+import { ValetRouterService } from "../core_services/services/ValetRouterService.js";
 import { NotificationService } from "./NotificationService.js";
-import { SettingsService } from "../phase2/services/SettingsService.js";
-import { OpenArtService } from "../phase2/services/OpenArtService.js";
-import { AsyncJobService } from "../phase2/services/AsyncJobService.js";
+import { SettingsService } from "../core_services/services/SettingsService.js";
+import { OpenArtService } from "../core_services/services/OpenArtService.js";
+import { AsyncJobService } from "../core_services/services/AsyncJobService.js";
+import { ModelCatalogService } from "../core_services/services/ModelCatalogService.js";
 // Unified Context Type
 // ─────────────────────────────────────────────────────────────────────────────
 
@@ -120,6 +121,7 @@ export type TrpcContext = {
     settings: SettingsService;
     openArt: OpenArtService;
     asyncJob: AsyncJobService;
+    modelCatalog: ModelCatalogService;
   };
 };
 
@@ -226,6 +228,7 @@ export async function createContext(
       settings: SettingsService.getInstance(),
       openArt: OpenArtService.getInstance(),
       asyncJob: AsyncJobService.getInstance(),
+      modelCatalog: ModelCatalogService.getInstance(),
     },
   };
 }

@@ -8,6 +8,7 @@
 // Token counts use js-tiktoken (pure JS, no WASM) — see ./tokenizer.
 // @anthropic-ai/tokenizer was avoided because its WASM broke Vite resolution.
 import { countTokens } from "./tokenizer";
+import type { AssistantBlock } from "@shared/chatBlocks";
 
 export type MessageRole = "user" | "assistant" | "system" | "tool";
 
@@ -17,6 +18,13 @@ export interface ChatMessage {
   content: string;
   timestamp: Date;
   tokens?: number;
+  /**
+   * Ordered, in-place-updatable render blocks for an *assistant* turn (agentic
+   * chat stream). When present, the UI renders these instead of the raw
+   * `content` string; `content` remains the flattened text for persistence,
+   * copy, export, and non-agentic providers. See `shared/chatBlocks.ts`.
+   */
+  blocks?: AssistantBlock[];
   metadata?: {
     model?: string;
     provider?: string;
@@ -315,6 +323,9 @@ export interface SelectedModel {
   modelId: string;
   apiKey?: string;
   baseUrl?: string;
+  /** Model-Fabric Phase 5 — pin mesh routing to a specific OMMESH peer (set
+   *  when the picker's selection came from a `mesh-peer` catalog entry). */
+  targetNodeId?: string;
 }
 
 // ---------------------------------------------------------------------------
@@ -327,6 +338,10 @@ export interface StoredConversationMeta {
   lastMessage: string;
   updatedAt: string; // ISO string
   messageCount: number;
+  /** Mesh-Delegation.md — set when this is a managed sub-agent chat (a run
+   *  delegated to a peer). Drives the sidebar node badge + the delegated
+   *  render path. Absent for ordinary local conversations. */
+  delegatedNodeName?: string;
 }
 
 const CONV_INDEX_KEY = "omnecor:conv-index";

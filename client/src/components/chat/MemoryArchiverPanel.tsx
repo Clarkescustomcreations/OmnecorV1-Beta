@@ -22,6 +22,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface MemoryArchiverPanelProps {
   sessionId: string;
@@ -100,14 +101,16 @@ export function MemoryArchiverPanel({ sessionId, projectId, selectedModel }: Mem
           {/* Action Section */}
           <div className="space-y-4">
             <h4 className="text-[10px] font-bold text-muted-foreground uppercase px-1">Context Pruning</h4>
-            <Button 
-              className="w-full gap-2 h-10 bg-primary/10 text-foreground hover:bg-primary/90 hover:text-primary-foreground"
-              onClick={handleArchive}
-              disabled={isArchiving}
-            >
-              {isArchiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
-              Summarize & Prune
-            </Button>
+            <HowToTooltip title="Archive Memory" description="Summarize the current thread and store insights in vector storage." side="top">
+              <Button 
+                className="w-full gap-2 h-10 bg-primary/10 text-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                onClick={handleArchive}
+                disabled={isArchiving}
+              >
+                {isArchiving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Archive className="w-4 h-4" />}
+                Summarize & Prune
+              </Button>
+            </HowToTooltip>
             <p className="text-[10px] text-center text-muted-foreground">
               Compress this entire thread into dense insights and move them to Vector storage.
             </p>

@@ -21,14 +21,14 @@ vi.mock("../db.factory.js", async importActual => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
 }));
 
 const discoverMock = vi.hoisted(() => vi.fn());
-vi.mock("../phase2/services/ArticleDiscoveryService.js", () => ({
+vi.mock("../core_services/services/ArticleDiscoveryService.js", () => ({
   ArticleDiscoveryService: { getInstance: () => ({ discover: discoverMock }) },
 }));
 

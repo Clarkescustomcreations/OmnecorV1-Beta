@@ -18,14 +18,14 @@ const H = vi.hoisted(() => {
   return { dir, prevData };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
 }));
 
 const chatMock = vi.hoisted(() => vi.fn());
-vi.mock("../phase2/services/AiProviderService.js", () => ({
+vi.mock("../core_services/services/AiProviderService.js", () => ({
   AiProviderService: { getInstance: () => ({ chat: chatMock }) },
 }));
 

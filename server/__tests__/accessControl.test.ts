@@ -18,7 +18,7 @@ vi.mock("../db.factory.js", () => ({
 }));
 
 // auditRouter.setRetention calls AuditLogService directly
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: vi.fn().mockReturnValue({
       log: vi.fn().mockResolvedValue(undefined),
@@ -35,7 +35,7 @@ vi.mock("../phase2/services/AuditLogService.js", () => ({
 }));
 
 // trpc.ts reads getSetting for the sovereign check inside cloudProcedure
-vi.mock("../phase2/services/SettingsService.js", () => ({
+vi.mock("../core_services/services/SettingsService.js", () => ({
   getSetting: vi.fn().mockReturnValue(false),
   SettingsService: {
     getInstance: vi.fn().mockReturnValue({
@@ -48,7 +48,7 @@ vi.mock("../phase2/services/SettingsService.js", () => ({
 // ── Dynamic imports (after mocks) ────────────────────────────────────────────
 const { auditRouter } = await import("../routers/auditRouter.js");
 const { router, ownerProcedure } = await import("../_core/trpc.js");
-const { hasPermission } = await import("../phase2/config/rbac.js");
+const { hasPermission } = await import("../core_services/config/rbac.js");
 
 // ── Inline test router using ownerProcedure (item 10) ────────────────────────
 // No production router currently uses ownerProcedure, so we create a minimal

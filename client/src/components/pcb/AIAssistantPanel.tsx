@@ -21,6 +21,7 @@ import { toast } from 'sonner';
 import { useDesignerStore } from '@/lib/stores/designerStore';
 import { useAppStore } from '@/lib/store/app.store';
 import { LoadingQuote } from '@/components/chat/LoadingQuote';
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export interface AIAssistantPanelProps {
   canvasState: {
@@ -192,12 +193,14 @@ What would you like help with?`,
           <h2 className="text-sm font-semibold text-foreground">AI Assistant</h2>
           <p className="text-xs text-muted-foreground mt-0.5">Context-aware design help</p>
         </div>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground text-lg leading-none"
-        >
-          ×
-        </button>
+        <HowToTooltip title="Close Assistant" description="Hide the AI assistant panel" side="left">
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-lg leading-none"
+          >
+            ×
+          </button>
+        </HowToTooltip>
       </div>
 
       {/* Design Context Summary */}
@@ -271,14 +274,16 @@ What would you like help with?`,
             className="h-9 text-sm bg-background border-border focus-visible:ring-1 focus-visible:ring-primary/30"
             disabled={isLoading}
           />
-          <Button
-            onClick={handleSendMessage}
-            disabled={isLoading || !inputValue.trim()}
-            size="sm"
-            className="gap-2 bg-primary/10 hover:bg-primary/90 text-accent-foreground"
-          >
-            <Send className="w-4 h-4" />
-          </Button>
+          <HowToTooltip title="Send Message" description="Send your question to the AI" side="top">
+            <Button
+              onClick={handleSendMessage}
+              disabled={isLoading || !inputValue.trim()}
+              size="sm"
+              className="gap-2 bg-primary/10 hover:bg-primary/90 text-accent-foreground"
+            >
+              <Send className="w-4 h-4" />
+            </Button>
+          </HowToTooltip>
         </div>
         <p className="text-xs text-muted-foreground mt-2">
           💡 Tip: Ask about components, design review, or netlist analysis

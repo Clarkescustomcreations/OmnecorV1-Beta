@@ -7,6 +7,7 @@ import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from ".
 import { Slider } from "../ui/slider"; // Using custom slider patterns
 import { Volume2, Music, Download, Wand2 } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export const TTSPanel: React.FC = () => {
   const [text, setText] = useState("");
@@ -69,13 +70,15 @@ export const TTSPanel: React.FC = () => {
               </Select>
             </div>
             <div className="flex items-end">
-              <Button 
-                onClick={() => synthMutation.mutate({ text, speakerWavPath: selectedVoice })}
-                disabled={!text || !selectedVoice || synthMutation.isPending}
-                className="w-40"
-              >
-                {synthMutation.isPending ? "Generating..." : <><Wand2 className="w-4 h-4 mr-2" /> Synthesize</>}
-              </Button>
+              <HowToTooltip title="Synthesize Speech" description="Generate audio from text" side="top">
+                <Button 
+                  onClick={() => synthMutation.mutate({ text, speakerWavPath: selectedVoice })}
+                  disabled={!text || !selectedVoice || synthMutation.isPending}
+                  className="w-40"
+                >
+                  {synthMutation.isPending ? "Generating..." : <><Wand2 className="w-4 h-4 mr-2" /> Synthesize</>}
+                </Button>
+              </HowToTooltip>
             </div>
           </div>
         </CardContent>
@@ -91,11 +94,13 @@ export const TTSPanel: React.FC = () => {
               <p className="text-sm font-medium">Generated Output</p>
               <audio controls src={audioUrl} className="w-full h-8 mt-2" />
             </div>
-                                            <Button variant="outline" size="icon" asChild>
-              <a href={audioUrl} download="synthesis.wav">
-                <Download className="w-4 h-4" />
-              </a>
-            </Button>
+            <HowToTooltip title="Download Audio" description="Save the generated audio file" side="top">
+              <Button variant="outline" size="icon" asChild>
+                <a href={audioUrl} download="synthesis.wav">
+                  <Download className="w-4 h-4" />
+                </a>
+              </Button>
+            </HowToTooltip>
           </CardContent>
         </Card>
       )}

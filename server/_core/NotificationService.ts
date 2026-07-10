@@ -21,7 +21,7 @@ import type {
   OmnecorNotification,
   NotificationKind,
 } from "../../shared/notifications.js";
-import { getSetting } from "../phase2/services/SettingsService.js";
+import { getSetting } from "../core_services/services/SettingsService.js";
 
 export interface NotifyInput {
   kind: NotificationKind;

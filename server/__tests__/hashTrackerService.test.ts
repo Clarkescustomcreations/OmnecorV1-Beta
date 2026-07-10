@@ -11,7 +11,7 @@ import { describe, it, expect, vi } from "vitest";
 import {
   generateActionHash,
   HashTrackerService,
-} from "../phase2/services/HashTrackerService.js";
+} from "../core_services/services/HashTrackerService.js";
 
 // ---------------------------------------------------------------------------
 // generateActionHash — pure utility

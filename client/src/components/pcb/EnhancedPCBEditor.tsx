@@ -47,6 +47,7 @@ import { trpc } from '@/lib/trpc';
 import { componentLibrary } from '@/lib/componentLibrary';
 import { toast } from 'sonner';
 import { useDesignerStore } from '@/lib/stores/designerStore';
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 // Stable empty-array default — inline `= []` creates a new reference every render → infinite loop. See TD-046.
 const EMPTY_PROJECTS: { id: number; name: string; mode: string }[] = [];
@@ -583,15 +584,17 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
         <FolderOpen className="w-3.5 h-3.5 text-muted-foreground flex-shrink-0" />
 
         <div className="relative" ref={projectDropdownRef}>
-          <button
-            className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary transition-colors"
-            onClick={() => setShowProjectDropdown((v) => !v)}
-          >
-            <span className="max-w-[180px] truncate">
-              {activeProject?.name ?? (createProjectMutation.isPending ? 'Creating…' : 'No project')}
-            </span>
-            <ChevronDown className="w-3 h-3 opacity-60" />
-          </button>
+          <HowToTooltip title="Select Project" description="Switch between different designs" side="bottom">
+            <button
+              className="flex items-center gap-1.5 text-xs font-medium text-foreground hover:text-primary transition-colors"
+              onClick={() => setShowProjectDropdown((v) => !v)}
+            >
+              <span className="max-w-[180px] truncate">
+                {activeProject?.name ?? (createProjectMutation.isPending ? 'Creating…' : 'No project')}
+              </span>
+              <ChevronDown className="w-3 h-3 opacity-60" />
+            </button>
+          </HowToTooltip>
 
           {showProjectDropdown && (
             <div className="absolute top-full left-0 mt-1 w-56 bg-card border border-border rounded-md shadow-lg z-50 py-1">
@@ -734,9 +737,11 @@ const EnhancedPCBEditorInner: React.FC<EnhancedPCBEditorProps> = ({ onAIToggle }
               />
             )}
             <Controls>
-              <ControlButton onClick={handleRotateCanvas} title="Rotate Layout 90°">
-                <RotateCw className="w-3.5 h-3.5" />
-              </ControlButton>
+              <HowToTooltip title="Rotate View" description="Rotate the entire canvas view" side="right">
+                <ControlButton onClick={handleRotateCanvas} title="Rotate Layout 90°">
+                  <RotateCw className="w-3.5 h-3.5" />
+                </ControlButton>
+              </HowToTooltip>
             </Controls>
             {showMiniMap && (
               <MiniMap

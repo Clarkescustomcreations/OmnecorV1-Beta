@@ -19,7 +19,7 @@ import * as schema from "../../../drizzle/schema.js";
 import { users, type User } from "../../../drizzle/schema.js";
 import type { Db } from "../../db.js";
 import type { TrpcContext } from "../../_core/context.js";
-import { ProcessManagerService } from "../../phase2/services/ProcessManagerService.js";
+import { ProcessManagerService } from "../../core_services/services/ProcessManagerService.js";
 
 const MIGRATIONS_DIR = path.resolve(
   import.meta.dirname,

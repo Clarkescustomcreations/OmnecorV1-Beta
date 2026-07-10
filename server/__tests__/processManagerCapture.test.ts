@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
-import { ProcessManagerService } from "../phase2/services/ProcessManagerService.js";
-import type { ProcessLifecycleEvent } from "../phase2/services/ProcessManagerService.js";
+import { ProcessManagerService } from "../core_services/services/ProcessManagerService.js";
+import type { ProcessLifecycleEvent } from "../core_services/services/ProcessManagerService.js";
 
 /**
  * Verifies the opt-in raw ring-buffer capture added for the async-job condenser.

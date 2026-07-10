@@ -26,6 +26,7 @@ import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useLocation } from "wouter";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export function VirtualCardPanel() {
   const [, setLocation] = useLocation();
@@ -110,7 +111,9 @@ export function VirtualCardPanel() {
               Virtual card issuance requires a Lithic account. Add your API key to settings to enable this feature.
             </p>
           </div>
-          <Button id="btn-wallet-configure-lithic" variant="outline" size="sm" onClick={() => setLocation("/settings?tab=api")}>Configure Lithic</Button>
+          <HowToTooltip title="Configure Lithic" description="Set up the Lithic API key to issue virtual cards." side="bottom">
+            <Button id="btn-wallet-configure-lithic" variant="outline" size="sm" onClick={() => setLocation("/settings?tab=api")}>Configure Lithic</Button>
+          </HowToTooltip>
         </CardContent>
       </Card>
     );
@@ -158,17 +161,19 @@ export function VirtualCardPanel() {
                   <p className="text-[10px] uppercase font-bold text-muted-foreground tracking-widest">Card Number</p>
                   <div className="flex items-center gap-2">
                     <p className="font-mono text-lg tracking-[0.2em]">{formattedPan}</p>
-                    <Button
-                      id="btn-wallet-reveal-card"
-                      size="icon" variant="ghost"
-                      className="h-6 w-6 text-muted-foreground hover:text-white"
-                      onClick={handleReveal}
-                      disabled={revealPanMutation.isPending}
-                    >
-                      {revealPanMutation.isPending
-                        ? <Loader2 className="w-3 h-3 animate-spin" />
-                        : showSensitive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                    </Button>
+                    <HowToTooltip title="Reveal Card Number" description="Show or hide the virtual card's PAN." side="right">
+                      <Button
+                        id="btn-wallet-reveal-card"
+                        size="icon" variant="ghost"
+                        className="h-6 w-6 text-muted-foreground hover:text-white"
+                        onClick={handleReveal}
+                        disabled={revealPanMutation.isPending}
+                      >
+                        {revealPanMutation.isPending
+                          ? <Loader2 className="w-3 h-3 animate-spin" />
+                          : showSensitive ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                      </Button>
+                    </HowToTooltip>
                   </div>
                 </div>
 
@@ -184,15 +189,17 @@ export function VirtualCardPanel() {
                 </div>
 
                 <div className="pt-2 border-t border-border flex justify-end">
-                  <Button
-                    id="btn-wallet-copy-card-number"
-                    size="icon" variant="outline"
-                    className="h-8 w-8 border-border bg-card/50 hover:bg-card"
-                    onClick={handleCopyPan}
-                    title="Copy card number"
-                  >
-                    <Copy className="w-3.5 h-3.5" />
-                  </Button>
+                  <HowToTooltip title="Copy Card Number" description="Copy the virtual card number to clipboard." side="bottom">
+                    <Button
+                      id="btn-wallet-copy-card-number"
+                      size="icon" variant="outline"
+                      className="h-8 w-8 border-border bg-card/50 hover:bg-card"
+                      onClick={handleCopyPan}
+                      title="Copy card number"
+                    >
+                      <Copy className="w-3.5 h-3.5" />
+                    </Button>
+                  </HowToTooltip>
                 </div>
               </>
             )}
@@ -233,15 +240,17 @@ export function VirtualCardPanel() {
                 New card issuance requires administrator approval via the local interface.
               </p>
             </div>
-            <Button
-              id="btn-wallet-issue-card"
-              className="w-full gap-2 h-10 bg-primary/10 text-accent-foreground"
-              disabled={isIssuing}
-              onClick={handleIssue}
-            >
-              {isIssuing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
-              Request New Virtual Card
-            </Button>
+            <HowToTooltip title="Request Card" description="Issue a new virtual card with the specified limit and purpose." side="bottom">
+              <Button
+                id="btn-wallet-issue-card"
+                className="w-full gap-2 h-10 bg-primary/10 text-accent-foreground"
+                disabled={isIssuing}
+                onClick={handleIssue}
+              >
+                {isIssuing ? <Loader2 className="w-4 h-4 animate-spin" /> : <Plus className="w-4 h-4" />}
+                Request New Virtual Card
+              </Button>
+            </HowToTooltip>
           </CardContent>
         </Card>
       </div>
@@ -256,13 +265,17 @@ export function VirtualCardPanel() {
             <div className="flex items-center gap-2">
               {loadingTx && <Loader2 className="w-3 h-3 animate-spin text-muted-foreground" />}
               {activeCard && (
-                <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => refetchTx()}>
-                  <RefreshCw className="w-3 h-3" /> Refresh
-                </Button>
+                <HowToTooltip title="Refresh Activity" description="Fetch the latest transactions for this card." side="left">
+                  <Button variant="ghost" size="sm" className="h-7 text-xs gap-1" onClick={() => refetchTx()}>
+                    <RefreshCw className="w-3 h-3" /> Refresh
+                  </Button>
+                </HowToTooltip>
               )}
-              <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setLocation("/wallet")}>
-                View All
-              </Button>
+              <HowToTooltip title="View All Transactions" description="Navigate to the full transaction history." side="left">
+                <Button variant="ghost" size="sm" className="text-xs text-muted-foreground" onClick={() => setLocation("/wallet")}>
+                  View All
+                </Button>
+              </HowToTooltip>
             </div>
           </div>
         </CardHeader>

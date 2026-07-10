@@ -73,7 +73,24 @@ Create a `.env` file in the project root (copy from `.env.example`):
 
 ```env
 PORT=3000
-# OLLAMA_URL=http://localhost:11434
+
+# --- Local LLM Runtime (Ollama-optional) ---
+# Omnecor manages its own llama-server subprocess and does NOT require Ollama.
+# Ollama is an optional accelerator; when present it is detected and used automatically.
+# OLLAMA_URL=http://localhost:11434   # uncomment only if you run Ollama separately
+
+# Path to a llama-server binary (llama.cpp). If unset, Omnecor searches PATH and
+# common install locations (e.g. /usr/local/bin/llama-server, Android Studio bundled).
+# LLAMA_SERVER_BIN=/usr/local/bin/llama-server
+
+# Override the .gguf model loaded by the local runtime. If unset, Omnecor picks the
+# newest .gguf found under ~/.omnecor/models/ (excluding the valet-router/ classifier).
+# LOCAL_LLM_MODEL_PATH=/home/you/.omnecor/models/llama-3.2-3b.gguf
+
+# GPU layers to offload to the GPU via llama-server. Defaults to "auto" (llama.cpp
+# adaptive default). Set to 0 to force CPU-only. Do NOT set to 999 on small GPUs —
+# Vulkan does not overflow to CPU on allocation failure.
+# LOCAL_LLM_GPU_LAYERS=auto
 
 # Optional: Enable cross-session memory persistence
 # HONCHO_API_KEY=your_honcho_api_key
@@ -85,6 +102,18 @@ PORT=3000
 ```
 
 Refer to `server/_core/env.ts` for the complete list of supported environment variables.
+
+### Local LLM Runtime (optional — Ollama optional)
+
+Omnecor bundles its own inference path via `LocalLlmRuntimeService`, which spawns and supervises a `llama-server` (llama.cpp) subprocess at startup. **Ollama is not required.** When Ollama is present it is used as an optional backend; when it is absent the local runtime takes over transparently.
+
+**Quick start (no Ollama):**
+
+1. Download a `llama-server` binary from the [llama.cpp releases](https://github.com/ggerganov/llama.cpp/releases) and place it on your PATH (or set `LLAMA_SERVER_BIN`).
+2. Drop a `.gguf` model file into `~/.omnecor/models/` (or set `LOCAL_LLM_MODEL_PATH`).
+3. Start Omnecor — the local runtime starts automatically, appears in the `/health` payload under `checks.localLlm`, and shows as an **Omnecor · This PC** group in the model picker.
+
+If you also run Ollama, both sources appear in the unified catalog and are deduplicated automatically.
 
 ### Step 4: Database Setup
 

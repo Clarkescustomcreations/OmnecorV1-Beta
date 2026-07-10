@@ -15,14 +15,14 @@ vi.mock("../db.factory.js", async importActual => {
 });
 
 // Stub AuditLogService
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
 }));
 
 // Mock HonchoService
-vi.mock("../phase2/services/HonchoService.js", () => ({
+vi.mock("../core_services/services/HonchoService.js", () => ({
   honchoService: {
     addMessage: vi.fn().mockResolvedValue({ ok: true }),
     addFact: vi.fn().mockResolvedValue({ ok: true }),
@@ -31,7 +31,7 @@ vi.mock("../phase2/services/HonchoService.js", () => ({
 }));
 
 // Mock VirtualCardService
-vi.mock("../phase2/services/VirtualCardService.js", () => ({
+vi.mock("../core_services/services/VirtualCardService.js", () => ({
   VirtualCardService: {
     getInstance: () => ({
       isConfigured: () => true,
@@ -44,7 +44,7 @@ vi.mock("../phase2/services/VirtualCardService.js", () => ({
 }));
 
 // Mock HITLApprovalService
-vi.mock("../phase2/services/HITLApprovalService.js", () => ({
+vi.mock("../core_services/services/HITLApprovalService.js", () => ({
   HITLApprovalService: {
     getInstance: () => ({
       requestApproval: vi.fn().mockResolvedValue(true),

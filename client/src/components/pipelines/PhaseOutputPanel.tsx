@@ -2,6 +2,7 @@ import { trpc } from "@/lib/trpc";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 const PHASES = ["DEFINE", "PLAN", "EXECUTE", "REVIEW", "SHIP"] as const;
 
@@ -54,14 +55,16 @@ export function PhaseOutputPanel({ pipelineId }: { pipelineId: string }) {
             {pipeline.status.toUpperCase()}
           </Badge>
           {canAbort && (
-            <Button
-              variant="destructive"
-              size="sm"
-              onClick={() => abortPipeline.mutate({ pipelineId })}
-              disabled={abortPipeline.isPending}
-            >
-              Abort
-            </Button>
+            <HowToTooltip title="Abort Pipeline" description="Stop the current pipeline execution" side="top">
+              <Button
+                variant="destructive"
+                size="sm"
+                onClick={() => abortPipeline.mutate({ pipelineId })}
+                disabled={abortPipeline.isPending}
+              >
+                Abort
+              </Button>
+            </HowToTooltip>
           )}
         </div>
       </div>
@@ -87,14 +90,16 @@ export function PhaseOutputPanel({ pipelineId }: { pipelineId: string }) {
                 </pre>
               )}
               {phaseData?.status === "awaiting_approval" && (
-                <Button
-                  size="sm"
-                  className="mt-3"
-                  onClick={() => approvePhase.mutate({ pipelineId, phase: phaseName })}
-                  disabled={approvePhase.isPending}
-                >
-                  Approve
-                </Button>
+                <HowToTooltip title="Approve Phase" description="Approve and continue to the next phase" side="top">
+                  <Button
+                    size="sm"
+                    className="mt-3"
+                    onClick={() => approvePhase.mutate({ pipelineId, phase: phaseName })}
+                    disabled={approvePhase.isPending}
+                  >
+                    Approve
+                  </Button>
+                </HowToTooltip>
               )}
             </div>
           );

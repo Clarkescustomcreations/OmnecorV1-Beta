@@ -12,7 +12,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
-import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
+import { HITLApprovalService } from "../core_services/services/HITLApprovalService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Router Definition

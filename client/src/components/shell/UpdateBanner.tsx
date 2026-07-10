@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { trpc } from "@/lib/trpc";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export function UpdateBanner() {
   const [dismissed, setDismissed] = useState(() => {
@@ -25,16 +26,18 @@ export function UpdateBanner() {
           </a>
         )}
       </span>
-      <button
-        onClick={() => {
-          sessionStorage.setItem("update-banner-dismissed", "true");
-          setDismissed(true);
-        }}
-        className="ml-4 text-accent-info hover:text-foreground"
-        aria-label="Dismiss update banner"
-      >
-        &#x2715;
-      </button>
+      <HowToTooltip title="Dismiss Update" description="Hide this notification until the next session." side="bottom">
+        <button
+          onClick={() => {
+            sessionStorage.setItem("update-banner-dismissed", "true");
+            setDismissed(true);
+          }}
+          className="ml-4 text-accent-info hover:text-foreground"
+          aria-label="Dismiss update banner"
+        >
+          &#x2715;
+        </button>
+      </HowToTooltip>
     </div>
   );
 }

@@ -13,7 +13,7 @@
  * configures it and reflects its live state.
  */
 import { useCallback, useEffect, useState } from "react";
-import { Text, View, TextInput, Switch, Alert } from "react-native";
+import { Text, View, TextInput, Switch, Alert, ActivityIndicator, ScrollView } from "react-native";
 import { Pressable } from "@/components/pressable";
 import { useColors } from "@/hooks/use-colors";
 import { trpcQuery } from "@/lib/_core/trpc-fetch";
@@ -29,6 +29,7 @@ import {
 import {
   getAuditLog, clearAuditLog, type ActivationRecord, type ListenState,
 } from "@/lib/_core/always-listen";
+import * as Speech from "expo-speech";
 
 interface Persona { id: string; name: string; type?: string }
 
@@ -53,12 +54,16 @@ export function AlwaysListenSettings() {
   const [sensitivity, setSensitivity] = useState(cfg.sensitivity);
   const [sttModel, setSttModel]       = useState(cfg.sttModelFilename);
   const [wakeWord, setWakeWord]       = useState(cfg.wakeWord ?? "omnecor");
+  const [ttsVoiceId, setTtsVoiceId]   = useState(cfg.ttsVoiceId);
 
   const [personas, setPersonas] = useState<Persona[]>([]);
   const [downloaded, setDownloaded] = useState<Record<string, boolean>>({});
   const [progress, setProgress]     = useState<Record<string, number>>({});
   const [downloading, setDownloading] = useState<Record<string, boolean>>({});
   const [audit, setAudit] = useState<ActivationRecord[]>([]);
+  // expo-speech device voices (populated once at mount)
+  const [deviceVoices, setDeviceVoices] = useState<Speech.Voice[]>([]);
+  const [loadingVoices, setLoadingVoices] = useState(false);
 
   // Load personas, downloaded-model state, and the audit log.
   useEffect(() => {
@@ -81,6 +86,21 @@ export function AlwaysListenSettings() {
 
   useEffect(() => { refreshDownloaded(); refreshAudit(); }, [refreshDownloaded, refreshAudit]);
   useEffect(() => { if (state === "listening" || state === "off") refreshAudit(); }, [state, refreshAudit]);
+
+  // Load available TTS voices from the device once at mount.
+  useEffect(() => {
+    setLoadingVoices(true);
+    Speech.getAvailableVoicesAsync()
+      .then((voices) => {
+        // Filter to English voices and sort by name for a manageable list.
+        const sorted = [...voices]
+          .filter((v) => v.language?.startsWith("en") ?? true)
+          .sort((a, b) => (a.name ?? "").localeCompare(b.name ?? ""));
+        setDeviceVoices(sorted);
+      })
+      .catch(() => { /* Speech API unavailable on this device/build */ })
+      .finally(() => setLoadingVoices(false));
+  }, []);
 
   // ── Handlers ───────────────────────────────────────────────────────────────
 
@@ -145,6 +165,11 @@ export function AlwaysListenSettings() {
   const handleSpeak = useCallback(async (v: boolean) => {
     setSpeakReplies(v);
     await persist({ speakReplies: v });
+  }, [persist]);
+
+  const handlePickVoice = useCallback(async (id: string) => {
+    setTtsVoiceId(id);
+    await persist({ ttsVoiceId: id });
   }, [persist]);
 
   const handleClearAudit = useCallback(async () => {
@@ -215,7 +240,7 @@ export function AlwaysListenSettings() {
         </View>
       )}
 
-      {/* Speak replies + sensitivity */}
+      {/* Speak replies + voice picker */}
       <View className="bg-surface border border-border rounded-lg p-4 flex-row justify-between items-center mb-3">
         <View className="flex-1 mr-2">
           <Text className="text-sm font-semibold text-foreground">Speak replies aloud</Text>
@@ -225,6 +250,64 @@ export function AlwaysListenSettings() {
           trackColor={{ false: colors.border, true: colors.primary }}
           thumbColor={speakReplies ? colors.background : colors.foreground} />
       </View>
+
+      {/* AI Voice selector — shown only when speakReplies is on */}
+      {speakReplies && (
+        <View className="mb-4">
+          <Text className="text-sm font-semibold text-foreground mb-1">AI voice for spoken replies</Text>
+          <Text className="text-xs text-muted mb-3">
+            Select which installed device voice the AI uses when speaking answers aloud.
+            {"\n"}To add more voices, go to Android Settings → Text-to-Speech → Install voice data.
+          </Text>
+
+          {/* System default option */}
+          <Pressable
+            onPress={() => handlePickVoice("")}
+            className={`rounded-lg p-3 mb-2 border flex-row justify-between items-center ${
+              ttsVoiceId === "" ? "border-primary bg-primary/10" : "border-border bg-surface"
+            }`}>
+            <View>
+              <Text className={`text-sm font-semibold ${
+                ttsVoiceId === "" ? "text-primary" : "text-foreground"
+              }`}>System default</Text>
+              <Text className="text-xs text-muted mt-0.5">Use the device's default TTS voice</Text>
+            </View>
+            {ttsVoiceId === "" && <Text className="text-primary text-xs font-semibold">Selected ✓</Text>}
+          </Pressable>
+
+          {loadingVoices ? (
+            <View className="flex-row items-center gap-2 py-2">
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text className="text-xs text-muted">Loading device voices…</Text>
+            </View>
+          ) : deviceVoices.length === 0 ? (
+            <Text className="text-xs text-muted">
+              No additional voices found. Install voice packs via Android Settings → Accessibility → Text-to-Speech.
+            </Text>
+          ) : (
+            deviceVoices.map((voice) => (
+              <Pressable
+                key={voice.identifier}
+                onPress={() => handlePickVoice(voice.identifier)}
+                className={`rounded-lg p-3 mb-2 border flex-row justify-between items-center ${
+                  ttsVoiceId === voice.identifier ? "border-primary bg-primary/10" : "border-border bg-surface"
+                }`}>
+                <View className="flex-1 mr-2">
+                  <Text className={`text-sm font-semibold ${
+                    ttsVoiceId === voice.identifier ? "text-primary" : "text-foreground"
+                  }`} numberOfLines={1}>{voice.name ?? voice.identifier}</Text>
+                  <Text className="text-xs text-muted mt-0.5">
+                    {voice.language}{voice.quality ? ` · ${voice.quality}` : ""}
+                  </Text>
+                </View>
+                {ttsVoiceId === voice.identifier && (
+                  <Text className="text-primary text-xs font-semibold">Selected ✓</Text>
+                )}
+              </Pressable>
+            ))
+          )}
+        </View>
+      )}
 
       <Text className="text-sm font-semibold text-foreground mb-2">Wake-word sensitivity</Text>
       <View className="flex-row gap-2 mb-4">

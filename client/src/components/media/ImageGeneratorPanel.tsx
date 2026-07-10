@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 type Provider = "local" | "fal" | "openart";
 
@@ -97,12 +98,14 @@ export function ImageGeneratorPanel() {
         </label>
       </div>
 
-      <Button
-        onClick={() => generate.mutate({ prompt, provider, model: model || undefined, width, height })}
-        disabled={generate.isPending || !prompt.trim()}
-      >
-        {generate.isPending ? "Generating..." : "Generate"}
-      </Button>
+      <HowToTooltip title="Generate Image" description="Create an image using the selected AI provider" side="top">
+        <Button
+          onClick={() => generate.mutate({ prompt, provider, model: model || undefined, width, height })}
+          disabled={generate.isPending || !prompt.trim()}
+        >
+          {generate.isPending ? "Generating..." : "Generate"}
+        </Button>
+      </HowToTooltip>
 
       {generate.isError && (
         <p className="text-destructive text-sm">{generate.error?.message}</p>

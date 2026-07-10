@@ -26,7 +26,7 @@ const mockGenerate = vi.fn();
 const mockUnload = vi.fn().mockResolvedValue(undefined);
 const mockPreWarm = vi.fn().mockResolvedValue(undefined);
 
-vi.mock("../phase2/services/LlamaCppService.js", () => ({
+vi.mock("../core_services/services/LlamaCppService.js", () => ({
   LlamaCppService: {
     getInstance: () => ({
       generate: mockGenerate,
@@ -37,13 +37,13 @@ vi.mock("../phase2/services/LlamaCppService.js", () => ({
 }));
 
 const mockChat = vi.fn();
-vi.mock("../phase2/services/AiProviderService.js", () => ({
+vi.mock("../core_services/services/AiProviderService.js", () => ({
   AiProviderService: {
     getInstance: () => ({ chat: mockChat }),
   },
 }));
 
-import { MoeChainService } from "../phase2/services/MoeChainService.js";
+import { MoeChainService } from "../core_services/services/MoeChainService.js";
 import { isSovereignMode } from "../_core/sovereign.js";
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

@@ -6,10 +6,11 @@ import { sdk } from "./sdk";
 import { ENV } from "./env.js";
 import crypto from "crypto";
 import { exchangeCodeForToken, fetchUserProfile } from "../oauth/oauthClients.js";
+import { encryptPlatformToken } from "../oauth/platformTokens.js";
 import { getDb } from "../db.factory.js";
 import { platformAccounts, oauthStates } from "../../drizzle/schema.js";
 import { eq, lt } from "drizzle-orm";
-import { SettingsService, getSetting } from "../phase2/services/SettingsService.js";
+import { SettingsService, getSetting } from "../core_services/services/SettingsService.js";
 
 export const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
 
@@ -593,8 +594,10 @@ export function registerSocialMediaOAuthRoutes(app: Express) {
         userId: stateData.userId,
         platform,
         accountName,
-        oauthToken: tokenResponse.access_token,
-        oauthRefreshToken: tokenResponse.refresh_token || undefined,
+        oauthToken: encryptPlatformToken(tokenResponse.access_token),
+        oauthRefreshToken: tokenResponse.refresh_token
+          ? encryptPlatformToken(tokenResponse.refresh_token)
+          : undefined,
         tokenExpiresAt: tokenResponse.expires_in
           ? new Date(Date.now() + tokenResponse.expires_in * 1000)
           : undefined,
@@ -626,22 +629,97 @@ export function registerSocialMediaOAuthRoutes(app: Express) {
 // ---------------------------------------------------------------------------
 // Local account auth (desktop / sovereign installs with no OAuth provider)
 // ---------------------------------------------------------------------------
-// Uses scrypt via Node's built-in crypto — no extra dependency needed.
+// Uses scrypt via Node's built-in crypto — no extra dependency needed. Cost
+// parameters are OWASP's current minimum recommendation for scrypt (N=2^17,
+// r=8, p=1 — ~128MB / a few hundred ms per hash) and are encoded into the
+// stored hash string so the cost can be raised again later without breaking
+// verification of already-hashed passwords (mirrors bcrypt/argon2's
+// self-describing `$algo$params$...` convention).
+const SCRYPT_N = 2 ** 17;
+const SCRYPT_R = 8;
+const SCRYPT_P = 1;
+const SCRYPT_KEYLEN = 64;
+// scrypt needs ~128*N*r bytes (~128MB at current cost); give headroom.
+const SCRYPT_MAXMEM = 256 * 1024 * 1024;
 
-function hashPassword(password: string, salt: string): Promise<string> {
+function scryptDerive(
+  password: string,
+  salt: Buffer,
+  keylen: number,
+  options: { N: number; r: number; p: number }
+): Promise<Buffer> {
   return new Promise((resolve, reject) => {
-    crypto.scrypt(password, salt, 64, (err, derived) => {
-      if (err) reject(err);
-      else resolve(`${salt}:${derived.toString("hex")}`);
-    });
+    crypto.scrypt(
+      password,
+      salt,
+      keylen,
+      { ...options, maxmem: SCRYPT_MAXMEM },
+      (err, derived) => {
+        if (err) reject(err);
+        else resolve(derived);
+      }
+    );
   });
 }
 
-async function verifyPassword(password: string, stored: string): Promise<boolean> {
-  const [salt] = stored.split(":");
-  if (!salt) return false;
-  const hash = await hashPassword(password, salt);
-  return crypto.timingSafeEqual(Buffer.from(hash), Buffer.from(stored));
+export async function hashPassword(password: string): Promise<string> {
+  const salt = crypto.randomBytes(16);
+  const derived = await scryptDerive(password, salt, SCRYPT_KEYLEN, {
+    N: SCRYPT_N,
+    r: SCRYPT_R,
+    p: SCRYPT_P,
+  });
+  const saltHex = salt.toString("hex");
+  const derivedHex = derived.toString("hex");
+  return `scrypt:${SCRYPT_N}:${SCRYPT_R}:${SCRYPT_P}:${saltHex}:${derivedHex}`;
+}
+
+export async function verifyPassword(
+  password: string,
+  stored: string
+): Promise<boolean> {
+  const parts = stored.split(":");
+
+  let n: number;
+  let r: number;
+  let p: number;
+  let saltHex: string;
+  let hashHex: string;
+
+  if (parts.length === 6 && parts[0] === "scrypt") {
+    n = Number(parts[1]);
+    r = Number(parts[2]);
+    p = Number(parts[3]);
+    saltHex = parts[4];
+    hashHex = parts[5];
+  } else if (parts.length === 2) {
+    // Legacy format from before cost hardening: "<saltHex>:<hashHex>",
+    // implicitly Node's old scrypt defaults (N=16384, r=8, p=1).
+    [saltHex, hashHex] = parts;
+    n = 16384;
+    r = 8;
+    p = 1;
+  } else {
+    return false;
+  }
+
+  const validParams =
+    Number.isFinite(n) && Number.isFinite(r) && Number.isFinite(p);
+  if (!saltHex || !hashHex || !validParams) {
+    return false;
+  }
+
+  const expected = Buffer.from(hashHex, "hex");
+  const derived = await scryptDerive(
+    password,
+    Buffer.from(saltHex, "hex"),
+    expected.length,
+    { N: n, r, p }
+  );
+  return (
+    derived.length === expected.length &&
+    crypto.timingSafeEqual(derived, expected)
+  );
 }
 
 export function registerLocalAuthRoutes(app: Express) {
@@ -660,8 +738,7 @@ export function registerLocalAuthRoutes(app: Express) {
       return;
     }
 
-    const salt = crypto.randomBytes(16).toString("hex");
-    const passwordHash = await hashPassword(password, salt);
+    const passwordHash = await hashPassword(password);
     const openId = "local:owner";
 
     await db.upsertUser({

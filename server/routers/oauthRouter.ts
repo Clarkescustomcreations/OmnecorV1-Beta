@@ -8,6 +8,7 @@ import {
   exchangeCodeForToken,
   fetchUserProfile,
 } from "../oauth/oauthClients";
+import { encryptPlatformToken } from "../oauth/platformTokens.js";
 import { TRPCError } from "@trpc/server";
 import { nanoid } from "nanoid";
 import crypto from "crypto";
@@ -146,8 +147,10 @@ export const oauthRouter = router({
           userId: ctx.user.id,
           platform: input.platform,
           accountName,
-          oauthToken: tokenResponse.access_token,
-          oauthRefreshToken: tokenResponse.refresh_token || undefined,
+          oauthToken: encryptPlatformToken(tokenResponse.access_token),
+          oauthRefreshToken: tokenResponse.refresh_token
+            ? encryptPlatformToken(tokenResponse.refresh_token)
+            : undefined,
           tokenExpiresAt: tokenResponse.expires_in
             ? new Date(Date.now() + tokenResponse.expires_in * 1000)
             : undefined,

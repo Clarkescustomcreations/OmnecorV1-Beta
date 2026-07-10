@@ -21,6 +21,7 @@ import {
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 const jobTypeConfig: Record<string, { label: string; icon: React.ComponentType<{ className?: string }>; color: string }> = {
   lora_training: { label: "LoRA Training", icon: Activity, color: "text-accent-warning" },
@@ -70,9 +71,11 @@ export function JobsPanel() {
           </CardTitle>
           <CardDescription className="text-[10px]">Real-time status of asynchronous tasks</CardDescription>
         </div>
-        <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => pruneMutation.mutate({})}>
-          <Trash2 className="w-3.5 h-3.5" />
-        </Button>
+        <HowToTooltip title="Clear History" description="Remove completed and failed jobs" side="top">
+          <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-destructive" onClick={() => pruneMutation.mutate({})}>
+            <Trash2 className="w-3.5 h-3.5" />
+          </Button>
+        </HowToTooltip>
       </CardHeader>
       <CardContent>
         <div className="space-y-3">
@@ -105,14 +108,16 @@ export function JobsPanel() {
                   </div>
                   <div className="flex items-center gap-2">
                     {job.state === "running" && (
-                      <Button 
-                        size="icon" 
-                        variant="ghost" 
-                        className="h-7 w-7 text-destructive hover:bg-destructive/10"
-                        onClick={() => cancelMutation.mutate({ jobId: job.jobId })}
-                      >
-                        <StopCircle className="w-4 h-4" />
-                      </Button>
+                      <HowToTooltip title="Cancel Job" description="Stop this running background task" side="left">
+                        <Button 
+                          size="icon" 
+                          variant="ghost" 
+                          className="h-7 w-7 text-destructive hover:bg-destructive/10"
+                          onClick={() => cancelMutation.mutate({ jobId: job.jobId })}
+                        >
+                          <StopCircle className="w-4 h-4" />
+                        </Button>
+                      </HowToTooltip>
                     )}
                     {job.state === "completed" && <CheckCircle2 className="w-4 h-4 text-accent-success" />}
                     {job.state === "failed" && <XCircle className="w-4 h-4 text-destructive" />}

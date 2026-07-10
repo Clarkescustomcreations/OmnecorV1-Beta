@@ -21,7 +21,7 @@ vi.mock("../db.factory.js", async (importActual) => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -31,7 +31,7 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import path from "path";
 import fs from "fs/promises";
 import { appRouter } from "../routers.js";
-import { ESPToolBridge, type SerialPort } from "../phase2/services/ESPToolService.js";
+import { ESPToolBridge, type SerialPort } from "../core_services/services/ESPToolService.js";
 import { createTestDb, seedUser, makeContext, waitForJob } from "./_helpers/trpcHarness.js";
 import { PATHS } from "../_core/paths.js";
 

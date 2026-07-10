@@ -61,7 +61,7 @@ vi.mock("stream/promises", () => ({
   default: { pipeline: mockPipeline },
 }));
 
-import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
+import { ValetArtifactRegistry } from "../core_services/services/ValetArtifactRegistry.js";
 
 // ── Default behaviour: all reads throw ENOENT ─────────────────────────────────
 beforeEach(() => {
@@ -204,7 +204,7 @@ describe("ValetArtifactRegistry.seedFromRepoIfMissing", () => {
 
     vi.resetModules();
     const { ValetArtifactRegistry: IsolatedRegistry } =
-      await import("../phase2/services/ValetArtifactRegistry.js");
+      await import("../core_services/services/ValetArtifactRegistry.js");
 
     // Restore so subsequent tests get the real PATHS.
     vi.doUnmock("../_core/paths.js");

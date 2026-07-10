@@ -32,7 +32,7 @@ vi.mock("../_core/NotificationService.js", () => ({
   NotificationService: { getInstance: () => ({ notify }) },
 }));
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

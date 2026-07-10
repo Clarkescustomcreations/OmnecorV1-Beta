@@ -6,7 +6,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { AuditLogService } from "../core_services/services/AuditLogService.js";
 import { createLogger } from "../_core/logger.js";
 const log = createLogger("agentRouter");
 

@@ -24,11 +24,14 @@ import type { EdgeInsets, Metrics, Rect } from "react-native-safe-area-context";
 
 import { trpc, createTRPCClient } from "@/lib/trpc";
 import { initManusRuntime, subscribeSafeAreaInsets } from "@/lib/_core/manus-runtime";
-import { loadServerConfig } from "@/lib/_core/server-config";
+import { loadServerConfig, isServerConfigured, isOmmeshEnabled } from "@/lib/_core/server-config";
+import { connect as meshConnect } from "@/lib/_core/mobile-mesh-node";
+import { autoLoadLastPhoneModel } from "@/lib/_core/phone-model";
 import { loadListenConfig } from "@/lib/_core/always-listen-config";
 import { useAlwaysListenCapture } from "@/hooks/use-always-listen";
 import { startConnectionMonitor, subscribeConnection } from "@/lib/_core/connection";
 import { loadAccount, isOnboarded, getAccount, syncAccountToPc } from "@/lib/_core/account";
+import { getSessionToken } from "@/lib/_core/auth";
 import { syncChatsToPc } from "@/lib/_core/chat-sync";
 import { SetupFlow } from "@/components/setup-flow";
 import { View } from "react-native";
@@ -106,9 +109,22 @@ export default function RootLayout() {
       try { await loadServerConfig(); } catch { /* offline-safe */ }
       try { await loadListenConfig(); } catch { /* offline-safe */ }
       try { await loadAccount(); } catch { /* offline-safe */ }
+      // A device that already holds a PC-minted session token is paired and fully
+      // authenticated — skip the login/onboarding screen entirely, even if the
+      // account record is missing (e.g. paired by an older build before we
+      // persisted onboarded state on pairing).
+      let hasSession = false;
+      try { hasSession = !!(await getSessionToken()); } catch { /* offline-safe */ }
       if (cancelled) return;
-      setOnboarded(isOnboarded());
+      setOnboarded(isOnboarded() || hasSession);
       startConnectionMonitor();
+      // Rejoin the mesh on every launch when the user enabled worker mode —
+      // a worker node that silently drops out after an app restart isn't one.
+      if (isServerConfigured() && isOmmeshEnabled()) meshConnect();
+      // Re-arm the last on-device model (GGUF or LiteRT) in the background so
+      // the phone serves mesh inference without a manual tap after a restart.
+      // Honors the saved acceleration mode (NPU/GPU/CPU) via the loaders.
+      void autoLoadLastPhoneModel();
       setReady(true);
     })();
     return () => { cancelled = true; };

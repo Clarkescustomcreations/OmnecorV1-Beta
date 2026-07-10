@@ -8,10 +8,10 @@
 import { z } from "zod";
 import { publicProcedure, protectedProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { PCBWayService } from "../phase2/services/PCBWayService.js";
-import { extractBoardSpecs } from "../phase2/services/kicadBoardSpecs.js";
-import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
-import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { PCBWayService } from "../core_services/services/PCBWayService.js";
+import { extractBoardSpecs } from "../core_services/services/kicadBoardSpecs.js";
+import { HITLApprovalService } from "../core_services/services/HITLApprovalService.js";
+import { AuditLogService } from "../core_services/services/AuditLogService.js";
 import { validatePath } from "../_core/security.js";
 import { createLogger } from "../_core/logger.js";
 const log = createLogger("kicadRouter");

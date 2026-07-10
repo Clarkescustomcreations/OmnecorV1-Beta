@@ -13,7 +13,7 @@
  *   isAvailable(): returns false when server unreachable
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
+import { ValetRouterService } from "../core_services/services/ValetRouterService.js";
 
 function makeOfflineFetch() {
   return vi.fn().mockRejectedValue(new Error("ECONNREFUSED"));

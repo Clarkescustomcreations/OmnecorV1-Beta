@@ -24,7 +24,7 @@ vi.mock("../db.factory.js", async importActual => {
 // The audit middleware on every protectedProcedure persists through the real
 // file DB; stub it so these tests stay hermetic (audit logging is tested
 // elsewhere).
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

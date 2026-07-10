@@ -17,6 +17,7 @@ import { useState } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { LoadingQuote } from "@/components/loading-quote";
 import { useColors } from "@/hooks/use-colors";
+import { useBottomInset } from "@/hooks/use-bottom-inset";
 import { useChatDisplaySettings } from "@/hooks/use-chat-display-settings";
 import { isServerConfigured } from "@/lib/_core/server-config";
 import { useNotifications, type OmnecorNotification, type NotificationKind } from "@/hooks/use-notifications";
@@ -139,6 +140,7 @@ function HitlQueue() {
 // ── Alerts ───────────────────────────────────────────────────────────────────
 
 function AlertsView() {
+  const bottomInset = useBottomInset();
   const { notifications, unread, loading, error, refresh, markRead, markAllRead, clear } = useNotifications();
 
   const renderItem = ({ item }: { item: OmnecorNotification }) => (
@@ -190,7 +192,7 @@ function AlertsView() {
         data={notifications}
         keyExtractor={(i) => i.id}
         renderItem={renderItem}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: bottomInset }}
         ListHeaderComponent={<HitlQueue />}
         ListEmptyComponent={
           <View className="flex-1 items-center justify-center py-16 px-6">
@@ -209,6 +211,7 @@ function AlertsView() {
 // ── Messenger ────────────────────────────────────────────────────────────────
 
 function MessengerView() {
+  const bottomInset = useBottomInset();
   const { conversations, loading, error, refresh } = useAgentConversations();
   const [active, setActive] = useState<AgentConversation | null>(null);
   const thread = useAgentThread(active?.personaId ?? null);
@@ -302,7 +305,7 @@ function MessengerView() {
       <FlatList
         data={conversations}
         keyExtractor={(c) => c.personaId}
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: bottomInset }}
         renderItem={({ item }) => (
           <Pressable onPress={() => setActive(item)} className="flex-row items-center gap-3 p-4 border-b border-border">
             <View className="w-10 h-10 rounded-full bg-primary/15 items-center justify-center">

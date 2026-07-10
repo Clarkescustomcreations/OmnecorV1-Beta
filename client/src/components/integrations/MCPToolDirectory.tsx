@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/collapsible";
 import { Plus, ChevronDown, X, AlertTriangle, Plug } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 // ---------------------------------------------------------------------------
 // Local type definitions (MCPClientService is not importable from frontend)
@@ -100,13 +101,15 @@ function ConnectServerForm() {
   return (
     <Collapsible open={open} onOpenChange={setOpen}>
       <CollapsibleTrigger asChild>
-                                        <Button variant="outline" size="sm" className="gap-2">
-          <Plus className="w-4 h-4" />
-          Connect Server
-          <ChevronDown
-            className={cn("w-4 h-4 transition-transform", open && "rotate-180")}
-          />
-        </Button>
+        <HowToTooltip title="Connect Server" description="Configure and connect a new Model Context Protocol (MCP) server." side="bottom">
+          <Button variant="outline" size="sm" className="gap-2">
+            <Plus className="w-4 h-4" />
+            Connect Server
+            <ChevronDown
+              className={cn("w-4 h-4 transition-transform", open && "rotate-180")}
+            />
+          </Button>
+        </HowToTooltip>
       </CollapsibleTrigger>
 
       <CollapsibleContent>
@@ -215,13 +218,15 @@ function ServerChip({ server }: { server: MCPServerConfig }) {
   return (
     <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full bg-secondary text-secondary-foreground text-xs font-medium border border-border">
       {server.name}
-      <button
-        className="ml-1 rounded-full hover:bg-muted p-0.5 transition-colors"
-        onClick={() => disconnectMutation.mutate({ serverId: server.id }, { onError: (err) => toast.error(`Disconnect failed: ${err.message}`) })}
-        aria-label={`Disconnect ${server.name}`}
-      >
-        <X className="w-3 h-3" />
-      </button>
+      <HowToTooltip title="Disconnect Server" description="Disconnect this MCP server and remove its tools." side="bottom">
+        <button
+          className="ml-1 rounded-full hover:bg-muted p-0.5 transition-colors"
+          onClick={() => disconnectMutation.mutate({ serverId: server.id }, { onError: (err) => toast.error(`Disconnect failed: ${err.message}`) })}
+          aria-label={`Disconnect ${server.name}`}
+        >
+          <X className="w-3 h-3" />
+        </button>
+      </HowToTooltip>
     </span>
   );
 }
@@ -269,13 +274,15 @@ function ToolTestPanel({ tool }: { tool: MCPTool }) {
 
   if (!state.open) {
     return (
-      <Button
-        size="sm"
-        variant="outline"
-        onClick={() => setState(s => ({ ...s, open: true }))}
-      >
-        Test
-      </Button>
+      <HowToTooltip title="Test Tool" description="Open the payload editor to manually test this tool." side="bottom">
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={() => setState(s => ({ ...s, open: true }))}
+        >
+          Test
+        </Button>
+      </HowToTooltip>
     );
   }
 

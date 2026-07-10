@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { hasPermission, ROLE_PERMISSIONS } from "../phase2/config/rbac.js";
+import { hasPermission, ROLE_PERMISSIONS } from "../core_services/config/rbac.js";
 
 // The "device" role is applied at auth time to a paired phone's token
 // (sdk.authenticateRequest caps the resolved user's role when session.deviceId is

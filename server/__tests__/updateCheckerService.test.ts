@@ -10,7 +10,7 @@
  *   checkForUpdates(): releaseUrl and releaseNotes populated from API response
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { UpdateCheckerService } from "../phase2/services/UpdateCheckerService.js";
+import { UpdateCheckerService } from "../core_services/services/UpdateCheckerService.js";
 
 function makeGitHubResponse(tag: string, htmlUrl: string, body: string, status = 200) {
   return {

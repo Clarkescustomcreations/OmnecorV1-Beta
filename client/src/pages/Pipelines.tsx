@@ -71,7 +71,7 @@ export function Pipelines() {
   if (selectedPipelineId) {
     return (
       <OmnecorDashboardLayout>
-        <div className="h-full flex flex-col bg-background">
+        <div className="h-full flex flex-col">
           <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4 flex items-center gap-3 min-w-0">
             <Button
               id="btn-back-to-pipelines"
@@ -95,7 +95,7 @@ export function Pipelines() {
 
   return (
     <OmnecorDashboardLayout>
-      <div className="h-full flex flex-col bg-background">
+      <div className="h-full flex flex-col">
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">

@@ -12,7 +12,7 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { integrationManagementService } from "../phase2/services/IntegrationManagementService.js";
+import { integrationManagementService } from "../core_services/services/IntegrationManagementService.js";
 
 export const integrationManagementRouter = router({
   /**

@@ -12,6 +12,7 @@ const KEY_SPEAK        = "omnecor_listen_speak";
 const KEY_SENSITIVITY  = "omnecor_listen_sensitivity";
 const KEY_STT_MODEL    = "omnecor_listen_stt_model";
 const KEY_WAKE_WORD    = "omnecor_listen_wake_word";
+const KEY_TTS_VOICE_ID = "omnecor_listen_tts_voice_id";
 
 export interface AlwaysListenConfig {
   /** Master toggle — whether the wake-word service should run. */
@@ -26,6 +27,11 @@ export interface AlwaysListenConfig {
   sttModelFilename: string;
   /** Wake word to listen for (defaults to "omnecor"). */
   wakeWord: string;
+  /**
+   * expo-speech voice identifier for AI reply playback (from Speech.getAvailableVoicesAsync()).
+   * Empty string = use the device system default voice.
+   */
+  ttsVoiceId: string;
 }
 
 // In-memory cache so callers (the orchestrator/service) can read synchronously
@@ -37,11 +43,12 @@ let _cfg: AlwaysListenConfig = {
   sensitivity: 0.5,
   sttModelFilename: "",
   wakeWord: "omnecor",
+  ttsVoiceId: "",
 };
 
 export async function loadListenConfig(): Promise<void> {
-  const [enabled, persona, speak, sens, model, wakeWord] = await AsyncStorage.multiGet([
-    KEY_ENABLED, KEY_PERSONA, KEY_SPEAK, KEY_SENSITIVITY, KEY_STT_MODEL, KEY_WAKE_WORD,
+  const [enabled, persona, speak, sens, model, wakeWord, ttsVoiceId] = await AsyncStorage.multiGet([
+    KEY_ENABLED, KEY_PERSONA, KEY_SPEAK, KEY_SENSITIVITY, KEY_STT_MODEL, KEY_WAKE_WORD, KEY_TTS_VOICE_ID,
   ]).then((pairs) => pairs.map(([, v]) => v));
 
   _cfg = {
@@ -51,6 +58,7 @@ export async function loadListenConfig(): Promise<void> {
     sensitivity: sens != null ? clamp01(parseFloat(sens)) : 0.5,
     sttModelFilename: model ?? "",
     wakeWord: wakeWord ?? "omnecor",
+    ttsVoiceId: ttsVoiceId ?? "",
   };
 }
 
@@ -73,11 +81,12 @@ export async function saveListenConfig(
     sensitivity: patch.sensitivity != null ? clamp01(patch.sensitivity) : _cfg.sensitivity,
   };
   await AsyncStorage.multiSet([
-    [KEY_ENABLED,     String(_cfg.enabled)],
-    [KEY_PERSONA,     _cfg.personaId],
-    [KEY_SPEAK,       String(_cfg.speakReplies)],
-    [KEY_SENSITIVITY, String(_cfg.sensitivity)],
-    [KEY_STT_MODEL,   _cfg.sttModelFilename],
-    [KEY_WAKE_WORD,   _cfg.wakeWord],
+    [KEY_ENABLED,      String(_cfg.enabled)],
+    [KEY_PERSONA,      _cfg.personaId],
+    [KEY_SPEAK,        String(_cfg.speakReplies)],
+    [KEY_SENSITIVITY,  String(_cfg.sensitivity)],
+    [KEY_STT_MODEL,    _cfg.sttModelFilename],
+    [KEY_WAKE_WORD,    _cfg.wakeWord],
+    [KEY_TTS_VOICE_ID, _cfg.ttsVoiceId],
   ]);
 }

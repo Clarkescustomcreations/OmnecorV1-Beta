@@ -45,9 +45,16 @@ PIP="${VENV_DIR}/bin/pip"
 "${PIP}" install --upgrade pip --quiet
 
 # ── Core ML deps (always) ─────────────────────────────────────────────────────
+# Pins verified on real hardware (RTX 4060 Ti smoke test, 2026-07-02):
+#  - transformers <5: 5.x breaks unsloth's patched training step (same 5.x
+#    breakage class as the coqui-tts pin in requirements.txt).
+#  - trl <0.24: 0.24 computes per-token entropy via `outputs.logits.shape` in
+#    compute_loss, which crashes on unsloth's lazy-logits optimization
+#    ("'function' object is not subscriptable"). localLLMfine-tuning.py also
+#    sets UNSLOTH_RETURN_LOGITS=1 as a belt-and-suspenders guard.
 "${PIP}" install \
-  "transformers>=4.40.0" \
-  "trl>=0.8.0" \
+  "transformers>=4.40.0,<5" \
+  "trl>=0.8.0,<0.24" \
   "datasets>=2.19.0" \
   "accelerate>=0.30.0" \
   "peft>=0.10.0" \
@@ -61,6 +68,11 @@ if [[ "${HAS_GPU}" -eq 1 ]]; then
     "${PIP}" install "torch>=2.3.0" --quiet
   "${PIP}" install "unsloth[colab-new]@git+https://github.com/unslothai/unsloth.git" --quiet || \
     "${PIP}" install "unsloth" --quiet
+  # `pip install unsloth` can replace the CUDA torch wheel with a CPU build —
+  # re-assert the CUDA wheel (observed on Windows; harmless no-op when intact).
+  "${PIP}" install "torch>=2.3.0" --index-url https://download.pytorch.org/whl/cu121 --quiet || true
+  # unsloth may also drag transformers/trl past the pins — re-assert them.
+  "${PIP}" install "transformers>=4.40.0,<5" "trl>=0.8.0,<0.24" --quiet
 else
   echo "[setup-valet-ml] Installing torch (CPU)..."
   "${PIP}" install "torch>=2.3.0" --quiet

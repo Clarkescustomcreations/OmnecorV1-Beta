@@ -7,10 +7,10 @@ import path from "path";
 import { router, protectedProcedure, adminProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
-import { ValetRouterService } from "../phase2/services/ValetRouterService.js";
-import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
-import { ValetServerService } from "../phase2/services/ValetServerService.js";
-import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
+import { ValetRouterService } from "../core_services/services/ValetRouterService.js";
+import { ValetArtifactRegistry } from "../core_services/services/ValetArtifactRegistry.js";
+import { ValetServerService } from "../core_services/services/ValetServerService.js";
+import { PYTHON_SCRIPTS } from "../core_services/config/index.js";
 import { getDb } from "../db.factory.js";
 import { moeChainConfigs, type MoeChainStep } from "../../drizzle/schema.js";
 import { eq, and } from "drizzle-orm";
@@ -18,7 +18,11 @@ import { PATHS } from "../_core/paths.js";
 
 const execFileAsync = promisify(execFile);
 
-const MIN_TRAINING_VRAM_MB = 8 * 1024; // 8 GB — minimum for 1.5B LoRA on Unsloth
+// 8-GB-class minimum for 1.5B LoRA on Unsloth. Set below a literal 8192 because
+// every "8 GB" card reports slightly less usable VRAM (an RTX 4060 Ti reports
+// 8188 MiB) — a `>= 8*1024` check rejects exactly the hardware this gate exists
+// to admit, while 7.5 GB still excludes the 6-GB tier.
+const MIN_TRAINING_VRAM_MB = 7680;
 
 async function detectGpu(): Promise<{ available: boolean; name: string; vramMb: number }> {
   // NVIDIA

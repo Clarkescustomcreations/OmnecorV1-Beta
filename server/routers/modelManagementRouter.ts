@@ -7,7 +7,7 @@
 
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
-import { ModelManagementService } from "../phase2/services/ModelManagementService.js";
+import { ModelManagementService } from "../core_services/services/ModelManagementService.js";
 import { TRPCError } from "@trpc/server";
 import { createLogger } from "../_core/logger.js";
 import { validatePath } from "../_core/security.js";

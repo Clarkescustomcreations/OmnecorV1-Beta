@@ -3,6 +3,7 @@ import { Loader2, Eye, Edit3, Sliders, Type, Image, Sparkles } from "lucide-reac
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface ElementData {
   tagName: string;
@@ -336,30 +337,32 @@ export function WebPreview({ code, onChange, onTextHighlight }: WebPreviewProps)
               💡 Tip: Click elements to inspect/edit or drag to resize/move
             </span>
           )}
-          <Button
-            size="sm"
-            variant={editMode ? "default" : "outline"}
-            className={cn(
-              "h-7 text-[10px] px-2.5 flex items-center gap-1",
-              editMode 
-                ? "bg-primary/10 hover:bg-primary/90 text-white border-none" 
-                : "border-slate-800 hover:bg-slate-800 text-slate-300"
-            )}
-            onClick={() => {
-              setEditMode(!editMode);
-              setSelectedElement(null);
-            }}
-          >
-            {editMode ? (
-              <>
-                <Eye className="w-3.5 h-3.5" /> Preview Mode
-              </>
-            ) : (
-              <>
-                <Edit3 className="w-3.5 h-3.5 text-primary" /> Visual Edit Mode
-              </>
-            )}
-          </Button>
+          <HowToTooltip title="Toggle Edit Mode" description="Switch between standard preview and interactive visual builder" side="bottom">
+            <Button
+              size="sm"
+              variant={editMode ? "default" : "outline"}
+              className={cn(
+                "h-7 text-[10px] px-2.5 flex items-center gap-1",
+                editMode 
+                  ? "bg-primary/10 hover:bg-primary/90 text-white border-none" 
+                  : "border-slate-800 hover:bg-slate-800 text-slate-300"
+              )}
+              onClick={() => {
+                setEditMode(!editMode);
+                setSelectedElement(null);
+              }}
+            >
+              {editMode ? (
+                <>
+                  <Eye className="w-3.5 h-3.5" /> Preview Mode
+                </>
+              ) : (
+                <>
+                  <Edit3 className="w-3.5 h-3.5 text-primary" /> Visual Edit Mode
+                </>
+              )}
+            </Button>
+          </HowToTooltip>
         </div>
       </div>
 

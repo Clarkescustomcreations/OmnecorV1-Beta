@@ -5,8 +5,8 @@
  * cadence. Settings are re-read each tick (mtime-cached) so toggling the
  * switch or changing the frequency takes effect without a restart.
  */
-import { SecurityService } from "../phase2/services/SecurityService.js";
-import { getSetting } from "../phase2/services/SettingsService.js";
+import { SecurityService } from "../core_services/services/SecurityService.js";
+import { getSetting } from "../core_services/services/SettingsService.js";
 import { PATHS } from "./paths.js";
 import { createLogger } from "./logger.js";
 

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export function ZeroLoginBanner() {
   const [dismissed, setDismissed] = useState(false);
@@ -27,14 +28,16 @@ export function ZeroLoginBanner() {
           <strong>Zero-Login Mode</strong> — All requests run as local admin. {modeLabel} Do not expose this instance to a network.
         </span>
       </div>
-      <button
-        onClick={() => setDismissed(true)}
-        disabled={isLoading}
-        className="ml-4 text-accent-warning hover:text-accent-warning/80 font-medium flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
-        aria-label="Dismiss zero-login warning"
-      >
-        Dismiss
-      </button>
+      <HowToTooltip title="Dismiss Warning" description="Acknowledge and dismiss this security warning." side="bottom">
+        <button
+          onClick={() => setDismissed(true)}
+          disabled={isLoading}
+          className="ml-4 text-accent-warning hover:text-accent-warning/80 font-medium flex-shrink-0 disabled:opacity-40 disabled:cursor-not-allowed"
+          aria-label="Dismiss zero-login warning"
+        >
+          Dismiss
+        </button>
+      </HowToTooltip>
     </div>
   );
 }

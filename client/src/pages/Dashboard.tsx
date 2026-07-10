@@ -161,7 +161,7 @@ export function Dashboard() {
 
   return (
     <OmnecorDashboardLayout>
-      <div className="min-h-screen bg-background">
+      <div className="min-h-screen">
         {/* Hero Section */}
         <div className="border-b border-border bg-gradient-to-br from-card to-background">
           <div className="max-w-5xl mx-auto px-6 sm:px-12 py-10 md:py-20 flex flex-col md:flex-row justify-between items-start md:items-center gap-8">

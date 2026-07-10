@@ -9,9 +9,10 @@
 
 import React, { useMemo } from 'react';
 import { Node, Edge } from 'reactflow';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { componentLibrary } from '@/lib/componentLibrary';
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export interface NetlistPanelProps {
   nodes: Node[];
@@ -99,12 +100,14 @@ export const NetlistPanel: React.FC<NetlistPanelProps> = ({
       {/* Header */}
       <div className="p-3 border-b border-border flex items-center justify-between">
         <h2 className="text-sm font-semibold text-foreground">Netlist</h2>
-        <button
-          onClick={onClose}
-          className="text-muted-foreground hover:text-foreground text-lg leading-none"
-        >
-          ×
-        </button>
+        <HowToTooltip title="Close Netlist" description="Hide the netlist panel" side="left">
+          <button
+            onClick={onClose}
+            className="text-muted-foreground hover:text-foreground text-lg leading-none"
+          >
+            ×
+          </button>
+        </HowToTooltip>
       </div>
 
       {/* Statistics */}

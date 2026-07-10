@@ -13,6 +13,7 @@ const KEY_PORT   = "omnecor_server_port";
 // sensitive and stay in AsyncStorage.
 const KEY_SECRET = "omnecor_ommesh_secret";
 const KEY_NAME   = "omnecor_node_name";
+const KEY_MESH   = "omnecor_ommesh_enabled";
 
 // In-memory cache so callers can use getServerBaseUrl() synchronously
 // after the first loadServerConfig() call at app startup.
@@ -20,11 +21,13 @@ let _ip     = "";
 let _port   = "3000";
 let _secret = "";
 let _name   = "Phone";
+let _meshEnabled = false;
 
 export async function loadServerConfig(): Promise<void> {
   _ip     = (await AsyncStorage.getItem(KEY_IP))     ?? "";
   _port   = (await AsyncStorage.getItem(KEY_PORT))   ?? "3000";
   _name   = (await AsyncStorage.getItem(KEY_NAME))   ?? "Phone";
+  _meshEnabled = (await AsyncStorage.getItem(KEY_MESH)) === "true";
 
   // Read the OMMESH secret from the hardware KeyStore. Migrate any pre-existing
   // plaintext secret left in AsyncStorage by older builds, then scrub it.
@@ -96,6 +99,13 @@ export function getOmmeshSecret(): string  { return _secret; }
 export function getNodeName(): string       { return _name; }
 export function getServerIp(): string       { return _ip; }
 export function isServerConfigured(): boolean { return !!_ip; }
+
+/** Whether the user enabled "Register as OMMESH Node" (persisted). */
+export function isOmmeshEnabled(): boolean { return _meshEnabled; }
+export async function setOmmeshEnabled(enabled: boolean): Promise<void> {
+  _meshEnabled = enabled;
+  await AsyncStorage.setItem(KEY_MESH, enabled ? "true" : "false");
+}
 
 export async function saveServerConfig(opts: {
   ip: string;

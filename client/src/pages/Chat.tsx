@@ -11,9 +11,10 @@ import { MemoryArchiverPanel } from "@/components/chat/MemoryArchiverPanel";
 import { TerminalPanel } from "@/components/chat/TerminalPanel";
 import { EmbeddedTerminal } from "@/components/terminal/EmbeddedTerminal";
 import { HITLCommandApproval } from "@/components/terminal/HITLCommandApproval";
-import { extractTerminalCommand } from "@/lib/terminalDirective";
 import { vanillaTrpc, trpc } from "@/lib/trpc";
 import { IS_DEMO } from "@/lib/demo";
+import { applyAgentEvent, applyJobCompletion } from "@/lib/agentStream";
+import type { AssistantBlock } from "@shared/chatBlocks";
 import {
   ChatMessage,
   ContextFile,
@@ -58,7 +59,7 @@ import { useUserPeerCard, buildPeerCardContext } from "@/lib/userPeerCard";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
 import { useNeuralContextStore } from "@/lib/neuralContextStore";
 import { useFictionMode } from "@/contexts/FictionModeContext";
-import { ChevronLeft, ChevronRight, Coins, FolderOpen, Box, Cpu, Globe, Maximize2, X, UserCircle2 } from "lucide-react";
+import { ChevronLeft, ChevronRight, Coins, FolderOpen, Box, Cpu, Globe, Maximize2, X, UserCircle2, Network } from "lucide-react";
 
 import { ThreeViewer } from "@/components/designer/ThreeViewer";
 import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
@@ -205,6 +206,22 @@ export function Chat() {
   const updateDbSession = trpc.chat.updateSession.useMutation();
   const deleteDbSession = trpc.chat.deleteSession.useMutation();
   const bulkImportDb = trpc.chat.bulkImport.useMutation();
+  const resolveToolApproval = trpc.aiProvider.resolveToolApproval.useMutation();
+  const runCodeSnippet = trpc.aiProvider.runCodeSnippet.useMutation();
+  // Mesh-Delegation.md — managed sub-agent chats. `delegatedById` maps every
+  // delegated session id → its delegation metadata (node/scope), derived from
+  // the DB session list (which carries `metadata.delegation`). `activeDelegation`
+  // is the current conversation's, when it is a managed chat.
+  const delegationSendTurn = trpc.delegation.sendTurn.useMutation();
+  const delegationCancel = trpc.delegation.cancel.useMutation();
+  const delegatedById = useMemo(() => {
+    const m = new Map<string, { nodeId: string; nodeName: string }>();
+    for (const s of dbSessions) {
+      const del = (s.metadata as { delegation?: { nodeId: string; nodeName: string } } | null)?.delegation;
+      if (del) m.set(s.id, { nodeId: del.nodeId, nodeName: del.nodeName });
+    }
+    return m;
+  }, [dbSessions]);
   // Set of session IDs known to exist in DB (to skip redundant creates)
   const dbSessionIds = useRef<Set<string>>(new Set());
   useEffect(() => {
@@ -295,10 +312,16 @@ export function Chat() {
   // ── Streaming ────────────────────────────────────────────────────────────
   const [isStreaming, setIsStreaming] = useState(false);
   const streamRef = useRef<{ unsubscribe: () => void } | null>(null);
+  // How the most recent turn ended, read by the message-queue drain effect:
+  // "done"/"stopped" drain the next queued turn; "error" holds it back so a
+  // failing provider isn't hammered with the whole queue. Starts "done" so the
+  // very first idle state is allowed to drain.
+  const streamEndRef = useRef<"done" | "error" | "stopped">("done");
 
   const handleStop = useCallback(() => {
     streamRef.current?.unsubscribe();
     streamRef.current = null;
+    streamEndRef.current = "stopped";
     setIsStreaming(false);
   }, []);
 
@@ -334,6 +357,11 @@ export function Chat() {
   const sidebarCollapsed = useAppStore((s) => s.chatHistoryCollapsed);
   const setSidebarCollapsed = useAppStore((s) => s.setChatHistoryCollapsed);
 
+  // Between-turn message queue (type-ahead — ChatInput enqueues while streaming).
+  const messageQueue = useAppStore((s) => s.messageQueue);
+  const dequeueMessage = useAppStore((s) => s.dequeueMessage);
+  const clearMessageQueue = useAppStore((s) => s.clearMessageQueue);
+
   // When DB sessions load, use them as the authoritative sidebar list
   useEffect(() => {
     if (IS_DEMO || !dbSessionsLoaded) return;
@@ -343,6 +371,7 @@ export function Chat() {
       lastMessage: "",
       updatedAt: new Date(s.updatedAt).toISOString(),
       messageCount: 0,
+      delegatedNodeName: (s.metadata as { delegation?: { nodeName: string } } | null)?.delegation?.nodeName,
     })));
   }, [dbSessions, dbSessionsLoaded]);
 
@@ -564,9 +593,22 @@ export function Chat() {
     if (loaded) setConversation(loaded);
   }, [conversation, chatUtils]);
 
-  // Auto-switch conversation when activeMap or filterScope changes to align with project isolation
+  // Auto-switch conversation when activeMap or filterScope changes to align with project isolation.
+  // Keyed on the map+scope pair (not every session-list refetch) so that persisting the FIRST
+  // message of a brand-new conversation — which invalidates listSessions and refetches dbSessions —
+  // does not briefly see an empty project list and yank the user out of the chat they just started.
+  const prevMapScopeRef = useRef<string>("");
   useEffect(() => {
     if (IS_DEMO || !dbSessionsLoaded) return;
+
+    const key = `${filterScope}:${activeMap?.id ?? ""}`;
+    const mapScopeChanged = prevMapScopeRef.current !== key;
+    prevMapScopeRef.current = key;
+
+    // On a mere session-list refetch (same map + scope), never abandon a conversation the user is
+    // actively using — it may have just been created for THIS project and not yet reappear in the
+    // refetched list. Only realign when the map/scope genuinely changed, or the view is empty.
+    if (!mapScopeChanged && conversation.messages.length > 0) return;
 
     if (filterScope === "project" && activeMap?.id) {
       const projectSessions = dbSessions; // already filtered at API layer
@@ -586,7 +628,7 @@ export function Chat() {
         }
       }
     }
-  }, [activeMap?.id, filterScope, dbSessionsLoaded, dbSessions, conversation.id, handleSelectConversation, handleNewConversation]);
+  }, [activeMap?.id, filterScope, dbSessionsLoaded, dbSessions, conversation.id, conversation.messages.length, handleSelectConversation, handleNewConversation]);
 
   const handleDeleteConversation = useCallback(
     (id: string) => {
@@ -719,7 +761,10 @@ export function Chat() {
       if (!selectedModel) return;
 
       const assistantId = crypto.randomUUID();
-      let assistantContent = "";
+      // The agentic stream builds an ordered AssistantBlock[]; the client folds
+      // each wire event into it (pure reducer) and re-renders. `content` stays
+      // the flattened text (from the server's `done`) for persistence/copy.
+      let assistantBlocks: AssistantBlock[] = [];
 
       setConversation(prev => ({
         ...prev,
@@ -727,6 +772,7 @@ export function Chat() {
           id: assistantId,
           role: "assistant" as const,
           content: "",
+          blocks: [],
           timestamp: new Date(),
           tokens: 0,
         }],
@@ -745,8 +791,79 @@ export function Chat() {
       });
       apiMessages.push({ role: "user", content: userMsg.content });
 
+      // Push the current block array onto the streaming assistant message.
+      const writeBlocks = () => {
+        setConversation(prev => ({
+          ...prev,
+          messages: prev.messages.map(m =>
+            m.id === assistantId ? { ...m, blocks: assistantBlocks } : m
+          ),
+        }));
+      };
+
+      const finalize = (content: string, totalTokens?: number) => {
+        streamEndRef.current = "done";
+        setIsStreaming(false);
+        streamRef.current = null;
+        setConversation(prev => ({
+          ...prev,
+          messages: prev.messages.map(m =>
+            m.id === assistantId
+              ? {
+                  ...m,
+                  blocks: assistantBlocks,
+                  content,
+                  // `|| estimate` (not `??`): a provider that reports no usage
+                  // sends 0, which must fall back to the char estimate, not stick.
+                  tokens: totalTokens || Math.ceil(content.length / 4),
+                }
+              : m
+          ),
+        }));
+
+        // Sync both sides of the exchange to Honcho (background, non-blocking)
+        const sid = conversationRef.current.id;
+        addHonchoMessage.mutate({ openId, sessionId: sid, role: "user", content: userMsg.content });
+        addHonchoMessage.mutate({ openId, sessionId: sid, role: "ai", content });
+        // Persist to DB (fire-and-forget — also creates session if not yet tracked)
+        persistToDbRef.current(conversationRef.current.id, conversationRef.current.title, userMsg, assistantId, content);
+        // Rolling buffer: auto-compress when conversation exceeds 50 messages
+        setConversation(prev => {
+          const ROLLING_BUFFER_LIMIT = 50;
+          if (prev.messages.length > ROLLING_BUFFER_LIMIT) {
+            const kept = prev.messages.slice(-6);
+            const compressed = prev.messages.slice(0, prev.messages.length - 6);
+            const summaryMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              role: "system" as const,
+              content: `[Auto-compressed: ${compressed.length} older messages summarized to manage context. Last 6 messages retained.]`,
+              timestamp: new Date(),
+              tokens: estimateTokens(`${compressed.length} messages compressed`),
+            };
+            toast.info(`Context auto-compressed: ${compressed.length} older messages summarized.`, { duration: 4000 });
+            return { ...prev, messages: [summaryMsg, ...kept], updatedAt: new Date() };
+          }
+          return prev;
+        });
+      };
+
+      const failStream = (message: string) => {
+        toast.error(`Stream error: ${message}`);
+        setConversation(prev => ({
+          ...prev,
+          messages: prev.messages.map(m =>
+            m.id === assistantId
+              ? { ...m, content: `Error: ${message}`, metadata: { error: message } }
+              : m
+          ),
+        }));
+        streamEndRef.current = "error";
+        setIsStreaming(false);
+        streamRef.current = null;
+      };
+
       const startStream = (providerId: SelectedModel["providerId"], modelId: string) => {
-        const sub = vanillaTrpc.aiProvider.chatStream.subscribe(
+        const sub = vanillaTrpc.aiProvider.agentChatStream.subscribe(
           {
             providerId,
             modelId,
@@ -757,92 +874,34 @@ export function Chat() {
             // its indexed knowledge. Gated client-side by the same enableAIContext
             // toggle used for projectContext; the server re-checks authoritatively.
             ragMapId: activeMap?.settings.enableAIContext ? activeMap.id : undefined,
+            // Tool scope: file edits + command cwd are confined to the active
+            // map's roots; the server re-validates every path against them.
+            mapId: activeMap?.id,
+            rootDirectories: activeMap?.rootDirectories,
+            // Session "auto-approve within active map" toggle (chat header).
+            autoApprove: useAppStore.getState().chatDisplaySettings.autoApproveTools,
+            conversationId: conversationRef.current.id,
+            // Model-Fabric Phase 5 — pins mesh routing to the exact peer the
+            // user picked in the catalog (undefined for This PC / Cloud /
+            // auto-valet selections, which never go through mesh offload).
+            targetNodeId: selectedModel.targetNodeId,
           },
-        {
-          onData(chunk) {
-            assistantContent += chunk.delta;
-            setConversation(prev => ({
-              ...prev,
-              messages: prev.messages.map(m =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      content: assistantContent,
-                      tokens:
-                        chunk.totalTokens ??
-                        Math.ceil(assistantContent.length / 4),
-                    }
-                  : m
-              ),
-            }));
-            if (chunk.done) {
-              setIsStreaming(false);
-              streamRef.current = null;
-
-              // AI-initiated terminal command directive — parsed only once the
-              // message is complete (never mid-stream, so a partial tag can't fire).
-              // Gated through EmbeddedTerminal's own HITL requestApproval() flow —
-              // this dispatch alone never executes anything.
-              const { command: terminalCommand, stripped: strippedAssistantContent } =
-                extractTerminalCommand(assistantContent);
-              if (terminalCommand) {
-                assistantContent = strippedAssistantContent;
-                setConversation(prev => ({
-                  ...prev,
-                  messages: prev.messages.map(m =>
-                    m.id === assistantId ? { ...m, content: strippedAssistantContent } : m
-                  ),
-                }));
-                window.dispatchEvent(new CustomEvent("omnecor:cli_command", {
-                  detail: { command: terminalCommand, cwd: activeMap?.rootDirectories[0] },
-                }));
+          {
+            onData(ev) {
+              assistantBlocks = applyAgentEvent(assistantBlocks, ev);
+              if (ev.type === "done") {
+                finalize(ev.content, ev.totalTokens);
+              } else if (ev.type === "error") {
+                failStream(ev.message);
+              } else {
+                writeBlocks();
               }
-
-              // Sync both sides of the exchange to Honcho (background, non-blocking)
-              const sid = conversationRef.current.id;
-              addHonchoMessage.mutate({ openId, sessionId: sid, role: "user", content: userMsg.content });
-              addHonchoMessage.mutate({ openId, sessionId: sid, role: "ai", content: assistantContent });
-              // Persist to DB (fire-and-forget — also creates session if not yet tracked)
-              persistToDbRef.current(conversationRef.current.id, conversationRef.current.title, userMsg, assistantId, assistantContent);
-              // Rolling buffer: auto-compress when conversation exceeds 50 messages
-              setConversation(prev => {
-                const ROLLING_BUFFER_LIMIT = 50;
-                if (prev.messages.length > ROLLING_BUFFER_LIMIT) {
-                  const kept = prev.messages.slice(-6);
-                  const compressed = prev.messages.slice(0, prev.messages.length - 6);
-                  const summaryMsg: ChatMessage = {
-                    id: crypto.randomUUID(),
-                    role: "system" as const,
-                    content: `[Auto-compressed: ${compressed.length} older messages summarized to manage context. Last 6 messages retained.]`,
-                    timestamp: new Date(),
-                    tokens: estimateTokens(`${compressed.length} messages compressed`),
-                  };
-                  toast.info(`Context auto-compressed: ${compressed.length} older messages summarized.`, { duration: 4000 });
-                  return { ...prev, messages: [summaryMsg, ...kept], updatedAt: new Date() };
-                }
-                return prev;
-              });
-            }
-          },
-          onError(err) {
-            toast.error(`Stream error: ${err.message}`);
-            setConversation(prev => ({
-              ...prev,
-              messages: prev.messages.map(m =>
-                m.id === assistantId
-                  ? {
-                      ...m,
-                      content: `Error: ${err.message}`,
-                      metadata: { error: err.message },
-                    }
-                  : m
-              ),
-            }));
-            setIsStreaming(false);
-            streamRef.current = null;
-          },
-        }
-      );
+            },
+            onError(err) {
+              failStream(err.message);
+            },
+          }
+        );
 
         streamRef.current = sub;
       };
@@ -867,8 +926,32 @@ export function Chat() {
         startStream(selectedModel.providerId, selectedModel.modelId);
       }
     },
-    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, excludedMessageIds, activeMap?.id, activeMap?.settings.enableAIContext]
+    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, excludedMessageIds, activeMap?.id, activeMap?.settings.enableAIContext, activeMap?.rootDirectories]
   );
+
+  // ── HITL tool approval (agentic stream) ──────────────────────────────────
+  // A pending_approval tool box resolves through the server broker; the block
+  // id is the approval key. `resolved: false` means it already expired / was
+  // superseded (e.g. the 10-min TTL auto-denied it) — surface that, don't retry.
+  const handleApproveTool = useCallback((id: string) => {
+    resolveToolApproval.mutate(
+      { id, decision: "approve" },
+      {
+        onSuccess: (r) => { if (!r.resolved) toast.warning("That approval already expired or was handled."); },
+        onError: (e) => toast.error(`Approval failed: ${e.message}`),
+      }
+    );
+  }, [resolveToolApproval]);
+
+  const handleDenyTool = useCallback((id: string, reason?: string) => {
+    resolveToolApproval.mutate(
+      { id, decision: "deny", denyReason: reason },
+      {
+        onSuccess: (r) => { if (!r.resolved) toast.warning("That approval already expired or was handled."); },
+        onError: (e) => toast.error(`Denial failed: ${e.message}`),
+      }
+    );
+  }, [resolveToolApproval]);
 
   // ── Send message ─────────────────────────────────────────────────────────
   const handleSendMessage = useCallback(
@@ -882,6 +965,26 @@ export function Chat() {
         timestamp: new Date(),
         tokens: Math.ceil(content.length / 4),
       };
+
+      // Mesh-Delegation.md — a follow-up turn in a managed sub-agent chat routes
+      // to the peer (Decision 5, between-turn chat), NOT the local model path.
+      // The user bubble is appended optimistically; the peer's live stream drives
+      // the assistant turn via the delegation.stream subscription effect below.
+      if (delegatedById.has(conversation.id)) {
+        setConversation(prev => addMessageToConversation(prev, userMsg));
+        setIsStreaming(true);
+        streamEndRef.current = "done";
+        delegationSendTurn.mutate(
+          { conversationId: conversation.id, content },
+          {
+            onError: (e) => {
+              toast.error(`Sub-agent is busy or unreachable: ${e.message}`);
+              setIsStreaming(false);
+            },
+          }
+        );
+        return;
+      }
 
       const baseMessages = priorMessages ?? conversation.messages;
       setConversation(prev => addMessageToConversation(
@@ -911,7 +1014,7 @@ export function Chat() {
       setIsStreaming(true);
       streamResponse(userMsg, baseMessages);
     },
-    [conversation.messages, isStreaming, selectedModel, streamResponse]
+    [conversation.messages, conversation.id, isStreaming, selectedModel, streamResponse, delegatedById, delegationSendTurn]
   );
 
   // ── Retry ────────────────────────────────────────────────────────────────
@@ -1031,6 +1134,7 @@ export function Chat() {
               modelId: selectedModel.modelId,
               apiKey: selectedModel.apiKey,
               baseUrl: selectedModel.baseUrl,
+              targetNodeId: selectedModel.targetNodeId,
               messages: [{
                 role: "user",
                 content: `Summarize the following conversation history into a single concise paragraph. Preserve all key facts, decisions, file names, and context. Be complete — nothing important should be lost:\n\n${transcript}`,
@@ -1146,6 +1250,7 @@ export function Chat() {
                 modelId: selectedModel.modelId,
                 apiKey: selectedModel.apiKey,
                 baseUrl: selectedModel.baseUrl,
+                targetNodeId: selectedModel.targetNodeId,
                 messages: conversation.messages.map(m => ({
                   role: m.role,
                   content: m.content,
@@ -1346,11 +1451,67 @@ export function Chat() {
     handleSendMessageRef.current = handleSendMessage;
   }, [handleSendMessage]);
 
+  // ── Message queue drain ───────────────────────────────────────────────────
+  // When the turn ends and the AI is idle, dequeue the oldest type-ahead message
+  // and fire it as the next turn (FIFO). The isStreaming guard + React batching
+  // (handleSendMessage synchronously flips isStreaming back on) mean exactly one
+  // message drains per idle transition. Skipped after an error so a failing
+  // provider isn't hit with every queued turn back-to-back.
+  useEffect(() => {
+    if (isStreaming) return;
+    if (streamEndRef.current === "error") return;
+    if (messageQueue.length === 0) return;
+    const next = dequeueMessage();
+    if (next) handleSendMessageRef.current(next.content);
+  }, [isStreaming, messageQueue, dequeueMessage]);
+
+  // The queue is bound to the active conversation — switching away must drop any
+  // queued type-ahead so it can't fire into the wrong chat. Also cleared on
+  // unmount (leaving the page) since the queue is ephemeral by design.
+  const prevConvIdRef = useRef(conversation.id);
+  useEffect(() => {
+    if (prevConvIdRef.current !== conversation.id) {
+      prevConvIdRef.current = conversation.id;
+      clearMessageQueue();
+    }
+  }, [conversation.id, clearMessageQueue]);
+  useEffect(() => () => clearMessageQueue(), [clearMessageQueue]);
+
   const handleAsyncJobResult = useCallback((data: Record<string, unknown>) => {
     const formatted = typeof data?.formatted === "string" ? data.formatted : "";
     if (!formatted) return;
-    const label =
-      (data?.result as { label?: string } | undefined)?.label ?? "background job";
+    const result = data?.result as { label?: string; status?: string } | undefined;
+    const label = result?.label ?? "background job";
+    const jobId = typeof data?.jobId === "string" ? data.jobId : "";
+
+    // Drive the live JobBlock (if any) to its terminal state — correlated by
+    // jobId, not block id — so the box in the stream turns green/red with the
+    // condensed tail, matching the injected system message.
+    if (jobId) {
+      const jobStatus =
+        result?.status === "completed" || result?.status === "failed" || result?.status === "cancelled"
+          ? result.status
+          : "completed";
+      setConversation(prev => ({
+        ...prev,
+        messages: prev.messages.map(m =>
+          m.blocks && m.blocks.some(b => b.type === "job" && b.jobId === jobId)
+            ? { ...m, blocks: applyJobCompletion(m.blocks, jobId, jobStatus, formatted) }
+            : m
+        ),
+      }));
+    }
+
+    // User-initiated code Runs (autoContinue === false): the job box above already
+    // shows the outcome. Don't inject a system message or re-prompt the AI — the
+    // run was a test, not a request to regenerate. Just surface a status toast.
+    const context = data?.context as { autoContinue?: boolean } | undefined;
+    if (context?.autoContinue === false) {
+      if (result?.status === "failed") toast.error(`${label} failed — open the box to see the output.`);
+      else toast.success(`${label} finished.`);
+      return;
+    }
+
     const resultMsg: ChatMessage = {
       id: crypto.randomUUID(),
       role: "system",
@@ -1381,11 +1542,28 @@ export function Chat() {
     );
   }, []);
 
+  // Mesh-Delegation.md — a managed sub-agent chat was created / advanced / ended
+  // on the server. Refresh the session list so the new managed chat appears in
+  // the sidebar without a manual reload (the "appears automatically" requirement)
+  // and toast the lifecycle. The parent chat's `subagent` chip is driven
+  // separately by the async-job path (jobId = taskId), so we don't touch blocks
+  // here — this is purely list/awareness.
+  const handleDelegationEvent = useCallback((data: Record<string, unknown>) => {
+    const kind = typeof data?.kind === "string" ? data.kind : "";
+    const nodeName = typeof data?.nodeName === "string" ? data.nodeName : "a mesh node";
+    const label = typeof data?.label === "string" ? data.label : "task";
+    chatUtils.chat.listSessions.invalidate();
+    if (kind === "created") toast.success(`Sub-agent started on ${nodeName}: ${label}`);
+    else if (kind === "failed") toast.error(`Sub-agent on ${nodeName} failed.`);
+    else if (kind === "cancelled") toast.info(`Sub-agent on ${nodeName} cancelled.`);
+  }, [chatUtils]);
+
   const handleSocketEvent = useCallback(
     (type: string, data: Record<string, unknown>) => {
       if (type === "asyncJobResult") handleAsyncJobResult(data);
+      else if (type === "delegationEvent") handleDelegationEvent(data);
     },
-    [handleAsyncJobResult]
+    [handleAsyncJobResult, handleDelegationEvent]
   );
 
   const { subscribe: subscribeSocket, unsubscribe: unsubscribeSocket } =
@@ -1401,11 +1579,153 @@ export function Chat() {
     return () => unsubscribeSocket(channel);
   }, [me?.id, subscribeSocket, unsubscribeSocket]);
 
+  // ── Managed sub-agent chat: live stream subscription (Mesh-Delegation.md) ──
+  // When the active conversation is a managed sub-agent chat, subscribe to the
+  // peer's relayed `AgentStreamEvent` stream (via the origin's DelegationService)
+  // and fold it into a streaming assistant message — the same reducer + block
+  // renderers the local agentic chat uses. Finished turns already live in the DB
+  // transcript (loaded on select); this only drives the in-progress turn. HITL
+  // approve/deny for a delegated tool box goes through the ordinary
+  // `resolveToolApproval` mutation (the server forwards it to the peer).
+  const isActiveDelegated = delegatedById.has(conversation.id);
+  useEffect(() => {
+    if (IS_DEMO || !isActiveDelegated) return;
+    const convId = conversation.id;
+    // Per-turn accumulator: `curId` is the current streaming assistant message
+    // id (null between turns). A fresh non-terminal event starts a new turn.
+    let curId: string | null = null;
+    let blocks: AssistantBlock[] = [];
+
+    const ensureTurn = () => {
+      if (curId) return;
+      curId = crypto.randomUUID();
+      blocks = [];
+      setIsStreaming(true);
+      setConversation(prev =>
+        prev.id !== convId ? prev : {
+          ...prev,
+          messages: [...prev.messages, { id: curId!, role: "assistant" as const, content: "", blocks: [], timestamp: new Date(), tokens: 0 }],
+        }
+      );
+    };
+    const writeBlocks = () => {
+      const id = curId;
+      setConversation(prev =>
+        prev.id !== convId ? prev : { ...prev, messages: prev.messages.map(m => m.id === id ? { ...m, blocks } : m) }
+      );
+    };
+
+    const sub = vanillaTrpc.delegation.stream.subscribe(
+      { conversationId: convId },
+      {
+        onData(ev) {
+          if (ev.type === "done") {
+            const id = curId;
+            const content = ev.content;
+            const finalBlocks = ev.blocks?.length ? ev.blocks : blocks;
+            setConversation(prev =>
+              prev.id !== convId ? prev : { ...prev, messages: prev.messages.map(m => m.id === id ? { ...m, blocks: finalBlocks, content, tokens: ev.totalTokens || Math.ceil(content.length / 4) } : m) }
+            );
+            curId = null;
+            setIsStreaming(false);
+            return;
+          }
+          if (ev.type === "error") {
+            const id = curId;
+            setConversation(prev =>
+              prev.id !== convId ? prev : { ...prev, messages: prev.messages.map(m => m.id === id ? { ...m, metadata: { ...m.metadata, error: ev.message } } : m) }
+            );
+            curId = null;
+            setIsStreaming(false);
+            return;
+          }
+          ensureTurn();
+          blocks = applyAgentEvent(blocks, ev);
+          writeBlocks();
+        },
+        onError(err) {
+          toast.error(`Sub-agent stream error: ${err.message}`);
+          setIsStreaming(false);
+        },
+      }
+    );
+    return () => {
+      sub.unsubscribe();
+    };
+  }, [isActiveDelegated, conversation.id]);
+
+  // Cancel the active managed sub-agent run.
+  const handleCancelDelegation = useCallback(() => {
+    delegationCancel.mutate(
+      { conversationId: conversation.id },
+      {
+        onSuccess: () => { toast.info("Sub-agent cancelled."); setIsStreaming(false); },
+        onError: (e) => toast.error(`Cancel failed: ${e.message}`),
+      }
+    );
+  }, [conversation.id, delegationCancel]);
+
   const handleOpenPreview = useCallback((mode: "3d" | "pcb" | "web", code: string) => {
     setPreviewMode(mode);
     setPreviewCode(code);
     setContextCollapsed(true); // Auto collapse context to make room
   }, []);
+
+  // ── Code-block Run / Preview (the ▶ Run / ⚡ Preview buttons on code fences) ──
+  // Run executes a snippet as a background job (rendered as a JobBlock in the
+  // conversation, driven to completion by the async-job → WS path); a GUI app
+  // like pygame opens a window on the host display. Preview routes markup to the
+  // existing live-preview panel. Both notify via toast, per the workstation flow.
+  useEffect(() => {
+    const onRun = (e: Event) => {
+      const { language, code } = (e as CustomEvent<{ language: string; code: string }>).detail ?? {};
+      if (!code?.trim()) return;
+      runCodeSnippet.mutate(
+        {
+          language,
+          code,
+          mapId: activeMap?.id,
+          rootDirectories: activeMap?.rootDirectories,
+          conversationId: conversationRef.current.id,
+        },
+        {
+          onSuccess: (res) => {
+            toast.success(`Running ${res.label.replace(/^run /, "")} — output streams into the job box (a window opens if it's a GUI app).`);
+            const jobMsg: ChatMessage = {
+              id: crypto.randomUUID(),
+              role: "assistant",
+              content: "",
+              blocks: [{
+                id: crypto.randomUUID(),
+                type: "job",
+                jobId: res.jobId,
+                label: res.label,
+                command: res.command,
+                status: "running",
+                kind: "process",
+              }],
+              timestamp: new Date(),
+              tokens: 0,
+            };
+            setConversation(prev => addMessageToConversation(prev, jobMsg));
+          },
+          onError: (err) => toast.error(`Run failed: ${err.message}`),
+        },
+      );
+    };
+    const onPreview = (e: Event) => {
+      const { code } = (e as CustomEvent<{ language: string; code: string }>).detail ?? {};
+      if (!code?.trim()) return;
+      handleOpenPreview("web", code);
+      toast.success("Opened the live preview panel.");
+    };
+    window.addEventListener("omnecor:run_code", onRun);
+    window.addEventListener("omnecor:preview_code", onPreview);
+    return () => {
+      window.removeEventListener("omnecor:run_code", onRun);
+      window.removeEventListener("omnecor:preview_code", onPreview);
+    };
+  }, [runCodeSnippet, activeMap?.id, activeMap?.rootDirectories, handleOpenPreview]);
 
   const transparency = useMemo(() => {
     const systemTokens = estimateTokens(buildFullSystemPrompt(), selectedModel?.modelId);
@@ -1503,6 +1823,23 @@ export function Chat() {
                 ))}
               </div>
             )}
+          {/* Managed sub-agent chat banner (Mesh-Delegation.md) */}
+          {isActiveDelegated && (
+            <div className="flex items-center gap-2 px-3 py-1.5 rounded-md bg-accent-cyan/10 border border-accent-cyan/30 text-xs flex-shrink-0">
+              <Network className="w-3.5 h-3.5 text-accent-cyan" />
+              <span className="text-foreground/90">
+                Sub-agent on <strong>{delegatedById.get(conversation.id)?.nodeName ?? "mesh peer"}</strong> — running here, streamed live.
+              </span>
+              {isStreaming && (
+                <button
+                  onClick={handleCancelDelegation}
+                  className="ml-auto text-destructive hover:underline"
+                >
+                  Cancel
+                </button>
+              )}
+            </div>
+          )}
           <ChatIntegrationBar
             onInjectContext={(snippet) =>
               handleSendMessage(`[Integration context injected]\n\n${snippet}`)
@@ -1510,6 +1847,10 @@ export function Chat() {
           />
           <ChatInterface
             className="flex-1 min-w-0"
+            layout="stream"
+            onApproveTool={handleApproveTool}
+            onDenyTool={handleDenyTool}
+            onOpenDelegation={handleSelectConversation}
             messages={conversation.messages}
             isLoading={isStreaming}
             conversationTitle={conversation.title}

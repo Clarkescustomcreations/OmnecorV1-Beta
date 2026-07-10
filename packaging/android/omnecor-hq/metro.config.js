@@ -16,6 +16,31 @@ config.watchFolders = [
   WORKSPACE_ROOT,
 ];
 
+// ── Keep the watcher under the inotify budget ────────────────────────────────
+// Watching the whole workspace root pulls in enormous non-mobile build trees
+// (AppImage bundle with full node headers, the electron workspace, gradle/NDK
+// .cxx output, coverage, docs). On Linux that exhausts fs.inotify
+// max_user_watches (ENOSPC) and Metro dies at startup. None of these are ever
+// imported by the app, so block them from the file map / watcher entirely.
+const WR = WORKSPACE_ROOT.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const prevBlockList = config.resolver.blockList;
+config.resolver.blockList = [
+  ...(Array.isArray(prevBlockList) ? prevBlockList : prevBlockList ? [prevBlockList] : []),
+  new RegExp(`${WR}/\\.git/.*`),
+  new RegExp(`${WR}/packaging/appimage-build/.*`),
+  new RegExp(`${WR}/packaging/electron-app/.*`),
+  new RegExp(`${WR}/dist/.*`),
+  new RegExp(`${WR}/docs/.*`),
+  new RegExp(`${WR}/coverage/.*`),
+  new RegExp(`${WR}/attached_assets/.*`),
+  new RegExp(`${WR}/data/.*`),
+  // Gradle/NDK output anywhere (app, local expo modules, linked packages):
+  // .cxx object trees and android/**/build intermediates are never bundled.
+  new RegExp(".*/\\.cxx/.*"),
+  new RegExp(".*/android/build/.*"),
+  new RegExp(".*/android/app/build/.*"),
+];
+
 const nwConfig = withNativeWind(config, {
   input: "./global.css",
   // Force write CSS to file system instead of virtual modules

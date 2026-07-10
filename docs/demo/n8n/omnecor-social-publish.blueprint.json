@@ -1,0 +1,259 @@
+{
+  "name": "Omnecor — Social Publish",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## Omnecor Social Publish\nOmnecor POSTs `{ platform, content, mediaUrls?, title? }` to this webhook.\nEach branch publishes to one platform, then a **Respond to Webhook** node returns\n`{ ok, platformPostId, url }` so Omnecor can record the real post.\n\n**This is a starting point, not a turnkey workflow.** Open each HTTP Request node,\nattach the matching n8n OAuth2 credential (Twitter / LinkedIn / Facebook), authorize\n(consumer login — no Omnecor-side developer app), then **send a test** from the node\nto confirm the response shape before activating. Instagram needs a connected\nFacebook Page with a linked IG business account and an image in `mediaUrls[0]`.",
+        "height": 360,
+        "width": 460
+      },
+      "id": "note-setup",
+      "name": "Setup",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [-260, -40]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "omnecor-social-publish",
+        "responseMode": "responseNode",
+        "options": {}
+      },
+      "id": "webhook-in",
+      "name": "Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [300, 320],
+      "webhookId": "omnecor-social-publish"
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [ { "leftValue": "={{ $json.body.platform }}", "rightValue": "twitter", "operator": { "type": "string", "operation": "equals" } } ] } },
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [ { "leftValue": "={{ $json.body.platform }}", "rightValue": "x", "operator": { "type": "string", "operation": "equals" } } ] } },
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [ { "leftValue": "={{ $json.body.platform }}", "rightValue": "linkedin", "operator": { "type": "string", "operation": "equals" } } ] } },
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [ { "leftValue": "={{ $json.body.platform }}", "rightValue": "facebook", "operator": { "type": "string", "operation": "equals" } } ] } },
+            { "conditions": { "options": { "caseSensitive": false }, "conditions": [ { "leftValue": "={{ $json.body.platform }}", "rightValue": "instagram", "operator": { "type": "string", "operation": "equals" } } ] } }
+          ]
+        },
+        "options": { "fallbackOutput": "extra" }
+      },
+      "id": "switch-platform",
+      "name": "Route by platform",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [540, 320]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.twitter.com/2/tweets",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "twitterOAuth2Api",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ text: $('Webhook').item.json.body.content }) }}",
+        "options": {}
+      },
+      "id": "http-twitter",
+      "name": "Post to X",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 0]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, platformPostId: $json.data.id, url: 'https://x.com/i/web/status/' + $json.data.id }) }}",
+        "options": {}
+      },
+      "id": "resp-twitter",
+      "name": "Respond X",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 0]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://api.linkedin.com/v2/me",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linkedInOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "X-Restli-Protocol-Version", "value": "2.0.0" } ] },
+        "options": {}
+      },
+      "id": "http-linkedin-me",
+      "name": "LinkedIn: get me",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 180]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://api.linkedin.com/v2/ugcPosts",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "linkedInOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": { "parameters": [ { "name": "X-Restli-Protocol-Version", "value": "2.0.0" } ] },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ author: 'urn:li:person:' + $('LinkedIn: get me').item.json.id, lifecycleState: 'PUBLISHED', specificContent: { 'com.linkedin.ugc.ShareContent': { shareCommentary: { text: $('Webhook').item.json.body.content }, shareMediaCategory: 'NONE' } }, visibility: { 'com.linkedin.ugc.MemberNetworkVisibility': 'PUBLIC' } }) }}",
+        "options": {}
+      },
+      "id": "http-linkedin",
+      "name": "Post to LinkedIn",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1060, 180]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, platformPostId: ($json.id || $headers['x-restli-id'] || 'linkedin-post'), url: 'https://www.linkedin.com/feed/update/' + ($json.id || $headers['x-restli-id'] || '') }) }}",
+        "options": {}
+      },
+      "id": "resp-linkedin",
+      "name": "Respond LinkedIn",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1320, 180]
+    },
+
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v18.0/me/feed",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": { "parameters": [ { "name": "message", "value": "={{ $('Webhook').item.json.body.content }}" } ] },
+        "options": {}
+      },
+      "id": "http-facebook",
+      "name": "Post to Facebook",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [840, 360]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, platformPostId: $json.id, url: 'https://www.facebook.com/' + $json.id }) }}",
+        "options": {}
+      },
+      "id": "resp-facebook",
+      "name": "Respond Facebook",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1120, 360]
+    },
+
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "https://graph.facebook.com/v18.0/me/accounts?fields=instagram_business_account",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "options": {}
+      },
+      "id": "http-ig-resolve",
+      "name": "IG: resolve user",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [820, 560]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $json.data[0].instagram_business_account.id }}/media",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": { "parameters": [
+          { "name": "image_url", "value": "={{ $('Webhook').item.json.body.mediaUrls[0] }}" },
+          { "name": "caption", "value": "={{ $('Webhook').item.json.body.content }}" }
+        ] },
+        "options": {}
+      },
+      "id": "http-ig-create",
+      "name": "IG: create media",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1040, 560],
+      "notes": "Requires mediaUrls[0] — the Instagram Graph API does not support text-only posts."
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "=https://graph.facebook.com/v18.0/{{ $('IG: resolve user').item.json.data[0].instagram_business_account.id }}/media_publish",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "bodyParameters": { "parameters": [ { "name": "creation_id", "value": "={{ $json.id }}" } ] },
+        "options": {}
+      },
+      "id": "http-ig-publish",
+      "name": "IG: publish",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [1260, 560]
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: true, platformPostId: $json.id, url: 'https://www.instagram.com/p/' + $json.id }) }}",
+        "options": {}
+      },
+      "id": "resp-instagram",
+      "name": "Respond Instagram",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [1480, 560]
+    },
+
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={{ JSON.stringify({ ok: false, error: 'Unknown platform: ' + $('Webhook').item.json.body.platform }) }}",
+        "options": {}
+      },
+      "id": "resp-fallback",
+      "name": "Respond Unknown",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1,
+      "position": [840, 760]
+    }
+  ],
+  "connections": {
+    "Webhook": { "main": [ [ { "node": "Route by platform", "type": "main", "index": 0 } ] ] },
+    "Route by platform": {
+      "main": [
+        [ { "node": "Post to X", "type": "main", "index": 0 } ],
+        [ { "node": "Post to X", "type": "main", "index": 0 } ],
+        [ { "node": "LinkedIn: get me", "type": "main", "index": 0 } ],
+        [ { "node": "Post to Facebook", "type": "main", "index": 0 } ],
+        [ { "node": "IG: resolve user", "type": "main", "index": 0 } ],
+        [ { "node": "Respond Unknown", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Post to X": { "main": [ [ { "node": "Respond X", "type": "main", "index": 0 } ] ] },
+    "LinkedIn: get me": { "main": [ [ { "node": "Post to LinkedIn", "type": "main", "index": 0 } ] ] },
+    "Post to LinkedIn": { "main": [ [ { "node": "Respond LinkedIn", "type": "main", "index": 0 } ] ] },
+    "Post to Facebook": { "main": [ [ { "node": "Respond Facebook", "type": "main", "index": 0 } ] ] },
+    "IG: resolve user": { "main": [ [ { "node": "IG: create media", "type": "main", "index": 0 } ] ] },
+    "IG: create media": { "main": [ [ { "node": "IG: publish", "type": "main", "index": 0 } ] ] },
+    "IG: publish": { "main": [ [ { "node": "Respond Instagram", "type": "main", "index": 0 } ] ] }
+  },
+  "settings": { "executionOrder": "v1" },
+  "meta": {
+    "templateCredsSetupCompleted": false,
+    "description": "Omnecor social publishing — receives a webhook from Omnecor and fans out to X, LinkedIn, Facebook and Instagram. Returns { ok, platformPostId, url } synchronously. Connect each node's credential and test before activating."
+  },
+  "pinData": {}
+}

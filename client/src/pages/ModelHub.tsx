@@ -128,7 +128,7 @@ export function ModelHub() {
 
   return (
     <OmnecorDashboardLayout>
-      <div className="h-full flex flex-col bg-background">
+      <div className="h-full flex flex-col">
         {/* Header */}
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex flex-wrap items-center justify-between gap-3">

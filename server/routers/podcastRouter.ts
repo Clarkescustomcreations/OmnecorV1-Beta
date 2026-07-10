@@ -7,7 +7,7 @@ import { z } from "zod";
 import { randomUUID } from "crypto";
 import { and, desc, eq } from "drizzle-orm";
 import { router, protectedProcedure } from "../_core/trpc.js";
-import { LocalPodcastService } from "../phase2/services/LocalPodcastService.js";
+import { LocalPodcastService } from "../core_services/services/LocalPodcastService.js";
 import { observable } from "@trpc/server/observable";
 import { TRPCError } from "@trpc/server";
 import { assertProviderAllowedInMode } from "../_core/sovereign.js";

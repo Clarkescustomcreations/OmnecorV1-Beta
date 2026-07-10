@@ -304,7 +304,7 @@ export function OmnecorDashboardLayout({
                   sidebarOpen 
                     ? "w-full justify-start gap-3 h-11 px-4 rounded-lg border-sidebar-border/50 hover:bg-sidebar-hover" 
                     : "w-10 h-10 rounded-full border-sidebar-border/50",
-                  isFictionMode && "bg-primary/10 text-accent-foreground border-transparent"
+                  isFictionMode && "bg-accent-purple/15 text-accent-purple border-transparent"
                 )}
                 title={sidebarOpen ? "Toggle Fiction Mode" : (isFictionMode ? "Fiction Mode Active" : "Standard Mode")}
               >
@@ -338,15 +338,9 @@ export function OmnecorDashboardLayout({
             </div>
 
             {/* User Identity Card — global peer identity, persists across projects */}
-            <HowToTooltip
-              title="Your Identity Card"
-              description="Your global peer profile. The AI knows your name, role, and preferences in every project."
-              side="right"
-            >
-              <div className={cn("transition-all duration-300", sidebarOpen ? "w-full" : "w-10 h-10 flex items-center justify-center")}>
-                <UserIdentityCard collapsed={!sidebarOpen} />
-              </div>
-            </HowToTooltip>
+            <div className={cn("transition-all duration-300", sidebarOpen ? "w-full" : "w-10 h-10 flex items-center justify-center")}>
+              <UserIdentityCard collapsed={!sidebarOpen} />
+            </div>
 
             {/* Ommesh Peer Status */}
             <HowToTooltip

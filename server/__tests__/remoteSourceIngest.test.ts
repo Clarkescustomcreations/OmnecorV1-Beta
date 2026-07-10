@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { sanitizeCollectionName } from "../phase2/services/VectorDBService.js";
+import { sanitizeCollectionName } from "../core_services/services/VectorDBService.js";
 import {
   hasTextExtension,
   htmlToText,

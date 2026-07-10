@@ -18,6 +18,7 @@ import {
 } from '@/lib/componentLibrary';
 import { Search, X, ChevronLeft } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export interface ComponentLibraryPanelProps {
   onAddComponent: (componentId: string, position: { x: number; y: number }) => void;
@@ -73,9 +74,11 @@ export const ComponentLibraryPanel: React.FC<ComponentLibraryPanelProps> = ({
         <div className="flex items-center justify-between mb-1">
           <h2 className="text-sm font-semibold text-foreground">Component Library</h2>
           {onClose && (
-            <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={onClose} title="Collapse Panel">
-              <ChevronLeft className="h-4 w-4" />
-            </Button>
+            <HowToTooltip title="Close Library" description="Hide the component library panel" side="right">
+              <Button variant="ghost" size="icon" className="h-6 w-6 text-muted-foreground hover:text-foreground" onClick={onClose} title="Collapse Panel">
+                <ChevronLeft className="h-4 w-4" />
+              </Button>
+            </HowToTooltip>
           )}
         </div>
         <p className="text-[10px] text-muted-foreground mb-2">Click to add · Drag to position</p>
@@ -172,43 +175,45 @@ const ComponentCard: React.FC<ComponentCardProps> = ({
   onDragEnd,
   onClick,
 }) => (
-  <div
-    draggable
-    onDragStart={(e) => onDragStart(e, component.id)}
-    onDragEnd={onDragEnd}
-    onClick={() => onClick(component.id)}
-    className={`
-      p-2 rounded border cursor-pointer transition-all select-none
-      ${
-        isDragging
-          ? 'bg-primary/20 border-primary/30 opacity-50'
-          : 'bg-muted/40 border-border hover:bg-primary/10 hover:border-primary/50 active:bg-primary/30'
-      }
-    `}
-  >
-    <div className="flex items-center gap-2 mb-1">
-      <div className="w-8 h-8 bg-background border border-border rounded flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">
-        <div
-          dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(component.symbolSvg) }}
-          className="w-6 h-6"
-        />
+  <HowToTooltip title="Component" description="Click to add or drag to canvas" side="right">
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, component.id)}
+      onDragEnd={onDragEnd}
+      onClick={() => onClick(component.id)}
+      className={`
+        p-2 rounded border cursor-pointer transition-all select-none
+        ${
+          isDragging
+            ? 'bg-primary/20 border-primary/30 opacity-50'
+            : 'bg-muted/40 border-border hover:bg-primary/10 hover:border-primary/50 active:bg-primary/30'
+        }
+      `}
+    >
+      <div className="flex items-center gap-2 mb-1">
+        <div className="w-8 h-8 bg-background border border-border rounded flex items-center justify-center text-xs text-muted-foreground flex-shrink-0">
+          <div
+            dangerouslySetInnerHTML={{ __html: DOMPurify.sanitize(component.symbolSvg) }}
+            className="w-6 h-6"
+          />
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="text-xs font-semibold text-foreground truncate">{component.name}</p>
+          <p className="text-[10px] text-muted-foreground truncate">{component.description}</p>
+        </div>
       </div>
-      <div className="flex-1 min-w-0">
-        <p className="text-xs font-semibold text-foreground truncate">{component.name}</p>
-        <p className="text-[10px] text-muted-foreground truncate">{component.description}</p>
+  
+      <div className="flex flex-wrap gap-1">
+        {component.tags.slice(0, 2).map((tag) => (
+          <span
+            key={tag}
+            className="inline-block text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded"
+          >
+            {tag}
+          </span>
+        ))}
       </div>
     </div>
-
-    <div className="flex flex-wrap gap-1">
-      {component.tags.slice(0, 2).map((tag) => (
-        <span
-          key={tag}
-          className="inline-block text-[10px] bg-muted text-muted-foreground px-1.5 py-0.5 rounded"
-        >
-          {tag}
-        </span>
-      ))}
-    </div>
-  </div>
+  </HowToTooltip>
 );
 

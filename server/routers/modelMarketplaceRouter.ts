@@ -1,6 +1,6 @@
 import { z } from "zod";
 import { router, protectedProcedure } from "../_core/trpc.js";
-import { ModelMarketplaceService } from "../phase2/services/ModelMarketplaceService.js";
+import { ModelMarketplaceService } from "../core_services/services/ModelMarketplaceService.js";
 
 export const modelMarketplaceRouter = router({
   /**

@@ -8,7 +8,7 @@
  *             pause/resume in ProcessManagerService.)
  *
  * Job shape mirrors ProcessStatus from
- * OmnecorV1-Beta/server/phase2/services/ProcessManagerService.ts.
+ * OmnecorV1-Beta/server/core_services/services/ProcessManagerService.ts.
  */
 import { useState, useEffect, useCallback } from "react";
 import { trpcQuery, trpcMutate } from "@/lib/_core/trpc-fetch";

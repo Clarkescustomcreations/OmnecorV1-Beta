@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Settings2, CreditCard, AlertTriangle } from "lucide-react";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface BudgetConfigDialogProps {
   projectId: string;
@@ -64,10 +65,12 @@ export function BudgetConfigDialog({ projectId }: BudgetConfigDialogProps) {
   return (
     <Dialog open={open} onOpenChange={handleOpen}>
       <DialogTrigger asChild>
-        <Button id="btn-wallet-configure-budget" variant="ghost" size="icon" className="h-7 w-7">
-          <Settings2 className="h-4 w-4" />
-          <span className="sr-only">Configure budget</span>
-        </Button>
+        <HowToTooltip title="Budget Settings" description="Configure spending limits and alerts for the Agentic Wallet." side="bottom">
+          <Button id="btn-wallet-configure-budget" variant="ghost" size="icon" className="h-7 w-7">
+            <Settings2 className="h-4 w-4" />
+            <span className="sr-only">Configure budget</span>
+          </Button>
+        </HowToTooltip>
       </DialogTrigger>
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
@@ -107,24 +110,28 @@ export function BudgetConfigDialog({ projectId }: BudgetConfigDialogProps) {
             </div>
             <div className="space-y-2">
               <Label>Enforcement Mode</Label>
-              <RadioGroup value={mode} onValueChange={(v) => setMode(v as "soft" | "hard")} className="space-y-1">
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="soft" id="soft" />
-                  <Label htmlFor="soft" className="font-normal cursor-pointer">
-                    <span className="font-medium">Soft</span> — Alert only, continue with cloud
-                  </Label>
-                </div>
-                <div className="flex items-center gap-2">
-                  <RadioGroupItem value="hard" id="hard" />
-                  <Label htmlFor="hard" className="font-normal cursor-pointer">
-                    <span className="font-medium">Hard</span> — Auto-downgrade to local Ollama
-                  </Label>
-                </div>
-              </RadioGroup>
+              <HowToTooltip title="Enforcement Mode" description="Choose whether to softly alert or strictly block spending when limits are reached." side="bottom">
+                <RadioGroup value={mode} onValueChange={(v) => setMode(v as "soft" | "hard")} className="space-y-1">
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="soft" id="soft" />
+                    <Label htmlFor="soft" className="font-normal cursor-pointer">
+                      <span className="font-medium">Soft</span> — Alert only, continue with cloud
+                    </Label>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <RadioGroupItem value="hard" id="hard" />
+                    <Label htmlFor="hard" className="font-normal cursor-pointer">
+                      <span className="font-medium">Hard</span> — Auto-downgrade to local Ollama
+                    </Label>
+                  </div>
+                </RadioGroup>
+              </HowToTooltip>
             </div>
-            <Button id="btn-wallet-save-budget" onClick={handleSave} disabled={setBudget.isPending} className="w-full">
-              {setBudget.isPending ? "Saving..." : "Save Budget"}
-            </Button>
+            <HowToTooltip title="Save Budget" description="Apply changes to the project's spending limits." side="bottom">
+              <Button id="btn-wallet-save-budget" onClick={handleSave} disabled={setBudget.isPending} className="w-full">
+                {setBudget.isPending ? "Saving..." : "Save Budget"}
+              </Button>
+            </HowToTooltip>
           </TabsContent>
 
           <TabsContent value="cards" className="pt-4 space-y-4">
@@ -176,15 +183,17 @@ export function BudgetConfigDialog({ projectId }: BudgetConfigDialogProps) {
                     <div className="text-muted-foreground">Card issued — token encrypted at rest</div>
                   </div>
                 )}
-                <Button
-                  onClick={handleIssueCard}
-                  disabled={issueCard.isPending}
-                  className="w-full"
-                  variant="outline"
-                >
-                  <CreditCard className="h-4 w-4 mr-2" />
-                  {issueCard.isPending ? "Issuing..." : "Issue Virtual Card"}
-                </Button>
+                <HowToTooltip title="Issue Virtual Card" description="Generate a new virtual credit card for isolated spending." side="bottom">
+                  <Button
+                    onClick={handleIssueCard}
+                    disabled={issueCard.isPending}
+                    className="w-full"
+                    variant="outline"
+                  >
+                    <CreditCard className="h-4 w-4 mr-2" />
+                    {issueCard.isPending ? "Issuing..." : "Issue Virtual Card"}
+                  </Button>
+                </HowToTooltip>
               </div>
             )}
           </TabsContent>

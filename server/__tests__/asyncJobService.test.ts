@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
-import { ProcessManagerService } from "../phase2/services/ProcessManagerService.js";
+import { ProcessManagerService } from "../core_services/services/ProcessManagerService.js";
 import {
   AsyncJobService,
   type AsyncJobResultEvent,
-} from "../phase2/services/AsyncJobService.js";
+} from "../core_services/services/AsyncJobService.js";
 
 /**
  * Integration check for the async-job continuation: a tracked job that fails

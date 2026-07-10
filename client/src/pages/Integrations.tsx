@@ -15,7 +15,7 @@ import { Plug } from "lucide-react";
 export function Integrations() {
   return (
     <OmnecorDashboardLayout>
-      <div className="h-full flex flex-col bg-background">
+      <div className="h-full flex flex-col">
         <div className="border-b border-border bg-card px-4 sm:px-6 py-3 sm:py-4">
           <div className="flex items-center gap-3 min-w-0">
             <Plug className="w-6 h-6 text-primary flex-shrink-0" />

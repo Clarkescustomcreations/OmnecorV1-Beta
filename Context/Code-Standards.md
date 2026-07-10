@@ -65,6 +65,19 @@ You must use the correct tRPC procedure tier defined in [trpc.ts](file:///home/l
     const result = await AiProviderService.getInstance().chat(input);
     ```
 
+### 2.3 Native Module Lazy-Loading
+*   **Graceful Degradation:** Native C++ extensions (e.g., `node-pty`, `canvas`, `sqlite3` depending on bindings) must be lazy-loaded at runtime. This prevents the entire server from crashing during bootstrap if the native bindings fail to compile on a specific host environment.
+    ```typescript
+    // Correct: Lazy load native module
+    let ptyModule: typeof import("node-pty") | null = null;
+    async function getPty() {
+      if (!ptyModule) {
+        try { ptyModule = await import("node-pty"); } catch { ptyModule = null; }
+      }
+      return ptyModule;
+    }
+    ```
+
 ---
 
 ## 🗄️ 3. Database Standards (Drizzle ORM & libSQL)
@@ -119,9 +132,10 @@ Drizzle enums, timestamps, and JSON data must utilize standard SQLite mapping ty
     }))
     ```
 
-### 4.4 Mobile Credentials Security
-*   **Hardware Keystore:** Plaintext storage of sensitive API keys or OMMESH secret tokens in `@react-native-async-storage/async-storage` is forbidden. 
-*   **Expo SecureStore:** Always encrypt credentials using Expo's `SecureStore` (which leverages Android KeyStore/iOS Keychain).
+### 4.4 Credentials Security & Storage
+*   **Frontend / Web:** Never store plaintext credentials, API keys, or OMMESH secret tokens in `localStorage`, `sessionStorage`, or plain frontend state.
+*   **Mobile (React Native):** Plaintext storage of sensitive API keys or OMMESH secret tokens in `@react-native-async-storage/async-storage` is explicitly forbidden.
+*   **Expo SecureStore:** Always encrypt credentials on mobile using Expo's `SecureStore` (which leverages Android KeyStore/iOS Keychain).
 
 ---
 

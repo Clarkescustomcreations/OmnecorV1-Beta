@@ -1,84 +1,69 @@
-import React, { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAppStore } from "@/lib/store/app.store";
+import { pickQuote } from "./quoteBag";
 
-const SERIOUS_QUOTES = [
-  "Computing the optimal response...",
-  "Consulting the neural archives...",
-  "Synthesizing information...",
-  "Parsing the space-time continuum...",
-  "Analyzing context vectors...",
-  "Compiling thought processes...",
-  "Running heuristics...",
-  "Aligning dimensional parameters...",
-  "Gathering intelligence...",
-  "Formulating a reply...",
-  "Connecting to quantum processing units...",
-  "Calibrating conversational matrices...",
-  "Retrieving historical context...",
-  "Decoding input semantics..."
-];
-
-const FUNNY_QUOTES = [
-  "No One messes with Boris! Slughead... I Am Invincible",
-  "Go Ahead, Make My Day... Show Me The Error Fool",
-  "Nobody Codes Me Into a Corner",
-  "But Wait Theres More...",
-  "Waskely Bug ! ... I Like Huntin Waskely Bugs",
-  "Hey Hey NOW! DONT DO THAT",
-  "Oh.. Im Sorry That Last Hand Nearly Killed Me",
-  "I Can't Find The Blasted thing",
-  "awwww Jeeezz Ah I.. I Dont Know Abot This...",
-  "Processing Pure Confabulation.. Please Hold... Just Kidding!",
-  "Why! DO I Always Get The Hardest Tasks.. Oh Ya Right Because I'M AI",
-  "Formulating Opinions... Realizing You Don't Care.. Retracting Opinions NVM",
-  "Ewwww That's One Ugly....",
-  "Kick Butt An Chew BubbleGum!.."
-];
-
-function getRandomQuote(style: "random" | "funny" | "serious") {
-  if (style === "funny") {
-    return FUNNY_QUOTES[Math.floor(Math.random() * FUNNY_QUOTES.length)];
-  }
-  if (style === "serious") {
-    return SERIOUS_QUOTES[Math.floor(Math.random() * SERIOUS_QUOTES.length)];
-  }
-  
-  // random mode - 60% chance for a funny quote, 40% for a serious quote
-  if (Math.random() < 0.6) {
-    return FUNNY_QUOTES[Math.floor(Math.random() * FUNNY_QUOTES.length)];
-  }
-  return SERIOUS_QUOTES[Math.floor(Math.random() * SERIOUS_QUOTES.length)];
-}
-
-export function LoadingQuote({ 
+export function LoadingQuote({
   className,
-}: { 
+  typewriter = false,
+}: {
   className?: string;
+  /** Notepad mode: type the quote out flush-left as plain text (no box/bubble). */
+  typewriter?: boolean;
 }) {
   const { chatDisplaySettings } = useAppStore();
   const quoteStyle = chatDisplaySettings.quoteStyle;
-  
-  const [quote, setQuote] = useState(() => getRandomQuote(quoteStyle));
 
+  const [quote, setQuote] = useState(() => pickQuote(quoteStyle));
+
+  // Draw a fresh quote from the new pool when the style changes — but not on the
+  // initial mount (useState already drew one), so we don't waste a draw.
+  const firstStyleRun = useRef(true);
   useEffect(() => {
-    // Update immediately if quoteStyle prop changes
-    setQuote(getRandomQuote(quoteStyle));
-    
-    const interval = setInterval(() => {
-      setQuote(prev => {
-        let next = getRandomQuote(quoteStyle);
-        while (next === prev) {
-          next = getRandomQuote(quoteStyle);
-        }
-        return next;
-      });
-    }, 3000);
-
-    return () => clearInterval(interval);
+    if (firstStyleRun.current) {
+      firstStyleRun.current = false;
+      return;
+    }
+    setQuote(pickQuote(quoteStyle));
   }, [quoteStyle]);
+
+  // --- Boxed variant (bubble layouts, personas panel) — fade between quotes ---
+  useEffect(() => {
+    if (typewriter) return;
+    const interval = setInterval(() => setQuote(pickQuote(quoteStyle)), 3000);
+    return () => clearInterval(interval);
+  }, [quoteStyle, typewriter]);
+
+  // --- Typewriter variant — type the quote out, hold, then move to the next ---
+  const [typed, setTyped] = useState("");
+  useEffect(() => {
+    if (!typewriter) return;
+    setTyped("");
+    let i = 0;
+    let t: ReturnType<typeof setTimeout>;
+    const step = () => {
+      i++;
+      setTyped(quote.slice(0, i));
+      if (i < quote.length) {
+        t = setTimeout(step, 52); // ~19 chars/sec — a touch faster than human typing
+      } else {
+        t = setTimeout(() => setQuote(pickQuote(quoteStyle)), 1500);
+      }
+    };
+    t = setTimeout(step, 52);
+    return () => clearTimeout(t);
+  }, [quote, quoteStyle, typewriter]);
+
+  if (typewriter) {
+    return (
+      <p className={cn("text-sm text-muted-foreground/70 italic", className)}>
+        {typed}
+        <span className="not-italic text-primary animate-pulse">▋</span>
+      </p>
+    );
+  }
 
   return (
     <div className={cn("flex items-center gap-3 text-muted-foreground bg-muted/20 rounded-lg max-w-sm px-4 py-3 border border-border/50 min-h-[48px]", className)}>

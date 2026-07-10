@@ -19,7 +19,7 @@ vi.mock("../db.factory.js", async importActual => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -33,13 +33,13 @@ const vcSvc = vi.hoisted(() => ({
   listTransactions: vi.fn(),
   revealPan: vi.fn(),
 }));
-vi.mock("../phase2/services/VirtualCardService.js", async importActual => {
+vi.mock("../core_services/services/VirtualCardService.js", async importActual => {
   const actual = await importActual<Record<string, unknown>>();
   return { ...actual, VirtualCardService: { getInstance: () => vcSvc } };
 });
 
 const hitlSvc = vi.hoisted(() => ({ requestApproval: vi.fn() }));
-vi.mock("../phase2/services/HITLApprovalService.js", () => ({
+vi.mock("../core_services/services/HITLApprovalService.js", () => ({
   HITLApprovalService: { getInstance: () => hitlSvc },
 }));
 

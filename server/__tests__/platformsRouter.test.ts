@@ -17,7 +17,7 @@ vi.mock("../db.factory.js", async importActual => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -29,7 +29,7 @@ import fs from "node:fs";
 import { appRouter } from "../routers.js";
 import { platformAccounts } from "../../drizzle/schema.js";
 import { ENV } from "../_core/env.js";
-import { DEFAULT_SOCIAL_WEBHOOK_PATH } from "../phase2/services/WebhookPublisher.js";
+import { DEFAULT_SOCIAL_WEBHOOK_PATH } from "../core_services/services/WebhookPublisher.js";
 import { createTestDb, seedUser, makeContext, type TestDb } from "./_helpers/trpcHarness.js";
 import type { Db } from "../db.js";
 

@@ -13,9 +13,9 @@
  *                                      # python-multipart, torch, soundfile …
  *   # STT (light, ~140MB base model):
  *   WHISPER_MODEL_SIZE=base WHISPER_DEVICE=cpu WHISPER_COMPUTE_TYPE=int8 \
- *     python server/phase2/python_scripts/whisper_server.py       # :8001
+ *     python server/core_services/python_scripts/whisper_server.py       # :8001
  *   # TTS (XTTS-v2, ~1.8GB first-run download):
- *   COQUI_TOS_AGREED=1 python server/phase2/python_scripts/tts_server.py  # :8002
+ *   COQUI_TOS_AGREED=1 python server/core_services/python_scripts/tts_server.py  # :8002
  *
  * The audio file must live under an allowed dir (PATHS.data) — `voiceRouter`
  * runs every path through `validatePath` — so the clip is written there.
@@ -32,12 +32,12 @@ vi.mock("../db.factory.js", async importActual => {
   const actual = await importActual<typeof import("../db.factory.js")>();
   return { ...actual, getDb: async () => h.db };
 });
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: { getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }) },
 }));
 
 import { appRouter } from "../routers.js";
-import { VoiceService } from "../phase2/services/VoiceService.js";
+import { VoiceService } from "../core_services/services/VoiceService.js";
 import { PATHS } from "../_core/paths.js";
 import { createTestDb, seedUser, makeContext } from "./_helpers/trpcHarness.js";
 
@@ -113,5 +113,9 @@ describe.skipIf(!ttsUp || !espeakOk)("voice.synthesize — real tts_server (XTTS
     const hasAudio =
       res?.data?.hasAudioBuffer ?? (res as { hasAudioBuffer?: boolean }).hasAudioBuffer;
     expect(hasAudio).toBe(true);
-  }, 120_000);
+    // XTTS-v2 on CPU measures ~50s for this sentence on an otherwise-idle
+    // machine; the parallel vitest workers of a full `pnpm test` run can more
+    // than double that, so 120s flakes under load (same pattern as the scrypt
+    // suite's 60s timeout).
+  }, 300_000);
 });

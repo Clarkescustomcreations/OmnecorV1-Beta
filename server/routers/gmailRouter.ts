@@ -4,10 +4,8 @@ import { TRPCError } from "@trpc/server";
 import { protectedProcedure, externalServiceProcedure, router } from "../_core/trpc.js";
 import { getDb } from "../db.factory.js";
 import { platformAccounts } from "../../drizzle/schema.js";
-import {
-  isPlatformConfigured,
-  refreshOAuthToken,
-} from "../oauth/oauthClients.js";
+import { isPlatformConfigured } from "../oauth/oauthClients.js";
+import { getFreshAccessToken, refreshAndPersistAccount } from "../oauth/platformTokens.js";
 import { createLogger } from "../_core/logger.js";
 
 const log = createLogger("GmailRouter");
@@ -122,26 +120,15 @@ export const gmailRouter = router({
           body: JSON.stringify({ raw }),
         });
 
-      let res = await send(account.oauthToken);
+      // Pre-emptively renew if the stored token is within the expiry window,
+      // then send. On a live 401 refresh once and retry. Both paths persist the
+      // rotated (re-encrypted) token via the shared platform-token helpers.
+      let res = await send(await getFreshAccessToken(account));
 
-      // Refresh-on-401 (once), then persist the rotated token.
       if (res.status === 401 && account.oauthRefreshToken) {
         log.info("Gmail token expired, refreshing");
-        const refreshed = await refreshOAuthToken("gmail", account.oauthRefreshToken);
-        if (refreshed.access_token) {
-          res = await send(refreshed.access_token);
-          const db = await getDb();
-          await db
-            .update(platformAccounts)
-            .set({
-              oauthToken: refreshed.access_token,
-              oauthRefreshToken: refreshed.refresh_token || account.oauthRefreshToken,
-              tokenExpiresAt: refreshed.expires_in
-                ? new Date(Date.now() + refreshed.expires_in * 1000)
-                : account.tokenExpiresAt,
-            })
-            .where(eq(platformAccounts.id, account.id));
-        }
+        const refreshed = await refreshAndPersistAccount(account);
+        if (refreshed) res = await send(refreshed);
       }
 
       if (!res.ok) {

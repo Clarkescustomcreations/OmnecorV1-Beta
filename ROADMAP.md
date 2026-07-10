@@ -28,6 +28,12 @@ The core platform feature set is fully code-complete, packaged, and verified. Pr
 | 13 unaudited TSX files covered by input-tracker | ✅ Done (2026-06-10) — 0 DEAD found across all 12 |
 | pnpm check — 0 errors | ✅ Passing |
 | All stale audit comments removed | ✅ Done (2026-06-10) |
+| Agentic Chat Stream — web + APK (Claude-Code-style typed stream, HITL, FIFO queue, code execution) | ✅ Done (2026-07-04–07) — 1315 tests passing |
+| Model-Fabric: Ollama decoupled, LocalLlmRuntimeService, dual tool-protocol, unified model catalog, beacon-minimal mesh advertising | ✅ Done (2026-07-07–08) — 1455 tests at Phase 7 gate |
+| Mesh Sub-Agent Delegation: delegate_task tool, SubAgentHostService, DelegationService, mTLS NDJSON relay, web + APK managed chats | ✅ Done (2026-07-08) — 1447 tests at that workstream's Phase 9 gate |
+| Model-Fabric Phase 8: local GGUF auto-discovery (app dir + Ollama blob store, Ollama-stopped) + hot-swap runtime (`ensureModelLoaded`, per-model VRAM fit) + `loadLocalModel` + picker loading indicator | ✅ Done (2026-07-10) — 1469 tests (authoritative HEAD total), live-verified on DadsPC RTX 4060 Ti |
+
+> **Test count note:** Gate counts are sequential per-phase snapshots. Model-Fabric's 1455 includes its own Phase 7 additions; Mesh-Delegation's **1447** was the verified `pnpm test` count at that workstream's Phase 9 close (2026-07-08). Later work has since moved HEAD past 1447 — Model-Fabric **Phase 8** (local GGUF auto-discovery + hot-swap, 2026-07-10) added +22 tests to **1469 passing / 4 skipped**. See `Context/Tracker-Docs/Verification-Pass.md` for the authoritative live HEAD baseline.
 
 ### Phase 2 (v2.x): Advanced Orchestration & Integration
 

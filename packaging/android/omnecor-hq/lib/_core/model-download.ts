@@ -10,7 +10,8 @@
  */
 import * as FileSystem from "expo-file-system/legacy";
 import * as DocumentPicker from "expo-document-picker";
-import type { ModelInfo } from "./local-inference";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import type { ModelInfo } from "./model-catalog";
 
 export const MODELS_DIR = FileSystem.documentDirectory + "models/";
 
@@ -34,6 +35,30 @@ export interface DownloadedModel {
 export async function isModelDownloaded(filename: string): Promise<boolean> {
   const info = await FileSystem.getInfoAsync(modelPath(filename));
   return info.exists && !info.isDirectory;
+}
+
+export type ModelFileState = "missing" | "partial" | "complete";
+
+/**
+ * Classify a catalog model's on-disk file by comparing its actual size to the
+ * expected size (same tolerance as the download completeness gate below).
+ *
+ * This exists because `isModelDownloaded` only checks *existence*: an
+ * interrupted download (app backgrounded mid-transfer, network drop) leaves a
+ * truncated file that then masquerades as "✓ Downloaded" and fails to load with
+ * an opaque llama.cpp error. `"partial"` lets the UI show "Incomplete —
+ * re-download" instead of offering a Load that can't succeed.
+ */
+export async function getModelFileState(model: ModelInfo): Promise<ModelFileState> {
+  const info = await FileSystem.getInfoAsync(modelPath(model.filename), { size: true } as Parameters<typeof FileSystem.getInfoAsync>[1]);
+  if (!info.exists || info.isDirectory) return "missing";
+  const size = (info as { size?: number }).size ?? 0;
+  const expected = model.sizeGb * 1024 * 1024 * 1024;
+  // `sizeGb` is a decimal-GB label but expected is computed in GiB, so a
+  // complete file lands around 90–95% of `expected`; 0.9 matches the download
+  // gate and reliably separates a full file from a truncated one.
+  if (expected > 0 && size < expected * 0.9) return "partial";
+  return "complete";
 }
 
 export async function getDownloadedModel(filename: string): Promise<DownloadedModel | null> {
@@ -110,8 +135,10 @@ export function isDownloading(filename: string): boolean {
 /** GGUF model file extensions llama.rn can load. */
 const GGUF_EXTS = [".gguf"];
 /** LiteRT-LM model file extensions (Google AI Edge Gallery). `.litertlm` is the
- *  format the LiteRT-LM engine loads. */
-const TASK_EXTS = [".litertlm", ".bin"];
+ *  format the LiteRT-LM engine loads; `.task` is the legacy MediaPipe bundle
+ *  Edge Gallery still exports (the engine loads most of these too). We surface
+ *  both so a user's existing Gallery downloads are discoverable. */
+const TASK_EXTS = [".litertlm", ".task", ".bin"];
 
 function hasExt(name: string, exts: string[]): boolean {
   const lower = name.toLowerCase();
@@ -235,4 +262,105 @@ export async function importTaskModelFromDevice(): Promise<DownloadedModel | nul
   await FileSystem.copyAsync({ from: asset.uri, to: dest });
   const info = await FileSystem.getInfoAsync(dest, { size: true } as Parameters<typeof FileSystem.getInfoAsync>[1]);
   return { filename: asset.name, path: dest, sizeBytes: (info as { size?: number }).size ?? 0 };
+}
+
+// ── Device model FOLDER (Storage Access Framework) ─────────────────────────
+//
+// The single-file DocumentPicker importers above make the user re-navigate to
+// their model on every load. Worse, LiteRT-LM models pulled by the Google AI
+// Edge Gallery app live in *its* storage — an app-private folder Omnecor can't
+// see. SAF fixes both: the user grants Omnecor read access to the folder that
+// holds their `.litertlm`/`.task` models ONCE (persisted across launches), and
+// we then list every model in it and load any of them with a single tap.
+//
+// The grant is persistent (Android keeps the tree URI permission), so the whole
+// folder becomes a live, re-scannable model list — exactly the "load a model
+// list" experience that was missing.
+
+const KEY_TASK_FOLDER = "omnecor_task_model_folder";
+const SAF = FileSystem.StorageAccessFramework;
+
+/** A LiteRT-LM model discovered inside a user-granted device folder. */
+export interface FolderTaskModel {
+  filename: string;
+  /** SAF content:// URI — not a POSIX path, so it must be copied in before load. */
+  uri: string;
+  sizeBytes: number;
+}
+
+/** Decode a SAF content URI down to its plain display filename. */
+function safDisplayName(uri: string): string {
+  let s = uri;
+  try { s = decodeURIComponent(uri); } catch { /* keep raw on malformed escape */ }
+  const cut = Math.max(s.lastIndexOf("/"), s.lastIndexOf(":"));
+  return cut >= 0 ? s.slice(cut + 1) : s;
+}
+
+/**
+ * Prompt the user to grant a device folder (e.g. Downloads, or wherever their
+ * Edge Gallery / sideloaded models live) and remember it. Returns the granted
+ * SAF tree URI, or null if the user cancelled. Android only.
+ */
+export async function pickTaskModelFolder(): Promise<string | null> {
+  const res = await SAF.requestDirectoryPermissionsAsync();
+  if (!res.granted) return null;
+  await AsyncStorage.setItem(KEY_TASK_FOLDER, res.directoryUri).catch(() => { /* best-effort */ });
+  return res.directoryUri;
+}
+
+/** The previously granted model folder, or null if none/permission lost. */
+export async function getSavedTaskFolder(): Promise<string | null> {
+  try { return await AsyncStorage.getItem(KEY_TASK_FOLDER); } catch { return null; }
+}
+
+/** Forget the granted folder (the OS permission itself is dropped on uninstall). */
+export async function clearTaskFolder(): Promise<void> {
+  try { await AsyncStorage.removeItem(KEY_TASK_FOLDER); } catch { /* best-effort */ }
+}
+
+/**
+ * List every LiteRT-LM model (`.litertlm`/`.task`/`.bin`) inside a granted SAF
+ * folder. A revoked/stale permission (e.g. folder deleted, or grant cleared by
+ * the OS) throws from `readDirectoryAsync`; callers treat that as "re-pick".
+ */
+export async function scanFolderForTaskModels(dirUri: string): Promise<FolderTaskModel[]> {
+  const entries = await SAF.readDirectoryAsync(dirUri);
+  const out: FolderTaskModel[] = [];
+  for (const uri of entries) {
+    const name = safDisplayName(uri);
+    if (!isTask(name)) continue;
+    let sizeBytes = 0;
+    try {
+      const info = await FileSystem.getInfoAsync(uri, { size: true } as Parameters<typeof FileSystem.getInfoAsync>[1]);
+      sizeBytes = (info as { size?: number }).size ?? 0;
+    } catch { /* size is best-effort — a listable file is still loadable */ }
+    out.push({ filename: name, uri, sizeBytes });
+  }
+  out.sort((a, b) => a.filename.localeCompare(b.filename));
+  return out;
+}
+
+/**
+ * Copy a folder-discovered model into the app's models directory so the native
+ * LiteRT-LM engine (which needs a real POSIX path, not a content:// URI) can
+ * load it. Reuses an existing same-name copy only when its size provably matches
+ * the source, so a second load of the same model is instant instead of
+ * re-copying gigabytes. When the source size is unknown (some content providers
+ * don't report it) we always re-copy — reusing an unverified same-name file
+ * risks silently loading stale/different bytes. Returns the local
+ * `DownloadedModel`.
+ */
+export async function importTaskModelFromFolder(model: FolderTaskModel): Promise<DownloadedModel> {
+  await ensureDir();
+  const dest = modelPath(model.filename);
+  const existing = await FileSystem.getInfoAsync(dest, { size: true } as Parameters<typeof FileSystem.getInfoAsync>[1]);
+  const existingSize = (existing as { size?: number }).size ?? 0;
+  const alreadyCopied = existing.exists && !existing.isDirectory &&
+    model.sizeBytes > 0 && existingSize === model.sizeBytes;
+  if (!alreadyCopied) {
+    if (existing.exists) await FileSystem.deleteAsync(dest, { idempotent: true });
+    await FileSystem.copyAsync({ from: model.uri, to: dest });
+  }
+  const info = await FileSystem.getInfoAsync(dest, { size: true } as Parameters<typeof FileSystem.getInfoAsync>[1]);
+  return { filename: model.filename, path: dest, sizeBytes: (info as { size?: number }).size ?? 0 };
 }

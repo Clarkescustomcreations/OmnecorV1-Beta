@@ -9,6 +9,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Terminal, Cpu, Zap, RefreshCw } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface ESPProgressEvent { percent: number; phase: string; }
 interface ESPSerialEvent { line: string; }
@@ -80,27 +81,33 @@ export const ESPToolPanel: React.FC = () => {
                 ))}
               </SelectContent>
             </Select>
-            <Button variant="outline" size="icon" onClick={() => portsQuery.refetch()}>
-              <RefreshCw className={`w-4 h-4 ${portsQuery.isFetching ? 'animate-spin' : ''}`} />
-            </Button>
+            <HowToTooltip title="Scan Ports" description="Rescan for connected ESP devices on serial ports" side="top">
+              <Button variant="outline" size="icon" onClick={() => portsQuery.refetch()}>
+                <RefreshCw className={`w-4 h-4 ${portsQuery.isFetching ? 'animate-spin' : ''}`} />
+              </Button>
+            </HowToTooltip>
           </div>
 
           <div className="flex gap-2">
-            <Button 
-              className="flex-1" 
-              onClick={() => detectChipMutation.mutate({ port: selectedPort })}
-              disabled={!selectedPort || detectChipMutation.isPending}
-            >
-              Detect Chip
-            </Button>
-            <Button 
-              className="flex-1" 
-              variant="destructive"
-              onClick={handleFlash}
-              disabled={!selectedPort || flashMutation.isPending}
-            >
-              <Zap className="w-4 h-4 mr-2" /> Flash Firmware
-            </Button>
+            <HowToTooltip title="Detect Chip" description="Read information from the connected ESP chip" side="top">
+              <Button 
+                className="flex-1 w-full" 
+                onClick={() => detectChipMutation.mutate({ port: selectedPort })}
+                disabled={!selectedPort || detectChipMutation.isPending}
+              >
+                Detect Chip
+              </Button>
+            </HowToTooltip>
+            <HowToTooltip title="Flash Device" description="Write compiled firmware to the connected ESP board" side="top">
+              <Button 
+                className="flex-1 w-full" 
+                variant="destructive"
+                onClick={handleFlash}
+                disabled={!selectedPort || flashMutation.isPending}
+              >
+                <Zap className="w-4 h-4 mr-2" /> Flash Firmware
+              </Button>
+            </HowToTooltip>
           </div>
 
           {flashMutation.isPending || flashProgress > 0 ? (

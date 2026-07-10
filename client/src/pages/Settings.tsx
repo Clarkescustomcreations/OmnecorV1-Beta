@@ -219,7 +219,7 @@ export const Settings: React.FC = () => {
 
   return (
     <OmnecorDashboardLayout>
-      <div className="flex flex-col h-full bg-background">
+      <div className="flex flex-col h-full">
         {/* Header */}
         <div className="flex flex-wrap items-center justify-between gap-3 p-4 sm:p-6 border-b bg-muted/30">
           <div className="flex items-center gap-4 min-w-0">

@@ -19,6 +19,7 @@ import {
   integer,
   text,
   index,
+  uniqueIndex,
 } from "drizzle-orm/sqlite-core";
 import { relations } from "drizzle-orm";
 
@@ -463,6 +464,53 @@ export const designSaves = sqliteTable(
 
 export type DesignSave = typeof designSaves.$inferSelect;
 export type InsertDesignSave = typeof designSaves.$inferInsert;
+
+/**
+ * Model Assets Table (3D model library)
+ *
+ * A DB registry for the .glb/.gltf files that live in the shared model library
+ * (PATHS.models). Files on disk are the payload; this row is the *association* —
+ * it binds a mesh to a neural map (mapId null = global/all-maps) and can further
+ * link it to a specific PCB/schematic design project. That linkage is what lets
+ * the assistant see a project's 3D housing and its PCB/schematic together: both
+ * hang off the same map, and a mesh can point at the exact design it encloses.
+ */
+export const modelAssets = sqliteTable(
+  "model_assets",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    userId: integer("userId").notNull(),
+    // null mapId = global asset, visible in every map.
+    mapId: text("mapId").references(() => neuralMaps.id, { onDelete: "cascade" }),
+    // Optional hard link to the PCB/schematic project this mesh belongs with.
+    // set null on delete so removing the PCB project only unlinks the housing.
+    designProjectId: integer("designProjectId").references(() => designProjects.id, {
+      onDelete: "set null",
+    }),
+    name: text("name").notNull(), // display name
+    // basename in the shared PATHS.models library. The library is a shared file
+    // namespace (every user sees every file via listModels); a model_assets row
+    // is one user's *association metadata* over a shared file, so the uniqueness
+    // that matters is (userId, fileName) — two users must each be able to link
+    // the same shared mesh to their own map/project independently.
+    fileName: text("fileName").notNull(),
+    format: text("format", { enum: ["glb", "gltf"] }).notNull(),
+    size: integer("size").default(0),
+    source: text("source", { enum: ["blender", "comfy", "upload"] }).notNull().default("upload"),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+    updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+  },
+  (t) => [
+    // Per-user association metadata: one row per (owner, file). A global unique
+    // on fileName would let one user's registration clobber another's row.
+    uniqueIndex("model_assets_user_file_unique").on(t.userId, t.fileName),
+    index("model_assets_map_id_idx").on(t.mapId),
+    index("model_assets_design_project_id_idx").on(t.designProjectId),
+  ]
+);
+
+export type ModelAsset = typeof modelAssets.$inferSelect;
+export type InsertModelAsset = typeof modelAssets.$inferInsert;
 
 /**
  * Component Library Table (PCB Editor)

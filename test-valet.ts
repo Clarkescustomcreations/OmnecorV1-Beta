@@ -1,6 +1,6 @@
 import 'dotenv/config';
-import { ValetRouterService } from "./server/phase2/services/ValetRouterService.js";
-import { AiProviderService } from "./server/phase2/services/AiProviderService.js";
+import { ValetRouterService } from "./server/core_services/services/ValetRouterService.js";
+import { AiProviderService } from "./server/core_services/services/AiProviderService.js";
 
 async function run() {
   console.log("Testing ValetRouterService Fallback with OpenAI...");

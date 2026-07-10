@@ -14,6 +14,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Brain, Box, Zap, Play, Settings, Plus, Cloud, CheckCircle2, AlertCircle, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { trpc } from "@/lib/trpc";
@@ -146,10 +147,12 @@ export function SpecializedModuleLauncher({
             <p className="text-sm text-muted-foreground mb-4">
               Create a new LLM fine-tuning session to get started.
             </p>
-            <Button size="sm" onClick={handleCreateSession}>
-              <Plus className="w-4 h-4 mr-2" />
-              Create Session
-            </Button>
+            <HowToTooltip title="Create Session" description="Start a new LLM fine-tuning configuration" side="top">
+              <Button size="sm" onClick={handleCreateSession}>
+                <Plus className="w-4 h-4 mr-2" />
+                Create Session
+              </Button>
+            </HowToTooltip>
           </div>
         </div>
       );
@@ -192,12 +195,12 @@ export function SpecializedModuleLauncher({
           </CardHeader>
           <CardContent className="space-y-2">
             {llmSession.status === "training" ? (
-              <div className="flex items-center gap-2 text-sm text-accent-cyan">
+              <div className="flex items-center gap-2 text-sm text-primary">
                 <Loader2 className="size-4 animate-spin shrink-0" />
                 <span>Training in progress — monitor in Jobs panel</span>
               </div>
             ) : llmSession.status === "completed" ? (
-              <div className="flex items-center gap-2 text-sm text-accent-success">
+              <div className="flex items-center gap-2 text-sm text-primary">
                 <CheckCircle2 className="size-4 shrink-0" />
                 <span>
                   Training complete
@@ -220,20 +223,22 @@ export function SpecializedModuleLauncher({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">LoRA Configurations</CardTitle>
-            <Button size="sm" variant="outline" onClick={() => {
-              if (!llmSession) return;
-              const newConfig = createLoRAConfig(
-                `new-config-${llmSession.loraConfigs.length + 1}`,
-                llmSession.baseModel,
-                "/path/to/dataset.jsonl",
-                { rank: 16, alpha: 16, epochs: 3 }
-              );
-              setLLMSession({ ...llmSession, loraConfigs: [...llmSession.loraConfigs, newConfig] });
-              setEditingLoraConfig(newConfig);
-            }}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Config
-            </Button>
+            <HowToTooltip title="New LoRA Config" description="Add a new training configuration for fine-tuning" side="left">
+              <Button size="sm" variant="outline" onClick={() => {
+                if (!llmSession) return;
+                const newConfig = createLoRAConfig(
+                  `new-config-${llmSession.loraConfigs.length + 1}`,
+                  llmSession.baseModel,
+                  "/path/to/dataset.jsonl",
+                  { rank: 16, alpha: 16, epochs: 3 }
+                );
+                setLLMSession({ ...llmSession, loraConfigs: [...llmSession.loraConfigs, newConfig] });
+                setEditingLoraConfig(newConfig);
+              }}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Config
+              </Button>
+            </HowToTooltip>
           </div>
         </CardHeader>
         <CardContent>
@@ -251,9 +256,11 @@ export function SpecializedModuleLauncher({
                       {config.epochs}
                     </p>
                   </div>
-                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${config.name}`} onClick={() => setEditingLoraConfig(config)}>
-                    <Settings className="w-4 h-4" aria-hidden="true" />
-                  </Button>
+                  <HowToTooltip title="Edit Config" description="Modify rank, alpha, and epochs for this LoRA configuration" side="left">
+                    <Button size="sm" variant="ghost" aria-label={`Configure ${config.name}`} onClick={() => setEditingLoraConfig(config)}>
+                      <Settings className="w-4 h-4" aria-hidden="true" />
+                    </Button>
+                  </HowToTooltip>
                 </div>
               ))}
             </div>
@@ -327,44 +334,50 @@ export function SpecializedModuleLauncher({
                 <Input id="lora-edit-epochs" type="number" min={1} max={100} value={editingLoraConfig.epochs} onChange={(e) => setEditingLoraConfig({ ...editingLoraConfig, epochs: Number(e.target.value) })} className="text-sm font-mono" />
               </div>
             </div>
-            <Button className="w-full" size="sm" onClick={() => {
-              if (!llmSession) return;
-              setLLMSession({
-                ...llmSession,
-                loraConfigs: llmSession.loraConfigs.map(c => c.id === editingLoraConfig.id ? editingLoraConfig : c)
-              });
-              setEditingLoraConfig(null);
-              toast.success("LoRA config updated");
-            }}>
-              <Settings className="w-4 h-4 mr-2" />
-              Save Config
-            </Button>
+            <HowToTooltip title="Save Config" description="Apply changes to this LoRA configuration" side="top">
+              <Button className="w-full" size="sm" onClick={() => {
+                if (!llmSession) return;
+                setLLMSession({
+                  ...llmSession,
+                  loraConfigs: llmSession.loraConfigs.map(c => c.id === editingLoraConfig.id ? editingLoraConfig : c)
+                });
+                setEditingLoraConfig(null);
+                toast.success("LoRA config updated");
+              }}>
+                <Settings className="w-4 h-4 mr-2" />
+                Save Config
+              </Button>
+            </HowToTooltip>
           </CardContent>
         </Card>
       )}
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button className="flex-1" aria-label="Start LLM training" onClick={handleStartTraining}>
-          <Play className="w-4 h-4 mr-2" aria-hidden="true" />
-          Start Training
-        </Button>
-        <Button variant="outline" className="flex-1" aria-label="Open full LLM Builder" onClick={() => setLocation("/llm-builder")}>
-          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
-          Open LLM Builder
-        </Button>
+        <HowToTooltip title="Start Training" description="Begin fine-tuning the model using the current LoRA configuration" side="top">
+          <Button className="flex-1" aria-label="Start LLM training" onClick={handleStartTraining}>
+            <Play className="w-4 h-4 mr-2" aria-hidden="true" />
+            Start Training
+          </Button>
+        </HowToTooltip>
+        <HowToTooltip title="Open Builder" description="Navigate to the dedicated LLM Builder workspace" side="top">
+          <Button variant="outline" className="flex-1" aria-label="Open full LLM Builder" onClick={() => setLocation("/llm-builder")}>
+            <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
+            Open LLM Builder
+          </Button>
+        </HowToTooltip>
       </div>
 
       {/* Kaggle GPU Training */}
-      <Card className="border-accent-cyan/20 bg-accent-cyan/5">
+      <Card className="border-primary/20 bg-primary/5">
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm flex items-center gap-2">
-              <Cloud className="w-4 h-4 text-accent-cyan" />
+              <Cloud className="w-4 h-4 text-primary" />
               Kaggle GPU Training (Free)
             </CardTitle>
             {kaggleStatus.data?.connected
-              ? <Badge className="bg-accent-success/10 text-accent-success border-accent-success/20 text-[10px] gap-1"><CheckCircle2 className="w-3 h-3" /> {kaggleStatus.data.username}</Badge>
+              ? <Badge className="bg-primary/10 text-primary border-primary/20 text-[10px] gap-1"><CheckCircle2 className="w-3 h-3" /> {kaggleStatus.data.username}</Badge>
               : <Badge variant="outline" className="text-[10px] text-muted-foreground gap-1"><AlertCircle className="w-3 h-3" /> Not connected</Badge>
             }
           </div>
@@ -381,29 +394,31 @@ export function SpecializedModuleLauncher({
               <p>3. Go to <strong>kaggle.com/settings</strong> → API section → click <strong>"Create New Token"</strong> — this downloads a file called <code className="font-mono bg-muted px-1 rounded">kaggle.json</code></p>
               <p>4. Open that file — it looks like: <code className="font-mono bg-muted px-1 rounded">{`{"username":"you","key":"abc123..."}`}</code></p>
               <p>5. Enter those values in <strong>Settings → AI Providers → Kaggle</strong> or in the <strong>Valet Router tab</strong> to connect.</p>
-              <p className="text-accent-cyan">Once connected, come back here to launch a training run with one click.</p>
+              <p className="text-primary">Once connected, come back here to launch a training run with one click.</p>
             </div>
           ) : (
             <>
-              <Button
-                className="w-full"
-                size="sm"
-                onClick={() => {
-                  const cfg = llmSession.loraConfigs[0];
-                  startKaggle.mutate({
-                    datasetPath: cfg?.datasetPath || "data/valet",
-                    modelName: llmSession.baseModel,
-                    epochs: cfg?.epochs ?? 1,
-                    maxSeqLength: 3072,
-                    r: cfg?.rank ?? 8,
-                    loraAlpha: cfg?.alpha ?? 16,
-                  });
-                }}
-                disabled={startKaggle.isPending || llmSession.loraConfigs.length === 0}
-              >
-                <Cloud className="w-4 h-4 mr-2" />
-                {startKaggle.isPending ? "Launching..." : "Train on Kaggle GPU"}
-              </Button>
+              <HowToTooltip title="Train on Kaggle" description="Launch a remote GPU training job on Kaggle using your API token" side="top">
+                <Button
+                  className="w-full"
+                  size="sm"
+                  onClick={() => {
+                    const cfg = llmSession.loraConfigs[0];
+                    startKaggle.mutate({
+                      datasetPath: cfg?.datasetPath || "data/valet",
+                      modelName: llmSession.baseModel,
+                      epochs: cfg?.epochs ?? 1,
+                      maxSeqLength: 3072,
+                      r: cfg?.rank ?? 8,
+                      loraAlpha: cfg?.alpha ?? 16,
+                    });
+                  }}
+                  disabled={startKaggle.isPending || llmSession.loraConfigs.length === 0}
+                >
+                  <Cloud className="w-4 h-4 mr-2" />
+                  {startKaggle.isPending ? "Launching..." : "Train on Kaggle GPU"}
+                </Button>
+              </HowToTooltip>
               {llmSession.loraConfigs.length === 0 && (
                 <p className="text-[10px] text-accent-warning">Add a LoRA config above before launching a Kaggle job.</p>
               )}
@@ -426,10 +441,12 @@ export function SpecializedModuleLauncher({
             <p className="text-sm text-muted-foreground mb-4">
               Create a new Blender project to start 3D modeling.
             </p>
-            <Button size="sm" onClick={() => handleNewProject("3d")}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
+            <HowToTooltip title="New 3D Project" description="Create a new Blender scene project" side="top">
+              <Button size="sm" onClick={() => handleNewProject("3d")}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Project
+              </Button>
+            </HowToTooltip>
           </div>
         </div>
       );
@@ -490,19 +507,21 @@ export function SpecializedModuleLauncher({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">Scene Objects</CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (!blenderProject) return;
-                const newObj = { name: `Object_${blenderProject.objects.length + 1}`, type: "MESH", position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number], scale: [1, 1, 1] as [number, number, number] };
-                setBlenderProject({ ...blenderProject, objects: [...blenderProject.objects, newObj] });
-                toast.success("Object added to scene — open Blender to place it");
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Object
-            </Button>
+            <HowToTooltip title="Add Object" description="Insert a new object into the current 3D scene" side="left">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!blenderProject) return;
+                  const newObj = { name: `Object_${blenderProject.objects.length + 1}`, type: "MESH", position: [0, 0, 0] as [number, number, number], rotation: [0, 0, 0] as [number, number, number], scale: [1, 1, 1] as [number, number, number] };
+                  setBlenderProject({ ...blenderProject, objects: [...blenderProject.objects, newObj] });
+                  toast.success("Object added to scene — open Blender to place it");
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Object
+              </Button>
+            </HowToTooltip>
           </div>
         </CardHeader>
         <CardContent>
@@ -519,9 +538,11 @@ export function SpecializedModuleLauncher({
                       Type: {obj.type} | Pos: ({obj.position.join(", ")})
                     </p>
                   </div>
-                                                          <Button size="sm" variant="ghost" aria-label={`Configure ${obj.name}`} onClick={() => setSelectedObject(obj)}>
-                    <Settings className="w-4 h-4" aria-hidden="true" />
-                  </Button>
+                  <HowToTooltip title="Edit Object Properties" description="Modify position, scale, and other properties of this object" side="left">
+                    <Button size="sm" variant="ghost" aria-label={`Configure ${obj.name}`} onClick={() => setSelectedObject(obj)}>
+                      <Settings className="w-4 h-4" aria-hidden="true" />
+                    </Button>
+                  </HowToTooltip>
                 </div>
               ))}
             </div>
@@ -573,41 +594,47 @@ export function SpecializedModuleLauncher({
                 <Input id="obj-scale-z" type="number" step={0.1} min={0.1} value={selectedObject.scale[2]} onChange={(e) => setSelectedObject({ ...selectedObject, scale: [selectedObject.scale[0], selectedObject.scale[1], Number(e.target.value)] })} className="text-sm font-mono" />
               </div>
             </div>
-            <Button className="w-full" size="sm" onClick={() => {
-              if (!blenderProject) return;
-              setBlenderProject({
-                ...blenderProject,
-                objects: blenderProject.objects.map((o, idx) => o.name === selectedObject.name ? selectedObject : o)
-              });
-              setSelectedObject(null);
-              toast.success("Object properties updated");
-            }}>
-              <Settings className="w-4 h-4 mr-2" />
-              Save Object
-            </Button>
+            <HowToTooltip title="Save Properties" description="Apply property changes to the object" side="top">
+              <Button className="w-full" size="sm" onClick={() => {
+                if (!blenderProject) return;
+                setBlenderProject({
+                  ...blenderProject,
+                  objects: blenderProject.objects.map((o, idx) => o.name === selectedObject.name ? selectedObject : o)
+                });
+                setSelectedObject(null);
+                toast.success("Object properties updated");
+              }}>
+                <Settings className="w-4 h-4 mr-2" />
+                Save Object
+              </Button>
+            </HowToTooltip>
           </CardContent>
         </Card>
       )}
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button
-          className="flex-1"
-          aria-label="Open project in Blender"
-          disabled={openInBlenderMutation.isPending}
-          onClick={() => {
-            openInBlenderMutation.mutate({
-              filePath: blenderProject?.filePath || undefined,
-            });
-          }}
-        >
-          <Box className="w-4 h-4 mr-2" aria-hidden="true" />
-          {openInBlenderMutation.isPending ? "Opening…" : "Open in Blender"}
-        </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure 3D Modeler settings" onClick={() => setLocation("/settings?tab=hardware")}>
-          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
-          Settings
-        </Button>
+        <HowToTooltip title="Open in Blender" description="Launch the Blender application with this project loaded" side="top">
+          <Button
+            className="flex-1"
+            aria-label="Open project in Blender"
+            disabled={openInBlenderMutation.isPending}
+            onClick={() => {
+              openInBlenderMutation.mutate({
+                filePath: blenderProject?.filePath || undefined,
+              });
+            }}
+          >
+            <Box className="w-4 h-4 mr-2" aria-hidden="true" />
+            {openInBlenderMutation.isPending ? "Opening…" : "Open in Blender"}
+          </Button>
+        </HowToTooltip>
+        <HowToTooltip title="3D Settings" description="Configure external tool paths and 3D application settings" side="top">
+          <Button variant="outline" className="flex-1" aria-label="Configure 3D Modeler settings" onClick={() => setLocation("/settings?tab=hardware")}>
+            <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
+            Settings
+          </Button>
+        </HowToTooltip>
       </div>
     </div>
     );
@@ -623,10 +650,12 @@ export function SpecializedModuleLauncher({
             <p className="text-sm text-muted-foreground mb-4">
               Create a new KiCad project to start PCB design.
             </p>
-            <Button size="sm" onClick={() => handleNewProject("pcb")}>
-              <Plus className="w-4 h-4 mr-2" />
-              New Project
-            </Button>
+            <HowToTooltip title="New PCB Project" description="Create a new KiCad board project" side="top">
+              <Button size="sm" onClick={() => handleNewProject("pcb")}>
+                <Plus className="w-4 h-4 mr-2" />
+                New Project
+              </Button>
+            </HowToTooltip>
           </div>
         </div>
       );
@@ -692,19 +721,21 @@ export function SpecializedModuleLauncher({
         <CardHeader>
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm">Components</CardTitle>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => {
-                if (!pcbProject) return;
-                const ref = `C${pcbProject.components.length + 1}`;
-                setPCBProject({ ...pcbProject, components: [...pcbProject.components, { reference: ref, value: "100nF", footprint: "C_0402", position: [0, 0] as [number, number], rotation: 0 }] });
-                toast.success(`Component ${ref} added`);
-              }}
-            >
-              <Plus className="w-4 h-4 mr-2" />
-              Add Component
-            </Button>
+            <HowToTooltip title="Add Component" description="Place a new electronic component onto the board" side="left">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (!pcbProject) return;
+                  const ref = `C${pcbProject.components.length + 1}`;
+                  setPCBProject({ ...pcbProject, components: [...pcbProject.components, { reference: ref, value: "100nF", footprint: "C_0402", position: [0, 0] as [number, number], rotation: 0 }] });
+                  toast.success(`Component ${ref} added`);
+                }}
+              >
+                <Plus className="w-4 h-4 mr-2" />
+                Add Component
+              </Button>
+            </HowToTooltip>
           </div>
         </CardHeader>
         <CardContent>
@@ -731,23 +762,27 @@ export function SpecializedModuleLauncher({
 
       {/* Actions */}
       <div className="flex gap-2">
-        <Button
-          className="flex-1"
-          aria-label="Open project in KiCad"
-          disabled={openInKicadMutation.isPending}
-          onClick={() => {
-            openInKicadMutation.mutate({
-              filePath: pcbProject?.filePath || undefined,
-            });
-          }}
-        >
-          <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
-          {openInKicadMutation.isPending ? "Opening…" : "Open in KiCad"}
-        </Button>
-        <Button variant="outline" className="flex-1" aria-label="Configure PCB Designer settings" onClick={() => setLocation("/settings?tab=hardware")}>
-          <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
-          Settings
-        </Button>
+        <HowToTooltip title="Open in KiCad" description="Launch KiCad with this PCB project loaded" side="top">
+          <Button
+            className="flex-1"
+            aria-label="Open project in KiCad"
+            disabled={openInKicadMutation.isPending}
+            onClick={() => {
+              openInKicadMutation.mutate({
+                filePath: pcbProject?.filePath || undefined,
+              });
+            }}
+          >
+            <Zap className="w-4 h-4 mr-2" aria-hidden="true" />
+            {openInKicadMutation.isPending ? "Opening…" : "Open in KiCad"}
+          </Button>
+        </HowToTooltip>
+        <HowToTooltip title="PCB Settings" description="Configure KiCad paths and PCB design preferences" side="top">
+          <Button variant="outline" className="flex-1" aria-label="Configure PCB Designer settings" onClick={() => setLocation("/settings?tab=hardware")}>
+            <Settings className="w-4 h-4 mr-2" aria-hidden="true" />
+            Settings
+          </Button>
+        </HowToTooltip>
       </div>
     </div>
     );

@@ -5,12 +5,13 @@ import { platformAccounts } from "../../drizzle/schema";
 import { and, eq } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
 import { ENV } from "../_core/env.js";
-import { getSetting, setSetting } from "../phase2/services/SettingsService.js";
+import { encryptPlatformToken } from "../oauth/platformTokens.js";
+import { getSetting, setSetting } from "../core_services/services/SettingsService.js";
 import {
   SOCIAL_WEBHOOK_PATH_KEY,
   DEFAULT_SOCIAL_WEBHOOK_PATH,
   isLoopbackUrl,
-} from "../phase2/services/WebhookPublisher.js";
+} from "../core_services/services/WebhookPublisher.js";
 
 /**
  * Columns that are safe to return to the client. The OAuth access/refresh
@@ -87,8 +88,10 @@ export const platformsRouter = router({
         await db.update(platformAccounts)
           .set({
             accountName: input.accountName,
-            oauthToken: input.oauthToken,
-            oauthRefreshToken: input.oauthRefreshToken,
+            oauthToken: encryptPlatformToken(input.oauthToken),
+            oauthRefreshToken: input.oauthRefreshToken
+              ? encryptPlatformToken(input.oauthRefreshToken)
+              : undefined,
             accountMetadata: input.accountMetadata,
             isActive: 1,
           })
@@ -100,8 +103,10 @@ export const platformsRouter = router({
         userId: ctx.user.id,
         platform: input.platform,
         accountName: input.accountName,
-        oauthToken: input.oauthToken,
-        oauthRefreshToken: input.oauthRefreshToken,
+        oauthToken: encryptPlatformToken(input.oauthToken),
+        oauthRefreshToken: input.oauthRefreshToken
+          ? encryptPlatformToken(input.oauthRefreshToken)
+          : undefined,
         accountMetadata: input.accountMetadata,
         isActive: 1,
       }).returning({ id: platformAccounts.id });
@@ -124,8 +129,8 @@ export const platformsRouter = router({
 
       await db.update(platformAccounts)
         .set({
-          ...(input.oauthToken && { oauthToken: input.oauthToken }),
-          ...(input.oauthRefreshToken && { oauthRefreshToken: input.oauthRefreshToken }),
+          ...(input.oauthToken && { oauthToken: encryptPlatformToken(input.oauthToken) }),
+          ...(input.oauthRefreshToken && { oauthRefreshToken: encryptPlatformToken(input.oauthRefreshToken) }),
           ...(input.tokenExpiresAt && { tokenExpiresAt: input.tokenExpiresAt }),
           ...(input.isActive !== undefined && { isActive: input.isActive }),
         })

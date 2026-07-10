@@ -13,9 +13,10 @@ import React, { useMemo } from 'react';
 import { Node } from 'reactflow';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { componentLibrary } from '@/lib/componentLibrary';
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export interface PropertiesPanelProps {
   selectedNodeId: string | null;
@@ -142,20 +143,21 @@ export const PropertiesPanel: React.FC<PropertiesPanelProps> = ({
             </Label>
             <div className="flex gap-2 mt-1">
               {[0, 90, 180, 270].map((angle) => (
-                <button
-                  key={angle}
-                  onClick={() => handlePropertyChange('rotation', angle)}
-                  className={`
-                    flex-1 h-8 text-xs font-medium rounded border transition-all
-                    ${
-                      selectedNode.data.rotation === angle
-                        ? 'bg-primary/10 text-accent-foreground border-primary/30'
-                        : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
-                    }
-                  `}
-                >
-                  {angle}°
-                </button>
+                <HowToTooltip key={angle} title="Set Rotation" description={`Rotate component to ${angle} degrees`} side="top">
+                  <button
+                    onClick={() => handlePropertyChange('rotation', angle)}
+                    className={`
+                      flex-1 h-8 text-xs font-medium rounded border transition-all
+                      ${
+                        selectedNode.data.rotation === angle
+                          ? 'bg-primary/10 text-accent-foreground border-primary/30'
+                          : 'bg-muted text-muted-foreground border-border hover:bg-muted/80'
+                      }
+                    `}
+                  >
+                    {angle}°
+                  </button>
+                </HowToTooltip>
               ))}
             </div>
           </div>

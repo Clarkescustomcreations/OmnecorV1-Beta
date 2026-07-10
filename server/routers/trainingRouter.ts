@@ -23,9 +23,9 @@ import fs from "fs/promises";
 import os from "os";
 import path from "path";
 import { execFile } from "child_process";
-import { PYTHON_SCRIPTS } from "../phase2/config/index.js";
+import { PYTHON_SCRIPTS } from "../core_services/config/index.js";
 import { promisify } from "util";
-import { ValetArtifactRegistry } from "../phase2/services/ValetArtifactRegistry.js";
+import { ValetArtifactRegistry } from "../core_services/services/ValetArtifactRegistry.js";
 
 const execFileP = promisify(execFile);
 

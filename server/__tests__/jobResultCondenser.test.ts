@@ -3,7 +3,7 @@ import {
   condenseJobResult,
   formatCondensedResultForAgent,
   type CondenseJobInput,
-} from "../phase2/services/JobResultCondenser.js";
+} from "../core_services/services/JobResultCondenser.js";
 
 const base: CondenseJobInput = {
   status: "completed",

@@ -2,9 +2,9 @@ import { NOT_ADMIN_ERR_MSG, UNAUTHED_ERR_MSG } from "@shared/const";
 import { initTRPC, TRPCError } from "@trpc/server";
 import superjson from "superjson";
 import type { TrpcContext } from "./context";
-import { AuditLogService } from "../phase2/services/AuditLogService.js";
-import { hasPermission, type Role } from "../phase2/config/rbac.js";
-import { getSetting } from "../phase2/services/SettingsService.js";
+import { AuditLogService } from "../core_services/services/AuditLogService.js";
+import { hasPermission, type Role } from "../core_services/config/rbac.js";
+import { getSetting } from "../core_services/services/SettingsService.js";
 import { isSovereignMode } from "./sovereign.js";
 import { createLogger } from "./logger.js";
 

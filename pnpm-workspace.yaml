@@ -3,6 +3,16 @@ packages:
   - "packaging/electron-app"
   - "packaging/android/omnecor-hq"
 
+# Flat node_modules. REQUIRED for the Expo/Metro APK build: Metro's Babel
+# transform worker loads presets/plugins (babel-preset-expo and its transitive
+# @babel/plugin-* deps) via the ROOT @babel/core, which only resolves them when
+# they're hoisted to the top-level node_modules. pnpm 11 IGNORES `node-linker`
+# from .npmrc in a workspace (same reason overrides must live here, not in
+# package.json), so the setting must be declared here or the install silently
+# falls back to the isolated layout and `expo run:android` / assembleRelease
+# fails at `createBundleReleaseJsAndAssets` with "Cannot find module '@babel/…'".
+nodeLinker: hoisted
+
 # pnpm v11: allowBuilds replaces onlyBuiltDependencies. true = permit build
 # scripts; false = block them. Native bindings and prebuilt downloads must be
 # true or the compiled module is missing at runtime.
@@ -13,6 +23,7 @@ allowBuilds:
   llama.rn: true
   node-pty: true
   onnxruntime-node: true
+  postinstall-postinstall: true
   react-native-litert-lm: true
   unrs-resolver: true
 

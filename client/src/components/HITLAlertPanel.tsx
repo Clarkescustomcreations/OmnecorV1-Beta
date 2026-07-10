@@ -14,6 +14,7 @@ import type { HITLAlert } from "@/lib/actionHashDetector";
 import { useOmnecorSocket } from "@/hooks/useOmnecorSocket";
 import { useAppStore } from "@/lib/store/app.store";
 import { vanillaTrpc } from "@/lib/trpc";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface HITLAlertPanelProps {
   alert?: HITLAlert;
@@ -208,14 +209,16 @@ export function HITLAlertPanel({
             {activeAlert.severity.toUpperCase()}
           </Badge>
           {onDismiss && (
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8"
-              onClick={onDismiss}
-            >
-              <X className="w-4 h-4" />
-            </Button>
+            <HowToTooltip title="Dismiss Alert" description="Close this notification without resolving the underlying issue." side="bottom">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8"
+                onClick={onDismiss}
+              >
+                <X className="w-4 h-4" />
+              </Button>
+            </HowToTooltip>
           )}
         </div>
       </CardHeader>
@@ -259,20 +262,22 @@ export function HITLAlertPanel({
 
         {/* Action Buttons */}
         <div className="flex gap-2 pt-2">
-          <Button
-            ref={dismissButtonRef}
-            variant="default"
-            size="sm"
-            className="flex-1"
-            aria-label="Acknowledge and clear alert"
-            onClick={() => {
-              clearFileEvents();
-              clearLoopAlert();
-            }}
-          >
-            <CheckCircle className="w-4 h-4 mr-2" />
-            Acknowledge & Clear
-          </Button>
+          <HowToTooltip title="Acknowledge Alert" description="Clear this alert and resume normal agent operations." side="bottom">
+            <Button
+              ref={dismissButtonRef}
+              variant="default"
+              size="sm"
+              className="flex-1"
+              aria-label="Acknowledge and clear alert"
+              onClick={() => {
+                clearFileEvents();
+                clearLoopAlert();
+              }}
+            >
+              <CheckCircle className="w-4 h-4 mr-2" />
+              Acknowledge & Clear
+            </Button>
+          </HowToTooltip>
         </div>
       </CardContent>
     </Card>

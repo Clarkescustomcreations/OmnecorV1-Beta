@@ -23,8 +23,8 @@ import {
   updateChatSession,
 } from "../db.factory.js";
 import { validatePath } from "../_core/security.js";
-import { AuditLogService } from "../phase2/services/AuditLogService.js";
-import { getWsInstance } from "../phase2/websocket/WebSocketServer.js";
+import { AuditLogService } from "../core_services/services/AuditLogService.js";
+import { getWsInstance } from "../core_services/websocket/WebSocketServer.js";
 import { NotificationService } from "../_core/NotificationService.js";
 import { assertProviderAllowedInMode } from "../_core/sovereign.js";
 import { injectMapRagContext } from "../_core/ragContext.js";
@@ -112,6 +112,14 @@ const chatInputSchema = z.object({
   /** Active neural map — when set (and its enableAIContext is on), the map's
    *  indexed knowledge is retrieved and injected as system context. */
   ragMapId: z.string().max(256).optional(),
+  /** Model-Fabric Phase 5/6 — pin mesh routing to the specific OMMESH peer the
+   *  caller selected in the catalog picker (`SelectedModel.targetNodeId`).
+   *  Unset → the mesh auto-scorer picks a peer as before. Threaded through
+   *  here (not just `aiProviderRouter`'s `agentChatStream`) so one-shot
+   *  utility calls on this endpoint — `/compress`, `/btw save` — honor the
+   *  same pin the user made for their live chat session instead of silently
+   *  routing those calls elsewhere. */
+  targetNodeId: z.string().max(256).optional(),
 });
 
 const createSessionSchema = z.object({

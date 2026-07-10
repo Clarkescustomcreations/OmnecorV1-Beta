@@ -10,7 +10,19 @@ export interface NodeIdentity {
 }
 
 export interface NodeCapabilities {
-  models: Array<{ name: string; contextWindow: number; vramReq: number }>;
+  models: Array<{
+    name: string;
+    contextWindow: number;
+    vramReq: number;
+    /**
+     * Chat provider this model runs through on the advertising node
+     * ("ollama" | "llamacpp"). Optional so existing/older TXT payloads
+     * (which never populated `models` at all — see Model-Fabric Phase 4)
+     * keep parsing; the Phase 3 catalog aggregator defaults to "ollama"
+     * when absent.
+     */
+    provider?: string;
+  }>;
   gpu: { vram: number; utilization: number; temperature: number };
   cpu: number;
   ram: number;

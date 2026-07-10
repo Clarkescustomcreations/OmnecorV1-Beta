@@ -2,7 +2,8 @@ import { z } from "zod";
 import { router, protectedProcedure, adminProcedure, externalServiceProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { ENV } from "../_core/env.js";
-import { HITLApprovalService } from "../phase2/services/HITLApprovalService.js";
+import { HITLApprovalService } from "../core_services/services/HITLApprovalService.js";
+import { SettingsService } from "../core_services/services/SettingsService.js";
 import { createLogger } from "../_core/logger.js";
 const log = createLogger("ollama");
 
@@ -99,7 +100,14 @@ const OLLAMA_FALLBACK_MODELS = [
   }
 ];
 
-const OLLAMA_BASE = () => ENV.ollamaUrl;
+// Resolve the SAME Ollama endpoint the chat path uses (settings override →
+// env → default). When OLLAMA_BASE_URL points at another node's GPU, the
+// model list must come from there too — otherwise the UI offers models the
+// chat backend doesn't have (phone chat 404'd on exactly this mismatch).
+const OLLAMA_BASE = () => {
+  const settings = SettingsService.getInstance();
+  return settings.getSecret("OLLAMA_BASE_URL", settings.getSecret("ollamaUrl", ENV.ollamaUrl || "http://localhost:11434"));
+};
 
 async function ollamaFetch(path: string, init?: RequestInit): Promise<Response> {
   const res = await fetch(`${OLLAMA_BASE()}${path}`, {

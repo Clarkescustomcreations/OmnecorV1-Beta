@@ -23,7 +23,7 @@ import { nanoid } from "nanoid";
 import { getServerBaseUrl, isServerConfigured } from "./server-config";
 import { setSessionToken, setUserInfo, removeSessionToken, clearUserInfo } from "./auth";
 
-export type AuthMethod = "local" | "google" | "microsoft" | "skipped";
+export type AuthMethod = "local" | "google" | "microsoft" | "skipped" | "paired";
 
 export interface Account {
   username: string;
@@ -99,6 +99,18 @@ export async function skipOnboarding(): Promise<void> {
 /** Mark that the user completed an OAuth (Google/Microsoft) sign-in via the PC. */
 export async function setOAuthAccount(method: "google" | "microsoft", username: string): Promise<void> {
   await persist({ username, method, onboarded: true, syncedToPc: true });
+}
+
+/**
+ * Mark the app as onboarded after a successful device pairing. The paired device
+ * already holds a PC-minted session token, so it is fully authenticated —
+ * onboarding must never be shown again (the bug this fixes: a paired phone fell
+ * back to the login screen on every relaunch because pairing set a session token
+ * but never persisted the account/onboarded state). `syncedToPc` is true so we
+ * don't attempt a redundant local register/login.
+ */
+export async function setPairedAccount(username: string): Promise<void> {
+  await persist({ username: username.trim() || "Owner", method: "paired", onboarded: true, syncedToPc: true });
 }
 
 /**

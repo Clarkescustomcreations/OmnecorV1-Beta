@@ -1,5 +1,5 @@
 import { ENV } from "./env.js";
-import { getSetting } from "../phase2/services/SettingsService.js";
+import { getSetting } from "../core_services/services/SettingsService.js";
 
 export type Role = "system" | "user" | "assistant" | "tool" | "function";
 
@@ -364,7 +364,7 @@ export async function invokeLLM(params: InvokeParams): Promise<InvokeResult> {
 
   // For other providers, we use AiProviderService (simplified)
   const { AiProviderService } = await import(
-    "../phase2/services/AiProviderService.js"
+    "../core_services/services/AiProviderService.js"
   );
   const aiProvider = AiProviderService.getInstance();
 

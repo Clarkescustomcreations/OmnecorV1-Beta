@@ -1,12 +1,13 @@
 import { useRef, useState, useEffect } from "react";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Paperclip, Image, Square, X, FileText, Loader2, Terminal } from "lucide-react";
+import { Send, Paperclip, Image, Square, X, FileText, Loader2, Terminal, ListPlus } from "lucide-react";
 import { VoiceInputButton } from "@/components/voice/VoiceInputButton";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import { cn } from "@/lib/utils";
 import type { ContextFile, SelectedModel } from "@/lib/chatContext";
 import { trpc } from "@/lib/trpc";
+import { useAppStore } from "@/lib/store/app.store";
 
 export type SlashCommand =
   | "clear"
@@ -58,6 +59,14 @@ interface ChatInputProps {
   maxTokens?: number;
   sessionId?: string;
   selectedModel?: SelectedModel;
+  /**
+   * Enable the between-turn message queue (main agentic chat only). When on, the
+   * input stays live while the AI streams — Enter/Send enqueues the message as the
+   * next turn instead of being ignored, and ↑ on an empty input recalls the most
+   * recently queued message for editing. Off (wrapper chats): input is disabled
+   * while streaming, exactly as before.
+   */
+  enableQueue?: boolean;
 }
 
 const COMMANDS: { cmd: SlashCommand; label: string; description: string }[] = [
@@ -94,12 +103,20 @@ export function ChatInput({
   maxTokens,
   sessionId,
   selectedModel,
+  enableQueue = false,
 }: ChatInputProps) {
   const [value, setValue] = useState("");
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [isUploading, setIsUploading] = useState(false);
 
   const uploadMutation = trpc.attachments.uploadFile.useMutation();
+
+  // Between-turn message queue (type-ahead while streaming). Global Zustand state
+  // so the drain-on-done handler in the Chat page reads the same source of truth.
+  const messageQueue = useAppStore((s) => s.messageQueue);
+  const enqueueMessage = useAppStore((s) => s.enqueueMessage);
+  const removeQueuedMessage = useAppStore((s) => s.removeQueuedMessage);
+  const popLatestQueuedMessage = useAppStore((s) => s.popLatestQueuedMessage);
 
   // Slash command state
   const [slashOpen, setSlashOpen] = useState(false);
@@ -224,51 +241,57 @@ export function ChatInput({
     setTimeout(resize, 0);
   };
 
+  const resetAfterDispatch = () => {
+    setValue("");
+    setAttachments([]);
+    if (textareaRef.current) textareaRef.current.style.height = "auto";
+  };
+
   const handleSend = async () => {
     const trimmed = value.trim();
-    if (!trimmed || isLoading || disabled || isUploading) return;
+    if (!trimmed || disabled || isUploading) return;
 
-    // Intercept /btw notes — store as session context, don't send as chat
-    if (trimmed.startsWith("/btw ")) {
-      const note = trimmed.slice(5).trim();
-      if (note) {
-        onBtw?.(note);
-        setValue("");
-        setAttachments([]);
-        if (textareaRef.current) textareaRef.current.style.height = "auto";
+    // While the AI is streaming: wrapper chats (no queue) ignore the send exactly
+    // as before; the agentic chat instead enqueues the message as the next turn.
+    // Slash-command intercepts run immediately and so only apply when idle — a
+    // command typed mid-stream is queued as literal text, not executed out of turn.
+    if (isLoading && !enableQueue) return;
+
+    if (!isLoading) {
+      // Intercept /btw notes — store as session context, don't send as chat
+      if (trimmed.startsWith("/btw ")) {
+        const note = trimmed.slice(5).trim();
+        if (note) {
+          onBtw?.(note);
+          resetAfterDispatch();
+        }
+        return;
       }
-      return;
-    }
 
-    // Intercept workflow commands that carry an inline argument so they run the
-    // workflow instead of being sent as a chat message.
-    const argCmd = /^\/(remember|imprint)\b\s*(.*)$/.exec(trimmed);
-    if (argCmd) {
-      onCommand(argCmd[1] as SlashCommand, argCmd[2].trim() || undefined);
-      setValue("");
-      setAttachments([]);
-      if (textareaRef.current) textareaRef.current.style.height = "auto";
-      return;
-    }
+      // Intercept workflow commands that carry an inline argument so they run the
+      // workflow instead of being sent as a chat message.
+      const argCmd = /^\/(remember|imprint)\b\s*(.*)$/.exec(trimmed);
+      if (argCmd) {
+        onCommand(argCmd[1] as SlashCommand, argCmd[2].trim() || undefined);
+        resetAfterDispatch();
+        return;
+      }
 
-    // Intercept argless commands
-    const arglessCmd = /^\/(clear|new|system|export|compress|plan|architect|review|recover|help|skill)$/.exec(trimmed);
-    if (arglessCmd) {
-      onCommand(arglessCmd[1] as SlashCommand);
-      setValue("");
-      setAttachments([]);
-      if (textareaRef.current) textareaRef.current.style.height = "auto";
-      return;
-    }
+      // Intercept argless commands
+      const arglessCmd = /^\/(clear|new|system|export|compress|plan|architect|review|recover|help|skill)$/.exec(trimmed);
+      if (arglessCmd) {
+        onCommand(arglessCmd[1] as SlashCommand);
+        resetAfterDispatch();
+        return;
+      }
 
-    // /MOE-Chain [L|C] — optional chain-type argument
-    const moeCmd = /^\/MOE-Chain\b\s*(L|C)?$/i.exec(trimmed);
-    if (moeCmd) {
-      onCommand("moe-chain", (moeCmd[1] ?? "").toLowerCase() || undefined);
-      setValue("");
-      setAttachments([]);
-      if (textareaRef.current) textareaRef.current.style.height = "auto";
-      return;
+      // /MOE-Chain [L|C] — optional chain-type argument
+      const moeCmd = /^\/MOE-Chain\b\s*(L|C)?$/i.exec(trimmed);
+      if (moeCmd) {
+        onCommand("moe-chain", (moeCmd[1] ?? "").toLowerCase() || undefined);
+        resetAfterDispatch();
+        return;
+      }
     }
 
     // Pre-upload any pending attachments, then append markdown references
@@ -299,10 +322,13 @@ export function ChatInput({
       }
     }
 
-    onSend(finalMessage);
-    setValue("");
-    setAttachments([]);
-    if (textareaRef.current) textareaRef.current.style.height = "auto";
+    // Streaming + queue enabled → enqueue as the next turn; otherwise send now.
+    if (isLoading) {
+      enqueueMessage(finalMessage);
+    } else {
+      onSend(finalMessage);
+    }
+    resetAfterDispatch();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
@@ -317,6 +343,17 @@ export function ChatInput({
       if (e.key === "ArrowUp")   { e.preventDefault(); setMentionIdx(i => Math.max(i - 1, 0)); return; }
       if (e.key === "Enter" || e.key === "Tab") { e.preventDefault(); insertMention(filteredFiles[mentionIdx]); return; }
       if (e.key === "Escape")    { e.preventDefault(); setMentionOpen(false); return; }
+    }
+    // ↑ on an empty input recalls the most recently queued message for editing.
+    // Only when the input is empty so ↑ still moves the caret in a drafted message.
+    if (e.key === "ArrowUp" && enableQueue && value === "" && !slashOpen && !mentionOpen) {
+      const recalled = popLatestQueuedMessage();
+      if (recalled) {
+        e.preventDefault();
+        setValue(recalled.content);
+        setTimeout(resize, 0);
+        return;
+      }
     }
     if (e.key === "Enter" && !e.shiftKey) {
       e.preventDefault();
@@ -395,6 +432,35 @@ export function ChatInput({
         </div>
       )}
 
+      {/* Queued messages (type-ahead while the AI is streaming) */}
+      {enableQueue && messageQueue.length > 0 && (
+        <div className="flex flex-wrap items-center gap-1.5 mb-2">
+          {messageQueue.map((q, i) => (
+            <div
+              key={q.id}
+              className="flex items-center gap-1.5 px-2 py-0.5 bg-accent-cyan/10 rounded-full text-xs border border-accent-cyan/30"
+              title={q.content}
+            >
+              <span className="text-[9px] font-semibold text-accent-cyan tabular-nums flex-shrink-0">
+                {i + 1}
+              </span>
+              <span className="max-w-[160px] truncate text-muted-foreground">{q.content}</span>
+              <button
+                onClick={() => removeQueuedMessage(q.id)}
+                className="hover:text-destructive ml-0.5"
+                aria-label="Remove queued message"
+                type="button"
+              >
+                <X className="w-3 h-3" />
+              </button>
+            </div>
+          ))}
+          <span className="text-[10px] text-muted-foreground/70 self-center">
+            queued · press ↑ to edit last
+          </span>
+        </div>
+      )}
+
       {/* Attachment chips */}
       {attachments.length > 0 && (
         <div className="flex flex-wrap gap-1.5 mb-2">
@@ -429,7 +495,7 @@ export function ChatInput({
           onChange={handleChange}
           onKeyDown={handleKeyDown}
           onPaste={handlePaste}
-          disabled={isLoading || disabled}
+          disabled={disabled || (isLoading && !enableQueue)}
           rows={1}
           aria-label="Message input"
           className="flex-1 resize-none border-0 bg-transparent p-0 text-sm focus-visible:ring-0 shadow-none leading-relaxed"
@@ -442,28 +508,32 @@ export function ChatInput({
         {/* Left: Terminal buttons */}
         <div className="flex items-center gap-2 order-2 sm:order-1 justify-start w-full sm:w-auto">
           {onToggleCliTerminal && (
-            <Button
-              id="btn-chat-terminal"
-              onClick={onToggleCliTerminal}
-              variant="default"
-              className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-              type="button"
-            >
-              <Terminal className="w-3 h-3" />
-              Terminal/CLI
-            </Button>
+            <HowToTooltip title="Open CLI Terminal" description="Launch the external terminal for command line operations." side="top">
+              <Button
+                id="btn-chat-terminal"
+                onClick={onToggleCliTerminal}
+                variant="default"
+                className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                type="button"
+              >
+                <Terminal className="w-3 h-3" />
+                Terminal/CLI
+              </Button>
+            </HowToTooltip>
           )}
           {onToggleSandbox && (
-            <Button
-              id="btn-chat-sandbox"
-              onClick={onToggleSandbox}
-              variant="default"
-              className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
-              type="button"
-            >
-              <Terminal className="w-3 h-3" />
-              Sandboxed
-            </Button>
+            <HowToTooltip title="Open Sandbox" description="Open the sandboxed terminal for safe command execution." side="top">
+              <Button
+                id="btn-chat-sandbox"
+                onClick={onToggleSandbox}
+                variant="default"
+                className="font-semibold text-xs h-7 px-2.5 rounded transition-all flex items-center gap-1 shadow-sm cursor-pointer"
+                type="button"
+              >
+                <Terminal className="w-3 h-3" />
+                Sandboxed
+              </Button>
+            </HowToTooltip>
           )}
         </div>
 
@@ -525,18 +595,39 @@ export function ChatInput({
           />
 
           {isLoading ? (
-            <HowToTooltip title="Stop Generation" description="Halt the current AI response immediately." side="top">
-              <Button
-                id="btn-chat-stop"
-                size="icon"
-                variant="destructive"
-                className="h-7 w-7 cursor-pointer"
-                onClick={onStop}
-                type="button"
-              >
-                <Square className="w-3.5 h-3.5 fill-current" />
-              </Button>
-            </HowToTooltip>
+            <>
+              {enableQueue && value.trim() && (
+                <HowToTooltip title="Queue message" description="Add this message to the queue. It sends as the next turn once the AI finishes — press ↑ later to edit the last queued message." side="top">
+                  <Button
+                    id="btn-chat-queue"
+                    size="icon"
+                    className="h-7 w-7 cursor-pointer"
+                    onClick={handleSend}
+                    disabled={isUploading}
+                    aria-label={isUploading ? "Uploading attachments" : "Queue message"}
+                    type="button"
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <ListPlus className="w-3.5 h-3.5" />
+                    )}
+                  </Button>
+                </HowToTooltip>
+              )}
+              <HowToTooltip title="Stop Generation" description="Halt the current AI response immediately." side="top">
+                <Button
+                  id="btn-chat-stop"
+                  size="icon"
+                  variant="destructive"
+                  className="h-7 w-7 cursor-pointer"
+                  onClick={onStop}
+                  type="button"
+                >
+                  <Square className="w-3.5 h-3.5 fill-current" />
+                </Button>
+              </HowToTooltip>
+            </>
           ) : (
             <HowToTooltip title="Send Message" description="Send your message to the AI. You can also press Enter to send." side="top">
               <Button
@@ -565,7 +656,9 @@ export function ChatInput({
           {isUploading
             ? "Uploading attachments…"
             : isLoading
-            ? "Generating response…"
+            ? enableQueue
+              ? "Generating… Enter ↵ queues the next turn · ↑ edits the last queued message"
+              : "Generating response…"
             : "Enter ↵ send · Shift+Enter new line · /commands/skills · @ mention files · paste image"}
         </p>
         {tokenCount !== undefined && maxTokens !== undefined && (

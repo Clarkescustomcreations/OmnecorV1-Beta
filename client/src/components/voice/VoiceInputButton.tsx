@@ -3,6 +3,7 @@ import { Button } from '../ui/button';
 import { Mic, MicOff, Loader2 } from 'lucide-react';
 import { WebSocketManager } from '../../lib/websocket';
 import { toast } from 'sonner';
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export const VoiceInputButton: React.FC<{
   onTranscription: (text: string) => void;
@@ -67,16 +68,18 @@ export const VoiceInputButton: React.FC<{
   }, [onTranscription]);
 
   return (
-    <Button
-      variant={isRecording ? "destructive" : "outline"}
-      size="icon"
-      type="button"
-      className={`rounded-full ${sizeClass} transition-all ${isRecording ? 'animate-pulse scale-110 shadow-lg' : ''} ${className ?? ''}`}
-      onMouseDown={startRecording}
-      onMouseUp={stopRecording}
-      disabled={isProcessing}
-    >
-      {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-    </Button>
+    <HowToTooltip title="Voice Input" description="Hold to speak, release to send" side="top">
+      <Button
+        variant={isRecording ? "destructive" : "outline"}
+        size="icon"
+        type="button"
+        className={`rounded-full ${sizeClass} transition-all ${isRecording ? 'animate-pulse scale-110 shadow-lg' : ''} ${className ?? ''}`}
+        onMouseDown={startRecording}
+        onMouseUp={stopRecording}
+        disabled={isProcessing}
+      >
+        {isProcessing ? <Loader2 className="w-5 h-5 animate-spin" /> : isRecording ? <MicOff className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
+      </Button>
+    </HowToTooltip>
   );
 };

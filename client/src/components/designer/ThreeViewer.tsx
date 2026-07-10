@@ -12,6 +12,7 @@ import { Canvas, useThree, ThreeEvent } from "@react-three/fiber";
 import { OrbitControls, ContactShadows, Html } from "@react-three/drei";
 import { Loader2, Sparkles, X } from "lucide-react";
 import * as THREE from "three";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader.js";
 import { OBJLoader } from "three/examples/jsm/loaders/OBJLoader.js";
 import { useDesignerStore } from "@/lib/stores/designerStore";
@@ -527,30 +528,34 @@ export function ThreeViewer({ code, url, onObjectSelect }: ThreeViewerProps) {
           />
 
           <div className="flex gap-2">
-            <button
-              onClick={handleSendToAI}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg py-1.5 transition-colors font-sans"
-            >
-              <Sparkles className="w-3 h-3" />
-              Ask AI About This
-            </button>
-            <button
-              onClick={() => {
-                const payload = {
-                  code: `${buildAiCode(selectedName)}\n\nPlease suggest design changes for this object.`,
-                  notes: aiQuery,
-                  actionType: "suggest" as const,
-                };
-                localStorage.setItem("omnecor:pending_ai_query", JSON.stringify(payload));
-                setSelectedName(null);
-                setAiQuery("");
-                onObjectSelect?.("", "");
-                window.location.href = "/chat";
-              }}
-              className="flex-1 flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold rounded-lg py-1.5 transition-colors font-sans"
-            >
-              Suggest Changes
-            </button>
+            <HowToTooltip title="Ask Assistant" description="Ask the AI assistant for design help" side="bottom">
+              <button
+                onClick={handleSendToAI}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-orange-600 hover:bg-orange-500 text-white text-xs font-semibold rounded-lg py-1.5 transition-colors font-sans"
+              >
+                <Sparkles className="w-3 h-3" />
+                Ask AI About This
+              </button>
+            </HowToTooltip>
+            <HowToTooltip title="Suggest Changes" description="Get AI suggestions for modifying this object" side="bottom">
+              <button
+                onClick={() => {
+                  const payload = {
+                    code: `${buildAiCode(selectedName)}\n\nPlease suggest design changes for this object.`,
+                    notes: aiQuery,
+                    actionType: "suggest" as const,
+                  };
+                  localStorage.setItem("omnecor:pending_ai_query", JSON.stringify(payload));
+                  setSelectedName(null);
+                  setAiQuery("");
+                  onObjectSelect?.("", "");
+                  window.location.href = "/chat";
+                }}
+                className="flex-1 flex items-center justify-center gap-1.5 bg-slate-700 hover:bg-slate-600 text-slate-200 text-xs font-semibold rounded-lg py-1.5 transition-colors font-sans"
+              >
+                Suggest Changes
+              </button>
+            </HowToTooltip>
           </div>
         </div>
       )}

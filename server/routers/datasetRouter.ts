@@ -5,7 +5,7 @@ import { eq, and, isNull } from "drizzle-orm";
 import { getDb } from "../db.factory.js";
 import { discoveredDatasetItems, curatedTrainingExamples } from "../../drizzle/schema.js";
 import { isSovereignMode } from "../_core/sovereign.js";
-import { getSetting } from "../phase2/services/SettingsService.js";
+import { getSetting } from "../core_services/services/SettingsService.js";
 import { createLogger } from "../_core/logger.js";
 
 const log = createLogger("datasetRouter");

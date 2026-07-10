@@ -29,6 +29,7 @@ import { cn } from "@/lib/utils";
 import { trpc } from "@/lib/trpc";
 import type { IntegrationType } from "@/lib/integrations";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 const MODE_ICONS: Record<NeuralMapMode, React.ReactNode> = {
   standard: <Globe className="w-4 h-4" />,
@@ -206,9 +207,11 @@ export function MapManager() {
           <Brain className="w-5 h-5 text-primary" />
           Neural Maps
         </h2>
-        <Button size="sm" variant="outline" className="gap-2" onClick={() => setIsOpen(true)}>
-          <Plus className="w-4 h-4" /> New Map
-        </Button>
+        <HowToTooltip title="Create New Map" description="Start a new Neural Brain Map with isolated context." side="bottom">
+          <Button size="sm" variant="outline" className="gap-2" onClick={() => setIsOpen(true)}>
+            <Plus className="w-4 h-4" /> New Map
+          </Button>
+        </HowToTooltip>
       </div>
 
       {/* Map list */}
@@ -269,14 +272,18 @@ export function MapManager() {
                         )}
                       </div>
                       <div className="flex items-center gap-1 ml-2 shrink-0">
-                        <Button size="icon" variant="ghost" className="w-8 h-8"
-                          onClick={e => { e.stopPropagation(); duplicateMap(map.id); }}>
-                          <Copy className="w-3.5 h-3.5" />
-                        </Button>
-                        <Button size="icon" variant="ghost" className="w-8 h-8 text-destructive hover:text-destructive"
-                          onClick={e => { e.stopPropagation(); deleteMap(map.id); }}>
-                          <Trash2 className="w-3.5 h-3.5" />
-                        </Button>
+                        <HowToTooltip title="Duplicate Map" description="Create a copy of this Neural Map." side="top">
+                          <Button size="icon" variant="ghost" className="w-8 h-8"
+                            onClick={e => { e.stopPropagation(); duplicateMap(map.id); }}>
+                            <Copy className="w-3.5 h-3.5" />
+                          </Button>
+                        </HowToTooltip>
+                        <HowToTooltip title="Delete Map" description="Permanently remove this Neural Map." side="top">
+                          <Button size="icon" variant="ghost" className="w-8 h-8 text-destructive hover:text-destructive"
+                            onClick={e => { e.stopPropagation(); deleteMap(map.id); }}>
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </Button>
+                        </HowToTooltip>
                       </div>
                     </div>
                   </CardContent>
@@ -352,27 +359,30 @@ export function MapManager() {
                         onKeyDown={e => e.key === "Enter" && addLocalFolder(folderInput)}
                         className="text-sm"
                       />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="outline"
-                        className="shrink-0 gap-1.5"
-                        onClick={pickFolder}
-                        title="Browse for folder"
-                      >
-                        <FolderOpen className="w-4 h-4" />
-                        Browse
-                      </Button>
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="shrink-0"
-                        onClick={() => addLocalFolder(folderInput)}
-                        disabled={!folderInput.trim()}
-                      >
-                        Add
-                      </Button>
+                      <HowToTooltip title="Browse Folders" description="Select a local directory to add as a data source." side="top">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="outline"
+                          className="shrink-0 gap-1.5"
+                          onClick={pickFolder}
+                        >
+                          <FolderOpen className="w-4 h-4" />
+                          Browse
+                        </Button>
+                      </HowToTooltip>
+                      <HowToTooltip title="Add Folder Path" description="Confirm the entered path as a data source." side="top">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="shrink-0"
+                          onClick={() => addLocalFolder(folderInput)}
+                          disabled={!folderInput.trim()}
+                        >
+                          Add
+                        </Button>
+                      </HowToTooltip>
                     </div>
                     {!(window as any).api?.selectFolder && (
                       <p className="text-[10px] text-muted-foreground mt-1">
@@ -432,17 +442,19 @@ export function MapManager() {
                         onKeyDown={e => e.key === "Enter" && addRepo(repoInput)}
                         className="text-sm"
                       />
-                      <Button
-                        type="button"
-                        size="sm"
-                        variant="secondary"
-                        className="shrink-0 gap-1.5"
-                        onClick={() => addRepo(repoInput)}
-                        disabled={!repoInput.trim()}
-                      >
-                        <Github className="w-3.5 h-3.5" />
-                        Add
-                      </Button>
+                      <HowToTooltip title="Add Repository" description="Add the specified GitHub repository to the map." side="top">
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant="secondary"
+                          className="shrink-0 gap-1.5"
+                          onClick={() => addRepo(repoInput)}
+                          disabled={!repoInput.trim()}
+                        >
+                          <Github className="w-3.5 h-3.5" />
+                          Add
+                        </Button>
+                      </HowToTooltip>
                     </div>
 
                     {githubRepos.length > 0 && (
@@ -537,10 +549,12 @@ export function MapManager() {
 
           <DialogFooter className="gap-2 mt-2">
             <Button variant="ghost" onClick={() => setIsOpen(false)}>Cancel</Button>
-            <Button onClick={handleCreate} disabled={!name.trim()}>
-              Create Map
-              {totalSources > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">{totalSources} sources</Badge>}
-            </Button>
+            <HowToTooltip title="Confirm Map Creation" description="Finalize and create the new Neural Map with the selected sources." side="top">
+              <Button onClick={handleCreate} disabled={!name.trim()}>
+                Create Map
+                {totalSources > 0 && <Badge variant="secondary" className="ml-2 text-[10px]">{totalSources} sources</Badge>}
+              </Button>
+            </HowToTooltip>
           </DialogFooter>
         </DialogContent>
       </Dialog>

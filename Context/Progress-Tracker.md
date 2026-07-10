@@ -66,6 +66,60 @@ Contingency: if the bug survives, keep the workaround + document it inline and f
 
 ---
 
+## ✅ Pre-commit code review — agentic-chat upgrade changeset — 2026-07-10 (Linux)
+
+**Scope:** xhigh-effort review of the uncommitted working tree before commit — the
+agentic-chat upgrade (web + Android), the `server/phase2/` → `server/core_services/`
+scripted relocation, OAuth token at-rest encryption, mesh sub-agent delegation, and the
+3D model library. 412 files (+9,305 / −30,117); most churn is the mechanical rename and
+deleted `docs/demo` build artifacts. `pnpm check` clean throughout, so the rename
+introduced no import/type breakage.
+
+**Verified CLEAN (reviewed in-file, not assumed):**
+- **Streaming reducers** (`client/src/lib/agentStream.ts`, APK `lib/_core/agent-stream.ts`)
+  + `Chat.tsx` send/finalize + delegation subscription — pure, immutable, correct delta
+  accumulation; proper AbortController/unsubscribe cleanup; no leaks.
+- **OAuth at-rest encryption** (`server/oauth/platformTokens.ts`) — AES-256-GCM sealing of
+  `oauthToken`/`oauthRefreshToken`; traced every raw column reader — all real consumers
+  decrypt (or route through `getFreshAccessToken`/`publishExecutor`); `verifyOAuthToken`
+  only checks presence+expiry so ciphertext-as-truthy is safe. Migration-safe (legacy
+  plaintext passthrough + re-seal on next refresh).
+- **`MeshServer.ts`** — inbound peer-fingerprint gate now uses `fingerprint256` colon-stripped
+  (`canonicalPeerFingerprint`), matching the exact form `SecurityManager` advertises (l.74),
+  `approvePeer` pins, and outbound `checkServerIdentity` compares (l.232) — a correct
+  security fix (the legacy SHA-1 `.fingerprint` never matched a pin). `handleSubAgent`
+  properly trust-gated, body-capped, write-guarded, keepalive-cleaned.
+- **`aiProviderRouter.agentChatStream`** — per-provider sovereign gate
+  (`assertProviderAllowedInMode`) present, so cloud providers stay blocked for air-gapped
+  users even though it's `protectedProcedure` (local models must work air-gapped).
+- **APK `index.tsx`** (+1403) — FIFO queue-drain with synchronous `isSendingRef` guard
+  (no double-send), on-device generation serialized to avoid Hermes SIGSEGV, delegation
+  stream folded via the shared reducer; **`settings.tsx`** (+754) model download/delete
+  handlers have try/catch/finally, partial-file cleanup, unload-before-delete;
+  **`phone-model.ts`** one-resident-model invariant + serialized native loads.
+
+**FIXED + VERIFIED this pass:**
+- 🐞 **Cross-user data corruption in the 3D model library** (`server/db-models.ts`,
+  `drizzle/schema.ts`). `model_assets.fileName` had a **global** unique index, but the
+  library is a shared file namespace (`listModels` shows every file to every user) and a
+  `model_assets` row is *one user's association metadata* over a shared file. Two users
+  registering the same basename (e.g. a Blender export named `model.glb`) collided:
+  `registerModelAsset`'s `onConflictDoUpdate(target: fileName)` overwrote the **other
+  user's** row (map/project association + metadata) without changing `userId`, and the
+  post-insert `SELECT ... WHERE userId` then returned `undefined` (violating its
+  `Promise<ModelAsset>` contract). Same mechanism gave an IDOR via `blenderRouter.assignModel`.
+  **Fix:** changed the index to composite `uniqueIndex(userId, fileName)` and the upsert
+  conflict target to `[userId, fileName]`, so each user's association is independent and
+  the function always returns a defined row. Regenerated migration **`0015`** in place
+  (was uncommitted/brand-new — no stacked 0016). Left on-disk sharing as-is (matches the
+  intentional shared-library design). Added a cross-user regression test to
+  `server/__tests__/dbModels.test.ts` (would fail under the old global unique).
+  **Verified:** `pnpm check` clean; `dbModels` + `blenderRouter` + `comfyRouterMesh` +
+  `jobRouter` suites 30/30 pass (incl. the new guard); migration applies through the real
+  in-memory harness.
+
+---
+
 ## ✅ Test-coverage tooling + first route-level tRPC tests; aiRouter IDOR fix — 2026-06-24
 
 **Status:** Complete. Closes the long-standing "no coverage tooling / API boundary untested" gap (tracked as **TD-044**) for its first two routers, and fixes a High-risk access-control bug found in the process (**TD-043**).
@@ -296,6 +350,44 @@ DB layer (no `insertId`/dialect-leak/unawaited `getDb`); no hardcoded secrets; `
 ---
 
 ## 🚦 Current Status
+*   **Built (2026-07-10): Model-Fabric Phase 8 — local GGUF auto-discovery + hot-swap (Omnecor's own runtime hosts *every* local model, no manual adds).** Closes the last "Ollama really is optional" gap: the runtime is no longer a single-static-model server — it discovers and hot-swaps across every GGUF the box already has.
+    *   **Discovery (`ModelIndexService`):** auto-indexes every GGUF from (1) the app models dir (`PATHS.models`, skipping the `valet-router/` classifier) and (2) the **Ollama blob store** — parses `~/.ollama/models/manifests` → model-layer digest → `blobs/sha256-*` and reconstructs real names (`deepseek-r1:14b`). Reads **off disk**, so it works with **Ollama stopped**. GGUF-magic (4-byte) gated; content-deduped by `size + sha256(first 64 KB)` (a models-dir hardlink and its Ollama blob collapse to one; models-dir wins). Async `fs/promises` scan + 30 s cache; synchronous non-blocking `list()`/`resolve()` (stale → background refresh; boot awaits one `refresh()`).
+    *   **Hot-swap (`LocalLlmRuntimeService`):** new `ensureModelLoaded(idOrPath)` stops the current `llama-server` and spawns the requested model. **All** lifecycle work (boot load / hot-swap / crash respawn) runs through **one serialization queue** so nothing orphans a second server on the port. Per-model `--n-gpu-layers` VRAM-fit via `collectGpuTelemetry()` (fits→all, else proportional partial offload — no OOM crash-loop for a 14B/27B on 8 GB). Last model persisted (`localLlmLastModel` setting) → boot resumes it, else idle/load-on-select. `getLoadedModelId()`/`isAvailable()` added.
+    *   **Catalog + surface:** `ModelCatalogService` now lists **all** indexed models as `omnecor-runtime` (warm one flagged `loaded`, ready-gated) and **skips the live Ollama API source when the runtime is available** (the index already covers the store — no double-listing). New non-blocking `aiProvider.loadLocalModel` mutation; `ModelSelector` "loading… → loaded" pending indicator (`bg-accent-success`, 2.5 s refetch while pending, ceiling so a failed load can't stick). APK: `loaded` flag mirrored in the type; mobile picker indicator UI still TODO.
+    *   **`/review` found 6 issues, all fixed same session** (1 Important + 5 Minor): serialized all lifecycle through one queue; `_waitForHealth` bails on proc-death; async non-blocking index scan; ready-gated `loaded` flag; content-clean source-gating; CPU-safe GPU fallback.
+    *   **Live-verified on DadsPC (`.201`, RTX 4060 Ti):** all 10 Ollama GGUFs render as **"Omnecor · This PC"** (0 Ollama-branded); boot-resume + hot-swap + inference (`REVIEW_FIX_OK`) + persistence confirmed on real hardware.
+    *   **Still open:** HF browse/download UI; MoE-Chain still on the separate `LlamaCppService`/:8013 bridge; APK picker loaded-indicator UI.
+    *   **Gates:** `pnpm check` (root + APK) ✅ · `pnpm test` **1469 passed | 4 skipped** ✅ (+22 from the 1447 baseline; new `ModelIndexService.test.ts` 8).
+*   **Built (2026-07-08): Model-Fabric Phase 7 — per-node "Omnecor hosts itself" grouping (web picker + APK picker + Model Hub) + all gates green.** Owner caught that although Model-Fabric made Ollama optional, no UI surfaced Omnecor as its own host — the pickers lumped the Omnecor runtime and Ollama into one "This PC" group and the web Model Hub was still Ollama+cloud only.
+    *   **Fix:** new `describeCatalogHost()` (single source of truth in `shared/types/modelCatalog.ts`, hand-mirrored in APK `lib/_core/ai-models.ts`) derives host **brand** (omnecor/ollama/cloud/phone) + **node** per catalog entry. A mesh peer's brand is derived from its advertised `providerId` (llamacpp = the peer's own Omnecor runtime, ollama = Ollama), so with OMMESH **each node reads as its own "Omnecor · \<node\>" group** — the design the owner asked for (Omnecor can host on 4+ mesh nodes, each distinct). Ollama kept as a de-emphasized fallback brand.
+    *   **Surfaces:** web `ModelSelector.tsx` (Omnecor nodes lead in purple, Ollama muted below, then Cloud); APK grouping; a new **"Omnecor" tab** in the web Model Hub (`ModelHubPanel.tsx`) sourced from `aiProvider.catalog` — per-node self-hosted sections, "Omnecor hosts these itself" banner, `Self-hosted`/`Ready` cards.
+    *   **Live-verified (chrome-devtools, real dev server + real spawned llama-server :8014):** live catalog exposes the `omnecor-runtime` entry (`llama-3.2-3b.gguf` · llamacpp · 1926 MB); the chat picker renders a distinct **"Omnecor · This PC"** group above "Ollama · This PC" + "Cloud"; the Model Hub Omnecor tab renders the **"OMNECOR · THIS PC"** node with the self-hosted card.
+    *   **Gates:** `pnpm check` (root + APK) ✅ · `pnpm test` **1455 passed | 4 skipped** ✅ (+16 tests) · `pnpm build` ✅ · `pnpm audit --prod` no known vulns ✅. **Still deferred to a hardware session:** the full agentic tool-loop dual-sided verify on a real mesh (web + APK + a peer advertising models → a real "Omnecor · DadsPC" group) — DadsPC (RTX 4060 Ti, owner's fastest reasoning node) has a stale build; bundle with Mesh-Delegation Phase 10.
+*   **Built (2026-07-08): Mesh Sub-Agent Delegation (Model-Fabric 5B) — full sub-agent on a mesh peer, streamed back as a managed chat.** Full detail + task list in `Mesh-Delegation.md` (Phases 1–9 ✅; Phase 10 live mesh verify deferred to a hardware session).
+    *   **What it does:** the main chat's agent can `delegate_task` to a trusted OMMESH peer; a full `ChatAgentRunner` tool loop runs *on the peer* (its own filesystem, inside a `~/.omnecor/…/delegation/<taskId>/` sandbox or an opt-in explicit path shown at approval). The run streams back over the existing strict-mTLS `:3001` as NDJSON and the origin persists + re-publishes it as a **new managed chat** on web + APK. Per-action HITL relays all the way to the user's device; the parent chat gets an async `subagent` block and is re-prompted with the condensed result on completion (start_job semantics).
+    *   **Server:** `shared/subagent.ts` wire contract + a `subagent` `AssistantBlock`; `SubAgentHostService` (isolated approval broker, concurrency cap + kill-switch, executionMode enforcement, cursor-replay buffer, grace-window abort, start_job continuation); 4 `/subagent` routes on `MeshServer` behind the pinned-peer trust gate; `DelegationService` (origin-owned persistence, ownership-checked HITL forward, cursor re-attach, parent re-prompt); `delegate_task` tool (origin-only, always HITL-gated); `delegationRouter` + `resolveToolApproval` transparent forward + WS `delegationEvent`.
+    *   **Clients:** web `SubAgentBox` chip (approve/deny + tap-through), managed chats in the sidebar with a node badge, live `delegation.stream` fold, between-turn input + cancel; APK mirror (`subagent` chip, transcript-fetch materialization, node badge, header cancel, delegated send branch).
+    *   **Gates:** `pnpm check` (root + APK) ✅ · `pnpm test` **1447 passed | 4 skipped** ✅ (33 new tests) · `pnpm build` ✅ · `pnpm audit --prod` 0 vulns ✅. Live multi-peer mesh verify is the one remaining item (deferred to a hardware session, bundled with Model-Fabric Phase 7's same pending live check).
+*   **Done (2026-07-08): APK Settings — TTS Voice Model Selection & AI Voice Picker.**
+    *   **Problem found:** The Settings tab Voice section had no way to select which device voice the AI uses for TTS. The Always Listening section had a `speakReplies` toggle but zero voice picker — and `ttsVoiceId` didn't exist in the config at all, so any future voice choice would be silently lost on app restart (OMNECOR memory principle violation).
+    *   **(1) Config persistence (`lib/_core/always-listen-config.ts`):** Added `ttsVoiceId: string` to `AlwaysListenConfig`; wired through `loadListenConfig()`, `saveListenConfig()`, and the in-memory default. Choice now survives restarts.
+    *   **(2) Fallback TTS (`lib/_core/always-listen.ts`):** The offline 8-second fallback `Speech.speak()` call now passes `voice: ttsVoiceId` so the AI's voice is consistent even when the PC stream is unreachable.
+    *   **(3) Always Listening voice picker (`components/always-listen-settings.tsx`):** Added `Speech.getAvailableVoicesAsync()` on mount; when `speakReplies` is on, shows a full "AI voice for spoken replies" section — "System default" option + list of all installed English voices (name, language, quality). Selecting any voice persists immediately via `saveListenConfig`.
+    *   **(4) Main Voice section voice picker (`app/(tabs)/settings.tsx`):** Added `expo-speech` + `AsyncStorage` imports; new `chatTtsVoiceId` / `deviceVoices` / `loadingVoices` state; voices loaded at mount alongside model state; `handleChangeChatTtsVoice` persists to `CHAT_TTS_VOICE_KEY` in AsyncStorage. Voice section now shows "AI voice for chat replies" below Reading Speed when TTS is enabled — same System default + installed voice list pattern.
+    *   **Files changed:** `lib/_core/always-listen-config.ts`, `lib/_core/always-listen.ts`, `components/always-listen-settings.tsx`, `app/(tabs)/settings.tsx`
+    *   **Gates:** APK `tsc --noEmit` ✅ · root `pnpm check` ✅
+*   **Done (2026-07-07): Agentic Chat — Phase 6 APK port (main chat → Claude-Code-APK-style agentic stream).** Full detail in `Chats-Agentic-Upgrade.md` (Phase 6 ✅).
+    *   **Transport:** `app/(tabs)/index.tsx` PC path now consumes the desktop `aiProvider.agentChatStream` **tRPC WS subscription** via a new lazily-built `getAgentTrpc()` (`lib/trpc.ts`: `splitLink` → `wsLink` to the token-authed `/ws` + `httpBatchLink`); the self-contained stub `lib/_core/app-router.ts` gained typed `aiProvider.{agentChatStream,resolveToolApproval,runCodeSnippet}` (async-generator stub infers `AgentStreamEvent`, no server type-graph import). Contract + reducer adopted via `lib/_core/agent-blocks.ts` (re-export of root `shared/chatBlocks.ts`+`chatAgentEvents.ts`) and a vendored `lib/_core/agent-stream.ts`.
+    *   **Server fix (found + fixed on sight):** the tRPC WS path (`applyWSSHandler`→`createContext`→`sdk.authenticateRequest`, cookie/Bearer only) never read the mobile `?token=` query param — the subscription authenticated under zero-login but would fail against a real server. New `server/core_services/websocket/wsAuthBridge.ts` promotes `?token=`→`Authorization: Bearer` (guarded; cookie/Bearer callers untouched); **7 unit tests**.
+    *   **UI:** native renderers `components/agentic/{assistant-stream,agentic-blocks}.tsx` — flush-left guide-line stream (`react-native-markdown-display`), collapsible thinking, command/edit/job/mcp chips + one shared `Modal` overlay, inline HITL approve/deny → `resolveToolApproval`, dependency-free LCS line-diff, ▶ Run (→ PC `runCodeSnippet`, JobBlock) / ⚡ Preview (native `WebView`). On-device GGUF/LiteRT turns stream via `onToken` folded into text/thinking blocks (`<think>` parsed). Component-state FIFO message queue + tap-recall chips. `LoadingQuote` rebuilt with a module-scoped no-repeat bag + typewriter; 3 quote styles + show/hide + auto-approve shield surfaced in-chat.
+    *   **Gates:** APK `tsc --noEmit` ✅ · `expo lint` 0 errors ✅ · root `pnpm check` ✅ · root `pnpm test` **1315 passed | 4 skipped** ✅. On-device runtime verify (live WS stream + HITL approve/deny from the phone) is bundled with the pending NPU-manifest rebuild (owner's one-rebuild directive).
+*   **Done (2026-07-05): NPU-First On-Device Models — real Hexagon path + model lifecycle overhaul (APK).**
+    *   *(Supersedes an earlier 2026-07-05 entry that was WRONG: it claimed a patched `use_npu` flag enabled Hexagon — review showed that patch was dead code on Android GPU devices [`RNLlamaJSI.cpp` pre-populates `cparams.devices` with Hexagon excluded], the `hasHexagon=true` Java hunk was unnecessary [SM8750 already in `KNOWN_HEXAGON_SOC_PATTERN`], and "Vulkan fallback" was wrong [OpenCL]. No native behavior had actually changed.)*
+    *   **(1) NPU without any native patch:** llama.rn 0.12.4 already supports `initLlama({ devices: ["HTP*"] })` — the TS layer expands the wildcard to real HTP device names and the returned `context.devices` reports what actually engaged. The entire `patches/llama.rn.patch` apparatus was DELETED (plus the stray 0-byte mobile patch file, unused `patch-package`/`postinstall-postinstall` devDeps, and the orphaned `wouter@3.7.1.patch`).
+    *   **(2) Backend-aware catalog (`model-catalog.ts`):** ggml-hexagon executes ONLY Q4_0/IQ4_NL/Q8_0/MXFP4 weights — every old catalog entry was Q4_K_M (0% NPU). New per-model variants: quality Q4_K_M + NPU-ready file (URLs + sizes HEAD-verified per bartowski repo); `pickVariant(accelMode)` drives the download UI. Capabilities metadata (`images`/`files`) added → chat attach/photo buttons are gated for text-only phone models (Alert + dimmed instead of a send-time error).
+    *   **(3) App-wide acceleration mode (`acceleration.ts`):** `auto|cpu|gpu|npu`, Auto default, migrates the legacy LiteRT-only key. Auto = NPU-if-file-capable-and-HTP-present → GPU → CPU; manual modes STRICT (clear failure over silent downgrade). GGUF loader derives the ACTUAL backend from `context.devices`; LiteRT GPU/NPU loads pass `validate: true` (real test inference at load — catches Google's silent-CPU fallback).
+    *   **(4) Lifecycle manager (`phone-model.ts`):** ONE resident model across BOTH engines (serialized load/unload, cross-engine eviction); **selection in the Chat model picker is the only lifecycle verb** (remote Ollama/OMMESH/cloud selection never touches the phone model); Settings = download/delete/Unload + status badges only (Load buttons removed); auto re-arm on app start honors engine + acceleration mode (fixes LiteRT-only auto-load that ignored the saved backend). AI Node + Status tabs now subscribe to the unified snapshot (fixes AI Node's always-"No model loaded" when a LiteRT model was resident).
+    *   **Gates:** mobile `tsc --noEmit` ✅, mobile eslint 0 errors ✅, root `pnpm check` ✅, new `model-catalog.test.ts` 11/11 ✅, root `pnpm test` + APK rebuild + **on-device NPU verification (logcat HTP devices + tok/s CPU/GPU/NPU)** in progress — this entry is only DONE when the on-device pass shows HTP devices serving tokens.
 *   **Done (2026-06-28): PCB Editor — Infinite Loop, Drop Crash, Notification & Socket Fixes.**
     *   **(1) First-boot infinite render loop (3D → PCB/Schematic tab):** Fixed "Maximum update depth exceeded" crash that hit when navigating to the PCB tab before any projects existed in the DB. Root cause: two patterns combined — `const { data: pcbProjects = [] }` creates a new array reference every render while loading, and an unselectored `useDesignerStore()` re-renders on every Zustand `set()` even with the same value. Chain: new `[]` → `useEffect` fires → `setActivePCBContext(null)` → Zustand merged-state object → subscriber re-renders → repeat until React's 25-nested-update limit throws. Fix: (a) module-level `EMPTY_PROJECTS` constant in `EnhancedPCBEditor.tsx`; (b) selective `useDesignerStore((s) => s.field)` in `EnhancedPCBEditor.tsx` and `3DDesigner.tsx`; (c) equality guard in `setActivePCBContext` (`designerStore.ts`). Documented as TD-046.
     *   **(2) PCB canvas drop crash ("Cannot read properties of undefined (reading 'map')"):** `handleAddComponent` was setting `data.component` to the string ID instead of the resolved component object; `SchematicNode`/`PCBNode` then called `.handles.map()` on the string. Fixed: resolve the full `Component` object from `componentLibrary` in `handleAddComponent` before building the node. Added backward-compat guard in both node renderers (`typeof raw === 'string' ? componentLibrary.find(c => c.id === raw) : raw`) for old saved designs that stored string IDs.

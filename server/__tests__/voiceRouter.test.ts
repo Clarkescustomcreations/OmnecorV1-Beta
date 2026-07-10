@@ -15,7 +15,7 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -31,7 +31,7 @@ const elSvc = vi.hoisted(() => ({
   listVoices: vi.fn(),
   synthesize: vi.fn(),
 }));
-vi.mock("../phase2/services/ElevenLabsService.js", () => ({
+vi.mock("../core_services/services/ElevenLabsService.js", () => ({
   ElevenLabsService: { getInstance: () => elSvc },
 }));
 

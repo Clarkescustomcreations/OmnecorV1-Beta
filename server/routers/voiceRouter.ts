@@ -22,7 +22,7 @@ import { z } from "zod";
 import { router, protectedProcedure, cloudProcedure } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
-import { ElevenLabsService } from "../phase2/services/ElevenLabsService.js";
+import { ElevenLabsService } from "../core_services/services/ElevenLabsService.js";
 import path from "path";
 
 // ---------------------------------------------------------------------------

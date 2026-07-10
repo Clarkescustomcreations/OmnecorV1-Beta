@@ -31,6 +31,7 @@ import {
   Activity,
   BookOpenText,
   ShieldAlert,
+  ShieldCheck,
   UserCircle2,
 } from "lucide-react";
 import {
@@ -45,6 +46,8 @@ import { Streamdown } from "streamdown";
 import { toast } from "sonner";
 import type { ChatMessage, ContextFile, SelectedModel } from "@/lib/chatContext";
 import { ChatInput, type SlashCommand } from "@/components/chat/ChatInput";
+import { AssistantStream } from "@/components/chat/agentic/AssistantStream";
+import { useCodeBlockActions } from "@/components/chat/agentic/useCodeBlockActions";
 import { ModelSelector } from "@/components/chat/ModelSelector";
 import { trpc } from "@/lib/trpc";
 import {
@@ -133,6 +136,8 @@ interface AssistantBubbleProps {
   onOpenPreview?: (mode: "3d" | "pcb" | "web", code: string) => void;
   isTyping?: boolean;
   quoteStyle?: "random" | "funny" | "serious";
+  excluded?: boolean;
+  onToggleExclusion?: () => void;
 }
 
 function AssistantBubble({
@@ -146,6 +151,8 @@ function AssistantBubble({
   showTokenCounts = false,
   onOpenPreview,
   isTyping = false,
+  excluded = false,
+  onToggleExclusion,
 }: AssistantBubbleProps) {
   const contentRef = useRef<HTMLDivElement>(null);
   const [showSaveDialog, setShowSaveDialog] = useState(false);
@@ -167,6 +174,7 @@ function AssistantBubble({
   });
 
   useCodeBlockCopy(contentRef, message.content);
+  useCodeBlockActions(contentRef, message.content);
 
   const handleSaveScriptClick = useCallback(() => {
     // Extract first python code block
@@ -227,7 +235,7 @@ function AssistantBubble({
   return (
     <div className="flex gap-3 justify-start animate-in fade-in slide-in-from-bottom-2 group">
       {/* Avatar */}
-      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1 text-[10px] font-bold text-accent-foreground">
+      <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center flex-shrink-0 mt-1 text-[10px] font-bold text-primary">
         AI
       </div>
 
@@ -265,65 +273,81 @@ function AssistantBubble({
 
           {/* Action: Live Preview */}
           {hasPreviewable && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-5 text-[10px] px-1.5 gap-1 border-accent-purple/30 text-accent-purple bg-accent-purple/5 hover:bg-accent-purple/10"
-              onClick={handleLivePreviewClick}
-            >
-              <Eye className="w-2.5 h-2.5" />
-              Live Preview
-            </Button>
+            <HowToTooltip title="Live Preview" description="Open a live preview of the code snippet in a sandboxed environment." side="top">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-5 text-[10px] px-1.5 gap-1 border-accent-purple/30 text-accent-purple bg-accent-purple/5 hover:bg-accent-purple/10"
+                onClick={handleLivePreviewClick}
+              >
+                <Eye className="w-2.5 h-2.5" />
+                Live Preview
+              </Button>
+            </HowToTooltip>
           )}
 
           {/* Action: Save Script (always visible if python present) */}
           {hasPython && (
-            <Button
-              size="sm"
-              variant="outline"
-              className="h-5 text-[10px] px-1.5 gap-1 border-accent-cyan/30 text-accent-cyan bg-accent-cyan/5 hover:bg-accent-cyan/10"
-              onClick={handleSaveScriptClick}
-            >
-              <Save className="w-2.5 h-2.5" />
-              Save Script
-            </Button>
+            <HowToTooltip title="Save Script" description="Extract Python code from the message and save it to your library." side="top">
+              <Button
+                size="sm"
+                variant="outline"
+                className="h-5 text-[10px] px-1.5 gap-1 border-accent-cyan/30 text-accent-cyan bg-accent-cyan/5 hover:bg-accent-cyan/10"
+                onClick={handleSaveScriptClick}
+              >
+                <Save className="w-2.5 h-2.5" />
+                Save Script
+              </Button>
+            </HowToTooltip>
           )}
 
           {/* Hover actions */}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-5 w-5"
-              onClick={onCopy}
-              title="Copy message"
-            >
-              {copied ? (
-                <Check className="w-3 h-3 text-accent-success" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </Button>
-            {isLast && (
+            <HowToTooltip title="Copy Message" description="Copy the entire message content to your clipboard." side="top">
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-5 w-5"
-                onClick={onRetry}
-                title="Regenerate response"
+                onClick={onCopy}
               >
-                <RotateCcw className="w-3 h-3" />
+                {copied ? (
+                  <Check className="w-3 h-3 text-accent-success" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
               </Button>
+            </HowToTooltip>
+            {isLast && (
+              <HowToTooltip title="Regenerate" description="Request a new response from the AI." side="top">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-5 w-5"
+                  onClick={onRetry}
+                >
+                  <RotateCcw className="w-3 h-3" />
+                </Button>
+              </HowToTooltip>
             )}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-5 w-5 hover:text-destructive"
-              onClick={onDelete}
-              title="Delete message"
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
+            <HowToTooltip title="Delete Message" description="Remove this message from the conversation history." side="top">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-5 w-5 hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </HowToTooltip>
+            {onToggleExclusion && (
+              <button
+                onClick={onToggleExclusion}
+                className="text-[10px] text-muted-foreground hover:text-foreground rounded px-1 py-0.5 border border-border/50 ml-1"
+                title={excluded ? "Include in context" : "Exclude from context"}
+              >
+                {excluded ? "⊕ include" : "⊖ exclude"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -379,6 +403,8 @@ interface UserBubbleProps {
   copied: boolean;
   showTimestamps?: boolean;
   showTokenCounts?: boolean;
+  excluded?: boolean;
+  onToggleExclusion?: () => void;
 }
 
 function UserBubble({
@@ -389,6 +415,8 @@ function UserBubble({
   copied,
   showTimestamps = true,
   showTokenCounts = true,
+  excluded = false,
+  onToggleExclusion,
 }: UserBubbleProps) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(message.content);
@@ -408,7 +436,7 @@ function UserBubble({
   return (
     <div className="flex gap-3 justify-end animate-in fade-in slide-in-from-bottom-2 group">
       <div className="flex flex-col gap-1 items-end max-w-xl min-w-0">
-        <div className="rounded-lg px-4 py-3 bg-primary/10 text-accent-foreground text-sm w-full shadow-sm">
+        <div className="rounded-lg px-4 py-3 bg-primary/10 text-foreground text-sm w-full shadow-sm">
           {editing ? (
             <div className="flex flex-col gap-2">
               <Textarea
@@ -421,7 +449,7 @@ function UserBubble({
                   }
                   if (e.key === "Escape") cancelEdit();
                 }}
-                className="text-sm resize-none bg-accent-foreground/10 border-accent-foreground/20 text-accent-foreground placeholder:text-accent-foreground/50 min-h-[60px]"
+                className="text-sm resize-none bg-background/40 border-border text-foreground placeholder:text-muted-foreground min-h-[60px]"
                 autoFocus
               />
               <div className="flex justify-end gap-1.5">
@@ -464,39 +492,51 @@ function UserBubble({
 
           {/* Hover actions */}
           <div className="flex items-center gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity ml-auto">
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-5 w-5"
-              onClick={onCopy}
-              title="Copy message"
-            >
-              {copied ? (
-                <Check className="w-3 h-3 text-accent-success" />
-              ) : (
-                <Copy className="w-3 h-3" />
-              )}
-            </Button>
-            {!editing && (
+            <HowToTooltip title="Copy Message" description="Copy your message text to the clipboard." side="top">
               <Button
                 size="icon"
                 variant="ghost"
                 className="h-5 w-5"
-                onClick={() => setEditing(true)}
-                title="Edit message"
+                onClick={onCopy}
               >
-                <Pencil className="w-3 h-3" />
+                {copied ? (
+                  <Check className="w-3 h-3 text-accent-success" />
+                ) : (
+                  <Copy className="w-3 h-3" />
+                )}
               </Button>
+            </HowToTooltip>
+            {!editing && (
+              <HowToTooltip title="Edit Message" description="Modify your message and re-send it." side="top">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-5 w-5"
+                  onClick={() => setEditing(true)}
+                >
+                  <Pencil className="w-3 h-3" />
+                </Button>
+              </HowToTooltip>
             )}
-            <Button
-              size="icon"
-              variant="ghost"
-              className="h-5 w-5 hover:text-destructive"
-              onClick={onDelete}
-              title="Delete message"
-            >
-              <Trash2 className="w-3 h-3" />
-            </Button>
+            <HowToTooltip title="Delete Message" description="Remove your message from the conversation history." side="top">
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-5 w-5 hover:text-destructive"
+                onClick={onDelete}
+              >
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            </HowToTooltip>
+            {onToggleExclusion && (
+              <button
+                onClick={onToggleExclusion}
+                className="text-[10px] text-muted-foreground hover:text-foreground rounded px-1 py-0.5 border border-border/50 ml-1"
+                title={excluded ? "Include in context" : "Exclude from context"}
+              >
+                {excluded ? "⊕ include" : "⊖ exclude"}
+              </button>
+            )}
           </div>
         </div>
       </div>
@@ -555,6 +595,19 @@ export interface ChatInterfaceProps {
 
   valetRoutedModel?: string | null;
 
+  /**
+   * Assistant render mode. `"stream"` (main Omnecor chat) renders the agentic
+   * flush-left block stream with tool boxes; `"bubble"` (default, wrapper chats)
+   * keeps the classic single-markdown bubble.
+   */
+  layout?: "stream" | "bubble";
+  /** Resolve a `pending_approval` agentic tool box (stream layout only). */
+  onApproveTool?: (id: string) => void;
+  onDenyTool?: (id: string, reason?: string) => void;
+  /** Tap-through from a delegated `subagent` chip to its managed chat
+   *  (Mesh-Delegation.md). */
+  onOpenDelegation?: (conversationId: string) => void;
+
   className?: string;
 }
 
@@ -598,6 +651,10 @@ export function ChatInterface({
   onToggleExclusion,
   onOpenPreview,
   valetRoutedModel,
+  layout = "bubble",
+  onApproveTool,
+  onDenyTool,
+  onOpenDelegation,
   className,
 }: ChatInterfaceProps) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
@@ -616,9 +673,18 @@ export function ChatInterface({
     setTitleDraft(conversationTitle);
   }, [conversationTitle]);
 
-  // Auto-scroll to bottom
+  // Auto-scroll to bottom — but only when the user is already near the bottom,
+  // so they can scroll up to read while the AI is still typing without being
+  // yanked back down on every streamed update.
   useEffect(() => {
-    scrollRef.current?.scrollIntoView({ behavior: "smooth" });
+    const sentinel = scrollRef.current;
+    if (!sentinel) return;
+    const viewport = sentinel.closest("[data-radix-scroll-area-viewport]") as HTMLElement | null;
+    if (viewport) {
+      const distanceFromBottom = viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight;
+      if (distanceFromBottom > 120) return; // scrolled up to read — don't follow
+    }
+    sentinel.scrollIntoView({ behavior: "smooth" });
   }, [messages]);
 
   const handleCopy = useCallback((content: string, id: string) => {
@@ -728,6 +794,41 @@ export function ChatInterface({
 
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Auto-approve tools toggle (agentic stream only) */}
+          {layout === "stream" && (
+            <HowToTooltip
+              title="Auto-approve tools"
+              description="When on, the AI runs commands, applies edits, and starts jobs scoped to the active map WITHOUT asking each time. Off = every action needs your approval."
+            >
+              <Button
+                size="sm"
+                variant={chatSettings.autoApproveTools ? "default" : "outline"}
+                className={cn(
+                  "h-7 text-[11px] gap-1 px-2",
+                  chatSettings.autoApproveTools
+                    ? "bg-accent-warning/90 hover:bg-accent-warning text-black border-transparent"
+                    : "text-muted-foreground",
+                )}
+                onClick={() => {
+                  const next = !chatSettings.autoApproveTools;
+                  setChatDisplaySettings({ autoApproveTools: next });
+                  toast[next ? "warning" : "info"](
+                    next
+                      ? "Auto-approve ON — tools run without asking (active map only)"
+                      : "Auto-approve OFF — every tool action needs approval",
+                  );
+                }}
+              >
+                {chatSettings.autoApproveTools ? (
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                ) : (
+                  <ShieldAlert className="w-3.5 h-3.5" />
+                )}
+                {chatSettings.autoApproveTools ? "Auto" : "Approve"}
+              </Button>
+            </HowToTooltip>
+          )}
 
           {/* Display Settings Popover */}
           <Popover>
@@ -958,21 +1059,43 @@ export function ChatInterface({
               return (
                 <div
                   key={msg.id}
-                  className={cn("group relative", excluded && "opacity-40")}
+                  className={cn(excluded && "opacity-40")}
                 >
                   {msg.role === "assistant" ? (
-                    <AssistantBubble
-                      message={msg}
-                      copied={copiedId === msg.id}
-                      isLast={idx === lastAssistantIdx}
-                      onCopy={() => handleCopy(msg.content, msg.id)}
-                      onRetry={() => onRetry?.()}
-                      onDelete={() => onDeleteMessage?.(msg.id)}
-                      showTimestamps={chatSettings.showTimestamps}
-                      showTokenCounts={chatSettings.showTokenCounts}
-                      onOpenPreview={onOpenPreview}
-                      isTyping={chatSettings.showThinkingQuotes && isLoading && idx === lastAssistantIdx}
-                    />
+                    layout === "stream" ? (
+                      <AssistantStream
+                        message={msg}
+                        isStreaming={isLoading && idx === lastAssistantIdx}
+                        isLast={idx === lastAssistantIdx}
+                        copied={copiedId === msg.id}
+                        showTimestamps={chatSettings.showTimestamps}
+                        showTokenCounts={chatSettings.showTokenCounts}
+                        showQuotes={chatSettings.showThinkingQuotes}
+                        onApprove={(id) => onApproveTool?.(id)}
+                        onDeny={(id, reason) => onDenyTool?.(id, reason)}
+                        onOpenDelegation={onOpenDelegation}
+                        onCopy={() => handleCopy(msg.content, msg.id)}
+                        onRetry={() => onRetry?.()}
+                        onDelete={() => onDeleteMessage?.(msg.id)}
+                        excluded={excluded}
+                        onToggleExclusion={onToggleExclusion ? () => onToggleExclusion(msg.id) : undefined}
+                      />
+                    ) : (
+                      <AssistantBubble
+                        message={msg}
+                        copied={copiedId === msg.id}
+                        isLast={idx === lastAssistantIdx}
+                        onCopy={() => handleCopy(msg.content, msg.id)}
+                        onRetry={() => onRetry?.()}
+                        onDelete={() => onDeleteMessage?.(msg.id)}
+                        showTimestamps={chatSettings.showTimestamps}
+                        showTokenCounts={chatSettings.showTokenCounts}
+                        onOpenPreview={onOpenPreview}
+                        isTyping={chatSettings.showThinkingQuotes && isLoading && idx === lastAssistantIdx}
+                        excluded={excluded}
+                        onToggleExclusion={onToggleExclusion ? () => onToggleExclusion(msg.id) : undefined}
+                      />
+                    )
                   ) : (
                     <UserBubble
                       message={msg}
@@ -982,17 +1105,13 @@ export function ChatInterface({
                       onDelete={() => onDeleteMessage?.(msg.id)}
                       showTimestamps={chatSettings.showTimestamps}
                       showTokenCounts={chatSettings.showTokenCounts}
+                      excluded={excluded}
+                      onToggleExclusion={onToggleExclusion ? () => onToggleExclusion(msg.id) : undefined}
                     />
                   )}
-                  {onToggleExclusion && (
-                    <button
-                      onClick={() => onToggleExclusion(msg.id)}
-                      className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 transition-opacity text-[10px] text-muted-foreground hover:text-foreground bg-background/80 rounded px-1 py-0.5 border border-border/50"
-                      title={excluded ? "Include in context" : "Exclude from context"}
-                    >
-                      {excluded ? "⊕ include" : "⊖ exclude"}
-                    </button>
-                  )}
+                  {/* Every message now renders its exclude toggle inside its own
+                      footer hover-actions (user, assistant-bubble, and assistant-
+                      stream), so it never overlaps the message text or a tool box. */}
                 </div>
               );
             })
@@ -1018,6 +1137,7 @@ export function ChatInterface({
           maxTokens={maxTokens}
           sessionId={conversationId}
           selectedModel={selectedModel}
+          enableQueue={layout === "stream"}
         />
       </div>
     </Card>

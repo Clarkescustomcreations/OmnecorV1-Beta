@@ -252,13 +252,13 @@ export function LLMBuilder() {
   // ── Render ─────────────────────────────────────────────────────────────────
   return (
     <OmnecorDashboardLayout>
-    <div className="flex h-full flex-col overflow-hidden bg-background">
+    <div className="flex h-full flex-col overflow-hidden">
       {/* ── Page Header ──────────────────────────────────────────────────── */}
       <div className="shrink-0 border-b border-border bg-card/50 px-6 py-5">
-        <div className="border-l-4 border-accent-cyan bg-gradient-to-r from-accent-cyan/5 to-transparent px-4 py-3">
+        <div className="border-l-4 border-primary bg-gradient-to-r from-primary/5 to-transparent px-4 py-3">
           <div className="flex items-center gap-3">
-            <div className="flex size-10 items-center justify-center rounded-xl bg-accent-cyan/10">
-              <Brain className="size-5 text-accent-cyan" />
+            <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10">
+              <Brain className="size-5 text-primary" />
             </div>
             <div>
               <h1 className="text-xl font-bold tracking-tight text-foreground">LLM Builder</h1>
@@ -282,25 +282,25 @@ export function LLMBuilder() {
             <TabsList className="h-12 gap-1 bg-transparent p-0">
               <TabsTrigger
                 value="dataset"
-                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-accent-cyan data-[state=active]:bg-transparent data-[state=active]:text-accent-cyan"
+                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary"
               >
                 <Database className="size-4" /> Dataset
               </TabsTrigger>
               <TabsTrigger
                 value="model"
-                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-accent-cyan data-[state=active]:bg-transparent data-[state=active]:text-accent-cyan"
+                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary"
               >
                 <Brain className="size-4" /> Model
               </TabsTrigger>
               <TabsTrigger
                 value="train"
-                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-accent-cyan data-[state=active]:bg-transparent data-[state=active]:text-accent-cyan"
+                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary"
               >
                 <Zap className="size-4" /> Train
               </TabsTrigger>
               <TabsTrigger
                 value="history"
-                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-accent-cyan data-[state=active]:bg-transparent data-[state=active]:text-accent-cyan"
+                className="flex items-center gap-2 rounded-none border-b-2 border-transparent px-4 py-3 text-sm font-medium text-muted-foreground data-[state=active]:border-primary data-[state=active]:bg-transparent data-[state=active]:text-primary"
               >
                 <Activity className="size-4" /> History
               </TabsTrigger>
@@ -338,7 +338,7 @@ export function LLMBuilder() {
                 id="btn-llm-dataset-next"
                 disabled={!datasetPath}
                 onClick={() => setActiveTab('model')}
-                className="gap-2 bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20 disabled:opacity-40"
+                className="gap-2 bg-primary/10 text-primary hover:bg-primary/20 disabled:opacity-40"
                 variant="outline"
               >
                 Next: Configure Model <ChevronRight className="size-4" />
@@ -353,7 +353,7 @@ export function LLMBuilder() {
               <Card className="border-border bg-card/60">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                    <Brain className="size-4 text-accent-cyan" /> Base Model
+                    <Brain className="size-4 text-primary" /> Base Model
                   </CardTitle>
                   <CardDescription>
                     HuggingFace model ID or one of the recommended options below.
@@ -383,9 +383,9 @@ export function LLMBuilder() {
                           id={`badge-model-${m.id}`}
                           onClick={() => setBaseModel(m.value)}
                           title={m.value}
-                          className={`group flex flex-col rounded-lg border px-3 py-2 text-left transition-all hover:border-accent-cyan/50 hover:bg-accent-cyan/5 ${
+                          className={`group flex flex-col rounded-lg border px-3 py-2 text-left transition-all hover:border-primary/50 hover:bg-primary/5 ${
                             baseModel === m.value
-                              ? 'border-accent-cyan bg-accent-cyan/10 text-accent-cyan'
+                              ? 'border-primary bg-primary/10 text-primary'
                               : 'border-border text-foreground'
                           }`}
                         >
@@ -405,7 +405,7 @@ export function LLMBuilder() {
                       variant="outline"
                       size="sm"
                       onClick={() => setShowOllamaModels((p) => !p)}
-                      className="gap-2 border-border text-muted-foreground hover:border-accent-cyan/40 hover:text-foreground"
+                      className="gap-2 border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
                     >
                       <Cpu className="size-3.5" />
                       {showOllamaModels ? 'Hide' : 'Browse'} Ollama Models
@@ -424,7 +424,7 @@ export function LLMBuilder() {
                                 key={m.name}
                                 variant="outline"
                                 onClick={() => setBaseModel(m.name)}
-                                className="cursor-pointer border-border text-xs text-muted-foreground hover:border-accent-cyan/50 hover:text-foreground"
+                                className="cursor-pointer border-border text-xs text-muted-foreground hover:border-primary/50 hover:text-foreground"
                               >
                                 {m.name}
                               </Badge>
@@ -441,7 +441,7 @@ export function LLMBuilder() {
               <Card className="border-border bg-card/60">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                    <PackageCheck className="size-4 text-accent-cyan" /> Save Format
+                    <PackageCheck className="size-4 text-primary" /> Save Format
                   </CardTitle>
                   <CardDescription>How to export the fine-tuned weights.</CardDescription>
                 </CardHeader>
@@ -451,7 +451,7 @@ export function LLMBuilder() {
                     <Select value={saveFormat} onValueChange={(v) => setSaveFormat(v as SaveFormat)}>
                       <SelectTrigger
                         id="select-llm-save-format"
-                        className="w-full focus-visible:border-accent-cyan/60 focus-visible:ring-accent-cyan/20"
+                        className="w-full focus-visible:border-primary/60 focus-visible:ring-primary/20"
                       >
                         <SelectValue />
                       </SelectTrigger>
@@ -474,7 +474,7 @@ export function LLMBuilder() {
               <Card className="border-border bg-card/60">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                    <Cpu className="size-4 text-accent-cyan" /> Compute Target
+                    <Cpu className="size-4 text-primary" /> Compute Target
                   </CardTitle>
                   <CardDescription>Where the training job will run.</CardDescription>
                 </CardHeader>
@@ -489,7 +489,7 @@ export function LLMBuilder() {
                     <div
                       className={`flex items-start gap-3 rounded-lg border p-4 transition-colors ${
                         computeTarget === 'local'
-                          ? 'border-accent-cyan/50 bg-accent-cyan/5'
+                          ? 'border-primary/50 bg-primary/5'
                           : 'border-border hover:border-border/80'
                       }`}
                     >
@@ -497,7 +497,7 @@ export function LLMBuilder() {
                       <div className="flex-1 space-y-1">
                         <Label htmlFor="compute-local" className="cursor-pointer font-medium text-foreground">
                           <span className="flex items-center gap-2">
-                            <Cpu className="size-4 text-accent-cyan" /> Local GPU
+                            <Cpu className="size-4 text-primary" /> Local GPU
                           </span>
                         </Label>
                         <p className="text-xs text-muted-foreground">
@@ -511,7 +511,7 @@ export function LLMBuilder() {
                     <div
                       className={`flex items-start gap-3 rounded-lg border p-4 transition-colors ${
                         computeTarget === 'kaggle'
-                          ? 'border-accent-cyan/50 bg-accent-cyan/5'
+                          ? 'border-primary/50 bg-primary/5'
                           : 'border-border hover:border-border/80'
                       }`}
                     >
@@ -519,7 +519,7 @@ export function LLMBuilder() {
                       <div className="flex-1 space-y-1">
                         <Label htmlFor="compute-kaggle" className="cursor-pointer font-medium text-foreground">
                           <span className="flex items-center gap-2">
-                            <Cloud className="size-4 text-accent-cyan" /> Kaggle (Free GPU)
+                            <Cloud className="size-4 text-primary" /> Kaggle (Free GPU)
                           </span>
                         </Label>
                         <p className="text-xs text-muted-foreground">
@@ -548,7 +548,7 @@ export function LLMBuilder() {
                     <div
                       className={`flex items-start gap-3 rounded-lg border p-4 transition-colors ${
                         computeTarget === 'ommesh'
-                          ? 'border-accent-cyan/50 bg-accent-cyan/5'
+                          ? 'border-primary/50 bg-primary/5'
                           : 'border-border hover:border-border/80'
                       }`}
                     >
@@ -556,7 +556,7 @@ export function LLMBuilder() {
                       <div className="flex-1 space-y-1">
                         <Label htmlFor="compute-ommesh" className="cursor-pointer font-medium text-foreground">
                           <span className="flex items-center gap-2">
-                            <Activity className="size-4 text-accent-cyan" /> OMMESH Node
+                            <Activity className="size-4 text-primary" /> OMMESH Node
                           </span>
                         </Label>
                         <p className="text-xs text-muted-foreground">
@@ -577,7 +577,7 @@ export function LLMBuilder() {
                     <div
                       className={`flex items-start gap-3 rounded-lg border p-4 transition-colors ${
                         computeTarget === 'cloud'
-                          ? 'border-accent-cyan/50 bg-accent-cyan/5'
+                          ? 'border-primary/50 bg-primary/5'
                           : 'border-border hover:border-border/80'
                       }`}
                     >
@@ -585,7 +585,7 @@ export function LLMBuilder() {
                       <div className="flex-1 space-y-1">
                         <Label htmlFor="compute-cloud" className="cursor-pointer font-medium text-foreground">
                           <span className="flex items-center gap-2">
-                            <Cloud className="size-4 text-accent-cyan" /> Cloud Compute
+                            <Cloud className="size-4 text-primary" /> Cloud Compute
                           </span>
                         </Label>
                         <p className="text-xs text-muted-foreground">
@@ -635,7 +635,7 @@ export function LLMBuilder() {
                 <Button
                   id="btn-llm-model-next"
                   onClick={() => setActiveTab('train')}
-                  className="gap-2 bg-accent-cyan/10 text-accent-cyan hover:bg-accent-cyan/20"
+                  className="gap-2 bg-primary/10 text-primary hover:bg-primary/20"
                   variant="outline"
                 >
                   Next: Train <ChevronRight className="size-4" />
@@ -651,7 +651,7 @@ export function LLMBuilder() {
               <Card className="border-border bg-card/60">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                    <Zap className="size-4 text-accent-cyan" /> LoRA Configuration
+                    <Zap className="size-4 text-primary" /> LoRA Configuration
                   </CardTitle>
                   <CardDescription>
                     Low-Rank Adaptation hyperparameters. Defaults work for most fine-tuning tasks.
@@ -676,7 +676,7 @@ export function LLMBuilder() {
                       step={4}
                       value={loraRank}
                       onChange={(e) => setLoraRank(Number(e.target.value))}
-                      className="w-full cursor-pointer accent-[var(--accent-cyan)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent-cyan/50 focus-visible:ring-offset-2 rounded"
+                      className="w-full cursor-pointer accent-[var(--primary)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/50 focus-visible:ring-offset-2 rounded"
                     />
                     <p className="text-[11px] text-muted-foreground">
                       Higher rank = more expressive but more VRAM. Start with 16 for most tasks.
@@ -764,8 +764,8 @@ export function LLMBuilder() {
                       className="font-mono text-sm"
                     />
                     <p className="text-[11px] text-muted-foreground">
-                      Typically <code className="text-accent-cyan">q_proj,v_proj</code> for attention-only LoRA. Add{' '}
-                      <code className="text-accent-cyan">k_proj,o_proj</code> for deeper adaptation.
+                      Typically <code className="text-primary">q_proj,v_proj</code> for attention-only LoRA. Add{' '}
+                      <code className="text-primary">k_proj,o_proj</code> for deeper adaptation.
                     </p>
                   </div>
                 </CardContent>
@@ -775,7 +775,7 @@ export function LLMBuilder() {
               <Card className="border-border bg-card/60">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                    <Database className="size-4 text-accent-cyan" /> Dataset
+                    <Database className="size-4 text-primary" /> Dataset
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
@@ -809,7 +809,7 @@ export function LLMBuilder() {
                         setValidateResult(null);
                         validateDataset.mutate({ datasetPath });
                       }}
-                      className="gap-2 border-border text-muted-foreground hover:border-accent-cyan/40 hover:text-foreground disabled:opacity-40"
+                      className="gap-2 border-border text-muted-foreground hover:border-primary/40 hover:text-foreground disabled:opacity-40"
                     >
                       {validateDataset.isPending ? (
                         <Loader2 className="size-3.5 animate-spin" />
@@ -838,7 +838,7 @@ export function LLMBuilder() {
               </Card>
 
               {/* ── Start Training ── */}
-              <Card className="border-accent-success/20 bg-accent-success/5">
+              <Card className="border-border bg-card/60">
                 <CardContent className="pt-6">
                   {computeTarget === 'ommesh' || computeTarget === 'cloud' ? (
                     <div className="flex flex-col items-center gap-3 py-2 text-center">
@@ -846,7 +846,7 @@ export function LLMBuilder() {
                       <p className="text-sm text-muted-foreground">
                         Navigate to the{' '}
                         <button
-                          className="text-accent-cyan underline underline-offset-2 hover:opacity-80"
+                          className="text-primary underline underline-offset-2 hover:opacity-80"
                           onClick={() =>
                             navigate(computeTarget === 'ommesh' ? '/settings?tab=ommesh' : '/settings?tab=cloud')
                           }
@@ -862,7 +862,7 @@ export function LLMBuilder() {
                       size="lg"
                       disabled={!datasetPath || isTraining}
                       onClick={handleStartTraining}
-                      className="w-full gap-2 bg-accent-success/20 text-accent-success hover:bg-accent-success/30 disabled:opacity-40"
+                      className="w-full gap-2 bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
                       variant="outline"
                     >
                       {isTraining ? (
@@ -891,7 +891,7 @@ export function LLMBuilder() {
                 <Card className="border-border bg-card/60">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                      <Cloud className="size-4 text-accent-cyan" /> Kaggle Job
+                      <Cloud className="size-4 text-primary" /> Kaggle Job
                       <Badge variant="outline" className="ml-auto border-border font-mono text-xs text-muted-foreground">
                         {kernelSlug}
                       </Badge>
@@ -941,7 +941,7 @@ export function LLMBuilder() {
                             size="sm"
                             disabled={pullKaggleArtifact.isPending}
                             onClick={() => pullKaggleArtifact.mutate({ kernelSlug, baseModel })}
-                            className="gap-2 border-border text-muted-foreground hover:border-accent-cyan/40 hover:text-foreground"
+                            className="gap-2 border-border text-muted-foreground hover:border-primary/40 hover:text-foreground"
                           >
                             {pullKaggleArtifact.isPending ? (
                               <Loader2 className="size-3.5 animate-spin" />
@@ -981,7 +981,7 @@ export function LLMBuilder() {
 
                     {mergeJobId && (
                       <p className="text-[11px] text-muted-foreground">
-                        Merge job: <code className="text-accent-cyan">{mergeJobId}</code>
+                        Merge job: <code className="text-primary">{mergeJobId}</code>
                       </p>
                     )}
                   </CardContent>
@@ -993,7 +993,7 @@ export function LLMBuilder() {
                 <Card className="border-border bg-card/60">
                   <CardHeader className="pb-2">
                     <CardTitle className="flex items-center gap-2 text-sm text-foreground">
-                      <PackageCheck className="size-4 text-accent-cyan" /> Current Registered Artifact
+                      <PackageCheck className="size-4 text-primary" /> Current Registered Artifact
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -1024,7 +1024,7 @@ export function LLMBuilder() {
               <Card className="border-border bg-card/60">
                 <CardHeader className="pb-3">
                   <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                    <PackageCheck className="size-4 text-accent-cyan" /> Registered Model Artifact
+                    <PackageCheck className="size-4 text-primary" /> Registered Model Artifact
                   </CardTitle>
                   <CardDescription>
                     The most recently registered fine-tuned model for this workstation.
@@ -1063,7 +1063,7 @@ export function LLMBuilder() {
                 <Card className="border-border bg-card/60">
                   <CardHeader className="pb-3">
                     <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                      <Cloud className="size-4 text-accent-cyan" /> Kaggle Job Monitor
+                      <Cloud className="size-4 text-primary" /> Kaggle Job Monitor
                       <Badge variant="outline" className="ml-auto border-border font-mono text-xs text-muted-foreground">
                         {kernelSlug}
                       </Badge>
@@ -1107,7 +1107,7 @@ export function LLMBuilder() {
               <Card className="border-border bg-card/40">
                 <CardHeader className="pb-2">
                   <CardTitle className="flex items-center gap-2 text-base text-foreground">
-                    <Activity className="size-4 text-accent-cyan" /> Training Run History
+                    <Activity className="size-4 text-primary" /> Training Run History
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
@@ -1119,7 +1119,7 @@ export function LLMBuilder() {
                     <p className="text-xs text-muted-foreground/60">
                       Monitor active jobs in{' '}
                       <button
-                        className="text-accent-cyan underline underline-offset-2 hover:opacity-80"
+                        className="text-primary underline underline-offset-2 hover:opacity-80"
                         onClick={() => navigate('/notifications?tab=jobs')}
                       >
                         Notifications → Jobs

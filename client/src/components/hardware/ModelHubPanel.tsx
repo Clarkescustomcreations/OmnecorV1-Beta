@@ -10,6 +10,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { ScrollArea } from "../ui/scroll-area";
 import { Database, Download, Trash2, FileCode, Loader2, RefreshCw, Play, Search, Star } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export const ModelHubPanel: React.FC = () => {
   const [pullName, setPullName] = useState("");
@@ -116,12 +117,16 @@ export const ModelHubPanel: React.FC = () => {
                 </CardDescription>
               </div>
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="sm" onClick={() => syncRegistryMutation.mutate({ models: listQuery.data?.models ?? [] })} disabled={syncRegistryMutation.isPending} aria-label="Sync models to registry">
-                  {syncRegistryMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="w-4 h-4" aria-hidden="true" />}
-                </Button>
-                <Button variant="ghost" size="sm" onClick={() => listQuery.refetch()} aria-label="Refresh model list">
-                  <RefreshCw className={`w-4 h-4 ${listQuery.isFetching ? "animate-spin" : ""}`} aria-hidden="true" />
-                </Button>
+                <HowToTooltip title="Sync Registry" description="Synchronize local models with server registry" side="top">
+                  <Button variant="ghost" size="sm" onClick={() => syncRegistryMutation.mutate({ models: listQuery.data?.models ?? [] })} disabled={syncRegistryMutation.isPending} aria-label="Sync models to registry">
+                    {syncRegistryMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" /> : <RefreshCw className="w-4 h-4" aria-hidden="true" />}
+                  </Button>
+                </HowToTooltip>
+                <HowToTooltip title="Refresh List" description="Update local models list" side="top">
+                  <Button variant="ghost" size="sm" onClick={() => listQuery.refetch()} aria-label="Refresh model list">
+                    <RefreshCw className={`w-4 h-4 ${listQuery.isFetching ? "animate-spin" : ""}`} aria-hidden="true" />
+                  </Button>
+                </HowToTooltip>
               </div>
             </CardHeader>
             <CardContent>
@@ -153,9 +158,11 @@ export const ModelHubPanel: React.FC = () => {
                               {model.digest?.slice(7, 14) ?? "—"}
                             </Badge>
                             {!isActive && (
-                              <Button variant="outline" size="sm" onClick={() => setActiveMutation.mutate({ id: `ollama:${model.name}` })} disabled={setActiveMutation.isPending} aria-label={`Set ${model.name} as active`}>
-                                {setActiveMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> : <span className="text-xs">Set Active</span>}
-                              </Button>
+                              <HowToTooltip title="Set Active" description="Mark this model as the primary active instance" side="top">
+                                <Button variant="outline" size="sm" onClick={() => setActiveMutation.mutate({ id: `ollama:${model.name}` })} disabled={setActiveMutation.isPending} aria-label={`Set ${model.name} as active`}>
+                                  {setActiveMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" aria-hidden="true" /> : <span className="text-xs">Set Active</span>}
+                                </Button>
+                              </HowToTooltip>
                             )}
                           </div>
                         </div>

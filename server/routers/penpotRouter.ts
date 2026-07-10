@@ -1,6 +1,6 @@
 import { protectedProcedure, router } from "../_core/trpc.js";
 import { z } from "zod";
-import { PenpotService } from "../phase2/services/PenpotService.js";
+import { PenpotService } from "../core_services/services/PenpotService.js";
 
 export const penpotRouter = router({
   configure: protectedProcedure

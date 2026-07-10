@@ -4,7 +4,7 @@
  * Opens a dedicated WebSocket to the Omnecor server's /ws endpoint and drives a
  * real pseudo-terminal on the PC. The PC side already implements every message
  * type used here (pty:spawn / pty:input / pty:output / pty:exit / pty:kill) in
- * server/phase2/websocket/WebSocketServer.ts — no PC changes are required.
+ * server/core_services/websocket/WebSocketServer.ts — no PC changes are required.
  *
  *   Phone → PC:
  *     { type: "pty:spawn",  data: { cols, rows } }

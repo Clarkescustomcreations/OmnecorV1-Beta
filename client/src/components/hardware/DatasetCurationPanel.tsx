@@ -25,6 +25,7 @@ import {
   HelpCircle,
   Brain
 } from "lucide-react";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface DatasetCurationPanelProps {
   datasetPath: string;
@@ -175,7 +176,7 @@ export const DatasetCurationPanel: React.FC<DatasetCurationPanelProps> = ({
     <div className="space-y-6">
       <div className="flex flex-col gap-1">
         <h3 className="text-lg font-semibold flex items-center gap-2">
-          <Database className="w-5 h-5 text-accent-cyan" /> Dataset Discovery & Curation
+          <Database className="w-5 h-5 text-primary" /> Dataset Discovery & Curation
         </h3>
         <p className="text-xs text-muted-foreground">
           Scan local codebases, document folders, or search web sources to generate instruction-tuning training pairs.
@@ -260,20 +261,22 @@ export const DatasetCurationPanel: React.FC<DatasetCurationPanelProps> = ({
                   />
                 </div>
                 <div className="flex items-end">
-                  <Button
-                    id="btn-discover-dataset"
-                    className="w-full bg-accent-cyan text-background hover:bg-accent-cyan/95 font-medium transition-all"
-                    onClick={handleDiscover}
-                    disabled={discoverSources.isPending}
-                  >
-                    {discoverSources.isPending ? (
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                    ) : (
-                      <>
-                        <Activity className="w-4 h-4 mr-2" /> Ingest
-                      </>
-                    )}
-                  </Button>
+                  <HowToTooltip title="Ingest Data" description="Scan and ingest raw text segments to be curated" side="top">
+                    <Button
+                      id="btn-discover-dataset"
+                      className="w-full bg-primary text-primary-foreground hover:bg-primary/95 font-medium transition-all"
+                      onClick={handleDiscover}
+                      disabled={discoverSources.isPending}
+                    >
+                      {discoverSources.isPending ? (
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                      ) : (
+                        <>
+                          <Activity className="w-4 h-4 mr-2" /> Ingest
+                        </>
+                      )}
+                    </Button>
+                  </HowToTooltip>
                 </div>
               </div>
             </CardContent>
@@ -292,25 +295,27 @@ export const DatasetCurationPanel: React.FC<DatasetCurationPanelProps> = ({
             <CardContent className="pt-0 space-y-3">
               {unprocessedSources && unprocessedSources.length > 0 ? (
                 <>
-                  <Button
-                    id="btn-curate-all-sources"
-                    variant="outline"
-                    className="w-full text-xs h-8 border-accent-cyan/40 hover:bg-accent-cyan/10 transition-colors"
-                    onClick={handleCurateAll}
-                    disabled={curatingAll || curateItem.isPending}
-                  >
-                    {curatingAll ? (
-                      <>
-                        <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-                        Curating ({curateProgress}/{curateTotal})
-                      </>
-                    ) : (
-                      <>
-                        <Play className="w-3.5 h-3.5 mr-2 text-accent-cyan" />
-                        Curate All ({unprocessedSources.length})
-                      </>
-                    )}
-                  </Button>
+                  <HowToTooltip title="Batch Curate" description="Run curation on all unprocessed sources" side="top">
+                    <Button
+                      id="btn-curate-all-sources"
+                      variant="outline"
+                      className="w-full text-xs h-8 border-primary/40 hover:bg-primary/10 transition-colors"
+                      onClick={handleCurateAll}
+                      disabled={curatingAll || curateItem.isPending}
+                    >
+                      {curatingAll ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                          Curating ({curateProgress}/{curateTotal})
+                        </>
+                      ) : (
+                        <>
+                          <Play className="w-3.5 h-3.5 mr-2 text-primary" />
+                          Curate All ({unprocessedSources.length})
+                        </>
+                      )}
+                    </Button>
+                  </HowToTooltip>
 
                   <div className="max-h-72 overflow-y-auto space-y-2 pr-1 custom-scrollbar">
                     {unprocessedSources.map((item) => (
@@ -332,7 +337,7 @@ export const DatasetCurationPanel: React.FC<DatasetCurationPanelProps> = ({
                             id={`btn-curate-item-${item.id}`}
                             size="sm"
                             variant="ghost"
-                            className="h-6 px-2 text-[10px] text-accent-cyan hover:bg-accent-cyan/10"
+                            className="h-6 px-2 text-[10px] text-primary hover:bg-primary/10"
                             onClick={() => curateItem.mutate({ itemId: item.id })}
                             disabled={curateItem.isPending && curateItem.variables?.itemId === item.id}
                           >
@@ -364,25 +369,27 @@ export const DatasetCurationPanel: React.FC<DatasetCurationPanelProps> = ({
               <Badge variant="outline" className="font-mono text-xs">
                 {pendingReviewExamples.length} Pending
               </Badge>
-              <Badge variant="outline" className="font-mono text-xs border-accent-success text-accent-success">
+              <Badge variant="outline" className="font-mono text-xs border-primary text-primary">
                 {approvedExamples.length} Approved
               </Badge>
             </div>
 
-            <Button
-              id="btn-compile-dataset-load"
-              disabled={approvedExamples.length === 0 || compileDataset.isPending}
-              onClick={handleCompile}
-              className="bg-accent-success text-background hover:bg-accent-success/95 text-xs font-semibold h-8"
-            >
-              {compileDataset.isPending ? (
-                <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
-              ) : (
-                <>
-                  <Check className="w-3.5 h-3.5 mr-1.5" /> Compile & Load ({approvedExamples.length})
-                </>
-              )}
-            </Button>
+            <HowToTooltip title="Compile Dataset" description="Compile the approved examples into a final dataset" side="top">
+              <Button
+                id="btn-compile-dataset-load"
+                disabled={approvedExamples.length === 0 || compileDataset.isPending}
+                onClick={handleCompile}
+                className="bg-primary text-primary-foreground hover:bg-primary/95 text-xs font-semibold h-8"
+              >
+                {compileDataset.isPending ? (
+                  <Loader2 className="w-3.5 h-3.5 mr-2 animate-spin" />
+                ) : (
+                  <>
+                    <Check className="w-3.5 h-3.5 mr-1.5" /> Compile & Load ({approvedExamples.length})
+                  </>
+                )}
+              </Button>
+            </HowToTooltip>
           </div>
 
           <div className="max-h-[600px] overflow-y-auto space-y-4 pr-2 custom-scrollbar">
@@ -447,10 +454,10 @@ const ExampleReviewCard: React.FC<ExampleReviewCardProps> = ({
 
   return (
     <Card className="border border-border/80 bg-card/65 hover:bg-card transition-colors relative overflow-hidden">
-      <div className="absolute left-0 top-0 bottom-0 w-1 bg-accent-cyan/80" />
+      <div className="absolute left-0 top-0 bottom-0 w-1 bg-primary/80" />
       <CardHeader className="py-3 flex flex-row items-center justify-between border-b border-border/40">
         <div>
-          <CardTitle className="text-xs font-semibold text-accent-cyan">Curated Example #{example.id}</CardTitle>
+          <CardTitle className="text-xs font-semibold text-primary">Curated Example #{example.id}</CardTitle>
           <CardDescription className="text-[10px]">Verify and edit generated instruction-tuning pair.</CardDescription>
         </div>
         <div className="flex gap-1.5">
@@ -468,7 +475,7 @@ const ExampleReviewCard: React.FC<ExampleReviewCardProps> = ({
           <Button
             id={`btn-approve-example-${example.id}`}
             size="sm"
-            className="h-7 px-2.5 bg-accent-success text-background hover:bg-accent-success/90 text-xs font-medium"
+            className="h-7 px-2.5 bg-primary text-primary-foreground hover:bg-primary/90 text-xs font-medium"
             onClick={() => onApprove(example.id, instruction, inputVal, output)}
             disabled={isUpdating}
             title="Approve & Save Example"

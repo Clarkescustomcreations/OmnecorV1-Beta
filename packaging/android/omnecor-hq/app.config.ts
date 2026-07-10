@@ -139,6 +139,12 @@ const config: ExpoConfig = {
     ],
     // Nitro-based on-device LiteRT-LM engine (replaces react-native-llm-mediapipe).
     "react-native-litert-lm",
+    // llama.rn Expo plugin — adds the <uses-native-library> manifest entries
+    // (libOpenCL.so, libcdsprpc.so). Without them Android 12+ refuses to link
+    // the hexagon_opencl JNI variant (logcat: 'libcdsprpc.so not found') and
+    // llama.rn silently falls back to the CPU-only lib — no Hexagon NPU and no
+    // Adreno GPU for any GGUF model. This registration is what unlocks both.
+    "llama.rn",
     [
       // Lets users "Share → Omnecor HQ" a model file (e.g. a .litertlm from Google
       // AI Edge Gallery) straight into the app — handled in app/_layout.tsx.

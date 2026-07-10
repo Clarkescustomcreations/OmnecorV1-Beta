@@ -7,22 +7,27 @@
  *   - llama.rn   → GGUF models
  *   - LiteRT-LM  → `.litertlm` models (Gemma / Google AI Edge family)
  *
- * The engine is a Nitro HybridObject created lazily, so the JS bundle still
- * runs even when the native library isn't present in a given build (e.g. an
- * older APK). The exported API is kept identical to the previous MediaPipe
- * wrapper so callers (`settings.tsx`) need no structural change — only the
- * underlying engine and the model format (`.task` → `.litertlm`) changed.
+ * Acceleration: the app-wide mode (`acceleration.ts`) resolves to a delegate:
+ * auto → GPU with CPU fallback; manual cpu/gpu/npu → that delegate, strict.
+ * GPU/NPU loads pass `validate: true`, which runs a real test inference at
+ * load time — Google's SDK can otherwise initialize a GPU/NPU engine that
+ * silently produces no tokens. A validated load is the only "it really
+ * accelerated" signal available from JS, so that's what `getTaskBackend()`
+ * reports. LiteRT NPU needs NPU-compiled `.litertlm` builds (Edge Gallery
+ * preview) — treat it as experimental.
  *
- * Installed API (react-native-litert-lm@0.4.x):
- *   createLLM() → instance
- *   instance.loadModel(pathOrUrl, config) → Promise<void>
- *   instance.sendMessage(prompt) → Promise<string>            (blocking)
- *   instance.sendMessageAsync(prompt, (token, done) => void)  (streaming)
- *   instance.close()
+ * The engine is a Nitro HybridObject created lazily, so the JS bundle still
+ * runs even when the native library isn't present in a given build.
+ *
+ * Model residency/persistence is owned by `phone-model.ts` — this module is a
+ * pure engine wrapper.
  */
 import { createLLM, type LiteRTLMInstance, type LLMConfig } from "react-native-litert-lm";
+import type { AccelBackend, AccelMode } from "./acceleration";
+import { getAccelMode } from "./acceleration";
 
 export type MpStatus = "idle" | "loading" | "ready" | "running" | "error";
+export type MpBackend = AccelBackend;
 
 let _status: MpStatus = "idle";
 const _listeners = new Set<(s: MpStatus) => void>();
@@ -60,47 +65,122 @@ export function isMediapipeAvailable(): boolean {
 export function isTaskModelLoaded(): boolean { return _loaded; }
 export function getLoadedTaskPath(): string | null { return _modelPath; }
 
+let _backend: MpBackend | null = null;
+/**
+ * Delegate the current model loaded on (null when nothing loaded). GPU/NPU
+ * values are load-validated (a real test inference produced tokens).
+ */
+export function getTaskBackend(): MpBackend | null { return _backend; }
+
 export interface MpLoadOptions {
   maxTokens?: number;
   topK?: number;
   temperature?: number;
   /** Accepted for API compatibility; LiteRT-LM does not expose a seed. */
   randomSeed?: number;
+  /** Override the app-wide acceleration mode for this load only. */
+  mode?: AccelMode;
+  /** Force one exact delegate (used internally for retries/reloads). */
+  backend?: MpBackend;
 }
 
-/** Load a local `.litertlm` model by absolute path (a remote URL also works). */
+/** Ordered delegate attempts for an acceleration mode (manual = strict). */
+function attemptsForMode(mode: AccelMode): MpBackend[] {
+  switch (mode) {
+    case "cpu": return ["cpu"];
+    case "gpu": return ["gpu"];
+    case "npu": return ["npu"];
+    case "auto": return ["gpu", "cpu"];
+  }
+}
+
+/**
+ * Load a local `.litertlm` model by absolute path (a remote URL also works).
+ *
+ * **Stability note (hard-won):** an earlier version looped `npu → gpu → cpu`,
+ * calling `_llm.close()` and recreating the engine after each failed delegate.
+ * On this native module that pattern **segfaults Hermes** (SIGSEGV, null write
+ * on the JS thread): closing a Nitro HybridObject whose native `loadModel` just
+ * failed frees resources a pending JSI promise still references (use-after-free).
+ * So: we never close-and-recreate after a failed load. The auto chain retries
+ * `loadModel` on the SAME engine object — the native side runs
+ * `cleanupInternal()` after a failed load, so the engine is reusable; only a
+ * *successfully* loaded engine is ever `close()`d (when switching models).
+ */
 export async function loadTaskModel(modelPath: string, opts: MpLoadOptions = {}): Promise<void> {
-  const llm = getEngine();
-  if (!llm) {
+  // Switching models: release a *cleanly loaded* engine first so the new load
+  // starts fresh. We only ever close an engine that loaded successfully —
+  // closing one whose load failed is the use-after-free that crashes Hermes.
+  if (_loaded && _llm) {
+    try { _llm.close(); } catch { /* ignore */ }
+    _llm = null;
+    _loaded = false;
+  }
+  const engine = getEngine();
+  if (!engine) {
     throw new Error(
       "LiteRT-LM engine not available in this build. Rebuild the APK with react-native-litert-lm linked (expo prebuild + assembleRelease)."
     );
   }
   setStatus("loading");
-  try {
-    if (_loaded) { try { llm.close(); } catch { /* ignore */ } _loaded = false; }
-    const config: LLMConfig = {
-      backend: "cpu", // safe default — always available; GPU/NPU may fail per device/model
-      temperature: opts.temperature ?? 0.8,
-      topK: opts.topK ?? 40,
-      maxTokens: opts.maxTokens ?? 1024,
-    };
-    await llm.loadModel(modelPath, config);
-    _modelPath = modelPath;
-    _loaded = true;
-    setStatus("ready");
-  } catch (err) {
-    _modelPath = null;
-    _loaded = false;
-    setStatus("error");
-    throw err;
+  // Expo's FileSystem.documentDirectory paths carry a file:// scheme; the
+  // native engine opens the string as a POSIX path, so strip the scheme
+  // (otherwise: "Model file not found: file:///data/user/0/…").
+  const nativePath = modelPath.startsWith("file://")
+    ? decodeURI(modelPath.slice("file://".length))
+    : modelPath;
+
+  const attempts = opts.backend
+    ? [opts.backend]
+    : attemptsForMode(opts.mode ?? (await getAccelMode()));
+  let lastErr: unknown = null;
+
+  for (const backend of attempts) {
+    try {
+      const config: LLMConfig = {
+        backend,
+        temperature: opts.temperature ?? 0.8,
+        topK: opts.topK ?? 40,
+        maxTokens: opts.maxTokens ?? 1024,
+        // GPU/NPU can initialize but silently produce no tokens; validation
+        // runs a real test inference at load time so a "loaded on gpu/npu"
+        // claim is backed by observed output. No-op on CPU.
+        validate: backend !== "cpu",
+      };
+      await engine.loadModel(nativePath, config);
+      _modelPath = modelPath;
+      _loaded = true;
+      _backend = backend;
+      setStatus("ready");
+      return;
+    } catch (err) {
+      lastErr = err;
+    }
   }
+
+  _modelPath = null;
+  _loaded = false;
+  _backend = null;
+  setStatus("error");
+  const detail = lastErr instanceof Error ? lastErr.message : String(lastErr ?? "LiteRT-LM load failed");
+  throw new Error(
+    attempts.length === 1 && attempts[0] !== "cpu"
+      ? `Couldn't load on the ${attempts[0].toUpperCase()} delegate. ` +
+        `LiteRT ${attempts[0].toUpperCase()} needs a compatible model build — switch Acceleration to Auto, or use a GGUF model for the NPU.\n\n(${detail})`
+      : detail
+  );
 }
 
 export async function releaseTaskModel(): Promise<void> {
-  if (_llm && _loaded) { try { _llm.close(); } catch { /* ignore */ } }
+  // Only a successfully loaded engine is closed (see stability note above);
+  // an idle/failed engine object stays reusable for the next load.
+  if (_llm && _loaded) {
+    try { _llm.close(); } catch { /* ignore */ }
+    _llm = null;
+  }
   _loaded = false;
   _modelPath = null;
+  _backend = null;
   setStatus("idle");
 }
 
@@ -113,10 +193,12 @@ export async function generateTask(
   prompt: string,
   onToken?: (partial: string) => void,
 ): Promise<string> {
-  const llm = getEngine();
-  if (!llm || !_loaded) throw new Error("No LiteRT-LM model loaded");
+  if (!getEngine() || !_loaded) throw new Error("No LiteRT-LM model loaded");
   setStatus("running");
-  try {
+
+  const run = async (): Promise<string> => {
+    const llm = getEngine();
+    if (!llm) throw new Error("LiteRT-LM engine unavailable");
     let full = "";
     if (onToken) {
       await llm.sendMessageAsync(prompt, (token: string, _done: boolean) => {
@@ -126,10 +208,31 @@ export async function generateTask(
     } else {
       full = await llm.sendMessage(prompt);
     }
-    setStatus("ready");
     return full;
+  };
+
+  try {
+    return await run();
   } catch (err) {
+    // Android can evict the model (GPU memory reclaim while backgrounded)
+    // leaving the JS `_loaded` flag stale — the native side then throws
+    // "No model loaded". Reload the known model once and retry.
+    const msg = err instanceof Error ? err.message : String(err);
+    if (_modelPath && /no model loaded/i.test(msg)) {
+      try {
+        const path = _modelPath;
+        _loaded = false;
+        await loadTaskModel(path, _backend ? { backend: _backend } : {});
+        setStatus("running");
+        return await run();
+      } catch (reloadErr) {
+        setStatus("error");
+        throw reloadErr;
+      }
+    }
     setStatus("ready");
     throw err;
+  } finally {
+    if (_status === "running") setStatus("ready");
   }
 }

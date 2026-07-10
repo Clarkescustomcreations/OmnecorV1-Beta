@@ -6,6 +6,7 @@ import { Card, CardHeader, CardTitle, CardContent } from "../ui/card";
 import { ScrollArea } from "../ui/scroll-area";
 import { ImageIcon, Wand2, Download, Search, Settings2 } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export const ImageStudioPanel: React.FC = () => {
   const [prompt, setPrompt] = useState("");
@@ -39,18 +40,22 @@ export const ImageStudioPanel: React.FC = () => {
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
               />
-              <Settings2
-                className="absolute right-4 top-3.5 w-5 h-5 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
-                onClick={() => setShowSettings(s => !s)}
-              />
+              <HowToTooltip title="Studio Settings" description="Configure default style and output size" side="top">
+                <Settings2
+                  className="absolute right-4 top-3.5 w-5 h-5 text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  onClick={() => setShowSettings(s => !s)}
+                />
+              </HowToTooltip>
             </div>
-            <Button 
-              className="h-12 px-8 bg-gradient-to-r from-accent-purple to-accent-info hover:opacity-90 transition-all shadow-lg"
-              onClick={() => generateMutation.mutate({ prompt })}
-              disabled={!prompt || generateMutation.isPending}
-            >
-              {generateMutation.isPending ? "Dreaming..." : <><Wand2 className="w-4 h-4 mr-2" /> Generate</>}
-            </Button>
+            <HowToTooltip title="Generate Image" description="Create an image from the text prompt" side="top">
+              <Button 
+                className="h-12 px-8 bg-gradient-to-r from-accent-purple to-accent-info hover:opacity-90 transition-all shadow-lg"
+                onClick={() => generateMutation.mutate({ prompt })}
+                disabled={!prompt || generateMutation.isPending}
+              >
+                {generateMutation.isPending ? "Dreaming..." : <><Wand2 className="w-4 h-4 mr-2" /> Generate</>}
+              </Button>
+            </HowToTooltip>
           </div>
           {showSettings && (
             <div className="mt-4 p-4 rounded-lg border bg-muted/30 space-y-4">
@@ -125,20 +130,22 @@ export const ImageStudioPanel: React.FC = () => {
                 <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity p-4 flex flex-col justify-end">
                   <p className="text-[10px] text-white/90 line-clamp-2 leading-relaxed mb-3">{img.prompt}</p>
                   <div className="flex gap-2">
-                    <Button
-                      variant="secondary"
-                      size="icon"
-                      className="h-7 w-7 rounded-full bg-white/20 backdrop-blur hover:bg-white/40 border-none"
-                      onClick={() => {
-                        const a = document.createElement("a");
-                        a.href = img.url;
-                        a.download = `omnecor-${img.id}.png`;
-                        a.target = "_blank";
-                        a.click();
-                      }}
-                    >
-                      <Download className="h-3.5 w-3.5 text-white" />
-                    </Button>
+                    <HowToTooltip title="Download Image" description="Save this generated image" side="top">
+                      <Button
+                        variant="secondary"
+                        size="icon"
+                        className="h-7 w-7 rounded-full bg-white/20 backdrop-blur hover:bg-white/40 border-none"
+                        onClick={() => {
+                          const a = document.createElement("a");
+                          a.href = img.url;
+                          a.download = `omnecor-${img.id}.png`;
+                          a.target = "_blank";
+                          a.click();
+                        }}
+                      >
+                        <Download className="h-3.5 w-3.5 text-white" />
+                      </Button>
+                    </HowToTooltip>
                   </div>
                 </div>
               </Card>

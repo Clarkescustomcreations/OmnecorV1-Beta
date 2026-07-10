@@ -4,7 +4,7 @@ import { getDb } from "../db.factory.js";
 import { discoveredArticles } from "../../drizzle/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { ArticleDiscoveryService } from "../phase2/services/ArticleDiscoveryService.js";
+import { ArticleDiscoveryService } from "../core_services/services/ArticleDiscoveryService.js";
 
 export const discoveryRouter = router({
   listUnprocessed: protectedProcedure

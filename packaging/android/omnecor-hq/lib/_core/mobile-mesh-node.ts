@@ -18,7 +18,7 @@
  *     { type: "mobile_node_ping" }
  *
  * To enable on the PC side add the handler block in:
- *   OmnecorV1-Beta/server/phase2/websocket/WebSocketServer.ts
+ *   OmnecorV1-Beta/server/core_services/websocket/WebSocketServer.ts
  *   — look for the switch(message.type) block and add the cases above.
  *
  * Works over Tailscale (100.x.x.x) just like a LAN IP — Tailscale creates a
@@ -27,7 +27,18 @@
 
 import { getWsUrl, getOmmeshSecret, getNodeName, isServerConfigured } from "./server-config";
 import { runInference, isModelLoaded, getStats, recordStats } from "./local-inference";
+import { generateTask, isTaskModelLoaded } from "./mediapipe-inference";
 import { nanoid } from "nanoid/non-secure";
+
+/**
+ * The phone can serve mesh inference from either on-device engine:
+ * llama.rn (GGUF) or LiteRT-LM (.litertlm — Google AI Edge Gallery Gemma
+ * family). Registration/heartbeat advertise `modelLoaded` when EITHER has a
+ * model, and inference prefers GGUF when both are loaded.
+ */
+function anyModelLoaded(): boolean {
+  return isModelLoaded() || isTaskModelLoaded();
+}
 
 export type NodeStatus =
   | "disconnected"
@@ -92,7 +103,7 @@ function startHeartbeat() {
     send({
       type: "mobile_node_heartbeat",
       nodeId: _nodeId,
-      stats: { ...getStats(), tokensPerSec: _tokensPerSec, modelLoaded: isModelLoaded() },
+      stats: { ...getStats(), tokensPerSec: _tokensPerSec, modelLoaded: anyModelLoaded() },
     });
     pushStats();
   }, 10_000);
@@ -110,22 +121,35 @@ async function handleInferenceRequest(msg: {
   prompt: string;
   options?: { maxTokens?: number; temperature?: number };
 }) {
-  if (!isModelLoaded()) {
+  if (!anyModelLoaded()) {
     send({ type: "mobile_inference_response", requestId: msg.requestId, content: "", done: true, error: "No model loaded on phone" });
     return;
   }
 
   let accumulated = "";
   try {
-    const result = await runInference(msg.prompt, {
-      maxTokens: msg.options?.maxTokens ?? 512,
-      temperature: msg.options?.temperature ?? 0.7,
-      onToken: (token) => {
-        accumulated += token;
+    if (isModelLoaded()) {
+      // llama.rn GGUF engine — onToken delivers deltas.
+      await runInference(msg.prompt, {
+        maxTokens: msg.options?.maxTokens ?? 512,
+        temperature: msg.options?.temperature ?? 0.7,
+        onToken: (token) => {
+          accumulated += token;
+          _recentTokens++;
+          send({ type: "mobile_inference_response", requestId: msg.requestId, content: token, done: false });
+        },
+      });
+    } else {
+      // LiteRT-LM engine (.litertlm) — onToken delivers the CUMULATIVE text,
+      // so convert to deltas to match the wire protocol.
+      await generateTask(msg.prompt, (partial) => {
+        const delta = partial.slice(accumulated.length);
+        accumulated = partial;
+        if (!delta) return;
         _recentTokens++;
-        send({ type: "mobile_inference_response", requestId: msg.requestId, content: token, done: false });
-      },
-    });
+        send({ type: "mobile_inference_response", requestId: msg.requestId, content: delta, done: false });
+      });
+    }
     recordStats(accumulated.split(" ").length); // rough token count
     send({ type: "mobile_inference_response", requestId: msg.requestId, content: "", done: true });
   } catch (err) {
@@ -167,7 +191,7 @@ export function connect(): void {
         npu: true,
         platform: "android",
         chip: "snapdragon-8-elite",
-        modelLoaded: isModelLoaded(),
+        modelLoaded: anyModelLoaded(),
       },
     });
     startHeartbeat();

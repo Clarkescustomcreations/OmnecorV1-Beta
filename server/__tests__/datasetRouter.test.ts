@@ -11,7 +11,7 @@ vi.mock("../db.factory.js", async importActual => {
 });
 
 // Stub the audit log service to stay hermetic.
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

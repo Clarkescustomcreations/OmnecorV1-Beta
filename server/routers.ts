@@ -43,6 +43,7 @@ import { updateUserExecutionMode, acceptTosForUser } from "./db.factory.js";
 import { knowledgeBaseRouter } from "./routers/knowledgeBase.js";
 import { aiRouter } from "./routers/aiRouter.js";
 import { aiProviderRouter } from "./routers/aiProviderRouter.js";
+import { delegationRouter } from "./routers/delegationRouter.js";
 import { jobRouter } from "./routers/jobRouter.js";
 import { blenderRouter } from "./routers/blenderRouter.js";
 import { kicadRouter } from "./routers/kicadRouter.js";
@@ -137,6 +138,8 @@ export const appRouter = router({
   // ─── AI Providers (Ollama, OpenAI, Anthropic, Gemini) ─────────────────────
   ai: aiRouter,
   aiProvider: aiProviderRouter,
+  // ─── Mesh sub-agent delegation (managed chats — Mesh-Delegation.md) ───────
+  delegation: delegationRouter,
 
   // ─── Voice Services (Whisper + TTS + RVC FastAPI proxy) ───────────────────
   voice: voiceRouter,

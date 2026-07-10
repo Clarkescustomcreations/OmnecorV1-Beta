@@ -26,6 +26,7 @@ import {
 } from "@/components/ui/select";
 import { Spinner } from "@/components/ui/spinner";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 // ── Types (mirrored from server for self-containment) ─────────────────────────
 
@@ -182,34 +183,38 @@ export function RecursiveMASPanel() {
 
           <div className="flex flex-col gap-1 flex-1">
             <label className="text-sm font-medium">Execution Mode</label>
-            <Select value={mode} onValueChange={(v) => setMode(v as ExecutionMode)}>
-              <SelectTrigger>
-                <SelectValue placeholder="Select mode" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="sequential">Sequential</SelectItem>
-                <SelectItem value="hierarchical">Hierarchical</SelectItem>
-                <SelectItem value="parallel">Parallel</SelectItem>
-              </SelectContent>
-            </Select>
+            <HowToTooltip title="Execution Mode" description="Choose how agents collaborate: sequentially, hierarchically, or in parallel." side="bottom">
+              <Select value={mode} onValueChange={(v) => setMode(v as ExecutionMode)}>
+                <SelectTrigger>
+                  <SelectValue placeholder="Select mode" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="sequential">Sequential</SelectItem>
+                  <SelectItem value="hierarchical">Hierarchical</SelectItem>
+                  <SelectItem value="parallel">Parallel</SelectItem>
+                </SelectContent>
+              </Select>
+            </HowToTooltip>
           </div>
         </div>
 
         {/* Launch button */}
-        <Button
-          onClick={handleLaunch}
-          disabled={runMutation.isPending || !goal.trim()}
-          className="self-start"
-        >
-          {runMutation.isPending ? (
-            <>
-              <Spinner className="mr-2 h-4 w-4" />
-              Launching…
-            </>
-          ) : (
-            "Launch Crew"
-          )}
-        </Button>
+        <HowToTooltip title="Launch Crew" description="Start the RecursiveMAS multi-agent system with the specified goal and configuration." side="bottom">
+          <Button
+            onClick={handleLaunch}
+            disabled={runMutation.isPending || !goal.trim()}
+            className="self-start"
+          >
+            {runMutation.isPending ? (
+              <>
+                <Spinner className="mr-2 h-4 w-4" />
+                Launching…
+              </>
+            ) : (
+              "Launch Crew"
+            )}
+          </Button>
+        </HowToTooltip>
 
         {launchError && (
           <p className="text-sm text-destructive">{launchError}</p>
@@ -233,9 +238,11 @@ export function RecursiveMASPanel() {
                   <Badge variant="outline" className="text-primary border-primary">
                     Running
                   </Badge>
-                  <Button size="sm" variant="destructive" onClick={handleStop}>
-                    Stop
-                  </Button>
+                  <HowToTooltip title="Stop Crew" description="Immediately halt all running agents in this crew." side="bottom">
+                    <Button size="sm" variant="destructive" onClick={handleStop}>
+                      Stop
+                    </Button>
+                  </HowToTooltip>
                 </>
               )}
               {isComplete && (

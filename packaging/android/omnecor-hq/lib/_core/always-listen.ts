@@ -287,7 +287,10 @@ export async function runVoiceTurn(audioUri: string): Promise<string> {
       if (activeJobId === jobId && audioQueue.length === 0 && _state === "thinking") {
         console.log("[AlwaysListen] Fallback: No stream from PC, triggering native TTS");
         interruptConversation();
-        Speech.speak("Cannot reach the PC server. Falling back to local offline mode.");
+        const voiceId = getListenConfig().ttsVoiceId;
+        Speech.speak("Cannot reach the PC server. Falling back to local offline mode.", {
+          ...(voiceId ? { voice: voiceId } : {}),
+        });
         setState("listening");
       }
     }, 8000);

@@ -20,9 +20,9 @@ export function ExecutionModeBadge({ collapsed = false }: ExecutionModeBadgeProp
 
   if (collapsed) {
     const collapsedStyles = {
-      sovereign: "bg-accent-danger text-white border-accent-danger",
-      scrapper: "bg-accent-success text-white border-accent-success",
-      big_spender: "bg-accent-warning text-white border-accent-warning",
+      sovereign: "bg-accent-danger/15 text-accent-danger border-accent-danger/30",
+      scrapper: "bg-accent-success/15 text-accent-success border-accent-success/30",
+      big_spender: "bg-accent-warning/15 text-accent-warning border-accent-warning/30",
     };
     return (
       <div 

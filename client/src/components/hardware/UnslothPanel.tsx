@@ -12,6 +12,7 @@ import { Switch } from "../ui/switch";
 import { useNeuralMap } from "../../contexts/NeuralMapContext";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { DatasetCurationPanel } from "./DatasetCurationPanel";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export const UnslothPanel: React.FC = () => {
   const [activeTab, setActiveTab] = useState("config");
@@ -96,12 +97,14 @@ export const UnslothPanel: React.FC = () => {
                   </div>
                   <div className="flex items-center gap-2">
                     <span className="text-[10px] text-muted-foreground">Global</span>
-                    <Switch
-                      checked={modelScope === "project"}
-                      onCheckedChange={handleScopeToggle}
-                      disabled={!activeMap}
-                      aria-label="Toggle project model scope"
-                    />
+                    <HowToTooltip title="Toggle Parameter" description="Enable or disable this advanced training parameter" side="top">
+                      <Switch
+                        checked={modelScope === "project"}
+                        onCheckedChange={handleScopeToggle}
+                        disabled={!activeMap}
+                        aria-label="Toggle project model scope"
+                      />
+                    </HowToTooltip>
                     <span className="text-[10px] text-muted-foreground">Project</span>
                   </div>
                 </div>
@@ -153,16 +156,20 @@ export const UnslothPanel: React.FC = () => {
                 </div>
 
                 <div className="flex gap-2">
-                   <Button className="flex-1 bg-accent-warning hover:bg-accent-warning/90" onClick={() => startFineTuning.mutate({
-                     datasetPath: datasetPath || "/path/to/dataset.jsonl",
-                     r: loraRank,
-                     loraAlpha: 32,
-                     maxSeqLength: 2048,
-                     saveMethod: "gguf"
-                   })}>
-                     <Activity className="w-4 h-4 mr-2" /> Start Training Pass
-                   </Button>
-                   <Button variant="outline" onClick={handleSaveConfig}><Save className="w-4 h-4 mr-2" /> Save Config</Button>
+                   <HowToTooltip title="Start Training" description="Begin fine-tuning using Unsloth engine" side="top">
+                     <Button className="flex-1 bg-accent-warning hover:bg-accent-warning/90" onClick={() => startFineTuning.mutate({
+                       datasetPath: datasetPath || "/path/to/dataset.jsonl",
+                       r: loraRank,
+                       loraAlpha: 32,
+                       maxSeqLength: 2048,
+                       saveMethod: "gguf"
+                     })}>
+                       <Activity className="w-4 h-4 mr-2" /> Start Training Pass
+                     </Button>
+                   </HowToTooltip>
+                   <HowToTooltip title="Save Configuration" description="Save training parameters for future use" side="top">
+                     <Button variant="outline" onClick={handleSaveConfig}><Save className="w-4 h-4 mr-2" /> Save Config</Button>
+                   </HowToTooltip>
                 </div>
               </CardContent>
             </Card>
@@ -233,33 +240,37 @@ export const UnslothPanel: React.FC = () => {
                 Output saved to <span className="font-mono">data/valet_router_dataset.jsonl</span> with 90/10 train/val split.
               </p>
               <div className="flex gap-2 flex-wrap">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  disabled={generateValetDataset.isPending}
-                  onClick={() => generateValetDataset.mutate({})}
-                >
-                  {generateValetDataset.isPending
-                    ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
-                    : <><Route className="w-4 h-4 mr-2" /> Generate Valet Dataset</>
-                  }
-                </Button>
-                {activeMap && (
+                <HowToTooltip title="Generate Dataset" description="Generate training data for Valet" side="top">
                   <Button
                     variant="outline"
                     size="sm"
                     disabled={generateValetDataset.isPending}
-                    title={`Generate training dataset from "${activeMap.name}" neural map context`}
-                    onClick={() => {
-                      const mapPath = activeMap.rootDirectories[0];
-                      if (!mapPath) { toast.error("Active map has no root directory set"); return; }
-                      setDatasetPath(`${mapPath}/data/dataset.jsonl`);
-                      generateValetDataset.mutate({});
-                      toast.info(`Generating dataset from neural map: ${activeMap.name}`);
-                    }}
+                    onClick={() => generateValetDataset.mutate({})}
                   >
-                    <Brain className="w-4 h-4 mr-2" /> Train from Neural Map
+                    {generateValetDataset.isPending
+                      ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Generating...</>
+                      : <><Route className="w-4 h-4 mr-2" /> Generate Valet Dataset</>
+                    }
                   </Button>
+                </HowToTooltip>
+                {activeMap && (
+                  <HowToTooltip title="Train from Map" description="Train model using the active neural map" side="top">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={generateValetDataset.isPending}
+                      title={`Generate training dataset from "${activeMap.name}" neural map context`}
+                      onClick={() => {
+                        const mapPath = activeMap.rootDirectories[0];
+                        if (!mapPath) { toast.error("Active map has no root directory set"); return; }
+                        setDatasetPath(`${mapPath}/data/dataset.jsonl`);
+                        generateValetDataset.mutate({});
+                        toast.info(`Generating dataset from neural map: ${activeMap.name}`);
+                      }}
+                    >
+                      <Brain className="w-4 h-4 mr-2" /> Train from Neural Map
+                    </Button>
+                  </HowToTooltip>
                 )}
               </div>
               {generateValetDataset.isSuccess && (

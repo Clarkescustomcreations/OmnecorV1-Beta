@@ -117,7 +117,7 @@ vi.mock("../db.factory.js", async (importActual) => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -125,7 +125,7 @@ vi.mock("../phase2/services/AuditLogService.js", () => ({
 
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { appRouter } from "../routers.js";
-import { ComfyService } from "../phase2/services/ComfyService.js";
+import { ComfyService } from "../core_services/services/ComfyService.js";
 import { createTestDb, seedUser, makeContext } from "./_helpers/trpcHarness.js";
 
 const COMFY_URL = process.env.COMFYUI_URL ?? "http://127.0.0.1:8188";

@@ -26,6 +26,7 @@ const server = new Server(
 
 // Standard local paths for agent skills
 const SKILL_PATHS = [
+  path.join(process.cwd(), "skills"), // Omnecor's native root skills directory
   path.join(os.homedir(), ".gemini", "antigravity-cli", "skills"),
   path.join(os.homedir(), ".gemini", "config", "skills"),
   path.join(os.homedir(), ".gemini", "skills")

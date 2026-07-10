@@ -24,7 +24,7 @@ vi.mock("../db.factory.js", async (importActual) => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -32,7 +32,7 @@ vi.mock("../phase2/services/AuditLogService.js", () => ({
 
 // getSetting — default returns true (gate enabled); individual tests override
 const mockGetSetting = vi.fn().mockReturnValue(true);
-vi.mock("../phase2/services/SettingsService.js", () => ({
+vi.mock("../core_services/services/SettingsService.js", () => ({
   SettingsService: { getInstance: vi.fn() },
   getSetting: (...args: unknown[]) => mockGetSetting(...args),
 }));
@@ -40,7 +40,7 @@ vi.mock("../phase2/services/SettingsService.js", () => ({
 import {
   HITLApprovalService,
   isHitlGateEnabled,
-} from "../phase2/services/HITLApprovalService.js";
+} from "../core_services/services/HITLApprovalService.js";
 
 // ── DB stub factory ───────────────────────────────────────────────────────────
 

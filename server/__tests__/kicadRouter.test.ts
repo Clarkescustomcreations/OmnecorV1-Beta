@@ -15,7 +15,7 @@ vi.mock("../db.factory.js", async (importActual) => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -26,7 +26,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { appRouter } from "../routers.js";
-import { KiCadBridge } from "../phase2/services/KiCadService.js";
+import { KiCadBridge } from "../core_services/services/KiCadService.js";
 import { createTestDb, makeContext } from "./_helpers/trpcHarness.js";
 
 // KiCad 8 PCB — 30 mm × 20 mm board with real copper:

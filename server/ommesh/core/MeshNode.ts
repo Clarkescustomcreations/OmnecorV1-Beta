@@ -12,6 +12,7 @@ import { collectHostTelemetry } from './HostTelemetry.js';
 import { MeshServer, MESH_PORT } from './MeshServer.js';
 import { createLogger } from "../../_core/logger.js";
 import { CLOUD_PROVIDER_IDS } from "../../_core/sovereign.js";
+import { hashModelList } from "../crypto.js";
 const log = createLogger("OMMESH:MeshNode");
 
 const SETTINGS_PATH = join(homedir(), '.omnecor', 'settings.json');
@@ -73,6 +74,9 @@ export class MeshNode {
   /** Last advertised dynamic telemetry — gates re-advertise to avoid mDNS churn. */
   private lastAdvertisedGpu: { vram: number; utilization: number } | null = null;
 
+  /** Last advertised model-list hash — gates re-advertise the same way (Model-Fabric Phase 4). */
+  private lastAdvertisedModelsHash: string | null = null;
+
   constructor() {
     this.security = securityManager;
     this.identity = this.security.getIdentity();
@@ -102,8 +106,12 @@ export class MeshNode {
   async start() {
     // Collect real host telemetry BEFORE the first beacon so the node's very
     // first mDNS advertisement already carries true VRAM/CPU/RAM figures (no
-    // initial vram:0 → immediate re-advertise churn).
+    // initial vram:0 → immediate re-advertise churn). Same reasoning for the
+    // model catalog — populate it before the first beacon so a fresh boot
+    // doesn't advertise an empty model list for one telemetry cycle.
     await this.primeTelemetry();
+    await this.refreshModelCatalog();
+    this.lastAdvertisedModelsHash = hashModelList(this.identity.capabilities.models);
     await this.discovery.startMdnsBeacon();
     await this.server.start();
     this.startTelemetryPush();
@@ -155,32 +163,69 @@ export class MeshNode {
   }
 
   /**
-   * Re-collect telemetry and, when free VRAM or utilization has moved
-   * materially, re-advertise so peers route on fresh headroom. The change-guard
-   * means a steady-state node re-advertises only when load actually shifts —
-   * avoiding constant mDNS up/down flapping.
+   * Re-collect telemetry and the local model catalog; re-advertise when
+   * either free VRAM/utilization has moved materially or the model list has
+   * changed (a model was pulled/swapped/removed) so peers see fresh routing
+   * data and an up-to-date catalog. The change-guards mean a steady-state
+   * node re-advertises only when something actually shifts — avoiding
+   * constant mDNS up/down flapping.
    */
   private async refreshTelemetry(): Promise<void> {
     try {
       const telemetry = await collectHostTelemetry();
       this.applyTelemetry(telemetry);
+      await this.refreshModelCatalog();
 
-      const last = this.lastAdvertisedGpu;
-      const materiallyChanged =
-        !last ||
-        Math.abs(telemetry.gpu.vram - last.vram) > 512 || // > 512 MB free-VRAM delta
-        Math.abs(telemetry.gpu.utilization - last.utilization) > 15; // > 15% util delta
+      const lastGpu = this.lastAdvertisedGpu;
+      const gpuChanged =
+        !lastGpu ||
+        Math.abs(telemetry.gpu.vram - lastGpu.vram) > 512 || // > 512 MB free-VRAM delta
+        Math.abs(telemetry.gpu.utilization - lastGpu.utilization) > 15; // > 15% util delta
 
-      if (materiallyChanged) {
+      const modelsHash = hashModelList(this.identity.capabilities.models);
+      const modelsChanged = modelsHash !== this.lastAdvertisedModelsHash;
+
+      if (gpuChanged || modelsChanged) {
         this.lastAdvertisedGpu = { vram: telemetry.gpu.vram, utilization: telemetry.gpu.utilization };
+        this.lastAdvertisedModelsHash = modelsHash;
         this.discovery.refreshAdvertisement();
         log.info("OMMESH re-advertised capabilities", {
           vramFreeMb: telemetry.gpu.vram,
           gpuUtil: telemetry.gpu.utilization,
+          modelCount: this.identity.capabilities.models.length,
+          modelsChanged,
         });
       }
     } catch (err) {
       log.warn("OMMESH telemetry refresh failed", { error: (err as Error).message });
+    }
+  }
+
+  /**
+   * Rebuild `identity.capabilities.models` from this node's local-only
+   * sources (Omnecor runtime + optional Ollama — never mesh/cloud, see
+   * `ModelCatalogService.collectLocalOnly`) so the mesh advertises real,
+   * Omnecor-tool-capable models rather than the empty placeholder. Dynamic
+   * import avoids a load-time circular dependency: `ModelCatalogService`
+   * imports `meshNode` (to read peer-advertised models) and `meshNode` needs
+   * `ModelCatalogService` (to read its own local models) — the existing
+   * `executeLocal()` uses the same pattern for `AiProviderService`.
+   */
+  private async refreshModelCatalog(): Promise<void> {
+    try {
+      const { ModelCatalogService } = await import("../../core_services/services/ModelCatalogService.js");
+      const entries = await ModelCatalogService.getInstance().collectLocalOnly();
+      this.identity.capabilities.models = entries.map((e) => ({
+        name: e.modelId,
+        contextWindow: e.capabilities.contextWindow ?? 0,
+        vramReq: e.capabilities.sizeMb ? Math.round(e.capabilities.sizeMb) : 0,
+        provider: e.providerId,
+      }));
+    } catch (err) {
+      log.warn("OMMESH model catalog refresh failed — advertising no models", {
+        error: (err as Error).message,
+      });
+      this.identity.capabilities.models = [];
     }
   }
 
@@ -251,7 +296,7 @@ export class MeshNode {
 
     // Broadcast to subscribed WS clients
     try {
-      const { getWsInstance } = await import("../../phase2/websocket/WebSocketServer.js");
+      const { getWsInstance } = await import("../../core_services/websocket/WebSocketServer.js");
       getWsInstance()?.broadcastAll("ommesh:sync_received", { nodeId, personaCount: safe.length });
     } catch {
       // WS not yet initialized — acceptable during early boot
@@ -503,7 +548,7 @@ export class MeshNode {
    * circular module dependency at load time.
    */
   async executeLocal(prompt: string, options: Record<string, unknown>): Promise<InferenceResult> {
-    const { AiProviderService } = await import("../../phase2/services/AiProviderService.js");
+    const { AiProviderService } = await import("../../core_services/services/AiProviderService.js");
 
     const str = (v: unknown): string | undefined => (typeof v === "string" && v ? v : undefined);
     const num = (v: unknown): number | undefined => (typeof v === "number" && Number.isFinite(v) ? v : undefined);
@@ -518,16 +563,40 @@ export class MeshNode {
       );
     }
 
+    // Federated chats carry their full history in options.messages; a bare
+    // prompt (legacy peers, ommesh.routeInference) becomes a single user turn.
+    const rawMessages = Array.isArray(options.messages) ? options.messages : null;
+    const messages = rawMessages
+      ?.filter((m): m is { role: string; content: string } =>
+        !!m && typeof m === "object" &&
+        typeof (m as Record<string, unknown>).role === "string" &&
+        typeof (m as Record<string, unknown>).content === "string")
+      .map(m => ({ role: m.role as "system" | "user" | "assistant", content: m.content }));
+
     const content = await AiProviderService.getInstance().chat({
       providerId,
       modelId,
-      messages: [{ role: "user", content: prompt }],
+      messages: messages?.length ? messages : [{ role: "user", content: prompt }],
       systemPrompt: str(options.systemPrompt),
       temperature: num(options.temperature),
       maxTokens: num(options.maxTokens),
+      // This request is executing on behalf of the mesh (inbound peer job or
+      // a locally-routed decision) — the provider layer must not run its own
+      // federated-offload check again or jobs hop node-to-node indefinitely.
+      meshOrigin: true,
     });
 
     return { content, executedBy: this.identity.id };
+  }
+
+  /**
+   * Execute an inference on a specific, already-chosen peer over the pinned
+   * mTLS channel. Used by AiProviderService's federated offload so the
+   * provider layer never opens its own (unpinned) transport to a peer.
+   */
+  async executeOnPeer(peer: PeerInfo, prompt: string, options: Record<string, unknown>): Promise<InferenceResult> {
+    const content = await this.routeToRemote(peer, prompt, options);
+    return { content, executedBy: peer.name };
   }
 
   /**

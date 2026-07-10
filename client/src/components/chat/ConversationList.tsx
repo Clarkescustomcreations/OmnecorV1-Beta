@@ -16,6 +16,7 @@ import {
   History,
   Terminal,
   MoreVertical,
+  Network,
 } from "lucide-react";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import { cn } from "@/lib/utils";
@@ -325,10 +326,19 @@ export function ConversationList({
                     />
                   ) : (
                     <div className="flex items-center gap-2">
-                      <MessageSquare className={cn("w-3 h-3", conv.id === activeId ? "text-primary" : "text-muted-foreground/50")} />
+                      {conv.delegatedNodeName ? (
+                        <Network className={cn("w-3 h-3 flex-shrink-0", conv.id === activeId ? "text-accent-cyan" : "text-accent-cyan/60")} />
+                      ) : (
+                        <MessageSquare className={cn("w-3 h-3", conv.id === activeId ? "text-primary" : "text-muted-foreground/50")} />
+                      )}
                       <span className="text-xs font-medium truncate flex-1">
                         {conv.title}
                       </span>
+                      {conv.delegatedNodeName && (
+                        <span className="text-[9px] px-1 rounded bg-accent-cyan/15 text-accent-cyan flex-shrink-0" title={`Sub-agent on ${conv.delegatedNodeName}`}>
+                          {conv.delegatedNodeName}
+                        </span>
+                      )}
                     </div>
                   )}
                   <div className="flex items-center gap-1.5 ml-5">
@@ -344,25 +354,29 @@ export function ConversationList({
 
                   {/* Hover actions */}
                   <div className="absolute right-1.5 top-1/2 -translate-y-1/2 hidden group-hover:flex items-center gap-0.5 bg-background/90 backdrop-blur-sm rounded-md border border-border/50 p-0.5">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-5 w-5"
-                      onClick={e => startEdit(conv.id, conv.title, e)}
-                    >
-                      <Edit2 className="w-2.5 h-2.5" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-5 w-5 hover:text-destructive"
-                      onClick={e => {
-                        e.stopPropagation();
-                        onDelete(conv.id);
-                      }}
-                    >
-                      <Trash2 className="w-2.5 h-2.5" />
-                    </Button>
+                    <HowToTooltip title="Rename Conversation" description="Edit the name of this conversation." side="right">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5"
+                        onClick={e => startEdit(conv.id, conv.title, e)}
+                      >
+                        <Edit2 className="w-2.5 h-2.5" />
+                      </Button>
+                    </HowToTooltip>
+                    <HowToTooltip title="Delete Conversation" description="Permanently delete this conversation and its history." side="right">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="h-5 w-5 hover:text-destructive"
+                        onClick={e => {
+                          e.stopPropagation();
+                          onDelete(conv.id);
+                        }}
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                      </Button>
+                    </HowToTooltip>
                   </div>
                 </div>
               ))

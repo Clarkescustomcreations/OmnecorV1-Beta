@@ -18,7 +18,7 @@ vi.mock("../db.factory.js", async (importActual) => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -29,7 +29,7 @@ import os from "node:os";
 import path from "node:path";
 import fs from "node:fs/promises";
 import { appRouter } from "../routers.js";
-import { BlenderBridge } from "../phase2/services/BlenderService.js";
+import { BlenderBridge } from "../core_services/services/BlenderService.js";
 import { createTestDb, makeContext, waitForJob } from "./_helpers/trpcHarness.js";
 
 // Probe Blender at module load so describe.skipIf has a concrete boolean

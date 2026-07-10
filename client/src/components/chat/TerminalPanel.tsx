@@ -21,6 +21,7 @@ import { trpc } from "@/lib/trpc";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useCommandAllowlistStore } from "@/lib/stores/commandAllowlistStore";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface LogEntry {
   id: string;
@@ -171,33 +172,36 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
             </div>
             <div className="ml-auto flex items-center gap-1">
               {/* Secret mode toggle */}
-              <button
-                onClick={() => setSecretMode(v => !v)}
-                title={secretMode ? "Secret mode ON — input is hidden" : "Secret mode OFF — toggle to hide passwords"}
-                className={cn(
-                  "flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border transition-colors font-mono font-bold",
-                  secretMode
-                    ? "border-accent-warning/50 text-accent-warning bg-accent-warning/10"
-                    : "border-border text-muted-foreground hover:text-foreground"
-                )}
-              >
-                {secretMode ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
-                {secretMode ? "SECRET ON" : "SECRET"}
-              </button>
-              <button
-                onClick={handleCopyLogs}
-                title="Copy logs to clipboard"
-                className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
-              >
-                <Copy className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={handleClearLogs}
-                title="Clear logs"
-                className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-card transition-colors"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              <HowToTooltip title="Toggle Secret Mode" description="Mask your input from the visible terminal logs." side="bottom">
+                <button
+                  onClick={() => setSecretMode(v => !v)}
+                  className={cn(
+                    "flex items-center gap-1 text-[9px] px-2 py-0.5 rounded-full border transition-colors font-mono font-bold",
+                    secretMode
+                      ? "border-accent-warning/50 text-accent-warning bg-accent-warning/10"
+                      : "border-border text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {secretMode ? <EyeOff className="w-3 h-3" /> : <Eye className="w-3 h-3" />}
+                  {secretMode ? "SECRET ON" : "SECRET"}
+                </button>
+              </HowToTooltip>
+              <HowToTooltip title="Copy Logs" description="Copy the current terminal session logs to clipboard." side="bottom">
+                <button
+                  onClick={handleCopyLogs}
+                  className="p-1 rounded text-muted-foreground hover:text-foreground hover:bg-card transition-colors"
+                >
+                  <Copy className="w-3.5 h-3.5" />
+                </button>
+              </HowToTooltip>
+              <HowToTooltip title="Clear Logs" description="Erase all current terminal output." side="bottom">
+                <button
+                  onClick={handleClearLogs}
+                  className="p-1 rounded text-muted-foreground hover:text-destructive hover:bg-card transition-colors"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </HowToTooltip>
             </div>
           </div>
 
@@ -240,18 +244,20 @@ export function TerminalPanel({ isOpen, onToggle, projectId }: TerminalPanelProp
               autoComplete="off"
               spellCheck={false}
             />
-            <Button
-              size="sm"
-              type="submit"
-              variant="ghost"
-              className="h-7 gap-1 text-[10px] text-muted-foreground hover:text-foreground flex-shrink-0"
-              disabled={isRunning || !command.trim()}
-            >
-              {isRunning
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <Play className="w-3 h-3" />}
-              Run
-            </Button>
+            <HowToTooltip title="Execute Command" description="Run the command in the sandboxed terminal." side="top">
+              <Button
+                size="sm"
+                type="submit"
+                variant="ghost"
+                className="h-7 gap-1 text-[10px] text-muted-foreground hover:text-foreground flex-shrink-0"
+                disabled={isRunning || !command.trim()}
+              >
+                {isRunning
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <Play className="w-3 h-3" />}
+                Run
+              </Button>
+            </HowToTooltip>
           </form>
 
           {/* HITL legend */}

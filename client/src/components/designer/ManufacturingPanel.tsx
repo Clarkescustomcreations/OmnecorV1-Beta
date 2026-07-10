@@ -30,6 +30,7 @@ import { toast } from "sonner";
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface ManufacturingPanelProps {
   activeFile: string | null;
@@ -165,34 +166,40 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                   </div>
                 </div>
 
-                <Button 
-                  className="w-full gap-2 h-9 bg-primary/10 text-accent-foreground hover:bg-primary/90"
-                  disabled={!blenderStatus?.isInstalled || renderMutation.isPending}
-                  onClick={() => renderMutation.mutate({ label: "High Fidelity UI Mockup" })}
-                >
-                  {renderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
-                  Start Remote Render
-                </Button>
+                <HowToTooltip title="Render Image" description="Start Blender rendering engine on current scene" side="top">
+                  <Button 
+                    className="w-full gap-2 h-9 bg-primary/10 text-accent-foreground hover:bg-primary/90"
+                    disabled={!blenderStatus?.isInstalled || renderMutation.isPending}
+                    onClick={() => renderMutation.mutate({ label: "High Fidelity UI Mockup" })}
+                  >
+                    {renderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Play className="w-4 h-4" />}
+                    Start Remote Render
+                  </Button>
+                </HowToTooltip>
                 
                 <div className="grid grid-cols-2 gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-[10px] h-8 gap-1.5 border-border bg-card hover:bg-card"
-                    disabled={!blenderStatus?.isInstalled || stlExportMutation.isPending}
-                    onClick={() => stlExportMutation.mutate({ blendFile: "scene.blend", outputPath: "export.stl" })}
-                  >
-                    {stlExportMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} STL (Print)
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="text-[10px] h-8 gap-1.5 border-border bg-card hover:bg-card"
-                    disabled={!blenderStatus?.isInstalled || glbExportMutation.isPending}
-                    onClick={() => glbExportMutation.mutate({ blendFile: "scene.blend", outputPath: "export.glb" })}
-                  >
-                    {glbExportMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} GLB (Web)
-                  </Button>
+                  <HowToTooltip title="Export STL" description="Generate STL file for 3D printing" side="bottom">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] h-8 gap-1.5 border-border bg-card hover:bg-card"
+                      disabled={!blenderStatus?.isInstalled || stlExportMutation.isPending}
+                      onClick={() => stlExportMutation.mutate({ blendFile: "scene.blend", outputPath: "export.stl" })}
+                    >
+                      {stlExportMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} STL (Print)
+                    </Button>
+                  </HowToTooltip>
+                  <HowToTooltip title="Export GLB" description="Generate GLB file for web preview" side="bottom">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="text-[10px] h-8 gap-1.5 border-border bg-card hover:bg-card"
+                      disabled={!blenderStatus?.isInstalled || glbExportMutation.isPending}
+                      onClick={() => glbExportMutation.mutate({ blendFile: "scene.blend", outputPath: "export.glb" })}
+                    >
+                      {glbExportMutation.isPending ? <Loader2 className="w-3 h-3 animate-spin" /> : <Download className="w-3 h-3" />} GLB (Web)
+                    </Button>
+                  </HowToTooltip>
                 </div>
               </CardContent>
             </Card>
@@ -224,25 +231,29 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                   </div>
                 </div>
 
-                <Button 
-                  variant="outline" 
-                  className="w-full gap-2 h-9 border-border bg-card hover:bg-card"
-                  disabled={!kicadStatus?.isInstalled || drcMutation.isPending}
-                  onClick={() => drcMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
-                >
-                  {drcMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
-                  Run Design Rules Check
-                </Button>
+                <HowToTooltip title="Run DRC" description="Validate PCB against design rules" side="top">
+                  <Button 
+                    variant="outline" 
+                    className="w-full gap-2 h-9 border-border bg-card hover:bg-card"
+                    disabled={!kicadStatus?.isInstalled || drcMutation.isPending}
+                    onClick={() => drcMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
+                  >
+                    {drcMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                    Run Design Rules Check
+                  </Button>
+                </HowToTooltip>
 
-                <Button
-                  variant="outline"
-                  className="w-full gap-2 h-9 border-border bg-card hover:bg-card"
-                  disabled={!kicadStatus?.isInstalled || exportFabMutation.isPending}
-                  onClick={() => exportFabMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
-                >
-                  {exportFabMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
-                  Download Fabrication Files (.zip)
-                </Button>
+                <HowToTooltip title="Export Manufacturing" description="Generate files needed for fabrication" side="top">
+                  <Button
+                    variant="outline"
+                    className="w-full gap-2 h-9 border-border bg-card hover:bg-card"
+                    disabled={!kicadStatus?.isInstalled || exportFabMutation.isPending}
+                    onClick={() => exportFabMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb" })}
+                  >
+                    {exportFabMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Download className="w-4 h-4" />}
+                    Download Fabrication Files (.zip)
+                  </Button>
+                </HowToTooltip>
               </CardContent>
             </Card>
 
@@ -268,14 +279,16 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                         className="h-8 w-24 text-[10px] bg-card border-border"
                       />
                     </div>
-                    <Button
-                      className="w-full gap-2 h-10 bg-primary hover:bg-primary text-white border-none"
-                      onClick={() => quoteMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb", qty })}
-                      disabled={quoteMutation.isPending}
-                    >
-                      {quoteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
-                      Get Manufacturing Quote
-                    </Button>
+                    <HowToTooltip title="Refresh Estimate" description="Update manufacturing cost estimate based on current specs" side="top">
+                      <Button
+                        className="w-full gap-2 h-10 bg-primary hover:bg-primary text-white border-none"
+                        onClick={() => quoteMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb", qty })}
+                        disabled={quoteMutation.isPending}
+                      >
+                        {quoteMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Activity className="w-4 h-4" />}
+                        Get Manufacturing Quote
+                      </Button>
+                    </HowToTooltip>
                   </div>
                 ) : (
                   <div className="space-y-4">
@@ -305,17 +318,21 @@ export function ManufacturingPanel({ activeFile, mode }: ManufacturingPanelProps
                        </div>
                     </div>
 
-                    <Button 
-                      className="w-full h-11 gap-2 bg-accent-success hover:bg-accent-success text-white border-none font-bold"
-                      onClick={() => orderMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb", qty, shippingAddress: address })}
-                      disabled={orderMutation.isPending}
-                    >
-                      {orderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
-                      Pay & Place Order
-                    </Button>
-                    <Button variant="ghost" className="w-full h-8 text-[10px] text-muted-foreground" onClick={() => setQuote(null)}>
-                      Cancel Quote
-                    </Button>
+                    <HowToTooltip title="Order Prototype" description="Submit design to partner manufacturer for fabrication" side="top">
+                      <Button 
+                        className="w-full h-11 gap-2 bg-accent-success hover:bg-accent-success text-white border-none font-bold"
+                        onClick={() => orderMutation.mutate({ pcbPath: activeFile || "main.kicad_pcb", qty, shippingAddress: address })}
+                        disabled={orderMutation.isPending}
+                      >
+                        {orderMutation.isPending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Truck className="w-4 h-4" />}
+                        Pay & Place Order
+                      </Button>
+                    </HowToTooltip>
+                    <HowToTooltip title="Reject Quote" description="Decline this manufacturing quote and return to settings" side="top">
+                      <Button variant="ghost" className="w-full h-8 text-[10px] text-muted-foreground" onClick={() => setQuote(null)}>
+                        Cancel Quote
+                      </Button>
+                    </HowToTooltip>
                   </div>
                 )}
               </CardContent>

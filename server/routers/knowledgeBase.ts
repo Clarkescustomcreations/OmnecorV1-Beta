@@ -17,7 +17,7 @@
 import { z } from "zod";
 import { router, publicProcedure, protectedProcedure } from "../_core/trpc.js";
 import { validatePath } from "../_core/security.js";
-import { VECTOR_DB_CONFIG } from "../phase2/config/index.js";
+import { VECTOR_DB_CONFIG } from "../core_services/config/index.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas

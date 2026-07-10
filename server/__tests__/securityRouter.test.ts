@@ -19,19 +19,19 @@ vi.mock("../db.factory.js", async importActual => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
 }));
 
-vi.mock("../phase2/services/TokenRefreshService.js", () => ({
+vi.mock("../core_services/services/TokenRefreshService.js", () => ({
   TokenRefreshService: {
     getInstance: () => ({ forceRefresh: vi.fn().mockResolvedValue(undefined) }),
   },
 }));
 
-vi.mock("../phase2/services/ThreatIntelService.js", () => ({
+vi.mock("../core_services/services/ThreatIntelService.js", () => ({
   ThreatIntelService: {
     getInstance: () => ({ getIoCFeed: vi.fn().mockReturnValue([]) }),
   },

@@ -10,7 +10,7 @@ import { z } from "zod";
 import { protectedProcedure, adminProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
-import { AsyncJobService } from "../phase2/services/AsyncJobService.js";
+import { AsyncJobService } from "../core_services/services/AsyncJobService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Input Schemas

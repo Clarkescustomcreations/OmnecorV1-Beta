@@ -1,9 +1,10 @@
 /**
  * Batch B — Items 14 & 15: Token at-rest crypto and OMMESH HMAC verification
  *
- * Item 15 — TokenRefreshService AES-256-GCM at-rest encryption:
- *   encryptToken() → decryptToken() round-trip when JWT_SECRET is set.
- *   Legacy base64 path (no JWT_SECRET) still works but warns.
+ * Item 15 — platformTokens AES-256-GCM at-rest encryption:
+ *   encryptPlatformToken() → decryptPlatformToken() round-trip when JWT_SECRET is set.
+ *   Legacy plaintext passthrough (no JWT_SECRET, or tokens written before
+ *   encryption existed) still resolves.
  *   Tampered ciphertext throws a GCM authentication error.
  *
  * Item 14 — OMMESH HMAC timing-safe secret comparison:
@@ -17,11 +18,11 @@
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { createHmac } from "crypto";
-import { secretsMatch, verifyHmacSig } from "../ommesh/crypto.js";
+import { secretsMatch, verifyHmacSig, hashModelList } from "../ommesh/crypto.js";
 
-// ── Item 15: TokenRefreshService at-rest encryption ──────────────────────────
+// ── Item 15: platformTokens at-rest encryption ───────────────────────────────
 
-describe("TokenRefreshService — AES-256-GCM token at-rest encryption (item 15)", () => {
+describe("platformTokens — AES-256-GCM token at-rest encryption (item 15)", () => {
   const ORIGINAL_JWT_SECRET = process.env.JWT_SECRET;
 
   beforeEach(() => {
@@ -42,77 +43,81 @@ describe("TokenRefreshService — AES-256-GCM token at-rest encryption (item 15)
     vi.resetModules();
   });
 
-  it("round-trip: encryptToken → decryptToken returns the original plaintext", async () => {
-    const { encryptToken, decryptToken } = await import(
-      "../phase2/services/TokenRefreshService.js"
+  it("round-trip: encryptPlatformToken → decryptPlatformToken returns the original plaintext", async () => {
+    const { encryptPlatformToken, decryptPlatformToken } = await import(
+      "../oauth/platformTokens.js"
     );
     const plaintext = "ya29.oauth-access-token-value";
-    const encrypted = encryptToken(plaintext);
-    expect(decryptToken(encrypted)).toBe(plaintext);
+    const encrypted = encryptPlatformToken(plaintext);
+    expect(decryptPlatformToken(encrypted)).toBe(plaintext);
   });
 
   it("encrypted form has the v1: prefix and contains iv, tag, ciphertext", async () => {
-    const { encryptToken } = await import(
-      "../phase2/services/TokenRefreshService.js"
-    );
-    const encrypted = encryptToken("some-token");
+    const { encryptPlatformToken } = await import("../oauth/platformTokens.js");
+    const encrypted = encryptPlatformToken("some-token");
     expect(encrypted).toMatch(/^v1:[0-9a-f]+:[0-9a-f]+:.+$/);
   });
 
   it("each call produces a different ciphertext (fresh random IV per call)", async () => {
-    const { encryptToken } = await import(
-      "../phase2/services/TokenRefreshService.js"
-    );
-    const a = encryptToken("same-plaintext");
-    const b = encryptToken("same-plaintext");
+    const { encryptPlatformToken } = await import("../oauth/platformTokens.js");
+    const a = encryptPlatformToken("same-plaintext");
+    const b = encryptPlatformToken("same-plaintext");
     // Different IVs → different ciphertexts even for the same plaintext
     expect(a).not.toBe(b);
   });
 
   it("plaintext never appears in the encrypted output", async () => {
-    const { encryptToken } = await import(
-      "../phase2/services/TokenRefreshService.js"
-    );
+    const { encryptPlatformToken } = await import("../oauth/platformTokens.js");
     const secret = "super-secret-token-value-1234";
-    const encrypted = encryptToken(secret);
+    const encrypted = encryptPlatformToken(secret);
     expect(encrypted).not.toContain(secret);
   });
 
   it("GCM authentication: tampered ciphertext throws on decryption", async () => {
-    const { encryptToken, decryptToken } = await import(
-      "../phase2/services/TokenRefreshService.js"
+    const { encryptPlatformToken, decryptPlatformToken } = await import(
+      "../oauth/platformTokens.js"
     );
-    const encrypted = encryptToken("sensitive-token");
+    const encrypted = encryptPlatformToken("sensitive-token");
     // Format: v1:<ivHex>:<tagHex>:<cipherBase64>
     const parts = encrypted.split(":");
-    // Corrupt one character of the ciphertext (base64, last segment)
-    const corrupted = parts.slice(0, 3).join(":") + ":" + parts[3].slice(0, -1) + "X";
-    expect(() => decryptToken(corrupted)).toThrow();
+    // Deterministically flip the first nibble of the GCM auth tag (hex). Any
+    // change to the tag makes authentication fail, so this always throws — unlike
+    // "replace last ciphertext char with X", which is a no-op when that char is
+    // already X and made this test flaky under the full suite.
+    const tag = parts[2];
+    const flippedTag = (tag[0] === "0" ? "1" : "0") + tag.slice(1);
+    const corrupted = [parts[0], parts[1], flippedTag, parts[3]].join(":");
+    expect(() => decryptPlatformToken(corrupted)).toThrow();
   });
 
-  it("legacy base64 path (no JWT_SECRET): encryptToken stores base64, decryptToken recovers it", async () => {
+  it("no JWT_SECRET: stores plaintext (no v1: prefix), decrypt returns it unchanged", async () => {
     delete process.env.JWT_SECRET;
     delete process.env.COOKIE_SECRET;
     vi.resetModules();
 
-    const { encryptToken, decryptToken } = await import(
-      "../phase2/services/TokenRefreshService.js"
+    const { encryptPlatformToken, decryptPlatformToken } = await import(
+      "../oauth/platformTokens.js"
     );
     const plaintext = "legacy-oauth-token";
-    const encoded = encryptToken(plaintext);
-    // Without JWT_SECRET the function falls back to plain base64 (no v1: prefix)
+    const encoded = encryptPlatformToken(plaintext);
+    // Without JWT_SECRET the value is stored as-is (no encryption available)
     expect(encoded).not.toMatch(/^v1:/);
-    expect(decryptToken(encoded)).toBe(plaintext);
+    expect(encoded).toBe(plaintext);
+    expect(decryptPlatformToken(encoded)).toBe(plaintext);
   });
 
-  it("decryptToken handles a raw base64 legacy token (no v1: prefix)", async () => {
-    const { decryptToken } = await import(
-      "../phase2/services/TokenRefreshService.js"
-    );
-    const plaintext = "slack-bot-token-xoxb-abc";
-    // Simulate a token that was stored before AES encryption was introduced
-    const legacyEncoded = Buffer.from(plaintext).toString("base64");
-    expect(decryptToken(legacyEncoded)).toBe(plaintext);
+  it("decrypt passes through a legacy plaintext token (no v1: prefix) unchanged", async () => {
+    const { decryptPlatformToken } = await import("../oauth/platformTokens.js");
+    // A token written before at-rest encryption existed is stored verbatim.
+    const legacyPlain = "xoxb-slack-bot-token-abc";
+    expect(decryptPlatformToken(legacyPlain)).toBe(legacyPlain);
+  });
+
+  it("decrypt of null/undefined/empty returns empty string", async () => {
+    const { decryptPlatformToken } = await import("../oauth/platformTokens.js");
+    expect(decryptPlatformToken(null)).toBe("");
+    expect(decryptPlatformToken(undefined)).toBe("");
+    expect(decryptPlatformToken("")).toBe("");
   });
 });
 
@@ -202,5 +207,41 @@ describe("OMMESH HMAC mobile-registration signature — verifyHmacSig (item 14)"
     // Send the same body WITH the sig field included — the canonical excludes it
     const bodyWithSig = { ...body, sig };
     expect(verifyHmacSig(bodyWithSig, sig, TEST_SECRET)).toBe(true);
+  });
+});
+
+// ── Model-Fabric Phase 4: hashModelList (mDNS TXT "catalog version") ────────
+
+describe("hashModelList (Model-Fabric Phase 4 beacon-minimal advertising)", () => {
+  it("is deterministic for the same model list", () => {
+    const models = [{ name: "llama3.2:3b", contextWindow: 8192, vramReq: 2048, provider: "ollama" }];
+    expect(hashModelList(models)).toBe(hashModelList(models));
+  });
+
+  it("is order-independent — re-enumerating the same set in a different order hashes the same", () => {
+    const a = [
+      { name: "llama3.2:3b", contextWindow: 8192, vramReq: 2048, provider: "ollama" },
+      { name: "qwen2.5:7b", contextWindow: 32768, vramReq: 5000, provider: "ollama" },
+    ];
+    const b = [a[1]!, a[0]!];
+    expect(hashModelList(a)).toBe(hashModelList(b));
+  });
+
+  it("changes when a model is added or removed", () => {
+    const base = [{ name: "llama3.2:3b", contextWindow: 8192, vramReq: 2048, provider: "ollama" }];
+    const withExtra = [...base, { name: "qwen2.5:7b", contextWindow: 32768, vramReq: 5000, provider: "ollama" }];
+    expect(hashModelList(base)).not.toBe(hashModelList(withExtra));
+    expect(hashModelList([])).not.toBe(hashModelList(base));
+  });
+
+  it("changes when a field on the same-named model changes (e.g. context window)", () => {
+    const v1 = [{ name: "llama3.2:3b", contextWindow: 8192, vramReq: 2048, provider: "ollama" }];
+    const v2 = [{ name: "llama3.2:3b", contextWindow: 4096, vramReq: 2048, provider: "ollama" }];
+    expect(hashModelList(v1)).not.toBe(hashModelList(v2));
+  });
+
+  it("the empty list always hashes to the same constant", () => {
+    expect(hashModelList([])).toBe(hashModelList([]));
+    expect(hashModelList([])).toHaveLength(16);
   });
 });

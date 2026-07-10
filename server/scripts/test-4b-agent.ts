@@ -1,7 +1,7 @@
 import { config } from "dotenv";
 config();
-import { AiProviderService } from "../phase2/services/AiProviderService.js";
-import { LocalSubAgentWorker } from "../phase2/services/LocalSubAgentWorker.js";
+import { AiProviderService } from "../core_services/services/AiProviderService.js";
+import { LocalSubAgentWorker } from "../core_services/services/LocalSubAgentWorker.js";
 import fs from "fs/promises";
 import path from "path";
 

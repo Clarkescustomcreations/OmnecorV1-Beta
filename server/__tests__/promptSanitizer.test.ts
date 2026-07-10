@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect } from "vitest";
-import { PromptSanitizer } from "../phase2/services/PromptSanitizer.js";
+import { PromptSanitizer } from "../core_services/services/PromptSanitizer.js";
 
 describe("PromptSanitizer", () => {
   const sanitizer = PromptSanitizer.getInstance();

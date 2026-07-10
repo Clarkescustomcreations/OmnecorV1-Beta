@@ -16,8 +16,12 @@ import {
   PlusCircle,
   Info,
   Sliders,
-  Play
+  Play,
+  Cpu,
+  Network,
+  Wrench,
 } from "lucide-react";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import { cn } from "@/lib/utils";
 import {
   getActiveModels,
@@ -28,6 +32,7 @@ import {
   type ModelMarketplaceItem,
 } from "@/lib/aiModels";
 import { trpc } from "@/lib/trpc";
+import { describeCatalogHost } from "@shared/types/modelCatalog";
 import { toast } from "sonner";
 
 interface ModelHubPanelProps {
@@ -64,10 +69,32 @@ export function ModelHubPanel({
   // Load configured API providers from Settings
   const { data: aiProviders } = trpc.system.aiProviders.useQuery();
 
+  // Unified model catalog (Model-Fabric) — the source of truth for what
+  // Omnecor's own runtime is hosting, on this PC and across OMMESH peers.
+  const { data: catalog = [], isLoading: catalogLoading, isError: catalogError } =
+    trpc.aiProvider.catalog.useQuery(undefined, { refetchInterval: 30_000 });
+
+  // Omnecor self-hosted models, grouped per node ("Omnecor · This PC",
+  // "Omnecor · <peer>"). Ollama and cloud are handled by their own tabs.
+  const omnecorGroups = useMemo(() => {
+    const byNode = new Map<string, { label: string; order: number; entries: typeof catalog }>();
+    for (const entry of catalog) {
+      const host = describeCatalogHost(entry);
+      if (host.brand !== "omnecor") continue;
+      const g = byNode.get(host.key) ?? { label: host.label, order: host.order, entries: [] };
+      g.entries.push(entry);
+      byNode.set(host.key, g);
+    }
+    return Array.from(byNode.entries())
+      .sort(([, a], [, b]) => a.order - b.order || a.label.localeCompare(b.label))
+      .map(([key, g]) => ({ key, ...g }));
+  }, [catalog]);
+
   // Dynamic tabs list depending on active keys
   const activeTabsList = useMemo(() => {
     const list = [
       { id: "active", label: "Active Models" },
+      { id: "omnecor", label: "Omnecor" },
       { id: "ollama", label: "Ollama" },
     ];
     if (aiProviders?.openai) list.push({ id: "openai", label: "OpenAI" });
@@ -225,22 +252,23 @@ export function ModelHubPanel({
       {/* Dynamic Tab Selector */}
       <div className="flex flex-wrap gap-1.5 border-b border-border pb-2">
         {activeTabsList.map((tab) => (
-          <button
-            key={tab.id}
-            id={`tab-selector-${tab.id}`}
-            onClick={() => {
-              setActiveTab(tab.id);
-              setSearchQuery("");
-            }}
-            className={cn(
-              "px-3 py-1.5 font-mono text-xs rounded transition-all cursor-pointer",
-              activeTab === tab.id
-                ? "bg-primary/20 border border-primary/40 text-primary font-semibold shadow-[0_0_8px_rgba(168,85,247,0.2)]"
-                : "bg-transparent border border-transparent text-muted-foreground hover:text-foreground hover:bg-primary/5"
-            )}
-          >
-            {tab.label}
-          </button>
+          <HowToTooltip key={tab.id} title="Switch View" description="Toggle between active models, local Ollama models, and cloud provider APIs" side="bottom">
+            <button
+              id={`tab-selector-${tab.id}`}
+              onClick={() => {
+                setActiveTab(tab.id);
+                setSearchQuery("");
+              }}
+              className={cn(
+                "px-3 py-1.5 font-mono text-xs rounded transition-all cursor-pointer",
+                activeTab === tab.id
+                  ? "bg-primary/20 border border-primary/40 text-primary font-semibold shadow-[0_0_8px_rgba(168,85,247,0.2)]"
+                  : "bg-transparent border border-transparent text-muted-foreground hover:text-foreground hover:bg-primary/5"
+              )}
+            >
+              {tab.label}
+            </button>
+          </HowToTooltip>
         ))}
       </div>
 
@@ -298,11 +326,13 @@ export function ModelHubPanel({
                         {model.type === "api" ? (
                           <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                             <span className="text-[10px] text-muted-foreground font-mono">Active</span>
-                            <Switch
-                              id={`switch-active-${model.source}-${model.id}`}
-                              checked={isModelActive(model.source, model.id)}
-                              onCheckedChange={(checked) => handleToggleActive(model.source, model.id, checked)}
-                            />
+                            <HowToTooltip title="Toggle Activation" description="Enable or disable this model for use across the application" side="top">
+                              <Switch
+                                id={`switch-active-${model.source}-${model.id}`}
+                                checked={isModelActive(model.source, model.id)}
+                                onCheckedChange={(checked) => handleToggleActive(model.source, model.id, checked)}
+                              />
+                            </HowToTooltip>
                           </div>
                         ) : (
                           <Badge className="bg-accent-success/20 text-accent-success border-accent-success/30 font-semibold text-[10px]">
@@ -315,6 +345,101 @@ export function ModelHubPanel({
                 ))
               )}
             </div>
+          </div>
+        )}
+
+        {/* TAB: OMNECOR SELF-HOSTED RUNTIME (per node) */}
+        {activeTab === "omnecor" && (
+          <div className="space-y-5">
+            <div className="flex items-start gap-2 border border-accent-purple/20 bg-accent-purple/5 p-3 rounded text-xs">
+              <Zap className="w-4 h-4 text-accent-purple mt-0.5 flex-shrink-0" />
+              <div>
+                <p className="font-semibold text-accent-purple">Omnecor hosts these itself.</p>
+                <p className="text-muted-foreground mt-0.5">
+                  Omnecor's own runtime serves these models with full tool access — no Ollama required.
+                  With OMMESH, each PC running Omnecor appears as its own node below.
+                </p>
+              </div>
+            </div>
+
+            {catalogLoading ? (
+              <div className="flex items-center justify-center py-8 text-muted-foreground text-xs">
+                <RefreshCw className="w-4 h-4 animate-spin mr-2" />
+                Loading Omnecor runtime catalog...
+              </div>
+            ) : omnecorGroups.length === 0 ? (
+              <div className="flex flex-col items-center justify-center h-32 border border-dashed border-border rounded-lg text-muted-foreground p-4 text-center">
+                <Info className="w-6 h-6 mb-2 opacity-60" />
+                <p className="text-xs">
+                  {catalogError
+                    ? "Couldn't reach the server to load the catalog."
+                    : "Omnecor isn't hosting any models yet — its local runtime starts automatically once a GGUF model is available, or join an OMMESH peer running Omnecor."}
+                </p>
+              </div>
+            ) : (
+              omnecorGroups.map((group) => {
+                const isMesh = group.key.startsWith("omnecor:mesh:");
+                const NodeIcon = isMesh ? Network : Cpu;
+                return (
+                  <div key={group.key} className="space-y-3">
+                    <h2 className="text-xs uppercase font-bold tracking-wider text-accent-purple flex items-center gap-1.5">
+                      <NodeIcon className="w-3.5 h-3.5" /> {group.label}
+                    </h2>
+                    <div className="grid grid-cols-1 gap-2.5">
+                      {group.entries.map((entry) => {
+                        const model: AIModel = {
+                          id: entry.modelId,
+                          name: entry.name,
+                          displayName: entry.name,
+                          source: "ollama",
+                          type: "local",
+                          status: "available",
+                          metadata: { size: entry.capabilities.sizeMb ? Math.round(entry.capabilities.sizeMb) : undefined },
+                        };
+                        return (
+                          <Card
+                            key={entry.key}
+                            className={cn(
+                              "cursor-pointer hover:border-accent-purple/40 transition-all",
+                              selectedModelId === entry.modelId && "border-accent-purple/40 bg-accent-purple/5"
+                            )}
+                            onClick={() => handleModelSelect(model)}
+                          >
+                            <CardContent className="p-3.5 flex items-center justify-between gap-4 card-content-safe">
+                              <div className="min-w-0 flex-1">
+                                <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                  <h3 className="font-semibold text-xs truncate">{entry.name}</h3>
+                                  <Badge className="text-[9px] bg-accent-purple/10 text-accent-purple border-accent-purple/20">
+                                    Self-hosted
+                                  </Badge>
+                                  {entry.capabilities.nativeTools && (
+                                    <Badge className="text-[9px] bg-accent-success/10 text-accent-success border-accent-success/20 flex items-center gap-0.5">
+                                      <Wrench className="w-2.5 h-2.5" /> Native tools
+                                    </Badge>
+                                  )}
+                                </div>
+                                <div className="flex flex-wrap gap-3 text-[10px] text-muted-foreground mt-1">
+                                  <span className="font-mono">{entry.providerId}</span>
+                                  {entry.capabilities.sizeMb && (
+                                    <span>Size: {Math.round(entry.capabilities.sizeMb).toLocaleString()} MB</span>
+                                  )}
+                                  {entry.capabilities.contextWindow && (
+                                    <span>Ctx: {entry.capabilities.contextWindow.toLocaleString()}</span>
+                                  )}
+                                </div>
+                              </div>
+                              <Badge className="bg-accent-success/20 text-accent-success border-accent-success/30 font-semibold text-[10px] flex-shrink-0">
+                                Ready
+                              </Badge>
+                            </CardContent>
+                          </Card>
+                        );
+                      })}
+                    </div>
+                  </div>
+                );
+              })
+            )}
           </div>
         )}
 
@@ -368,16 +493,18 @@ export function ModelHubPanel({
                             </div>
                           </div>
                           {isAdmin && (
-                            <Button
-                              id={`btn-delete-ollama-${m.name}`}
-                              size="sm"
-                              variant="ghost"
-                              className="text-destructive hover:text-destructive hover:bg-destructive/10"
-                              onClick={(e) => handleDeleteModel(model, e)}
-                              disabled={deleteMutation.isPending}
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </Button>
+                            <HowToTooltip title="Delete Model" description="Remove this local model from your Ollama server" side="left">
+                              <Button
+                                id={`btn-delete-ollama-${m.name}`}
+                                size="sm"
+                                variant="ghost"
+                                className="text-destructive hover:text-destructive hover:bg-destructive/10"
+                                onClick={(e) => handleDeleteModel(model, e)}
+                                disabled={deleteMutation.isPending}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </HowToTooltip>
                           )}
                         </CardContent>
                       </Card>
@@ -403,33 +530,35 @@ export function ModelHubPanel({
                     className="pl-10 h-9 text-xs"
                   />
                 </div>
-                <Button
-                  id="btn-pull-custom-input"
-                  size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    if (marketplaceSearch.trim()) {
-                      onModelDownload?.({
-                        id: marketplaceSearch.trim(),
-                        name: marketplaceSearch.trim(),
-                        provider: "ollama",
-                        description: `Ollama Model ${marketplaceSearch.trim()}`,
-                        size: 0,
-                        quantizations: [],
-                        popularity: 0,
-                        rating: 0,
-                        downloads: 0,
-                        tags: [],
-                        releaseDate: new Date(),
-                        latestVersion: "latest",
-                      });
-                    } else {
-                      toast.info("Enter a model name in the search box to pull directly.");
-                    }
-                  }}
-                >
-                  Pull Custom
-                </Button>
+                <HowToTooltip title="Pull Model" description="Download the specified model from the Ollama registry" side="top">
+                  <Button
+                    id="btn-pull-custom-input"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (marketplaceSearch.trim()) {
+                        onModelDownload?.({
+                          id: marketplaceSearch.trim(),
+                          name: marketplaceSearch.trim(),
+                          provider: "ollama",
+                          description: `Ollama Model ${marketplaceSearch.trim()}`,
+                          size: 0,
+                          quantizations: [],
+                          popularity: 0,
+                          rating: 0,
+                          downloads: 0,
+                          tags: [],
+                          releaseDate: new Date(),
+                          latestVersion: "latest",
+                        });
+                      } else {
+                        toast.info("Enter a model name in the search box to pull directly.");
+                      }
+                    }}
+                  >
+                    Pull Custom
+                  </Button>
+                </HowToTooltip>
               </div>
 
               {/* Search Results */}
@@ -465,27 +594,29 @@ export function ModelHubPanel({
                             )}
                           </div>
                         </div>
-                        <Button
-                          id={`btn-pull-marketplace-${item.id}`}
-                          size="sm"
-                          className="h-7 text-[10px] px-2.5 flex-shrink-0"
-                          onClick={() => onModelDownload?.({
-                            id: item.id,
-                            name: item.name,
-                            provider: "ollama",
-                            description: item.description,
-                            size: 0,
-                            quantizations: [],
-                            popularity: 0,
-                            rating: 0,
-                            downloads: item.pulls,
-                            tags: item.tags,
-                            releaseDate: new Date(),
-                            latestVersion: "latest",
-                          })}
-                        >
-                          <Download className="w-3 h-3 mr-1" /> Pull
-                        </Button>
+                        <HowToTooltip title="Download Model" description="Pull this model to your local Ollama library" side="left">
+                          <Button
+                            id={`btn-pull-marketplace-${item.id}`}
+                            size="sm"
+                            className="h-7 text-[10px] px-2.5 flex-shrink-0"
+                            onClick={() => onModelDownload?.({
+                              id: item.id,
+                              name: item.name,
+                              provider: "ollama",
+                              description: item.description,
+                              size: 0,
+                              quantizations: [],
+                              popularity: 0,
+                              rating: 0,
+                              downloads: item.pulls,
+                              tags: item.tags,
+                              releaseDate: new Date(),
+                              latestVersion: "latest",
+                            })}
+                          >
+                            <Download className="w-3 h-3 mr-1" /> Pull
+                          </Button>
+                        </HowToTooltip>
                       </CardContent>
                     </Card>
                   ))
@@ -496,7 +627,7 @@ export function ModelHubPanel({
         )}
 
         {/* TAB 3: DYNAMIC API PROVIDERS */}
-        {!["active", "ollama"].includes(activeTab) && (
+        {!["active", "omnecor", "ollama"].includes(activeTab) && (
           <div className="space-y-4">
             {/* Status & Fallback Banner */}
             <div className="flex items-center justify-between border border-border p-2.5 rounded bg-muted/20 text-xs">
@@ -573,11 +704,13 @@ export function ModelHubPanel({
                       </div>
                       <div className="flex items-center gap-2" onClick={(e) => e.stopPropagation()}>
                         <span className="text-[10px] text-muted-foreground font-mono">Active</span>
-                        <Switch
-                          id={`switch-activate-${activeTab}-${model.id}`}
-                          checked={isActive}
-                          onCheckedChange={(checked) => handleToggleActive(activeTab, model.id, checked)}
-                        />
+                        <HowToTooltip title="Toggle Activation" description="Enable or disable this model for use across the application" side="top">
+                          <Switch
+                            id={`switch-activate-${activeTab}-${model.id}`}
+                            checked={isActive}
+                            onCheckedChange={(checked) => handleToggleActive(activeTab, model.id, checked)}
+                          />
+                        </HowToTooltip>
                       </div>
                     </CardContent>
                   </Card>
@@ -598,14 +731,16 @@ export function ModelHubPanel({
                   onChange={(e) => setCustomModelId(e.target.value)}
                   className="h-9 text-xs"
                 />
-                <Button
-                  id="btn-add-custom-model"
-                  size="sm"
-                  onClick={() => handleAddCustomModel(activeTab)}
-                  disabled={!customModelId.trim()}
-                >
-                  <PlusCircle className="w-3.5 h-3.5 mr-1" /> Add
-                </Button>
+                <HowToTooltip title="Add Model Identifier" description="Register a specific model ID for this cloud provider" side="top">
+                  <Button
+                    id="btn-add-custom-model"
+                    size="sm"
+                    onClick={() => handleAddCustomModel(activeTab)}
+                    disabled={!customModelId.trim()}
+                  >
+                    <PlusCircle className="w-3.5 h-3.5 mr-1" /> Add
+                  </Button>
+                </HowToTooltip>
               </div>
               <p className="text-[10px] text-muted-foreground">
                 Enter any new model ID deployed by the provider. Useful for launching preview or experimental releases immediately.

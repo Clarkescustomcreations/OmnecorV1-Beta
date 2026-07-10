@@ -13,7 +13,7 @@
  * compile the native module. Mirrors the llama.rn optional-peer pattern in
  * `local-inference.ts` so the app still type-checks before the dep is installed.
  */
-import type { ModelInfo } from "./local-inference";
+import type { ModelInfo } from "./model-catalog";
 
 // whisper.rn is an optional peer dependency — import lazily so the app compiles
 // even before `pnpm add whisper.rn` has been run. Swap to a static import once

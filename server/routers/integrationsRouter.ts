@@ -32,8 +32,11 @@ import type { FileTreeNode } from "./projectRouter.js";
 import { getDb } from "../db.factory.js";
 import { platformAccounts, neuralMaps } from "../../drizzle/schema.js";
 import { and, desc, eq } from "drizzle-orm";
-import { refreshOAuthToken } from "../oauth/oauthClients.js";
-import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
+import {
+  getFreshAccessToken,
+  refreshAndPersistAccount,
+} from "../oauth/platformTokens.js";
+import { MemoryArchitectService } from "../core_services/services/MemoryArchitectService.js";
 import { NotificationService } from "../_core/NotificationService.js";
 
 const log = createLogger("integrations");
@@ -339,22 +342,14 @@ async function fetchOAuthIntegrationItems(userId: number, platform: string): Pro
     throw new TRPCError({ code: "NOT_FOUND", message: `${platform} is not connected. Connect it via OAuth in Settings → Integrations.` });
   }
   const lister = platform === "dropbox" ? listDropbox : listOnedrive;
-  let result = await lister(account.oauthToken);
+  // Pre-emptively renew an expiring token, then list. On a live 401 refresh
+  // once and retry — the shared helper persists the rotated, re-encrypted token.
+  let result = await lister(await getFreshAccessToken(account));
 
   if (result.status === 401 && account.oauthRefreshToken) {
     log.info(`${platform} token expired, refreshing`);
-    const refreshed = await refreshOAuthToken(platform, account.oauthRefreshToken);
-    if (refreshed.access_token) {
-      const db = await getDb();
-      await db.update(platformAccounts).set({
-        oauthToken: refreshed.access_token,
-        oauthRefreshToken: refreshed.refresh_token || account.oauthRefreshToken,
-        tokenExpiresAt: refreshed.expires_in
-          ? new Date(Date.now() + refreshed.expires_in * 1000)
-          : account.tokenExpiresAt,
-      }).where(eq(platformAccounts.id, account.id));
-      result = await lister(refreshed.access_token);
-    }
+    const refreshed = await refreshAndPersistAccount(account);
+    if (refreshed) result = await lister(refreshed);
   }
 
   if (result.status === 401) {
@@ -938,19 +933,8 @@ async function resolveSourceDocuments(uri: string, userId: number): Promise<Sour
 async function resolveOAuthToken(userId: number, platform: string): Promise<string> {
   const account = await getOAuthAccount(userId, platform);
   if (!account) throw new TRPCError({ code: "NOT_FOUND", message: `${platform} is not connected.` });
-  // If the stored token is still valid, use it; otherwise refresh.
-  const expired = account.tokenExpiresAt ? account.tokenExpiresAt.getTime() <= Date.now() + 60_000 : false;
-  if (!expired) return account.oauthToken;
-  if (!account.oauthRefreshToken) return account.oauthToken;
-  const refreshed = await refreshOAuthToken(platform, account.oauthRefreshToken);
-  if (!refreshed.access_token) return account.oauthToken;
-  const db = await getDb();
-  await db.update(platformAccounts).set({
-    oauthToken: refreshed.access_token,
-    oauthRefreshToken: refreshed.refresh_token || account.oauthRefreshToken,
-    tokenExpiresAt: refreshed.expires_in ? new Date(Date.now() + refreshed.expires_in * 1000) : account.tokenExpiresAt,
-  }).where(eq(platformAccounts.id, account.id));
-  return refreshed.access_token;
+  // Decrypt-and-return, pre-emptively refreshing + persisting when expiring.
+  return getFreshAccessToken(account);
 }
 
 // ---------------------------------------------------------------------------

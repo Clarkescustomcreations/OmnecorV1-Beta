@@ -43,6 +43,7 @@ import { getDefaultSettings, type AppSettings } from "@/lib/settings";
 import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { useAppStore } from "@/lib/store/app.store";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface SettingsPanelProps {
   className?: string;
@@ -373,10 +374,12 @@ export function SettingsPanel({ className }: SettingsPanelProps) {
                     Manage indexed project folders
                   </CardDescription>
                 </div>
-                <Button size="sm" onClick={handleAddFolder}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Add Folder
-                </Button>
+                <HowToTooltip title="Add Knowledge Folder" description="Index a new local directory into your workspace knowledge base." side="left">
+                  <Button size="sm" onClick={handleAddFolder}>
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Folder
+                  </Button>
+                </HowToTooltip>
               </div>
             </CardHeader>
             <CardContent className="space-y-3">
@@ -399,9 +402,11 @@ export function SettingsPanel({ className }: SettingsPanelProps) {
                       </div>
                       <div className="flex items-center gap-2">
                         <Switch checked={folder.enabled} onCheckedChange={checked => handleToggleFolder(folder.id, checked)} />
-                        <Button size="sm" variant="ghost" onClick={() => handleRemoveFolder(folder.id)}>
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
+                        <HowToTooltip title="Remove Folder" description="Stop indexing this folder and remove its data from the knowledge base." side="left">
+                          <Button size="sm" variant="ghost" onClick={() => handleRemoveFolder(folder.id)}>
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </HowToTooltip>
                       </div>
                     </div>
                   ))}
@@ -908,19 +913,21 @@ export function SettingsPanel({ className }: SettingsPanelProps) {
                       placeholder="/home/user/.omnecor/models/my-valet-router.gguf"
                       className="font-mono text-xs"
                     />
-                    <Button
-                      size="sm"
-                      disabled={!valetPathInput.trim() || setModelPathMutation.isPending}
-                      onClick={() =>
-                        setModelPathMutation.mutate({ artifactPath: valetPathInput.trim() })
-                      }
-                    >
-                      {setModelPathMutation.isPending ? (
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                      ) : (
-                        <Save className="w-4 h-4" />
-                      )}
-                    </Button>
+                    <HowToTooltip title="Save Model Path" description="Apply this custom model path and restart the Valet Router." side="bottom">
+                      <Button
+                        size="sm"
+                        disabled={!valetPathInput.trim() || setModelPathMutation.isPending}
+                        onClick={() =>
+                          setModelPathMutation.mutate({ artifactPath: valetPathInput.trim() })
+                        }
+                      >
+                        {setModelPathMutation.isPending ? (
+                          <Loader2 className="w-4 h-4 animate-spin" />
+                        ) : (
+                          <Save className="w-4 h-4" />
+                        )}
+                      </Button>
+                    </HowToTooltip>
                   </div>
                 </div>
               ) : (
@@ -936,21 +943,27 @@ export function SettingsPanel({ className }: SettingsPanelProps) {
       {/* SETTINGS ACTIONS */}
       <div className="flex gap-2 justify-between">
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={handleExport}>
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleImport}>
-            <Upload className="w-4 h-4 mr-2" />
-            Import
-          </Button>
+          <HowToTooltip title="Export Settings" description="Download a JSON file of your current configuration." side="top">
+            <Button variant="outline" size="sm" onClick={handleExport}>
+              <Download className="w-4 h-4 mr-2" />
+              Export
+            </Button>
+          </HowToTooltip>
+          <HowToTooltip title="Import Settings" description="Restore your configuration from a previously saved JSON file." side="top">
+            <Button variant="outline" size="sm" onClick={handleImport}>
+              <Upload className="w-4 h-4 mr-2" />
+              Import
+            </Button>
+          </HowToTooltip>
         </div>
-        <Button size="sm" disabled={!hasChanges || saveSettingsMutation.isPending} onClick={handleSave}>
-          {saveSettingsMutation.isPending
-            ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
-            : <><Save className="w-4 h-4 mr-2" />Save Changes</>
-          }
-        </Button>
+        <HowToTooltip title="Save Changes" description="Apply all modified settings to your workspace." side="top">
+          <Button size="sm" disabled={!hasChanges || saveSettingsMutation.isPending} onClick={handleSave}>
+            {saveSettingsMutation.isPending
+              ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Saving…</>
+              : <><Save className="w-4 h-4 mr-2" />Save Changes</>
+            }
+          </Button>
+        </HowToTooltip>
       </div>
     </div>
   );

@@ -11,7 +11,7 @@
 import { z } from "zod";
 import { externalServiceProcedure, router } from "../_core/trpc.js";
 import { TRPCError } from "@trpc/server";
-import { honchoService } from "../phase2/services/HonchoService.js";
+import { honchoService } from "../core_services/services/HonchoService.js";
 
 export const honchoRouter = router({
   /** Sync one message to Honcho (fire-and-forget from the client). */

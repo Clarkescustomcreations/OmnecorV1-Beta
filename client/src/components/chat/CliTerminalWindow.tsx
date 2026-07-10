@@ -7,6 +7,7 @@ import { trpc } from "@/lib/trpc";
 import { toast } from "sonner";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import {
   Dialog,
   DialogContent,
@@ -133,17 +134,19 @@ export function CliTerminalWindow({ isOpen, onClose, sessionId, selectedModel }:
               placeholder="Optional prompt to send to CLI on launch…"
               className="flex-1 bg-transparent border-none outline-none text-xs font-mono text-foreground placeholder:text-muted-foreground"
             />
-            <Button
-              size="sm"
-              type="submit"
-              className="h-7 gap-1.5 text-[10px] bg-primary hover:bg-primary text-white"
-              disabled={openTerminalMutation.isPending}
-            >
-              {openTerminalMutation.isPending
-                ? <Loader2 className="w-3 h-3 animate-spin" />
-                : <Terminal className="w-3 h-3" />}
-              Launch
-            </Button>
+            <HowToTooltip title="Launch Command" description="Send the prompt and launch the external terminal." side="top">
+              <Button
+                size="sm"
+                type="submit"
+                className="h-7 gap-1.5 text-[10px] bg-primary hover:bg-primary text-white"
+                disabled={openTerminalMutation.isPending}
+              >
+                {openTerminalMutation.isPending
+                  ? <Loader2 className="w-3 h-3 animate-spin" />
+                  : <Terminal className="w-3 h-3" />}
+                Launch
+              </Button>
+            </HowToTooltip>
           </form>
         </div>
       </FloatingWindow>

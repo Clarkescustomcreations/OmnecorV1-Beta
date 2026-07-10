@@ -8,11 +8,12 @@
  */
 import { ScrollView, Text, View, ActivityIndicator } from "react-native";
 import { Pressable } from "@/components/pressable";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { ScreenContainer } from "@/components/screen-container";
+import { useBottomInset } from "@/hooks/use-bottom-inset";
 import { useOmmeshNode } from "@/hooks/use-ommesh-node";
 import { useJobs, jobPercent, type Job, type JobState } from "@/hooks/use-jobs";
-import { isModelLoaded, getLoadedModelPath, getStats } from "@/lib/_core/local-inference";
+import { getPhoneModelStatus, subscribePhoneModel, type PhoneModelStatus } from "@/lib/_core/phone-model";
 import { isServerConfigured, getServerIp } from "@/lib/_core/server-config";
 
 const MESH_COLOR: Record<string, string> = {
@@ -48,10 +49,13 @@ const STATE_BG: Record<JobState, string> = {
 type Filter = "all" | "running" | "completed" | "failed";
 
 export default function StatusScreen() {
+  const bottomInset = useBottomInset();
   const { status: meshStatus, stats: meshStats, nodeId } = useOmmeshNode();
   const { jobs, loading, error, refresh, cancel } = useJobs();
-  const [modelLoaded] = useState(isModelLoaded());
-  const [modelPath]   = useState(getLoadedModelPath());
+  const [phoneModel, setPhoneModel] = useState<PhoneModelStatus>(getPhoneModelStatus());
+  useEffect(() => subscribePhoneModel(setPhoneModel), []);
+  const modelLoaded = phoneModel.state === "ready" || phoneModel.state === "running";
+  const modelPath   = phoneModel.path;
   const [filter, setFilter] = useState<Filter>("all");
 
   const counts = {
@@ -104,7 +108,7 @@ export default function StatusScreen() {
 
   return (
     <ScreenContainer className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ paddingBottom: 20 }} showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ paddingBottom: bottomInset }} showsVerticalScrollIndicator={false}>
 
         {/* ── OMMESH Node Status ─────────────────────────────────────── */}
         <View className="p-4 border-b border-border">
@@ -138,7 +142,7 @@ export default function StatusScreen() {
 
           <View className={`mt-3 rounded-lg border p-2 ${modelLoaded ? "bg-success/10 border-success" : "bg-muted/10 border-muted/30"}`}>
             <Text className={`text-xs font-semibold ${modelLoaded ? "text-success" : "text-muted"}`}>
-              {modelLoaded ? `🤖 ${modelPath?.split("/").pop() ?? "Model"} loaded` : "No model loaded — load one in Settings → Phone AI Model"}
+              {modelLoaded ? `🤖 ${modelPath?.split("/").pop() ?? "Model"} loaded${phoneModel.backend ? ` · ${phoneModel.backend === "npu" ? "⚡NPU" : phoneModel.backend.toUpperCase()}` : ""}` : "No model loaded — pick a phone model in the Chat model selector"}
             </Text>
           </View>
         </View>

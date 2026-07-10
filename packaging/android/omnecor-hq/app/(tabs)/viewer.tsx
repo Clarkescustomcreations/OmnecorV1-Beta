@@ -135,6 +135,15 @@ interface FileTreeNode {
   children?: FileTreeNode[];
 }
 interface ProjectItem { id: string; name: string; projectId: string; rootDir: string }
+interface ModelItem {
+  name: string; // filename (key)
+  displayName?: string;
+  url: string;
+  size: number;
+  mapId?: string | null;
+  designProjectId?: number | null;
+  source?: string;
+}
 interface PcbProject { id: number; name: string; mode?: string; mapId?: string | null }
 interface PcbDesign { id: number; name: string; canvasData: { nodes: any[]; edges: any[]; metadata?: any }; componentCount?: number; connectionCount?: number }
 
@@ -164,7 +173,9 @@ export default function Viewer3DScreen() {
     if (!configured) return;
     (async () => {
       try {
-        const activeMapId = await trpcQuery<string | null>("neuralMaps.getActiveMapId");
+        // The procedure returns { activeMapId }, not a bare string — unwrap it so
+        // we never persist an object into AsyncStorage (string-only native store).
+        const { activeMapId } = await trpcQuery<{ activeMapId: string | null }>("neuralMaps.getActiveMapId");
         if (activeMapId) {
           setSelectedNeuralMapId(activeMapId);
           await AsyncStorage.setItem("omnecor:selected_map_id", activeMapId);
@@ -192,9 +203,12 @@ export default function Viewer3DScreen() {
   // ── 3D selection + model library ──
   const [selected3d, setSelected3d] = useState<{ name: string; description: string } | null>(null);
   const webRef = useRef<WebView>(null);
-  const [models, setModels] = useState<{ name: string; url: string; size: number }[]>([]);
+  const [models, setModels] = useState<ModelItem[]>([]);
   const [activeModel, setActiveModel] = useState<string | null>(null); // model name, or null = demo scene
   const [modelStatus, setModelStatus] = useState<string | null>(null);
+  // Combined design context (3D models + PCB/schematic) for the active map, so
+  // "Ask AI" in any mode sees the whole project — housing and board together.
+  const [designContext, setDesignContext] = useState<string | null>(null);
   // Full URL of the currently-loaded model, kept so we can re-inject if the
   // WebView remounts (e.g. after switching modes and back).
   const activeModelUrlRef = useRef<string | null>(null);
@@ -227,22 +241,25 @@ export default function Viewer3DScreen() {
     return pcbProjects.filter(p => p.mapId === selectedNeuralMapId);
   }, [pcbProjects, selectedNeuralMapId]);
 
-  // 3D models are filesystem files with no DB row to carry a mapId, so we
-  // associate them to a map by name. When nothing matches we show none (rather
-  // than falling back to every model) to avoid cross-map leakage.
-  const filteredModels = useMemo(() => {
-    if (!selectedNeuralMapId || !activeNeuralMap) return models;
-    const mapName = activeNeuralMap.name.toLowerCase();
-    return models.filter(m => m.name.toLowerCase().includes(mapName));
-  }, [models, selectedNeuralMapId, activeNeuralMap]);
+  // Models are now scoped server-side by their real mapId association (map-scoped
+  // + global), so no client-side name heuristic is needed.
+  const filteredModels = models;
 
-
+  // Reload the model library, scoped to the active map. Exposed so the picker's
+  // refresh button can pull in meshes just generated on the desktop.
+  const loadModels = useCallback(async () => {
+    if (!configured) return;
+    try {
+      const m = await trpcQuery<ModelItem[]>("blender.listModels", { mapId: selectedNeuralMapId });
+      if (m) setModels(m);
+    } catch { /* offline / not configured */ }
+  }, [configured, selectedNeuralMapId]);
 
   // Load project / model lists when entering the relevant mode
   useEffect(() => {
     if (!configured) return;
-    if (viewMode === "3d" && models.length === 0) {
-      trpcQuery<{ name: string; url: string; size: number }[]>("blender.listModels").then((m) => m && setModels(m)).catch(() => {});
+    if (viewMode === "3d") {
+      loadModels();
     }
     if (viewMode === "pcb" && pcbProjects.length === 0) {
       trpcQuery<PcbProject[]>("pcbEditor.getProjects").then((p) => p && setPcbProjects(p)).catch(() => {});
@@ -250,7 +267,19 @@ export default function Viewer3DScreen() {
     if (viewMode === "code" && codeProjects.length === 0) {
       trpcQuery<ProjectItem[]>("project.list").then((p) => p && setCodeProjects(p)).catch(() => {});
     }
-  }, [viewMode, configured, models.length, pcbProjects.length, codeProjects.length]);
+  }, [viewMode, configured, loadModels, pcbProjects.length, codeProjects.length]);
+
+  // Keep the combined project design context (3D models + PCB/schematic) fresh
+  // for the active map so Ask AI always sees the whole project.
+  useEffect(() => {
+    if (!configured) { setDesignContext(null); return; }
+    (async () => {
+      try {
+        const res = await trpcQuery<{ contextText: string }>("blender.getMapDesignContext", { mapId: selectedNeuralMapId });
+        setDesignContext(res?.contextText ?? null);
+      } catch { setDesignContext(null); }
+    })();
+  }, [configured, selectedNeuralMapId, pcbDesign, activeModel]);
 
   // ── 3D model picker: inject loadModel/clearModel into the WebView scene ──
   const selectModel = useCallback((model: { name: string; url: string } | null) => {
@@ -342,26 +371,30 @@ export default function Viewer3DScreen() {
 
   // ── Build the context string fed to the AI for the current view ──
   const buildContext = useCallback((): string => {
+    // The whole-project view (housing meshes + PCB/schematic) so the assistant
+    // reasons about the 3D model and the board together, not in isolation.
+    const projectCtx = designContext ? `\n\n${designContext}` : "";
     if (viewMode === "3d") {
       const sceneDesc = activeModel
         ? `Viewing the loaded 3D model "${activeModel}".`
         : "Viewing a demo 3D scene containing a Cube, Sphere and Cylinder primitive.";
-      return selected3d
+      const base = selected3d
         ? `${sceneDesc} Selected object: ${selected3d.name}. ${selected3d.description}`
         : sceneDesc;
+      return base + projectCtx;
     }
     if (viewMode === "pcb") {
-      if (!pcbDesign) return "Viewing the Schematic/PCB editor (no design loaded).";
+      if (!pcbDesign) return "Viewing the Schematic/PCB editor (no design loaded)." + projectCtx;
       const comps = (pcbDesign.canvasData?.nodes ?? [])
         .map((n: any) => `${n?.data?.reference ?? n?.id}: ${n?.data?.value ?? n?.data?.label ?? ""}`)
         .join(", ");
-      return `PCB/Schematic design "${pcbDesign.name}" — ${pcbDesign.componentCount ?? pcbDesign.canvasData?.nodes?.length ?? 0} components, ${pcbDesign.connectionCount ?? pcbDesign.canvasData?.edges?.length ?? 0} connections. Components: ${comps || "none"}.`;
+      return `PCB/Schematic design "${pcbDesign.name}" — ${pcbDesign.componentCount ?? pcbDesign.canvasData?.nodes?.length ?? 0} components, ${pcbDesign.connectionCount ?? pcbDesign.canvasData?.edges?.length ?? 0} connections. Components: ${comps || "none"}.${projectCtx}`;
     }
     // code
     if (!activeFile) return "Viewing the code workspace (no file open).";
     const snippet = fileContent.length > 4000 ? fileContent.slice(0, 4000) + "\n…(truncated)" : fileContent;
     return `File: ${activeFile.name}\n\n${snippet}`;
-  }, [viewMode, selected3d, pcbDesign, activeFile, fileContent]);
+  }, [viewMode, selected3d, pcbDesign, activeFile, fileContent, activeModel, designContext]);
 
   // ── Actions: Ask AI / Analyze (real endpoints) ──
   const runAi = useCallback(async (prompt: string) => {
@@ -372,10 +405,11 @@ export default function Viewer3DScreen() {
     try {
       let text: string;
       if (viewMode === "pcb" && pcbDesign) {
-        // Real persisted AI review tied to the design.
+        // Real persisted AI review tied to the design. Fold in the linked 3D
+        // housing/model context so the review considers the enclosure too.
         const res = await trpcMutate<{ response: string }>("pcbEditor.reviewDesign", {
           designSaveId: pcbDesign.id,
-          prompt,
+          prompt: designContext ? `${prompt}\n\nLinked project assets:\n${designContext}` : prompt,
         });
         text = res?.response ?? "";
       } else {
@@ -394,7 +428,7 @@ export default function Viewer3DScreen() {
     } finally {
       setAiBusy(false);
     }
-  }, [configured, viewMode, pcbDesign, buildContext]);
+  }, [configured, viewMode, pcbDesign, buildContext, designContext]);
 
   const handleAskAi = useCallback(() => {
     const q = aiInput.trim();
@@ -520,7 +554,12 @@ export default function Viewer3DScreen() {
         <View className="flex-1">
           {/* Model library picker */}
           <View className="bg-surface border-b border-border p-2">
-            <Text className="text-xs text-muted mb-1">Model</Text>
+            <View className="flex-row items-center justify-between mb-1">
+              <Text className="text-xs text-muted">Model{activeNeuralMap ? ` · ${activeNeuralMap.name}` : ""}</Text>
+              <Pressable onPress={loadModels} className="px-2 py-0.5 active:opacity-60">
+                <Text className="text-xs text-primary">↻ Refresh</Text>
+              </Pressable>
+            </View>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} className="flex-row">
               <Pressable onPress={() => selectModel(null)}
                 className={`mr-2 px-3 py-1.5 rounded-lg ${activeModel === null ? "bg-primary" : "bg-background border border-border"}`}>
@@ -529,11 +568,13 @@ export default function Viewer3DScreen() {
               {filteredModels.map((m) => (
                 <Pressable key={m.name} onPress={() => selectModel(m)}
                   className={`mr-2 px-3 py-1.5 rounded-lg ${activeModel === m.name ? "bg-primary" : "bg-background border border-border"}`}>
-                  <Text className={`text-xs ${activeModel === m.name ? "text-background" : "text-foreground"}`}>{m.name}</Text>
+                  <Text className={`text-xs ${activeModel === m.name ? "text-background" : "text-foreground"}`}>
+                    {m.displayName || m.name}{m.designProjectId ? " 🔗" : ""}
+                  </Text>
                 </Pressable>
               ))}
               {filteredModels.length === 0 && (
-                <Text className="text-xs text-muted p-2">No models in the library — export one from the desktop Blender bridge.</Text>
+                <Text className="text-xs text-muted p-2">No models in the library — export one from the desktop Blender bridge or generate one in ComfyUI.</Text>
               )}
             </ScrollView>
           </View>

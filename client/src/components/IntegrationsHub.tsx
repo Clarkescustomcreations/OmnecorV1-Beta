@@ -36,6 +36,7 @@ import {
   Brain,
 } from "lucide-react";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 const FEATURE_LABELS: Record<string, { label: string; icon: React.ReactNode }> = {
   "chat":             { label: "Chat",          icon: <MessageSquare className="w-3 h-3" /> },
@@ -276,35 +277,45 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                     types (dropbox/onedrive) have no such store and fetch their
                     content on-demand in the map, so Sync doesn't apply. */}
                 {!OAUTH_CONNECT_TYPES.has(item.type) && (
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => syncMutation.mutate({ type: item.type as IntegrationType })} disabled={isSyncing}>
-                    <RefreshCw className={cn("w-3 h-3 mr-1", isSyncing && "animate-spin")} /> {isSyncing ? "Syncing..." : "Sync"}
-                  </Button>
+                  <HowToTooltip title="Sync Data" description="Force a refresh of data from this integration." side="bottom">
+                    <Button size="sm" variant="outline" className="flex-1" onClick={() => syncMutation.mutate({ type: item.type as IntegrationType })} disabled={isSyncing}>
+                      <RefreshCw className={cn("w-3 h-3 mr-1", isSyncing && "animate-spin")} /> {isSyncing ? "Syncing..." : "Sync"}
+                    </Button>
+                  </HowToTooltip>
                 )}
                 {healthStatus?.status === "error" && (
                   <Button size="sm" variant="outline" className="flex-1" onClick={() => refreshTokenMutation.mutate({ integrationId: item.type as string })} disabled={isRefreshing}>
                     <RefreshCw className={cn("w-3 h-3 mr-1", isRefreshing && "animate-spin")} /> {isRefreshing ? "..." : "Refresh"}
                   </Button>
                 )}
-                <Button size="sm" variant="outline" className="flex-1" onClick={() => setSettingsType(item.type as IntegrationType)}>
-                  <Settings className="w-3 h-3 mr-1" /> Settings
-                </Button>
-                <Button size="sm" variant="destructive" className="flex-1" onClick={() => disconnectMutation.mutate({ type: item.type as IntegrationType })} disabled={isDisconnecting}>
-                  <Unlink2 className="w-3 h-3 mr-1" /> {isDisconnecting ? "..." : "Disconnect"}
-                </Button>
+                <HowToTooltip title="Integration Settings" description="Configure or disconnect this integration." side="bottom">
+                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setSettingsType(item.type as IntegrationType)}>
+                    <Settings className="w-3 h-3 mr-1" /> Settings
+                  </Button>
+                </HowToTooltip>
+                <HowToTooltip title="Disconnect Integration" description="Remove this integration and its access tokens from the system." side="bottom">
+                  <Button size="sm" variant="destructive" className="flex-1" onClick={() => disconnectMutation.mutate({ type: item.type as IntegrationType })} disabled={isDisconnecting}>
+                    <Unlink2 className="w-3 h-3 mr-1" /> {isDisconnecting ? "..." : "Disconnect"}
+                  </Button>
+                </HowToTooltip>
               </>
             ) : OAUTH_CONNECT_TYPES.has(item.type) ? (
-              <Button
-                size="sm"
-                className="w-full"
-                onClick={() => getAuthUrlMutation.mutate({ platform: item.type as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] })}
-                disabled={getAuthUrlMutation.isPending}
-              >
-                <Link2 className="w-3 h-3 mr-2" /> Connect with OAuth
-              </Button>
+              <HowToTooltip title="Connect Integration" description="Link a new external integration using an access token or OAuth." side="bottom">
+                <Button
+                  size="sm"
+                  className="w-full"
+                  onClick={() => getAuthUrlMutation.mutate({ platform: item.type as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] })}
+                  disabled={getAuthUrlMutation.isPending}
+                >
+                  <Link2 className="w-3 h-3 mr-2" /> Connect with OAuth
+                </Button>
+              </HowToTooltip>
             ) : (
-              <Button size="sm" className="w-full" onClick={() => setConnectType(item.type as IntegrationType)}>
-                <Link2 className="w-3 h-3 mr-2" /> Connect Account
-              </Button>
+              <HowToTooltip title="Connect Integration" description="Link a new external integration using an access token or OAuth." side="bottom">
+                <Button size="sm" className="w-full" onClick={() => setConnectType(item.type as IntegrationType)}>
+                  <Link2 className="w-3 h-3 mr-2" /> Connect Account
+                </Button>
+              </HowToTooltip>
             )}
           </div>
         </CardContent>
@@ -325,12 +336,14 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
           <span className="text-xs font-medium whitespace-nowrap">
             {!crossProject && activeMap ? activeMap.name : "Cross-Project"}
           </span>
-          <Switch
-            checked={!crossProject}
-            onCheckedChange={v => handleCrossProjectToggle(!v)}
-            className="scale-75"
-            aria-label="Scope integrations to active neural map"
-          />
+          <HowToTooltip title="Cross-Project Integrations" description="Toggle to share integrations across all neural maps or isolate them to the current project." side="bottom">
+            <Switch
+              checked={!crossProject}
+              onCheckedChange={v => handleCrossProjectToggle(!v)}
+              className="scale-75"
+              aria-label="Scope integrations to active neural map"
+            />
+          </HowToTooltip>
         </div>
       </div>
 
@@ -375,15 +388,17 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <Button 
-                    variant="outline" 
-                    size="sm" 
-                    className="w-full text-destructive border-destructive/20 hover:bg-destructive/10"
-                    onClick={() => disconnectSocialMutation.mutate({ accountId: account.id })}
-                    disabled={disconnectSocialMutation.isPending}
-                  >
-                    Disconnect Social Profile
-                  </Button>
+                  <HowToTooltip title="Disconnect Integration" description="Remove this integration and its access tokens from the system." side="bottom">
+                    <Button 
+                      variant="outline" 
+                      size="sm" 
+                      className="w-full text-destructive border-destructive/20 hover:bg-destructive/10"
+                      onClick={() => disconnectSocialMutation.mutate({ accountId: account.id })}
+                      disabled={disconnectSocialMutation.isPending}
+                    >
+                      Disconnect Social Profile
+                    </Button>
+                  </HowToTooltip>
                 </CardContent>
               </Card>
             ))}
@@ -392,16 +407,18 @@ export function IntegrationsHub({ className }: IntegrationsHubProps) {
                 <p className="text-xs text-muted-foreground font-medium uppercase tracking-tighter">Add Discourse Channel</p>
                 <div className="flex flex-wrap justify-center gap-2">
                   {["twitter", "discord", "github"].map(p => (
-                    <Button
-                      key={p}
-                      size="sm"
-                      variant="outline"
-                      className="capitalize h-8 text-[10px] gap-2"
-                      onClick={() => getAuthUrlMutation.mutate({ platform: p as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] })}
-                    >
-                      {getAuthUrlMutation.isPending && getAuthUrlMutation.variables?.platform === p ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
-                      Link {p}
-                    </Button>
+                    <HowToTooltip title="Connect Integration" description="Link a new external integration using an access token or OAuth." side="bottom">
+                      <Button
+                        key={p}
+                        size="sm"
+                        variant="outline"
+                        className="capitalize h-8 text-[10px] gap-2"
+                        onClick={() => getAuthUrlMutation.mutate({ platform: p as Parameters<typeof getAuthUrlMutation.mutate>[0]["platform"] })}
+                      >
+                        {getAuthUrlMutation.isPending && getAuthUrlMutation.variables?.platform === p ? <Loader2 className="w-3 h-3 animate-spin" /> : <Plus className="w-3 h-3" />}
+                        Link {p}
+                      </Button>
+                    </HowToTooltip>
                   ))}
                 </div>
               </div>

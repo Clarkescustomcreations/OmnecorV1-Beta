@@ -3,7 +3,7 @@
  * arrived, so "Schedule" in the UI actually sends content to the connected
  * platforms at the chosen time (not just a DB status flip).
  */
-import { publishDuePosts } from "../phase2/services/publishExecutor.js";
+import { publishDuePosts } from "../core_services/services/publishExecutor.js";
 import { createLogger } from "./logger.js";
 
 const log = createLogger("publishWorker");

@@ -2,8 +2,8 @@ import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { adminProcedure, protectedProcedure, router } from "../_core/trpc.js";
 import { isSovereignMode } from "../_core/sovereign.js";
-import { MCPClientService } from "../phase2/services/MCPClientService.js";
-import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { MCPClientService } from "../core_services/services/MCPClientService.js";
+import { AuditLogService } from "../core_services/services/AuditLogService.js";
 import { createLogger } from "../_core/logger.js";
 const log = createLogger("mcpRouter");
 

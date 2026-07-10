@@ -18,11 +18,11 @@ vi.mock("../db.factory.js", async importActual => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/HITLApprovalService.js", () => ({
+vi.mock("../core_services/services/HITLApprovalService.js", () => ({
   HITLApprovalService: { getInstance: () => hitl },
 }));
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

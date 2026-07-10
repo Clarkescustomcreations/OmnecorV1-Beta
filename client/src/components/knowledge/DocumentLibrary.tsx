@@ -8,6 +8,7 @@ import { Search, FileText, UploadCloud, ExternalLink, X } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "../ui/badge";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "../ui/dialog";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface SearchResult {
   content: string;
@@ -47,10 +48,12 @@ export const DocumentLibrary: React.FC = () => {
                onChange={(e) => setSearch(e.target.value)}
              />
            </div>
-           <Button onClick={() => docsQuery.mutate({ projectId: "default" })} className="shadow-md" disabled={docsQuery.isPending}>
-             <UploadCloud className="w-4 h-4 mr-2" />
-             {docsQuery.isPending ? "Indexing..." : "Refresh Index"}
-           </Button>
+           <HowToTooltip title="Refresh Index" description="Update the semantic knowledge base index." side="bottom">
+             <Button onClick={() => docsQuery.mutate({ projectId: "default" })} className="shadow-md" disabled={docsQuery.isPending}>
+               <UploadCloud className="w-4 h-4 mr-2" />
+               {docsQuery.isPending ? "Indexing..." : "Refresh Index"}
+             </Button>
+           </HowToTooltip>
         </div>
       </div>
 
@@ -84,15 +87,16 @@ export const DocumentLibrary: React.FC = () => {
                   </TableCell>
                   <TableCell><Badge variant="outline">{(res.score * 100).toFixed(1)}%</Badge></TableCell>
                   <TableCell className="text-right">
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="h-8 w-8 opacity-0 group-hover:opacity-100"
-                      title="View full content"
-                      onClick={() => setPreviewDoc(res)}
-                    >
-                      <ExternalLink className="w-3.5 h-3.5" />
-                    </Button>
+                    <HowToTooltip title="View Document" description="Open the full contents of this document." side="left">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 opacity-0 group-hover:opacity-100"
+                        onClick={() => setPreviewDoc(res)}
+                      >
+                        <ExternalLink className="w-3.5 h-3.5" />
+                      </Button>
+                    </HowToTooltip>
                   </TableCell>
                 </TableRow>
               ))}
@@ -145,18 +149,20 @@ export const DocumentLibrary: React.FC = () => {
             </div>
           )}
           <div className="flex justify-end">
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                if (previewDoc) {
-                  navigator.clipboard.writeText(previewDoc.content);
-                  toast.success("Copied to clipboard");
-                }
-              }}
-            >
-              Copy Content
-            </Button>
+            <HowToTooltip title="Copy Document Content" description="Copy the entire document text to your clipboard." side="top">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => {
+                  if (previewDoc) {
+                    navigator.clipboard.writeText(previewDoc.content);
+                    toast.success("Copied to clipboard");
+                  }
+                }}
+              >
+                Copy Content
+              </Button>
+            </HowToTooltip>
           </div>
         </DialogContent>
       </Dialog>

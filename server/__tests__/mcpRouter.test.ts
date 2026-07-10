@@ -25,11 +25,11 @@ vi.mock("../db.factory.js", async importActual => {
   return { ...actual, getDb: async () => h.db };
 });
 
-vi.mock("../phase2/services/MCPClientService.js", () => ({
+vi.mock("../core_services/services/MCPClientService.js", () => ({
   MCPClientService: { getInstance: () => mcp },
 }));
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

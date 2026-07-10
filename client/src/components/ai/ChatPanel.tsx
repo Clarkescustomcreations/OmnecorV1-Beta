@@ -7,6 +7,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Card, CardContent } from "../ui/card";
 import { Send, StopCircle, User, Bot, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface Message {
   role: "user" | "assistant";
@@ -146,13 +147,17 @@ export const ChatPanel: React.FC = () => {
           />
           <div className="absolute right-1.5 top-1.5 flex gap-1">
              {isStreaming && (
-               <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground" onClick={handleStop}>
-                 <StopCircle className="w-5 h-5" />
-               </Button>
+               <HowToTooltip title="Stop Generation" description="Halt the AI's current response stream." side="top">
+                 <Button variant="ghost" size="icon" className="h-9 w-9 text-muted-foreground hover:text-foreground" onClick={handleStop}>
+                   <StopCircle className="w-5 h-5" />
+                 </Button>
+               </HowToTooltip>
              )}
-             <Button size="icon" className="h-9 w-9 bg-primary hover:bg-primary shadow-md" onClick={handleSend} disabled={isStreaming}>
-               <Send className="w-4 h-4" />
-             </Button>
+             <HowToTooltip title="Send Message" description="Send your prompt to the AI Orchestrator." side="top">
+               <Button size="icon" className="h-9 w-9 bg-primary hover:bg-primary shadow-md" onClick={handleSend} disabled={isStreaming}>
+                 <Send className="w-4 h-4" />
+               </Button>
+             </HowToTooltip>
           </div>
         </div>
       </div>

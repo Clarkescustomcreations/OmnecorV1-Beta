@@ -1,43 +1,50 @@
 /**
- * Batch C — Item 8: TokenRefreshService — expiry checking + provider refresh logic
+ * TokenRefreshService — pre-emptive background renewal of platformAccounts tokens.
  *
- * The crypto portion (encryptToken / decryptToken AES-256-GCM) is already
- * exhaustively tested in tokenCrypto.test.ts. This file covers the DB-driven
- * refresh logic:
+ * The service sweeps the `platformAccounts` store (the real, populated OAuth
+ * token store) and renews any active account with a refresh token that is within
+ * the 30-min renewal window. The per-account refresh/re-encrypt/revoke logic
+ * lives in server/oauth/platformTokens.ts (refreshAndPersistAccount), which
+ * calls oauthClients.refreshOAuthToken — mocked here.
  *
- *   checkExpiring(): only processes integrations expiring within 30 min that
- *     have a refreshToken; ignores rows without refreshToken or with future expiry
- *   refreshProvider('notion'): on 2xx updates accessToken + expiresAt in DB
- *   refreshProvider('notion'): on 4xx (invalid_grant) deletes the integration row
- *   refreshProvider('notion'): on 5xx leaves integration intact (transient error)
- *   refreshProvider('notion'): on network error leaves integration intact
- *   refreshProvider('slack'): auth.test {ok:false} → deletes integration
- *   refreshProvider('unknown'): no-op (returns without touching DB)
+ *   checkExpiring(): renews active accounts expiring < 30 min that have a
+ *     refresh token; ignores rows without a refresh token, with far-future
+ *     expiry, or that are inactive.
+ *   refresh success: persists a fresh (re-encrypted) access token + new expiry.
+ *   invalid_grant: deactivates the account (isActive → 0) so the UI reconnects.
+ *   transient failure: leaves the account intact for the next sweep.
+ *   forceRefresh(platform, userId): renews only that user's account(s).
  *
- * Uses a real in-memory libSQL test DB (createTestDb) so Drizzle's query
- * builder runs against the real schema, giving confidence that the column
- * references and update/delete operations match the actual table.
+ * Uses a real in-memory libSQL test DB (createTestDb) so Drizzle runs against
+ * the real schema and the encryption round-trips through the actual columns.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { randomUUID } from "crypto";
 
 // ── Mocks ────────────────────────────────────────────────────────────────────
 
-const h = vi.hoisted(() => ({ db: null as unknown }));
+// Set the encryption secret BEFORE the statically-imported modules load —
+// ENV.cookieSecret is resolved once at module-load time (process.env.JWT_SECRET),
+// so it must be present before `import` runs (hoisted callbacks run first).
+const h = vi.hoisted(() => {
+  process.env.JWT_SECRET = "test-jwt-secret-at-least-32-chars!";
+  process.env.COOKIE_SECRET = process.env.JWT_SECRET;
+  return { db: null as unknown };
+});
 
 vi.mock("../db.factory.js", async (importActual) => {
   const actual = await importActual<typeof import("../db.factory.js")>();
   return { ...actual, getDb: async () => h.db };
 });
 
-const mockResilientFetch = vi.fn();
-vi.mock("../_core/resilientFetch.js", () => ({
-  resilientFetch: (...args: unknown[]) => mockResilientFetch(...args),
+const mockRefreshOAuthToken = vi.fn();
+vi.mock("../oauth/oauthClients.js", () => ({
+  refreshOAuthToken: (...args: unknown[]) => mockRefreshOAuthToken(...args),
 }));
 
-import { TokenRefreshService, encryptToken } from "../phase2/services/TokenRefreshService.js";
+import { TokenRefreshService } from "../core_services/services/TokenRefreshService.js";
+import { encryptPlatformToken, decryptPlatformToken } from "../oauth/platformTokens.js";
 import { createTestDb, type TestDb } from "./_helpers/trpcHarness.js";
-import { integrations } from "../../drizzle/schema.js";
+import { platformAccounts } from "../../drizzle/schema.js";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db.js";
 
@@ -52,199 +59,165 @@ beforeEach(async () => {
   store = await createTestDb();
   db = store.db;
   h.db = db;
-  mockResilientFetch.mockReset();
+  mockRefreshOAuthToken.mockReset();
   (TokenRefreshService as any).instance = undefined;
 });
 
 afterEach(() => {
-  const svc = TokenRefreshService.getInstance();
-  svc.stop();
+  TokenRefreshService.getInstance().stop();
   delete process.env.JWT_SECRET;
   delete process.env.COOKIE_SECRET;
 });
 
-// ── Helpers ───────────────────────────────────────────────name──────────────────
+// ── Helpers ───────────────────────────────────────────────────────────────────
 
-function makeIntegration(overrides: {
-  provider: string;
+async function seedAccount(overrides: {
+  userId?: number;
+  platform?: string;
   expiresAt?: Date | null;
   refreshToken?: string | null;
-}) {
-  return {
-    id: randomUUID(),
-    provider: overrides.provider,
-    accessToken: encryptToken("current-access-token"),
-    refreshToken: overrides.refreshToken !== undefined
-      ? (overrides.refreshToken ? encryptToken(overrides.refreshToken) : null)
-      : encryptToken("old-refresh-token"),
-    expiresAt: overrides.expiresAt !== undefined
-      ? overrides.expiresAt
-      : new Date(Date.now() + 5 * 60 * 1000), // default: expires in 5 min (within 30-min window)
-    createdAt: new Date(),
-    updatedAt: new Date(),
-    tokenIv: null,
-    tokenTag: null,
-  };
+  isActive?: number;
+}): Promise<number> {
+  const [row] = await db
+    .insert(platformAccounts)
+    .values({
+      userId: overrides.userId ?? 1,
+      platform: overrides.platform ?? "gmail",
+      accountName: "Test Account",
+      oauthToken: encryptPlatformToken("current-access-token"),
+      oauthRefreshToken:
+        overrides.refreshToken !== undefined
+          ? overrides.refreshToken
+            ? encryptPlatformToken(overrides.refreshToken)
+            : null
+          : encryptPlatformToken("old-refresh-token"),
+      tokenExpiresAt:
+        overrides.expiresAt !== undefined
+          ? overrides.expiresAt
+          : new Date(Date.now() + 5 * 60 * 1000), // default: 5 min out (within window)
+      isActive: overrides.isActive ?? 1,
+    })
+    .returning({ id: platformAccounts.id });
+  return row.id;
 }
 
-function jsonResponse(body: unknown, status = 200) {
-  return {
-    ok: status >= 200 && status < 300,
-    status,
-    json: () => Promise.resolve(body),
-  };
+function accountById(id: number) {
+  return db.select().from(platformAccounts).where(eq(platformAccounts.id, id)).then(r => r[0]);
 }
 
 // ── checkExpiring ─────────────────────────────────────────────────────────────
 
 describe("TokenRefreshService.checkExpiring", () => {
-  it("refreshes an integration expiring in < 30 min with a refresh token", async () => {
-    await db.insert(integrations).values(makeIntegration({
-      provider: "notion",
-      expiresAt: new Date(Date.now() + 10 * 60 * 1000), // 10 min from now
-    }));
+  it("renews an active account expiring < 30 min with a refresh token", async () => {
+    const id = await seedAccount({ expiresAt: new Date(Date.now() + 10 * 60 * 1000) });
+    mockRefreshOAuthToken.mockResolvedValueOnce({
+      access_token: "new-access-token",
+      refresh_token: "rotated-refresh-token",
+      token_type: "Bearer",
+      expires_in: 3600,
+    });
 
-    mockResilientFetch.mockResolvedValueOnce(
-      jsonResponse({ access_token: "new-notion-token", expires_in: 3600 })
+    await (TokenRefreshService.getInstance() as any).checkExpiring();
+
+    expect(mockRefreshOAuthToken).toHaveBeenCalledWith("gmail", "old-refresh-token");
+    const row = await accountById(id);
+    expect(decryptPlatformToken(row.oauthToken)).toBe("new-access-token");
+    expect(decryptPlatformToken(row.oauthRefreshToken)).toBe("rotated-refresh-token");
+    const diff = row.tokenExpiresAt!.getTime() - Date.now();
+    expect(diff).toBeGreaterThan(3000 * 1000);
+    expect(diff).toBeLessThan(3700 * 1000);
+  });
+
+  it("stored access token is encrypted at rest (not plaintext)", async () => {
+    const id = await seedAccount({ expiresAt: new Date(Date.now() + 10 * 60 * 1000) });
+    mockRefreshOAuthToken.mockResolvedValueOnce({
+      access_token: "brand-new-token",
+      token_type: "Bearer",
+      expires_in: 3600,
+    });
+
+    await (TokenRefreshService.getInstance() as any).checkExpiring();
+
+    const row = await accountById(id);
+    expect(row.oauthToken).toMatch(/^v1:/);
+    expect(row.oauthToken).not.toContain("brand-new-token");
+  });
+
+  it("ignores accounts with no refresh token", async () => {
+    await seedAccount({ refreshToken: null });
+    await (TokenRefreshService.getInstance() as any).checkExpiring();
+    expect(mockRefreshOAuthToken).not.toHaveBeenCalled();
+  });
+
+  it("ignores accounts whose expiry is beyond the 30-min window", async () => {
+    await seedAccount({ expiresAt: new Date(Date.now() + 60 * 60 * 1000) });
+    await (TokenRefreshService.getInstance() as any).checkExpiring();
+    expect(mockRefreshOAuthToken).not.toHaveBeenCalled();
+  });
+
+  it("ignores inactive accounts", async () => {
+    await seedAccount({ isActive: 0, expiresAt: new Date(Date.now() + 5 * 60 * 1000) });
+    await (TokenRefreshService.getInstance() as any).checkExpiring();
+    expect(mockRefreshOAuthToken).not.toHaveBeenCalled();
+  });
+
+  it("ignores accounts with no known expiry (null tokenExpiresAt)", async () => {
+    await seedAccount({ expiresAt: null });
+    await (TokenRefreshService.getInstance() as any).checkExpiring();
+    expect(mockRefreshOAuthToken).not.toHaveBeenCalled();
+  });
+});
+
+// ── Refresh failure handling ──────────────────────────────────────────────────
+
+describe("TokenRefreshService — refresh failure handling", () => {
+  it("invalid_grant deactivates the account (isActive → 0)", async () => {
+    const id = await seedAccount({});
+    mockRefreshOAuthToken.mockRejectedValueOnce(
+      Object.assign(new Error("Bad Request"), { data: { payload: { error: "invalid_grant" } } })
     );
 
     await (TokenRefreshService.getInstance() as any).checkExpiring();
 
-    const [row] = await db.select().from(integrations).where(eq(integrations.provider, "notion"));
-    expect(row).toBeDefined();
-    // Access token must have been updated to the encrypted form of "new-notion-token".
-    // We compare encrypted forms so the test is format-agnostic (works whether
-    // JWT_SECRET is set at module-load time or not).
-    const freshEncrypted = encryptToken("new-notion-token");
-    expect(row!.accessToken).toBe(freshEncrypted);
-    // expiresAt should be set to roughly now + 1 hour
-    expect(row!.expiresAt).not.toBeNull();
-    const diff = row!.expiresAt!.getTime() - Date.now();
-    expect(diff).toBeGreaterThan(3000 * 1000); // > 50 min
-    expect(diff).toBeLessThan(3700 * 1000);    // < ~61 min
+    const row = await accountById(id);
+    expect(row.isActive).toBe(0);
   });
 
-  it("ignores integrations with no refresh token (can't refresh)", async () => {
-    await db.insert(integrations).values(makeIntegration({
-      provider: "notion",
-      expiresAt: new Date(Date.now() + 5 * 60 * 1000),
-      refreshToken: null,
-    }));
+  it("transient failure leaves the account active and unchanged", async () => {
+    const id = await seedAccount({});
+    mockRefreshOAuthToken.mockRejectedValueOnce(new Error("ECONNREFUSED"));
 
     await (TokenRefreshService.getInstance() as any).checkExpiring();
 
-    // resilientFetch should not have been called
-    expect(mockResilientFetch).not.toHaveBeenCalled();
-  });
-
-  it("ignores integrations with future expiry beyond the 30-min window", async () => {
-    await db.insert(integrations).values(makeIntegration({
-      provider: "notion",
-      expiresAt: new Date(Date.now() + 60 * 60 * 1000), // 60 min from now
-    }));
-
-    await (TokenRefreshService.getInstance() as any).checkExpiring();
-
-    expect(mockResilientFetch).not.toHaveBeenCalled();
+    const row = await accountById(id);
+    expect(row.isActive).toBe(1);
+    expect(decryptPlatformToken(row.oauthToken)).toBe("current-access-token");
   });
 });
 
-// ── refreshProvider — Notion ──────────────────────────────────────────────────
+// ── forceRefresh ──────────────────────────────────────────────────────────────
 
-describe("TokenRefreshService — Notion provider refresh", () => {
-  it("on 2xx: updates accessToken and expiresAt in DB", async () => {
-    await db.insert(integrations).values(makeIntegration({ provider: "notion" }));
+describe("TokenRefreshService.forceRefresh", () => {
+  it("renews only the given user's account(s) for a platform", async () => {
+    const mine = await seedAccount({ userId: 7, platform: "dropbox", expiresAt: new Date(Date.now() + 90 * 60 * 1000) });
+    const other = await seedAccount({ userId: 8, platform: "dropbox", expiresAt: new Date(Date.now() + 90 * 60 * 1000) });
+    mockRefreshOAuthToken.mockResolvedValue({
+      access_token: "forced-token",
+      token_type: "Bearer",
+      expires_in: 3600,
+    });
 
-    mockResilientFetch.mockResolvedValueOnce(
-      jsonResponse({ access_token: "fresh-token", expires_in: 3600 })
-    );
+    await TokenRefreshService.getInstance().forceRefresh("dropbox", 7);
 
-    await TokenRefreshService.getInstance().forceRefresh("notion");
-
-    const [row] = await db.select().from(integrations).where(eq(integrations.provider, "notion"));
-    expect(row).toBeDefined();
-    expect(row!.expiresAt).not.toBeNull();
-    // The new expiresAt should be roughly now + 1 hour
-    const diff = row!.expiresAt!.getTime() - Date.now();
-    expect(diff).toBeGreaterThan(3000 * 1000); // > 50 min
-    expect(diff).toBeLessThan(3700 * 1000);    // < ~61 min
+    expect(mockRefreshOAuthToken).toHaveBeenCalledTimes(1);
+    expect(decryptPlatformToken((await accountById(mine)).oauthToken)).toBe("forced-token");
+    // The other user's account is untouched even though it shares the platform.
+    expect(decryptPlatformToken((await accountById(other)).oauthToken)).toBe("current-access-token");
   });
 
-  it("on 4xx (invalid_grant): deletes the integration row", async () => {
-    await db.insert(integrations).values(makeIntegration({ provider: "notion" }));
-
-    mockResilientFetch.mockResolvedValueOnce(jsonResponse({ error: "invalid_grant" }, 401));
-
-    await TokenRefreshService.getInstance().forceRefresh("notion");
-
-    const rows = await db.select().from(integrations).where(eq(integrations.provider, "notion"));
-    expect(rows).toHaveLength(0);
-  });
-
-  it("on 5xx: leaves integration intact (transient error, retry next cycle)", async () => {
-    await db.insert(integrations).values(makeIntegration({ provider: "notion" }));
-
-    mockResilientFetch.mockResolvedValueOnce(jsonResponse({ error: "server_error" }, 503));
-
-    await TokenRefreshService.getInstance().forceRefresh("notion");
-
-    const rows = await db.select().from(integrations).where(eq(integrations.provider, "notion"));
-    expect(rows).toHaveLength(1); // still present
-  });
-
-  it("on network error: leaves integration intact", async () => {
-    await db.insert(integrations).values(makeIntegration({ provider: "notion" }));
-
-    mockResilientFetch.mockRejectedValueOnce(new Error("ECONNREFUSED"));
-
-    await TokenRefreshService.getInstance().forceRefresh("notion");
-
-    const rows = await db.select().from(integrations).where(eq(integrations.provider, "notion"));
-    expect(rows).toHaveLength(1);
-  });
-
-  it("no-op when there is no integration row for the provider", async () => {
-    await TokenRefreshService.getInstance().forceRefresh("notion");
-    expect(mockResilientFetch).not.toHaveBeenCalled();
-  });
-});
-
-// ── refreshProvider — Slack ───────────────────────────────────────────────────
-
-describe("TokenRefreshService — Slack provider refresh", () => {
-  it("deletes integration when auth.test returns {ok: false}", async () => {
-    await db.insert(integrations).values(makeIntegration({ provider: "slack" }));
-
-    mockResilientFetch.mockResolvedValueOnce(jsonResponse({ ok: false }, 200));
-
-    await TokenRefreshService.getInstance().forceRefresh("slack");
-
-    const rows = await db.select().from(integrations).where(eq(integrations.provider, "slack"));
-    expect(rows).toHaveLength(0);
-  });
-
-  it("leaves integration intact when auth.test returns {ok: true}", async () => {
-    await db.insert(integrations).values(makeIntegration({ provider: "slack" }));
-
-    mockResilientFetch.mockResolvedValueOnce(jsonResponse({ ok: true }, 200));
-
-    await TokenRefreshService.getInstance().forceRefresh("slack");
-
-    const rows = await db.select().from(integrations).where(eq(integrations.provider, "slack"));
-    expect(rows).toHaveLength(1);
-  });
-});
-
-// ── refreshProvider — unknown provider ───────────────────────────────────────
-
-describe("TokenRefreshService — unknown provider", () => {
-  it("is a no-op for providers not explicitly handled (e.g. 'github')", async () => {
-    await db.insert(integrations).values(makeIntegration({ provider: "github" }));
-
-    await TokenRefreshService.getInstance().forceRefresh("github");
-
-    expect(mockResilientFetch).not.toHaveBeenCalled();
-    const rows = await db.select().from(integrations).where(eq(integrations.provider, "github"));
-    expect(rows).toHaveLength(1); // unchanged
+  it("skips accounts without a refresh token", async () => {
+    await seedAccount({ platform: "dropbox", refreshToken: null });
+    await TokenRefreshService.getInstance().forceRefresh("dropbox");
+    expect(mockRefreshOAuthToken).not.toHaveBeenCalled();
   });
 });

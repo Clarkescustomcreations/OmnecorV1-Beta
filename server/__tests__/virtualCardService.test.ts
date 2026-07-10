@@ -18,7 +18,7 @@ vi.mock("../db.factory.js", () => {
 });
 
 const { VirtualCardService, CardOperationError } = await import(
-  "../phase2/services/VirtualCardService.js"
+  "../core_services/services/VirtualCardService.js"
 );
 const { getDb } = await import("../db.factory.js");
 const { __resetCircuitBreakers } = await import("../_core/resilientFetch.js");

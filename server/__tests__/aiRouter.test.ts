@@ -23,7 +23,7 @@ const auditHolder = vi.hoisted(() => ({
 }));
 const notifyHolder = vi.hoisted(() => ({ notify: vi.fn() }));
 
-vi.mock("../phase2/websocket/WebSocketServer.js", async importActual => {
+vi.mock("../core_services/websocket/WebSocketServer.js", async importActual => {
   const actual = await importActual<Record<string, unknown>>();
   return { ...actual, getWsInstance: () => wsHolder.ws };
 });
@@ -43,7 +43,7 @@ vi.mock("../_core/ragContext.js", () => ({
 // Audit middleware runs on every protectedProcedure; stub it so nothing touches
 // the real file DB. `.log()` must return a promise — the middleware calls
 // `.catch()` on it.
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: { getInstance: () => ({ log: auditHolder.log }) },
 }));
 

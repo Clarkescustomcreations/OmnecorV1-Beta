@@ -12,7 +12,7 @@ import { Pressable } from "@/components/pressable";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
 import { createLocalAccount, skipOnboarding } from "@/lib/_core/account";
-import { isServerConfigured } from "@/lib/_core/server-config";
+import { useConnection } from "@/hooks/use-connection";
 import { PairFlow } from "@/components/pair-flow";
 
 export function SetupFlow({ onDone }: { onDone: () => void }) {
@@ -23,7 +23,8 @@ export function SetupFlow({ onDone }: { onDone: () => void }) {
   const [busy, setBusy] = useState(false);
   const [note, setNote] = useState<string | null>(null);
 
-  const configured = isServerConfigured();
+  // Show "PC connected" only when the PC actually answers, not merely when an IP is saved.
+  const { online: pcOnline } = useConnection();
 
   const handleLocal = async () => {
     if (!username.trim()) { setNote("Enter a username."); return; }
@@ -75,7 +76,7 @@ export function SetupFlow({ onDone }: { onDone: () => void }) {
             </Pressable>
 
             <Text className="text-xs text-muted text-center mt-2">
-              {configured ? "🟢 PC connected" : "A local account works fully offline and auto-registers on your PC when it connects."}
+              {pcOnline ? "🟢 PC connected" : "A local account works fully offline and auto-registers on your PC when it connects."}
             </Text>
           </View>
         )}

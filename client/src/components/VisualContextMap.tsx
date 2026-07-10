@@ -11,6 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { X, Eye, EyeOff, Trash2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { ContextFile } from "@/lib/chatContext";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface VisualContextMapProps {
   files: ContextFile[];
@@ -92,30 +93,30 @@ export function VisualContextMap({
             </div>
 
             <div className="flex gap-1">
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 p-0"
-                onClick={() => onToggleFile?.(file.id)}
-                title={
-                  file.included ? "Exclude from context" : "Include in context"
-                }
-              >
-                {file.included ? (
-                  <Eye className="w-4 h-4 text-accent-success" />
-                ) : (
-                  <EyeOff className="w-4 h-4 text-muted-foreground" />
-                )}
-              </Button>
-              <Button
-                size="sm"
-                variant="ghost"
-                className="h-7 w-7 p-0 text-destructive hover:text-destructive"
-                onClick={() => onRemoveFile?.(file.id)}
-                title="Remove from context"
-              >
-                <Trash2 className="w-4 h-4" />
-              </Button>
+              <HowToTooltip title="Toggle File Context" description="Include or exclude this file from the AI's active context window." side="top">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0"
+                  onClick={() => onToggleFile?.(file.id)}
+                >
+                  {file.included ? (
+                    <Eye className="w-4 h-4 text-accent-success" />
+                  ) : (
+                    <EyeOff className="w-4 h-4 text-muted-foreground" />
+                  )}
+                </Button>
+              </HowToTooltip>
+              <HowToTooltip title="Remove File" description="Completely remove this file from the context map." side="top">
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  className="h-7 w-7 p-0 text-destructive hover:text-destructive"
+                  onClick={() => onRemoveFile?.(file.id)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
+              </HowToTooltip>
             </div>
           </div>
 
@@ -222,28 +223,32 @@ export function VisualContextMap({
         {/* Quick Actions */}
         {files.length > 0 && (
           <div className="flex gap-2 pt-2 border-t border-border">
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 text-xs"
-              onClick={() =>
-                files.forEach(f => f.included && onToggleFile?.(f.id))
-              }
-            >
-              <EyeOff className="w-3 h-3 mr-1" />
-              Exclude All
-            </Button>
-            <Button
-              size="sm"
-              variant="outline"
-              className="flex-1 text-xs"
-              onClick={() =>
-                files.forEach(f => !f.included && onToggleFile?.(f.id))
-              }
-            >
-              <Eye className="w-3 h-3 mr-1" />
-              Include All
-            </Button>
+            <HowToTooltip title="Exclude All" description="Temporarily exclude all files from the AI's context." side="top">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs"
+                onClick={() =>
+                  files.forEach(f => f.included && onToggleFile?.(f.id))
+                }
+              >
+                <EyeOff className="w-3 h-3 mr-1" />
+                Exclude All
+              </Button>
+            </HowToTooltip>
+            <HowToTooltip title="Include All" description="Include all available files in the AI's active context." side="top">
+              <Button
+                size="sm"
+                variant="outline"
+                className="flex-1 text-xs"
+                onClick={() =>
+                  files.forEach(f => !f.included && onToggleFile?.(f.id))
+                }
+              >
+                <Eye className="w-3 h-3 mr-1" />
+                Include All
+              </Button>
+            </HowToTooltip>
           </div>
         )}
       </CardContent>

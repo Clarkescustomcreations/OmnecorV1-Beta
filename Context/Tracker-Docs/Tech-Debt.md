@@ -1,6 +1,6 @@
 # Technical Debt Register
 
-*A centralized log of all known TODOs, FIXMEs, architectural compromises, and temporary workarounds across the Omnecor codebase. Entries are sourced from code-sweep audits, session notes, AGENTS.md, and Build-Plan appendices. Risk levels: Low / Medium / High / Critical. Last audited: 2026-06-20.*
+*A centralized log of all known TODOs, FIXMEs, architectural compromises, and temporary workarounds across the Omnecor codebase. Entries are sourced from code-sweep audits, session notes, AGENTS.md, and Build-Plan appendices. Risk levels: Low / Medium / High / Critical. Last audited: 2026-07-10 (doc-reconciliation pass — **TD-054 resolved**: agentic + Mesh-Delegation UI now fully imprinted in UI-Registry Sessions 29–33). Prior 2026-07-08 (Chats-Agentic-Upgrade Phases 1–6, Model-Fabric Phases 0–7, Mesh-Delegation Phases 1–9 — TD-054–058 added; TD-053 partially resolved — `<think>` collapse now handled on web via the new `ThinkingSection` collapsible block; APK SAF size issue remains open).*
 
 ---
 
@@ -42,8 +42,30 @@
 ### TD-006: Android APK Physical Device Test Not Completed
 - **File**: `packaging/android/omnecor-hq/android/app/build/outputs/apk/release/app-release.apk`
 - **Reason**: The release APK (118 MB, JS-bundled, debug-signed) has been built and verified at the build level. On-device sideload testing, Vulkan/NNAPI on-device LLM inference verification, and 3rd-party GGUF download/load testing on a physical Samsung Galaxy S25 Ultra (Snapdragon 8 Elite) are all pending.
-- **Risk**: High
-- **Status**: Open — F27 Android leg pending. GGUF must be downloaded to `Documents/models/` on device and Load tested at runtime.
+- **Risk**: High → **Low**
+- **Status**: **Substantially resolved (2026-07-04, live on the physical S25 Ultra over adb).** The whole on-device stack was driven end-to-end and hardened:
+  - **GGUF (llama.rn):** download → completeness-validate → load → chat verified (Llama-3.2-3B answered a prompt, PC offline). Fixed the real "Load failed" root causes — `use_mlock`+full-GPU-offload of a 4.7 GB model, and a **truncated download masquerading as "✓ Downloaded"** (existence-only check) → now `getModelFileState` size-validates and shows "⚠ Incomplete — re-download". Loader uses mmap (no mlock) + GPU→CPU fallback + `n_ctx` 2048.
+  - **LiteRT-LM (`.litertlm`):** DeepSeek-R1-1.5B **and Gemma-4-E4B** both loaded + answered on-device (PC offline). Fixed a hard-crash: loading crashed the whole APK (Hermes SIGSEGV) via our `npu→gpu→cpu` close-and-recreate loop → now one engine / one load, CPU default, opt-in GPU/NPU toggle. **Gemma-4 verified on the GPU backend, no crash.**
+  - **Model acquisition:** built a `.litertlm` download catalog (ungated litert-community), SAF **folder-scan** (grant a sub-folder → list + load; Android blocks `Android/data/` and Downloads/root grants), single-file import, and a chat **"📱 Phone (on-device)" provider** so any on-device GGUF/`.litertlm` is selectable and runs without a PC.
+  - **Still pending:** broad GPU/NPU stability across *all* models (only Gemma-4 GPU + CPU paths proven — see TD-051); true NPU via AICore/Gemini Nano (TD-052). Vulkan/NNAPI-specific delegate confirmation is moot — llama.rn uses Adreno OpenCL + Hexagon HTP libs, LiteRT uses its own GPU/CPU delegates.
+
+### TD-051: LiteRT-LM GPU/NPU Backend Not Validated Across All Models
+- **File**: `packaging/android/omnecor-hq/lib/_core/mediapipe-inference.ts`, `lib/_core/litert-prefs.ts`
+- **Reason**: The compute-backend toggle (CPU/GPU/NPU) is wired and persists, and **CPU is the stable default**. GPU verified working for **Gemma-4-E4B only**; NPU never exercised; the smaller `.litertlm` (DeepSeek/Qwen 1.5B) only proven on CPU. GPU/NPU on this Nitro native module is where the historical Hermes crash lived, so it stays opt-in with an in-UI "switch back to CPU if it crashes" note.
+- **Risk**: Low
+- **Status**: Open — validate GPU + NPU across the catalog + Gallery models on the physical device; if any model reliably crashes on a delegate, gate it per-model.
+
+### TD-052: True On-Device NPU (AICore / Gemini Nano) Not Integrated
+- **File**: (new) — would be a native module alongside `react-native-litert-lm`
+- **Reason**: The Gemma `.litertlm` files run **GPU/CPU** per Gallery's `model_allowlist.json`, not the Hexagon NPU. The genuine NPU path on the S25 Ultra is **Android AICore / Gemini Nano** (`com.google.android.aicore`, ML Kit GenAI APIs) — a system-managed model, not a file. Per-SoC NPU `.litertlm` builds (`..._sm8750.litertlm`, ~689 MB) exist but their `dl.google.com` URLs 404 without Gallery's request signing, so they can't be downloaded directly.
+- **Risk**: Low (CPU/GPU already deliver usable on-device inference)
+- **Status**: Open (Enhancement) — integrate the AICore/ML-Kit GenAI SDK for a true NPU on-device path if the perf/battery win is wanted.
+
+### TD-053: SAF Content-URI File Size Unreliable + DeepSeek `<think>` Tags Render Raw
+- **File**: `packaging/android/omnecor-hq/lib/_core/model-download.ts` (`scanFolderForTaskModels`), `app/(tabs)/index.tsx`
+- **Reason**: Two cosmetic issues seen during 2026-07-04 verification. (1) `getInfoAsync` on a SAF `content://` URI returns a wrong/absent size (folder-scan showed gemma-3n as "0.62 GB" for a 4.92 GB file); size is best-effort and hidden when 0, but the wrong value is misleading. (2) Reasoning models (DeepSeek-R1) emit `<think>…</think>` chain-of-thought that renders raw in the chat bubble — a collapse/hide would be cleaner.
+- **Risk**: Low (cosmetic)
+- **Status**: **Partially resolved (2026-07-07, Chats-Agentic-Upgrade).** Issue (2) — `<think>…</think>` rendering raw — is resolved on **web** by the new `ThinkingSection` collapsible block in `AgenticBlocks.tsx` (default-closed, collapse/hide UX is shipped). APK agentic stream renders the same block natively via `agentic-blocks.tsx` `ThinkingSection`. Issue (1) — SAF content-URI file size unreliable — remains open on APK: `getInfoAsync` on a `content://` URI returns a wrong/absent size (folder-scan shows gemma-3n as "0.62 GB" for a 4.92 GB file). Remaining work: read SAF sizes via a `DocumentFile`/columns query on the APK side.
 
 ### TD-007: Always-Listen Wake-Word `.ppn` Not Trained
 - **File**: `packaging/android/omnecor-hq/lib/_core/always-listen.ts`
@@ -337,6 +359,36 @@
 - **Risk**: High (remote-triggerable full-process crash / DoS) → Resolved
 - **Status**: **RESOLVED (2026-07-01).** Added `guardedEmit` (`server/_core/streamEmit.ts`): it drops any emit after completion or teardown and swallows a closed-controller throw, and exposes `.closed` so the producer stops pulling tokens from the model promptly. Wired into all three subscription sites — the stream loop now `break`s on `g.closed`, the observable teardown calls `g.close()`, and the terminal `.catch` uses `g.error`. `WebSocketServer`'s `streamChat` consumer was already safe (wrapped in try/catch with `session.aborted` guards). Locked with 6 unit tests in `server/__tests__/streamEmit.test.ts` (incl. the exact "controller already closed" throw). Gates: `tsc --noEmit` 0 errors · new tests 6/6.
 
+### TD-054: Agentic Chat UI not yet imprinted into UI-Registry (RESOLVED)
+- **File**: `client/src/components/chat/agentic/AssistantStream.tsx`, `AgenticBlocks.tsx`, `client/src/pages/Chat.tsx`, `client/src/components/chat/ConversationList.tsx`
+- **Reason**: The `/imprint` step for the agentic chat UI was tracked as deferred to the Phase 7 close-out. On review during the 2026-07-10 doc-reconciliation pass, the web agentic surface was in fact already captured (UI-Registry **Session 29** guide-line stream / `ThinkingSection` / `StatusDot` / block chips / `DiffView` / `ApprovalRow`; **Session 30** message chrome; **Session 31** message queue) and the APK port in **Session 32** — the only genuinely-missing piece was the Mesh-Delegation UI.
+- **Risk**: Low (no functional defect; consistency risk for future component additions that reference the registry)
+- **Status**: **Resolved (2026-07-10).** UI-Registry **Session 33** imprints the Mesh-Delegation UI (parent `SubAgentBox` chip + HITL, managed-chat `accent-cyan` banner + cancel, `ConversationList` Network badge, between-turn peer routing, APK mirror). The registry is now current across the entire agentic surface (Sessions 29–33); the Chats-Agentic-Upgrade Phase 4 `/imprint` checkbox is closed. No dependence on the live-mesh hardware session — that gates only the runtime `/review`, not the visual imprint.
+
+### TD-055: APK encrypted chat persistence broken on-device — secure random failure (Open)
+- **File**: `packaging/android/omnecor-hq/lib/_core/chat-store.ts`
+- **Reason**: `[ChatStore] Failed to persist encrypted chats: Native crypto module could not be used to get secure random number` — recurring on the S25 Ultra (also hit in Session-31). `react-native-get-random-values` is not providing `crypto.getRandomValues` reliably. This is a real data-loss risk: chats are not being persisted to device storage. Violates the "Operational Memory Never Escapes" principle.
+- **Risk**: High (data loss — user chat history not persisted on-device)
+- **Status**: Open — investigate `react-native-get-random-values` initialization order (must be imported before `uuid`/`nanoid` in the entry point); consider replacing with `expo-crypto` `getRandomBytes` polyfill which runs in the Hermes native binding and does not rely on the JS crypto global.
+
+### TD-056: APK user prompt bubble text low-contrast on blue background (Open)
+- **File**: `packaging/android/omnecor-hq/components/agentic/assistant-stream.tsx` (user bubble styles)
+- **Reason**: User prompt bubble text renders black/dark on the blue background in the APK \u2014 low contrast, hard to read. The same bug was already fixed in the web app; the fix was not mirrored into the APK. Found during on-device verification 2026-07-07.
+- **Risk**: Low (cosmetic/accessibility)
+- **Status**: Open — mirror the web `userBubble` text-color fix (use `var(--color-primary-foreground)` or equivalent token) into the APK native styles.
+
+### TD-057: APK model picker Omnecor Server "Test" button false-negative (Open)
+- **File**: `packaging/android/omnecor-hq/app/(tabs)/settings.tsx` (or equivalent server-test screen)
+- **Reason**: Settings → Omnecor Server → "Test" shows a sticky "Cannot reach server" even when the WebSocket connection actually establishes successfully (the footer goes 🟢 Connected immediately after). The "Test" preflight is a different, broken code path from the real WS connection. Found during on-device verification 2026-07-07.
+- **Risk**: Low (UX confusion; real connectivity still works)
+- **Status**: Open — align the "Test" button to use the same connection probe as the footer health-check, or simply report the WS connection state rather than running a separate preflight fetch.
+
+### TD-058: Agentic tool-loop + mesh dual-sided live verify deferred to hardware session (Open)
+- **File**: N/A — verification gap, not a code defect
+- **Reason**: The full live verification of the agentic tool-loop dual-sided (web + APK WS stream + HITL + Run/Preview + queue), the `targetNodeId` mesh-pin path, and the Mesh-Delegation `delegate_task` round-trip all require DadsPC (RTX 4060 Ti — owner's fastest reasoning node, but its build is stale) and the `.201` node both redeployed with the current build. This is a known deferred step in both `Chats-Agentic-Upgrade` Phase 7, `Model-Fabric` Phase 7, and `Mesh-Delegation` Phase 10; all three explicitly note it.
+- **Risk**: Medium (unit-tested, build-verified; live end-to-end not yet confirmed on real multi-peer hardware)
+- **Status**: Open — bundle with the next available joint hardware session. Steps: deploy current build to DadsPC + .201, confirm "Omnecor · DadsPC" group renders in the APK picker, spawn a `delegate_task` from the APK parent chat, approve a `run_command` on the peer, confirm the parent re-prompt.
+
 ---
 
 ## Key Insights & Gotchas (2026-06-20 sweep + live verification)
@@ -360,3 +412,4 @@
 - **Zustand + TanStack Query infinite loop trap (TD-046).** `const { data: foo = [] }` in a TanStack Query destructure is not just a minor inefficiency — it creates a **new array reference on every render** while `data` is undefined (loading state). `Object.is` sees a new value, so any effect with `foo` in its deps fires every render. Amplifier: an unselectored `useDesignerStore()` (no selector) subscribes to the entire Zustand store; every `set()` call — even with the same value — produces a new merged-state object and re-notifies all subscribers. The combination creates a render → effect → `set()` → re-render → render loop that hits React's 25-nested-update limit with "Maximum update depth exceeded." The failure only appears on the specific first-boot state where loading data is still undefined — once data arrives, the inline `[]` is replaced by the real array and the loop stops. Diagnosis: add render-count and per-effect `console.log` with the dep values; if an effect fires every render, its deps contain an unstable reference. Fix: hoist empty arrays/objects to module-level constants; always use selectors (`useStore((s) => s.field)`); add equality guards to Zustand setters that run in tight loops.
 - **Two independent mDNS advertisers exist for the same job (TD-049).** `server/ommesh/core/DiscoveryService.ts` (newer, OMMESH mesh discovery) and `server/phase2/services/MeshDiscoveryService.ts` (older, `system.aiProviders`/mesh-peer-card plumbing) both call `bonjour().publish(...)` independently. A defensive fix applied to one (the bonjour `error`-listener crash guard) does **not** propagate to the other — they're separate classes with separate bugs, not two call sites of shared code. When touching mDNS/bonjour behavior, grep for **all** `bonjour(` call sites, not just the one you're looking at; assume any fix needs to be mirrored, not shared.
 - **A WS/IPC message envelope split across two hand-written type declarations WILL drift (TD-048).** `EmbeddedTerminal.tsx`'s `pty:*` client/server message types and `WebSocketServer.ts`'s `ClientMessage`/`ServerMessage` interfaces were two independent, unlinked declarations describing the same wire protocol — TypeScript has no way to catch a mismatch between two types that never reference each other, even with `pnpm check` fully green. The bug (every keystroke silently dropped) shipped and stayed invisible through the type checker, tests, and casual code review. **Diagnosis pattern:** if a client/server or IPC feature "does nothing" with no error, suspect a message-shape mismatch before suspecting business logic — check literally what key names/nesting each side sends vs. reads. **Fix pattern:** extract the shared shape into one type in `shared/` (or equivalent common module) and import it on both sides; never hand-write the same wire contract twice.
+- **Android forbids app access to another app's `Android/data/` — and SAF won't grant Downloads/root either.** Google AI Edge Gallery stores its `.litertlm` models in `/sdcard/Android/data/com.google.ai.edge.gallery/files/<Model>/<hash>/`. On Android 11+ **no app can read another app's `Android/data/` subtree** — not via the SAF folder picker, not even with `MANAGE_EXTERNAL_STORAGE` ("All files access", which explicitly excludes `Android/data` + `Android/obb`). Only adb/root/Samsung "My Files" can. Additionally, SAF's `requestDirectoryPermissionsAsync` **refuses to grant the Downloads folder or the primary-volume root** ("Can't use this folder — choose another") — the user must pick a **sub-folder** (e.g. `Download/OmnecorModels`). So the only user-facing bridge for Gallery models is: My Files → copy `.litertlm` into a sub-folder → Omnecor folder-scan grants that sub-folder. The `dl.google.com/google-ai-edge-gallery/...` CDN URLs in Gallery's `model_allowlist.json` **404 without Gallery's request signing** (tested from the phone), so they can't be re-downloaded into another app.

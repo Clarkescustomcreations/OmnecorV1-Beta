@@ -1,10 +1,12 @@
 // server/ommesh/core/DiscoveryService.ts
 import bonjour from 'bonjour';
+import * as https from "https";
 import { NodeIdentity, NodeCapabilities } from '../../../shared/types/ommesh.types.js';
 import { SecurityManager } from './SecurityManager.js';
 import { createLogger } from "../../_core/logger.js";
 import { mdnsBindInterface, pickPeerAddress } from "../../_core/net-utils.js";
 import { MESH_PORT } from "./MeshServer.js";
+import { hashModelList } from "../crypto.js";
 const log = createLogger("OMMESH:Discovery");
 
 export interface PeerInfo {
@@ -14,6 +16,12 @@ export interface PeerInfo {
   fingerprint: string;
   /** Parsed from the peer's mDNS TXT record; feeds VRAM-weighted routing. */
   capabilities: NodeCapabilities;
+  /**
+   * The peer's advertised model-list hash (Model-Fabric Phase 4 beacon-
+   * minimal design) — `capabilities.models` is only refetched over mTLS when
+   * this changes, not on every mDNS re-announce.
+   */
+  modelsHash: string;
   discoveredAt: Date;
 }
 
@@ -43,23 +51,40 @@ export class DiscoveryService {
     const bonjourFactory = bonjour as unknown as (opts?: any) => any;
     this.bonjourInstance = bonjourFactory(ifaceIp ? { interface: ifaceIp } : undefined);
     if (ifaceIp) log.info("mDNS bound to LAN interface", { interface: ifaceIp });
+
+    // GET /models is pinned-peer gated (Model-Fabric Phase 4), so a peer
+    // discovered before approval can't be fetched from yet. Once it's
+    // approved, retry the fetch immediately rather than waiting for the next
+    // mDNS re-announce (which may not come for a long time if the peer's
+    // model list happens to be static).
+    this.security.on?.('peer-trusted', (fingerprint: string) => {
+      const peer = Array.from(this.peers.values()).find((p) => p.fingerprint === fingerprint);
+      if (peer) void this.refreshPeerModels(peer);
+    });
   }
 
   /**
-   * Publish (or re-publish) this node's mDNS service advertisement. The TXT
-   * record carries the node's fingerprint and current `capabilities` (including
-   * live GPU/CPU/RAM telemetry), so re-calling this after telemetry changes
-   * propagates fresh routing data to peers. Stores the service handle so it can
-   * be stopped before a re-publish.
+   * Publish (or re-publish) this node's mDNS service advertisement.
+   *
+   * Beacon-minimal (Model-Fabric Decision 4): the TXT record carries the
+   * node's fingerprint, live GPU/CPU/RAM telemetry, and a `modelsHash` —
+   * NOT the full model list. A model catalog can grow arbitrarily (many
+   * Ollama tags), which would blow past the mDNS TXT record's per-entry size
+   * limit; the small scalar telemetry fields don't have that problem and stay
+   * inline so routing has fresh data on every re-advertise. Peers fetch the
+   * real model list over mTLS (`GET /models`) only when `modelsHash` changes
+   * — see `handlePeerDiscovery`/`refreshPeerModels`.
    */
   private publishBeacon() {
+    const { models, ...restCapabilities } = this.identity.capabilities;
     const service = this.bonjourInstance.publish({
       name: this.identity.id,
       type: 'omnecor',
       port: MESH_PORT, // Dedicated mesh port (mTLS inference server)
       txt: {
         fingerprint: this.identity.fingerprint,
-        capabilities: JSON.stringify(this.identity.capabilities)
+        capabilities: JSON.stringify(restCapabilities),
+        modelsHash: hashModelList(models ?? []),
       }
     });
 
@@ -124,28 +149,104 @@ export class DiscoveryService {
     // Basic validation: don't discover ourselves
     if (service.name === this.identity.id) return;
 
+    const existing = this.peers.get(service.name);
+    const modelsHash = typeof service.txt?.modelsHash === "string" ? service.txt.modelsHash : "";
+
+    const parsedCapabilities: NodeCapabilities = (() => {
+      try {
+        const parsed = JSON.parse(service.txt?.capabilities ?? "");
+        // Guard against malformed or legacy (array-shaped) TXT payloads.
+        if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.gpu) {
+          return parsed as NodeCapabilities;
+        }
+        return emptyCapabilities();
+      } catch {
+        return emptyCapabilities();
+      }
+    })();
+
     const peerInfo: PeerInfo = {
       name: service.name,
       address: pickPeerAddress(service),
       port: service.port,
       fingerprint: service.txt?.fingerprint ?? "",
-      capabilities: (() => {
-        try {
-          const parsed = JSON.parse(service.txt?.capabilities ?? "");
-          // Guard against malformed or legacy (array-shaped) TXT payloads.
-          if (parsed && typeof parsed === "object" && !Array.isArray(parsed) && parsed.gpu) {
-            return parsed as NodeCapabilities;
-          }
-          return emptyCapabilities();
-        } catch {
-          return emptyCapabilities();
-        }
-      })(),
+      capabilities: {
+        ...parsedCapabilities,
+        // Beacon-minimal (Model-Fabric Phase 4): the TXT never carries the
+        // full model list. Keep the previously-fetched list as long as the
+        // hash hasn't moved (avoids flickering to `[]` on every re-announce);
+        // a changed/new hash starts empty until the fetch below resolves.
+        models: existing?.modelsHash === modelsHash ? existing?.capabilities.models ?? [] : [],
+      },
+      modelsHash,
       discoveredAt: new Date(),
     };
 
     this.peers.set(service.name, peerInfo);
     log.info("Peer added to mesh", { name: service.name, address: peerInfo.address, port: peerInfo.port });
+
+    if (modelsHash && modelsHash !== existing?.modelsHash) {
+      void this.refreshPeerModels(peerInfo);
+    }
+  }
+
+  /**
+   * Fetch a peer's full model list over mTLS (`GET /models`) and update the
+   * cached `PeerInfo` in place — only if the peer is still the one we asked
+   * about (its hash hasn't moved again mid-fetch) and is currently trusted
+   * (the endpoint is pinned-peer gated, so an unapproved peer's request would
+   * just 403; skip the network round trip entirely in that case).
+   */
+  private async refreshPeerModels(peer: PeerInfo): Promise<void> {
+    if (!this.security.isTrusted(peer.fingerprint)) return;
+    try {
+      const models = await this.fetchModelsFromPeer(peer);
+      const current = this.peers.get(peer.name);
+      if (current && current.modelsHash === peer.modelsHash) {
+        current.capabilities.models = models;
+        log.info("Fetched peer model list", { peer: peer.name, modelCount: models.length });
+      }
+    } catch (err) {
+      log.warn("Failed to fetch peer model list", { peer: peer.name, error: (err as Error).message });
+    }
+  }
+
+  private fetchModelsFromPeer(peer: PeerInfo): Promise<NodeCapabilities["models"]> {
+    const tlsOptions = this.security.getClientTlsOptions(peer.fingerprint || undefined);
+
+    return new Promise((resolve, reject) => {
+      const req = https.request(
+        {
+          host: peer.address,
+          port: peer.port || MESH_PORT,
+          path: "/models",
+          method: "GET",
+          ...tlsOptions,
+          timeout: 10_000,
+        },
+        (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (c: Buffer) => chunks.push(c));
+          res.on("end", () => {
+            const text = Buffer.concat(chunks).toString("utf8");
+            if (res.statusCode !== 200) {
+              reject(new Error(`peer ${peer.name} /models returned ${res.statusCode}: ${text.slice(0, 200)}`));
+              return;
+            }
+            try {
+              const parsed = JSON.parse(text) as { models?: unknown };
+              resolve(Array.isArray(parsed.models) ? (parsed.models as NodeCapabilities["models"]) : []);
+            } catch {
+              reject(new Error(`peer ${peer.name} /models returned invalid JSON`));
+            }
+          });
+        },
+      );
+
+      req.on("error", reject);
+      req.on("timeout", () => req.destroy(new Error(`peer ${peer.name} /models timed out`)));
+      req.end();
+    });
   }
 
   /**

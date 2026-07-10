@@ -21,7 +21,7 @@ vi.mock("../db.js", async importActual => {
 });
 
 // Stub the audit middleware so protectedProcedure stays hermetic.
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },

@@ -7,6 +7,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Play, FileText, Image as ImageIcon, Box } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface BlenderStdoutEvent { line: string; }
 interface BlenderRenderProgressEvent { percent: number; preview?: string; }
@@ -61,12 +62,16 @@ export const BlenderPanel: React.FC = () => {
           </Badge>
         </div>
         <div className="flex gap-2">
-          <Button variant="outline" size="sm" onClick={() => renderMutation.mutate({})}>
-            <ImageIcon className="w-4 h-4 mr-2" /> Quick Render
-          </Button>
-          <Button size="sm" onClick={() => executeMutation.mutate({ scriptPath: "init.py" })}>
-            <Play className="w-4 h-4 mr-2" /> Run Init Script
-          </Button>
+          <HowToTooltip title="Render Image" description="Start Blender rendering engine on current scene" side="top">
+            <Button variant="outline" size="sm" onClick={() => renderMutation.mutate({})}>
+              <ImageIcon className="w-4 h-4 mr-2" /> Quick Render
+            </Button>
+          </HowToTooltip>
+          <HowToTooltip title="Run Script" description="Execute python script in Blender environment" side="top">
+            <Button size="sm" onClick={() => executeMutation.mutate({ scriptPath: "init.py" })}>
+              <Play className="w-4 h-4 mr-2" /> Run Init Script
+            </Button>
+          </HowToTooltip>
         </div>
       </div>
 

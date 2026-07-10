@@ -1,5 +1,6 @@
 // server/routers/ommesh.router.ts
 import { z } from 'zod';
+import { TRPCError } from '@trpc/server';
 import { readFileSync, writeFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { homedir } from 'os';
@@ -34,14 +35,27 @@ export const ommeshRouter = router({
   }),
 
   /**
-   * Route an inference task through the mesh.
+   * Route an inference task through the mesh. By default the routing engine
+   * scores all nodes and picks the best; pass `targetNodeId` to pin the task
+   * to a specific peer (agent-task assignment) — same mTLS channel, no scoring.
    */
   routeInference: protectedProcedure
     .input(z.object({
       prompt: z.string(),
-      options: z.record(z.string(), z.any()).optional()
+      options: z.record(z.string(), z.any()).optional(),
+      targetNodeId: z.string().optional(),
     }))
     .mutation(async ({ input }) => {
+      if (input.targetNodeId) {
+        const peer = meshNode.getDiscovery().getPeers().find(p => p.name === input.targetNodeId);
+        if (!peer) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Mesh peer "${input.targetNodeId}" is not in the discovery table — is it online?`,
+          });
+        }
+        return meshNode.executeOnPeer(peer, input.prompt, input.options || {});
+      }
       return meshNode.routeInference(input.prompt, input.options || {});
     }),
 

@@ -9,7 +9,7 @@
  */
 import { describe, it, expect, beforeEach, vi } from "vitest";
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
@@ -17,7 +17,7 @@ vi.mock("../phase2/services/AuditLogService.js", () => ({
 
 const configure = vi.hoisted(() => vi.fn());
 const generateComponent = vi.hoisted(() => vi.fn());
-vi.mock("../phase2/services/PenpotService.js", () => ({
+vi.mock("../core_services/services/PenpotService.js", () => ({
   PenpotService: { getInstance: () => ({ configure, generateComponent }) },
 }));
 

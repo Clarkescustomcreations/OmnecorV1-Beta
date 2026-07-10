@@ -16,6 +16,10 @@ export interface StoredChatSession {
   messages: StoredChatMessage[];
   neuralMapId?: string | null;
   personaId?: string | null;
+  /** Mesh-Delegation.md — persisted so a managed sub-agent chat survives a
+   *  reload as a delegated session (routes turns to the peer, not the local
+   *  model). Absent for ordinary chats. */
+  delegatedNodeName?: string | null;
 }
 
 export interface ChatSnapshot {

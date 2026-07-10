@@ -13,11 +13,11 @@ import { Pressable } from "@/components/pressable";
 import { useState, useCallback, useEffect } from "react";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { useBottomInset } from "@/hooks/use-bottom-inset";
 import { useOmmeshNode } from "@/hooks/use-ommesh-node";
 import {
-  isModelLoaded, getLoadedModelPath, getStatus as getInferenceStatus,
-  subscribeStatus, getStats, RECOMMENDED_MODELS,
-} from "@/lib/_core/local-inference";
+  getPhoneModelStatus, subscribePhoneModel, type PhoneModelStatus,
+} from "@/lib/_core/phone-model";
 import { isServerConfigured } from "@/lib/_core/server-config";
 
 const STATUS_COLOR: Record<string, string> = {
@@ -46,52 +46,49 @@ const STATUS_LABEL: Record<string, string> = {
 
 export default function AiNodeScreen() {
   const colors = useColors();
-  const { status, nodeId, stats, isRegistered, connect, disconnect } = useOmmeshNode();
+  const bottomInset = useBottomInset();
+  const { status, nodeId, stats, connect, disconnect } = useOmmeshNode();
 
-  const [inferenceStatus, setInferenceStatus] = useState(getInferenceStatus());
-  const [modelLoaded,     setModelLoaded]     = useState(isModelLoaded());
-  const [modelPath,       setModelPath]       = useState(getLoadedModelPath());
+  // Resident phone model — the SAME truth the Chat picker and Settings show
+  // (either engine), including the backend that actually engaged.
+  const [phoneModel, setPhoneModel] = useState<PhoneModelStatus>(getPhoneModelStatus());
+  useEffect(() => subscribePhoneModel(setPhoneModel), []);
+  const modelLoaded = phoneModel.state === "ready" || phoneModel.state === "running";
 
   // Test inference input
   const [testPrompt,  setTestPrompt]  = useState("Tell me a one-sentence joke.");
   const [testResult,  setTestResult]  = useState("");
   const [testRunning, setTestRunning] = useState(false);
 
-  useEffect(() => {
-    const unsub = subscribeStatus((s) => {
-      setInferenceStatus(s);
-      setModelLoaded(isModelLoaded());
-      setModelPath(getLoadedModelPath());
-    });
-    return () => {
-      unsub();
-    };
-  }, []);
-
   const handleTestInference = useCallback(async () => {
     if (!modelLoaded || testRunning) return;
     setTestRunning(true);
     setTestResult("");
     try {
-      const { runInference } = await import("@/lib/_core/local-inference");
-      let out = "";
-      await runInference(testPrompt, {
-        maxTokens: 100,
-        onToken: (t) => {
-          out += t;
-          setTestResult(out);
-        },
-      });
+      if (phoneModel.engine === "gguf") {
+        const { runInference } = await import("@/lib/_core/local-inference");
+        let out = "";
+        await runInference(testPrompt, {
+          maxTokens: 100,
+          onToken: (t) => {
+            out += t;
+            setTestResult(out);
+          },
+        });
+      } else {
+        const { generateTask } = await import("@/lib/_core/mediapipe-inference");
+        await generateTask(testPrompt, (partial) => setTestResult(partial));
+      }
     } catch (err) {
       setTestResult("Error: " + String(err));
     } finally {
       setTestRunning(false);
     }
-  }, [modelLoaded, testPrompt, testRunning]);
+  }, [modelLoaded, phoneModel.engine, testPrompt, testRunning]);
 
   return (
     <ScreenContainer className="flex-1 bg-background">
-      <ScrollView contentContainerStyle={{ flexGrow: 1 }} className="p-4" showsVerticalScrollIndicator={false}>
+      <ScrollView contentContainerStyle={{ flexGrow: 1, paddingBottom: bottomInset }} className="p-4" showsVerticalScrollIndicator={false}>
         <View className="gap-5">
 
           {/* ── Node Status Card ──────────────────────────────────────── */}
@@ -115,7 +112,7 @@ export default function AiNodeScreen() {
 
           {/* ── Connect / Disconnect ─────────────────────────────────── */}
           <View className="flex-row gap-3">
-            <Pressable onPress={connect}
+            <Pressable testID="btn-connect-mesh" onPress={connect}
               disabled={status === "connected" || status === "registered" || status === "connecting" || !isServerConfigured()}
               className={`flex-1 rounded-lg p-3 items-center ${
                 status === "registered" || status === "connected" || !isServerConfigured()
@@ -125,7 +122,7 @@ export default function AiNodeScreen() {
                 {status === "connecting" ? "Connecting…" : "Connect to Mesh"}
               </Text>
             </Pressable>
-            <Pressable onPress={disconnect}
+            <Pressable testID="btn-disconnect-mesh" onPress={disconnect}
               disabled={status === "disconnected"}
               className={`flex-1 rounded-lg p-3 items-center border ${status === "disconnected" ? "border-muted/30 bg-surface" : "border-error bg-error/20 active:opacity-80"}`}>
               <Text className={`font-semibold text-sm ${status === "disconnected" ? "text-muted" : "text-error"}`}>
@@ -158,18 +155,38 @@ export default function AiNodeScreen() {
             <Text className="text-base font-bold text-foreground mb-3">On-Device Model</Text>
             {modelLoaded ? (
               <View className="bg-success/10 border border-success rounded-lg p-3">
-                <Text className="text-sm font-semibold text-success">✓ Model loaded</Text>
-                <Text className="text-xs text-muted mt-1">{modelPath?.split("/").pop()}</Text>
+                <View className="flex-row items-center gap-2">
+                  <Text className="text-sm font-semibold text-success">✓ Model loaded</Text>
+                  {phoneModel.backend && (
+                    <View className={`rounded-full px-2 py-0.5 ${phoneModel.backend === "npu" ? "bg-primary/20" : "bg-muted/20"}`}>
+                      <Text className={`text-xs font-semibold ${phoneModel.backend === "npu" ? "text-primary" : "text-foreground"}`}>
+                        {phoneModel.backend === "npu" ? "⚡ NPU" : phoneModel.backend.toUpperCase()}
+                      </Text>
+                    </View>
+                  )}
+                  <Text className="text-xs text-muted">{phoneModel.engine === "gguf" ? "GGUF" : "LiteRT"}</Text>
+                </View>
+                <Text className="text-xs text-muted mt-1">{phoneModel.filename}</Text>
+                {phoneModel.devices.length > 0 && (
+                  <Text className="text-xs text-muted mt-1">devices: {phoneModel.devices.join(", ")}</Text>
+                )}
                 <Text className="text-xs text-muted mt-1">
-                  Inference: {inferenceStatus === "running" ? "⚡ Running…" : inferenceStatus === "ready" ? "✓ Ready" : inferenceStatus}
+                  Inference: {phoneModel.state === "running" ? "⚡ Running…" : "✓ Ready"}
                 </Text>
+              </View>
+            ) : phoneModel.state === "loading" ? (
+              <View className="bg-primary/10 border border-primary rounded-lg p-3">
+                <Text className="text-sm font-semibold text-primary">Loading {phoneModel.filename}…</Text>
               </View>
             ) : (
               <View className="bg-warning/10 border border-warning rounded-lg p-3">
                 <Text className="text-sm font-semibold text-warning">⚠ No model loaded</Text>
                 <Text className="text-xs text-muted mt-1">
-                  Load a GGUF model in Settings → Phone AI Model to enable on-device inference.
+                  Pick a phone model in the Chat model selector to load one (download in Settings → Phone AI Model).
                 </Text>
+                {phoneModel.state === "error" && phoneModel.error ? (
+                  <Text className="text-xs text-error mt-1">{phoneModel.error}</Text>
+                ) : null}
               </View>
             )}
           </View>
@@ -180,9 +197,11 @@ export default function AiNodeScreen() {
             <View className="bg-surface border border-border rounded-lg p-4 gap-2">
               {[
                 ["Chipset",  "Snapdragon 8 Elite"],
-                ["NPU",      "Hexagon NPU — 45 TOPS"],
-                ["Backend",  "Vulkan / NNAPI (llama.rn)"],
-                ["Max Model","~7B Q4 (≈ 5 GB VRAM)"],
+                ["NPU",      "Hexagon HTP (ggml-hexagon via llama.rn)"],
+                ["Backend",  phoneModel.backend
+                  ? `${phoneModel.backend.toUpperCase()}${phoneModel.devices.length ? ` (${phoneModel.devices.join(", ")})` : ""}`
+                  : "— load a model to see the live backend"],
+                ["NPU quants", "Q4_0 · IQ4_NL · Q8_0 · MXFP4"],
                 ["Role",     "OMMESH worker node"],
               ].map(([label, value]) => (
                 <View key={label} className="flex-row justify-between">
@@ -197,10 +216,10 @@ export default function AiNodeScreen() {
           {modelLoaded && (
             <View>
               <Text className="text-base font-bold text-foreground mb-3">Test On-Device Inference</Text>
-              <TextInput value={testPrompt} onChangeText={setTestPrompt} multiline
+              <TextInput testID="input-test-prompt" value={testPrompt} onChangeText={setTestPrompt} multiline
                 placeholder="Enter a test prompt…" placeholderTextColor={colors.muted}
                 className="bg-surface border border-border rounded-lg px-3 py-2 text-foreground text-sm mb-3" />
-              <Pressable onPress={handleTestInference} disabled={testRunning}
+              <Pressable testID="btn-run-test-inference" onPress={handleTestInference} disabled={testRunning}
                 className={`rounded-lg p-3 items-center ${testRunning ? "bg-primary/50" : "bg-primary active:opacity-80"}`}>
                 {testRunning
                   ? <ActivityIndicator size="small" color="white" />
@@ -226,7 +245,7 @@ export default function AiNodeScreen() {
               {"→ Reverse: when phone needs heavy AI (vision, large context), it routes to PC.\n"}
               {"→ Over Tailscale: works from anywhere, not just same Wi-Fi.\n\n"}
               {"PC-side: add mobile_node_register handler to\n"}
-              {"OmnecorV1-Beta/server/phase2/websocket/WebSocketServer.ts"}
+              {"OmnecorV1-Beta/server/core_services/websocket/WebSocketServer.ts"}
             </Text>
           </View>
 

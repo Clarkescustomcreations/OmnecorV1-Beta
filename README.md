@@ -45,11 +45,14 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
   - ⚡ **Scrapper** *(default)* — Local-first with cloud fallback. Maximum efficiency.
   - 🔥 **Big Spender** — Cloud-first for maximum quality on production runs.
 - **Valet Router** — Qwen2.5-1.5B-Instruct fine-tuned routing classifier (GGUF, served via llama-cpp-python). Produced by `pnpm valet:build`; distributed as a pre-built artifact via GitHub Releases. Auto-starts with the app when the artifact is present; falls back to keyword rules otherwise. No cloud call is ever made for the routing decision.
-- **Local LLM Support** — First-class Ollama and Llama.cpp integration with VRAM-aware model selection.
+- **Ollama-optional local runtime** — Omnecor manages its own `llama-server` (llama.cpp) subprocess and can serve inference without Ollama installed. Ollama is an optional accelerator; when present it is used automatically, but it is never required. See [Local Runtime setup](INSTALL.md#local-llm-runtime-optional--ollama-optional).
+- **Unified Model Catalog** (`aiProvider.catalog`) — a single server-side aggregator that merges every runnable model across all sources: Omnecor-owned local runtime, optional local Ollama, OMMESH peer nodes, cloud providers with a configured key, and the phone's on-device models. Every entry is deduped, tagged by location and capabilities, and routes through Omnecor's full agent/tool layer. The model picker on web and APK consumes this catalog directly — no split-brain model lists.
 
 ### Agentic Workforce
+- **Agentic Chat Stream** — The main chat (web + APK) runs a Claude-Code-style typed stream: right-pinned user bubbles, flush-left AI notepad on a guide line, collapsible real-reasoning "Thinking" section, and inline status chips for commands / edits / background jobs (green/red dots, click-to-expand, hunk-only partial diffs). The AI actually runs tools — `edit_file`, `run_command`, `start_job` — each HITL-gated before execution. A FIFO message queue lets you type follow-up turns while the model is still streaming.
 - **Multi-Agent Orchestration** — Autonomous agents collaborate on software, media, and hardware tasks using shared context.
-- **Human-in-the-Loop (HITL)** — Critical agent actions require explicit human approval before execution.
+- **Mesh Sub-Agent Delegation** — The main agent can `delegate_task` to a trusted OMMESH peer: a full `ChatAgentRunner` loop runs on the peer's filesystem inside a scoped sandbox, its live typed events stream back over mTLS as NDJSON, and the origin creates a new managed conversation the user can observe, approve in, and type into between turns.
+- **Human-in-the-Loop (HITL)** — Critical agent actions require explicit human approval before execution. HITL gates relay transparently through mesh delegation — a delegated tool on a remote peer requires the same user approval as a local one.
 - **GodMode Pipelines** — 5-phase gated execution (DEFINE → PLAN → EXECUTE → REVIEW → SHIP) with per-phase approval gates.
 - **Agent Memory (RAG)** — ChromaDB vector store + `MemoryArchitectService` for semantic, long-horizon context retrieval.
 - **Agent Audit Trail** — Every agent spawn, termination, and tool call is written to the immutable audit log.
@@ -83,14 +86,16 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 ### OMMESH Distributed Intelligence
 - **LAN Mesh Discovery** — mDNS/Bonjour auto-discovery of other Omnecor nodes on the local network.
 - **Secure Federation** — mTLS mutual authentication between all mesh nodes.
-- **VRAM-Weighted Routing** — Inference requests delegated to the mesh node with the most available VRAM.
+- **Beacon-minimal model advertising** — Each peer advertises a catalog hash in its mDNS TXT record; the full model list is fetched over authenticated mTLS on demand so the TXT record stays within the RFC 6763 255-byte limit regardless of how many models a node serves.
+- **VRAM-Weighted Routing** — Inference requests auto-delegated to the mesh node with the most available VRAM, or pinned to a specific peer by selecting it from the unified model catalog.
 - **Real-Time Topology** — `mesh:node_joined` / `mesh:node_left` WebSocket events keep the UI in sync.
 - **Peer Indicators** — Sidebar footer shows discovered peers with hostname, latency, and available model counts; updates every 10 seconds.
+- **Sub-Agent Delegation** — Spawn a full `ChatAgentRunner` loop on a trusted peer via the `delegate_task` tool. The peer runs the loop inside a sandboxed workspace; per-action HITL relays to the user's device; the parent chat receives an async result on completion.
 
 ### Agentic Wallet & Budgeting
 - **Per-Project Budgets** — Set hard or soft spend limits (in cents) per project.
 - **Real-Time Spend Tracking** — `budget:spend` WebSocket events update spend meters after every cloud API call.
-- **Auto-Downgrade** — When a hard limit is hit, remaining tasks are automatically re-routed to local Ollama models.
+- **Auto-Downgrade** — When a hard limit is hit, remaining tasks are automatically re-routed to the local runtime (`pickLocalFallbackProvider()` — Omnecor's own `llama-server`, or Ollama only if it has a pulled model), never silently to a hardcoded provider.
 - **Virtual Credit Cards** — Lithic API integration issues unique virtual cards per project for total financial isolation.
 - **Manual Tracking Mode** — Full spend logging without `LITHIC_API_KEY`; no card required.
 

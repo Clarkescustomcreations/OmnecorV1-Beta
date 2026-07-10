@@ -12,7 +12,7 @@ import { describe, it, expect, beforeEach, vi } from "vitest";
 import { TRPCError } from "@trpc/server";
 
 const auditHolder = vi.hoisted(() => ({ log: vi.fn().mockResolvedValue(undefined) }));
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: { getInstance: () => ({ log: auditHolder.log }) },
 }));
 

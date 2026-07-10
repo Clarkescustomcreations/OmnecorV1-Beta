@@ -183,3 +183,11 @@ tmp-valet-train/
 
 # Local reference codebases (not part of the repo)
 reference_mcp_codebase/
+
+# Internal per-feature build-tracking docs — working notes, not shipped docs.
+# Their content is folded into CHANGELOG / Progress-Tracker / Feature-Map /
+# UI-Registry / Verification-Pass, which ARE committed. (The OMMESH mesh-test
+# skill under .claude/skills/ is already ignored by the .claude/skills/ rule above.)
+Chats-Agentic-Upgrade.md
+Model-Fabric.md
+Mesh-Delegation.md

@@ -1,6 +1,12 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 
+/** A single between-turn queued message (type-ahead while the AI is streaming). */
+export interface QueuedMessage {
+  id: string;
+  content: string;
+}
+
 export interface AppState {
   // WebSocket Status
   wsStatus: 'connecting' | 'connected' | 'reconnecting' | 'offline';
@@ -15,6 +21,8 @@ export interface AppState {
     autoStoreMemory: boolean;
     showThinkingQuotes: boolean;
     quoteStyle: "random" | "funny" | "serious";
+    /** Auto-approve agentic tool actions (commands/edits/jobs) scoped to the active map. */
+    autoApproveTools: boolean;
   };
   setChatDisplaySettings: (settings: Partial<AppState['chatDisplaySettings']>) => void;
 
@@ -30,6 +38,21 @@ export interface AppState {
   // Chat conversation state
   conversationMessages: Array<{ role: string; content: string }>;
   clearConversation: () => void;
+
+  // Between-turn message queue (type-ahead while the AI is streaming).
+  // Deliberately NOT persisted — a stale queued turn must never auto-fire on
+  // reload. Bound to the active chat conversation; cleared on conversation switch.
+  messageQueue: QueuedMessage[];
+  /** Append a message to the queue; returns the new queued-message id. */
+  enqueueMessage: (content: string) => string;
+  /** FIFO: remove and return the oldest queued message (drives the next turn). */
+  dequeueMessage: () => QueuedMessage | undefined;
+  /** LIFO: remove and return the newest queued message (up-arrow recall). */
+  popLatestQueuedMessage: () => QueuedMessage | undefined;
+  /** Remove a single queued message by id (chip ✕). */
+  removeQueuedMessage: (id: string) => void;
+  /** Drop the whole queue (conversation switch / unmount / stream error). */
+  clearMessageQueue: () => void;
 
   // File History (Recent Files)
   fileHistory: string[];
@@ -80,7 +103,7 @@ export interface AppState {
 
 export const useAppStore = create<AppState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
   wsStatus: 'connecting',
   setWsStatus: (status) => set({ wsStatus: status }),
 
@@ -92,6 +115,7 @@ export const useAppStore = create<AppState>()(
     autoStoreMemory: true,
     showThinkingQuotes: true,
     quoteStyle: "random",
+    autoApproveTools: false,
   },
   setChatDisplaySettings: (settings) => set((state) => ({ 
     chatDisplaySettings: { ...state.chatDisplaySettings, ...settings } 
@@ -106,6 +130,29 @@ export const useAppStore = create<AppState>()(
 
   conversationMessages: [],
   clearConversation: () => set({ conversationMessages: [] }),
+
+  messageQueue: [],
+  enqueueMessage: (content) => {
+    const id = crypto.randomUUID();
+    set((state) => ({ messageQueue: [...state.messageQueue, { id, content }] }));
+    return id;
+  },
+  dequeueMessage: () => {
+    const [next, ...rest] = get().messageQueue;
+    if (!next) return undefined;
+    set({ messageQueue: rest });
+    return next;
+  },
+  popLatestQueuedMessage: () => {
+    const queue = get().messageQueue;
+    if (queue.length === 0) return undefined;
+    const next = queue[queue.length - 1];
+    set({ messageQueue: queue.slice(0, -1) });
+    return next;
+  },
+  removeQueuedMessage: (id) =>
+    set((state) => ({ messageQueue: state.messageQueue.filter((m) => m.id !== id) })),
+  clearMessageQueue: () => set({ messageQueue: [] }),
 
   fileHistory: [],
   addToHistory: (path) => set((state) => {

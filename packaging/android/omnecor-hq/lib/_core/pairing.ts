@@ -12,6 +12,7 @@ import * as SecureStore from "expo-secure-store";
 import { Platform } from "react-native";
 import { saveServerConfig, getServerBaseUrl, isServerConfigured } from "./server-config";
 import { setSessionToken, setUserInfo, type User } from "./auth";
+import { setPairedAccount } from "./account";
 
 export interface PairTarget {
   host: string;
@@ -94,7 +95,10 @@ async function redeem(
   const data = (await res.json()) as { app_session_id?: string; user?: unknown };
   if (!data.app_session_id) throw new Error("Pairing did not return a session.");
   await setSessionToken(data.app_session_id);
-  if (data.user) await setUserInfo(data.user as User);
+  const user = data.user as User | undefined;
+  if (user) await setUserInfo(user);
+  // Persist onboarded state so a paired phone never sees the login screen again.
+  await setPairedAccount(user?.name ?? body.deviceName);
 }
 
 /** Scan-to-pair: store the PC address from the QR, then redeem with the secret. */

@@ -1,11 +1,10 @@
 {
-  "artifact_path": "/home/linux/Documents/OmnecorV1-Beta/models/valet-router/valet-router-v2-q8/",
+  "artifact_path": "ollama",
   "status": "ready",
-  "base_model": "Qwen/Qwen2.5-1.5B-Instruct",
-  "format": "gguf",
-  "gguf_file": "valet-router-q8_0.gguf",
-  "source": "github-release",
+  "base_model": "omnecor-valet-router:v2-q8",
+  "format": "ollama",
+  "source": "session-31-dadspc-deploy",
   "tag": "valet-router-v2-q8",
   "eval_scores": {},
-  "created_at": "2026-06-28T16:37:54Z"
+  "created_at": "2026-07-02T12:00:00Z"
 }

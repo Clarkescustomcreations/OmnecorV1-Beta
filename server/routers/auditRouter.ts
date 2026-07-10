@@ -13,7 +13,7 @@ import { auditList, auditListByActor } from "../db.factory.js";
 import {
   AuditLogService,
   type AuditRetentionDays,
-} from "../phase2/services/AuditLogService.js";
+} from "../core_services/services/AuditLogService.js";
 
 export const auditRouter = router({
   getAuditLog: adminProcedure

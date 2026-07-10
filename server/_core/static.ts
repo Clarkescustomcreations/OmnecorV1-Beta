@@ -4,7 +4,16 @@ import os from "os";
 import path from "path";
 import { PATHS } from "./paths.js";
 
-export function serveStatic(app: Express) {
+/**
+ * Register the server's media/file routes (3D models, podcast audio, uploads).
+ *
+ * These are API-side file endpoints, not the SPA — they must be available in
+ * BOTH dev and production. In dev they're mounted *before* the Vite catch-all so
+ * a GLB request doesn't fall through to index.html (which silently broke the
+ * mobile 3D viewer against a `pnpm dev` server). In production `serveStatic`
+ * calls this before the static bundle + SPA fallback.
+ */
+export function serveMedia(app: Express) {
   // Serve 3D models (.glb/.gltf) from the model library with HTTP range support
   // so the desktop and mobile three.js viewers can stream them. Only a bare
   // basename with an allowed extension is accepted (no traversal, no other types).
@@ -95,6 +104,15 @@ export function serveStatic(app: Express) {
     },
     express.static(uploadsPath)
   );
+}
+
+/**
+ * Serve the built frontend bundle + SPA fallback (production only). Media routes
+ * are registered first via {@link serveMedia} so file endpoints win over the
+ * catch-all that returns index.html.
+ */
+export function serveStatic(app: Express) {
+  serveMedia(app);
 
   const distPath =
     process.env.NODE_ENV === "development"

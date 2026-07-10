@@ -719,7 +719,7 @@ function BrainMapContent() {
 
   return (
     <OmnecorDashboardLayout>
-      <div className="h-full flex flex-col bg-background overflow-hidden relative">
+      <div className="h-full flex flex-col overflow-hidden relative">
         {/* Floating Window Overlay */}
         <FloatingWindow
           title={`${activeMap?.name || "Neural Map"} (Floating)`}

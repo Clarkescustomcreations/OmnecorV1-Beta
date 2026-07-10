@@ -1,7 +1,7 @@
 import { TRPCError } from "@trpc/server";
 import { z } from "zod";
 import { protectedProcedure, router } from "../_core/trpc.js";
-import { OpenArtService } from "../phase2/services/OpenArtService.js";
+import { OpenArtService } from "../core_services/services/OpenArtService.js";
 import { ENV } from "../_core/env.js";
 import { assertImageProviderAllowedInMode } from "../_core/sovereign.js";
 

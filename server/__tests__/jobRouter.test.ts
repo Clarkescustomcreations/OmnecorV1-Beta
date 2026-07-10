@@ -12,14 +12,14 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
 import { randomUUID } from "node:crypto";
 
-vi.mock("../phase2/services/AuditLogService.js", () => ({
+vi.mock("../core_services/services/AuditLogService.js", () => ({
   AuditLogService: {
     getInstance: () => ({ log: vi.fn().mockResolvedValue(undefined) }),
   },
 }));
 
 const trackMock = vi.hoisted(() => vi.fn());
-vi.mock("../phase2/services/AsyncJobService.js", () => ({
+vi.mock("../core_services/services/AsyncJobService.js", () => ({
   AsyncJobService: { getInstance: () => ({ track: trackMock }) },
 }));
 

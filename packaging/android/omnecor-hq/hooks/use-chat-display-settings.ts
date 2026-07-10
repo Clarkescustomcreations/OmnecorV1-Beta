@@ -16,11 +16,18 @@ const STORAGE_KEY = "omnecor:chatDisplaySettings";
 export interface MobileChatDisplaySettings {
   showThinkingQuotes: boolean;
   quoteStyle: "random" | "funny" | "serious";
+  /**
+   * Session "auto-approve tool actions within the active map" — mirrors the web
+   * `autoApproveTools`. When on, the PC agent's command/edit/job HITL gates are
+   * approved automatically (still scoped to the active map's roots server-side).
+   */
+  autoApproveTools: boolean;
 }
 
 const DEFAULTS: MobileChatDisplaySettings = {
   showThinkingQuotes: true,
   quoteStyle: "random",
+  autoApproveTools: false,
 };
 
 async function load(): Promise<MobileChatDisplaySettings> {

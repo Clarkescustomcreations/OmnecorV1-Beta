@@ -1,5 +1,30 @@
 import { createHash, createHmac, timingSafeEqual } from "crypto";
 
+/** One advertised model entry, matching `NodeCapabilities.models[number]`. */
+interface HashableModel {
+  name: string;
+  contextWindow: number;
+  vramReq: number;
+  provider?: string;
+}
+
+/**
+ * Deterministic short hash of a node's advertised model list — the mDNS TXT
+ * "catalog version" for Model-Fabric Decision 4 (beacon-minimal advertising).
+ * A peer compares this against its cached value for the node and only fetches
+ * the full list over mTLS (`GET /models`) when it changes, so the TXT record
+ * stays small regardless of how many models a node hosts. Order-independent
+ * (sorted before hashing) so re-publishing the same model set in a different
+ * enumeration order never looks like a change.
+ */
+export function hashModelList(models: HashableModel[]): string {
+  const canonical = models
+    .map((m) => `${m.name}|${m.contextWindow}|${m.vramReq}|${m.provider ?? ""}`)
+    .sort()
+    .join("\n");
+  return createHash("sha256").update(canonical).digest("hex").slice(0, 16);
+}
+
 /**
  * Constant-time comparison of two OMMESH secrets. Both sides are SHA-256
  * hashed first so the buffers are always equal length (timingSafeEqual

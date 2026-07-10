@@ -4,6 +4,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 type Finding = { tool: string; rule: string; file: string; line: number; message: string };
 
@@ -23,13 +24,14 @@ export function ThreatDashboard() {
     <div className="space-y-4">
       <div className="flex gap-2 border-b border-border pb-2">
         {(["scan", "ioc"] as const).map(tab => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-3 py-1.5 rounded text-sm transition-colors ${activeTab === tab ? "bg-primary text-white" : "text-muted-foreground hover:text-white"}`}
-          >
-            {tab === "scan" ? "Vulnerability Scan" : "IoC Feed"}
-          </button>
+          <HowToTooltip key={tab} title="Switch View" description="Toggle between the vulnerability scanner and the Indicators of Compromise feed." side="bottom">
+            <button
+              onClick={() => setActiveTab(tab)}
+              className={`px-3 py-1.5 rounded text-sm transition-colors ${activeTab === tab ? "bg-primary text-white" : "text-muted-foreground hover:text-white"}`}
+            >
+              {tab === "scan" ? "Vulnerability Scan" : "IoC Feed"}
+            </button>
+          </HowToTooltip>
         ))}
       </div>
 
@@ -42,13 +44,15 @@ export function ThreatDashboard() {
               placeholder="Target path"
               className="flex-1"
             />
-            <Button
-              size="sm"
-              onClick={() => scanMut.mutate({ targetPath })}
-              disabled={scanMut.isPending}
-            >
-              {scanMut.isPending ? "Scanning..." : "Scan"}
-            </Button>
+            <HowToTooltip title="Run Scan" description="Execute a vulnerability scan on the specified target path." side="bottom">
+              <Button
+                size="sm"
+                onClick={() => scanMut.mutate({ targetPath })}
+                disabled={scanMut.isPending}
+              >
+                {scanMut.isPending ? "Scanning..." : "Scan"}
+              </Button>
+            </HowToTooltip>
           </div>
 
           {scanMut.isError && (

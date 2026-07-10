@@ -7,6 +7,7 @@ import * as DocumentPicker from "expo-document-picker";
 import * as WebBrowser from "expo-web-browser";
 import { ScreenContainer } from "@/components/screen-container";
 import { useColors } from "@/hooks/use-colors";
+import { useBottomInset } from "@/hooks/use-bottom-inset";
 import { trpcMutate } from "@/lib/_core/trpc-fetch";
 import { isServerConfigured, getServerBaseUrl } from "@/lib/_core/server-config";
 import { askAi, resolveProviderId } from "@/lib/_core/ai-chat";
@@ -35,6 +36,7 @@ const LENGTH_OPTIONS: { value: string; label: string; desc: string; turnCount: n
 
 export default function PodcastScreen() {
   const colors = useColors();
+  const bottomInset = useBottomInset();
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [script, setScript] = useState("");
@@ -303,7 +305,7 @@ export default function PodcastScreen() {
   return (
     <ScreenContainer className="flex-1 bg-background">
       <ScrollView
-        contentContainerStyle={{ flexGrow: 1 }}
+        contentContainerStyle={{ flexGrow: 1, paddingBottom: bottomInset }}
         className="p-4"
         showsVerticalScrollIndicator={false}
       >

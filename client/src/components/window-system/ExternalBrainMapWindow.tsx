@@ -5,6 +5,7 @@ import { BrainMapViewport } from "@/components/neural/NeuralGraphView";
 import { useBrainMapStore } from "@/lib/stores/brainMapStore";
 import { Brain, Anchor } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export function ExternalBrainMapWindow() {
   const { setWindowMode } = useBrainMapStore();
@@ -54,14 +55,16 @@ export function ExternalBrainMapWindow() {
         </div>
 
         <div className="flex items-center gap-2">
-          <Button 
-            variant="outline" 
-            size="sm" 
-            className="h-8 gap-2 text-xs border-primary/30 hover:bg-primary/10"
-            onClick={handleRedock}
-          >
-            <Anchor className="h-3.5 w-3.5" /> Redock to Workspace
-          </Button>
+          <HowToTooltip title="Redock Window" description="Return the Neural Brain Map to the main workspace window." side="bottom">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="h-8 gap-2 text-xs border-primary/30 hover:bg-primary/10"
+              onClick={handleRedock}
+            >
+              <Anchor className="h-3.5 w-3.5" /> Redock to Workspace
+            </Button>
+          </HowToTooltip>
           <div className="h-4 w-px bg-border mx-2" />
           <div className="flex gap-1.5">
             <div className="h-2.5 w-2.5 rounded-full bg-accent-warning/50 border border-accent-warning/20" />

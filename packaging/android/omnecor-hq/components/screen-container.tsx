@@ -1,7 +1,5 @@
 import { View, KeyboardAvoidingView, type ViewProps } from "react-native";
 import { SafeAreaView, type Edge } from "react-native-safe-area-context";
-import { useContext } from "react";
-import { BottomTabBarHeightContext } from "@react-navigation/bottom-tabs";
 
 import { cn } from "@/lib/utils";
 import { ConnectionBanner } from "@/components/connection-banner";
@@ -55,8 +53,12 @@ export function ScreenContainer({
   style,
   ...props
 }: ScreenContainerProps) {
-  const tabBarHeight = useContext(BottomTabBarHeightContext) ?? 0;
-
+  // NOTE: we deliberately do NOT add a container-level bottom inset here. The tab
+  // bar reserves its own layout space (opaque, non-absolute), so bottom-anchored
+  // bars (chat input, terminal controls) already sit flush above it. SCROLLABLE
+  // screens instead pad their own scroll content via `useBottomTabBarHeight()` in
+  // `contentContainerStyle.paddingBottom` — the React-Navigation-recommended
+  // pattern — so their last item clears the bar with no dead black strip.
   return (
     <View
       className={cn(
@@ -69,7 +71,7 @@ export function ScreenContainer({
       <SafeAreaView
         edges={edges}
         className={cn("flex-1", safeAreaClassName)}
-        style={[style, tabBarHeight > 0 ? { paddingBottom: tabBarHeight } : undefined]}
+        style={style}
       >
         {!hideConnectionBanner && <ConnectionBanner />}
         {/* Lift bottom-anchored inputs above the on-screen keyboard. Under

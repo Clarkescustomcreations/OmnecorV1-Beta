@@ -1,12 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { inflateRawSync, crc32 } from "zlib";
-import { createZip } from "../phase2/services/zipArchive.js";
+import { createZip } from "../core_services/services/zipArchive.js";
 import {
   parseBoardSpecs,
   countCopperLayers,
   edgeCutsBoundingBox,
   snapToSupportedLayers,
-} from "../phase2/services/kicadBoardSpecs.js";
+} from "../core_services/services/kicadBoardSpecs.js";
 
 describe("zipArchive.createZip", () => {
   it("produces a valid ZIP that round-trips via inflateRaw", () => {

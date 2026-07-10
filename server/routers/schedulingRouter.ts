@@ -4,7 +4,7 @@ import { getDb } from "../db.factory.js";
 import { scheduledPosts, curatedPosts, platformAccounts } from "../../drizzle/schema";
 import { eq, and, desc, inArray } from "drizzle-orm";
 import { TRPCError } from "@trpc/server";
-import { publishScheduledPostIds } from "../phase2/services/publishExecutor.js";
+import { publishScheduledPostIds } from "../core_services/services/publishExecutor.js";
 
 export const schedulingRouter = router({
   listScheduledPosts: protectedProcedure

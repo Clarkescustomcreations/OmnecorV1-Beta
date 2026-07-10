@@ -7,6 +7,7 @@ import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from ".
 import { Badge } from "../ui/badge";
 import { CircuitBoard, AlertTriangle, FileSpreadsheet, Layers, Share2 } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export const KiCadPanel: React.FC = () => {
   const [activeProject, setActiveProject] = useState<string | null>(null);
@@ -61,9 +62,11 @@ export const KiCadPanel: React.FC = () => {
             <Badge variant={statusQuery.data?.isInstalled ? "default" : "destructive"}>
                 {statusQuery.data?.isInstalled ? "KiCad CLI Active" : "KiCad Missing"}
             </Badge>
-            <Button onClick={handleOpenProject} disabled={!statusQuery.data?.isInstalled}>
-                Open Project
-            </Button>
+            <HowToTooltip title="Open Editor" description="Launch the KiCad application" side="top">
+                <Button onClick={handleOpenProject} disabled={!statusQuery.data?.isInstalled}>
+                    Open Project
+                </Button>
+            </HowToTooltip>
         </div>
       </div>
 
@@ -78,9 +81,11 @@ export const KiCadPanel: React.FC = () => {
           <TabsContent value="drc" className="p-4 space-y-4">
             <div className="flex justify-between items-center">
               <h4 className="text-sm font-semibold">Design Rule Check Results</h4>
-              <Button size="sm" onClick={() => drcMutation.mutate({ pcbPath: "board.kicad_pcb" })} disabled={drcMutation.isPending}>
-                {drcMutation.isPending ? "Validating..." : "Run Validation"}
-              </Button>
+              <HowToTooltip title="Design Rules Check" description="Validate PCB against design rules" side="top">
+                <Button size="sm" onClick={() => drcMutation.mutate({ pcbPath: "board.kicad_pcb" })} disabled={drcMutation.isPending}>
+                  {drcMutation.isPending ? "Validating..." : "Run Validation"}
+                </Button>
+              </HowToTooltip>
             </div>
             {drcMutation.data ? (
               <div className="space-y-2">
@@ -102,9 +107,11 @@ export const KiCadPanel: React.FC = () => {
           <TabsContent value="bom" className="p-4 space-y-4">
              <div className="flex justify-between items-center">
               <h4 className="text-sm font-semibold">Bill of Materials</h4>
-              <Button size="sm" variant="outline" onClick={() => bomMutation.mutate({ inputFile: "project.kicad_sch", outputFile: "bom.csv" })}>
-                Generate BOM
-              </Button>
+              <HowToTooltip title="Generate BOM" description="Extract Bill of Materials from schematic" side="top">
+                <Button size="sm" variant="outline" onClick={() => bomMutation.mutate({ inputFile: "project.kicad_sch", outputFile: "bom.csv" })}>
+                  Generate BOM
+                </Button>
+              </HowToTooltip>
             </div>
             {bomMutation.isSuccess ? (
                 <div className="p-8 text-center bg-accent-success/5 border border-accent-success/20 rounded-lg">
@@ -128,9 +135,11 @@ export const KiCadPanel: React.FC = () => {
                <CircuitBoard className="w-12 h-12 text-muted-foreground opacity-20" />
             </div>
             <div className="flex gap-2">
-              <Button variant="outline" onClick={() => exportMutation.mutate({ inputFile: "project.kicad_sch", outputDir: "exports", format: "svg" })}>
-                Generate SVG Preview
-              </Button>
+              <HowToTooltip title="Export SVG" description="Generate SVG drawing of the board" side="top">
+                <Button variant="outline" onClick={() => exportMutation.mutate({ inputFile: "project.kicad_sch", outputDir: "exports", format: "svg" })}>
+                  Generate SVG Preview
+                </Button>
+              </HowToTooltip>
             </div>
           </TabsContent>
         </Card>

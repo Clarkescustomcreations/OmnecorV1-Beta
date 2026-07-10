@@ -15,6 +15,7 @@ import { trpc } from "@/lib/trpc";
 import { Badge } from "@/components/ui/badge";
 import { Wifi, WifiOff, ChevronDown, ChevronUp, Zap } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 import type { NodeCapabilities } from "@shared/types/ommesh.types";
 
 interface DiscoveredPeer {
@@ -38,35 +39,37 @@ export function PeerCard() {
   return (
     <div className="w-full rounded-lg border border-sidebar-border bg-sidebar-hover overflow-hidden text-xs">
       {/* Header row — always visible */}
-      <button
-        className="w-full flex items-center justify-between px-3 py-2 hover:bg-sidebar-hover/80 transition-colors"
-        onClick={() => setExpanded(v => !v)}
-        title="Toggle Ommesh peer list"
-      >
-        <div className="flex items-center gap-2 min-w-0">
-          {isLoading ? (
-            <span className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse flex-shrink-0" />
-          ) : online ? (
-            <span className="w-2 h-2 rounded-full bg-accent-success flex-shrink-0" />
-          ) : (
-            <span className="w-2 h-2 rounded-full bg-muted-foreground/40 flex-shrink-0" />
-          )}
-          <span className="text-sidebar-foreground/80 font-medium truncate">Mesh Peers</span>
-        </div>
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <Badge
-            variant={online ? "default" : "secondary"}
-            className={cn("text-[10px] px-1.5 py-0", online && "bg-accent-success/20 text-accent-success border-accent-success/30")}
-          >
-            {peers.length}
-          </Badge>
-          {expanded ? (
-            <ChevronUp className="w-3 h-3 text-muted-foreground" />
-          ) : (
-            <ChevronDown className="w-3 h-3 text-muted-foreground" />
-          )}
-        </div>
-      </button>
+      <HowToTooltip title="Toggle Ommesh Peers" description="View status of other Omnecor nodes on your local network." side="top">
+        <button
+          className="w-full flex items-center justify-between px-3 py-2 hover:bg-sidebar-hover/80 transition-colors"
+          onClick={() => setExpanded(v => !v)}
+          title="Toggle Ommesh peer list"
+        >
+          <div className="flex items-center gap-2 min-w-0">
+            {isLoading ? (
+              <span className="w-2 h-2 rounded-full bg-muted-foreground animate-pulse flex-shrink-0" />
+            ) : online ? (
+              <span className="w-2 h-2 rounded-full bg-accent-success flex-shrink-0" />
+            ) : (
+              <span className="w-2 h-2 rounded-full bg-muted-foreground/40 flex-shrink-0" />
+            )}
+            <span className="text-sidebar-foreground/80 font-medium truncate">Mesh Peers</span>
+          </div>
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <Badge
+              variant={online ? "default" : "secondary"}
+              className={cn("text-[10px] px-1.5 py-0", online && "bg-accent-success/20 text-accent-success border-accent-success/30")}
+            >
+              {peers.length}
+            </Badge>
+            {expanded ? (
+              <ChevronUp className="w-3 h-3 text-muted-foreground" />
+            ) : (
+              <ChevronDown className="w-3 h-3 text-muted-foreground" />
+            )}
+          </div>
+        </button>
+      </HowToTooltip>
 
       {/* Expanded peer list */}
       {expanded && (

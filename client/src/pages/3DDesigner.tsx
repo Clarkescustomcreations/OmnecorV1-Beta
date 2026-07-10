@@ -999,7 +999,7 @@ export function Designer3D() {
 
   return (
     <OmnecorDashboardLayout>
-      <div className="h-full flex flex-col bg-background relative overflow-hidden">
+      <div className="h-full flex flex-col relative overflow-hidden">
         {/* Floating Window Overlay */}
         <FloatingWindow
           title={`3D Designer (${mode.toUpperCase()})`}

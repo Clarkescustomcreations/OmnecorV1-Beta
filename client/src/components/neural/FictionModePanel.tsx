@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Badge } from "@/components/ui/badge";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export function FictionModePanel() {
   const { fictionState, addFictionNode, addTimelineEvent, updateLore } = useFictionMode();
@@ -95,9 +96,11 @@ export function FictionModePanel() {
                 value={loreValue}
                 onChange={e => setLoreValue(e.target.value)}
               />
-              <Button size="sm" className="w-full gap-2" onClick={handleAddLore}>
-                <Plus className="w-4 h-4" /> Add Lore Entry
-              </Button>
+              <HowToTooltip title="Add Lore" description="Save this lore entry to the fiction workspace." side="bottom">
+                <Button size="sm" className="w-full gap-2" onClick={handleAddLore}>
+                  <Plus className="w-4 h-4" /> Add Lore Entry
+                </Button>
+              </HowToTooltip>
             </div>
             <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="space-y-3">
@@ -131,9 +134,11 @@ export function FictionModePanel() {
                 value={charDesc}
                 onChange={e => setCharDesc(e.target.value)}
               />
-              <Button size="sm" className="w-full gap-2" onClick={handleAddCharacter}>
-                <Plus className="w-4 h-4" /> Register Character
-              </Button>
+              <HowToTooltip title="Register Character" description="Add this character to the narrative cast." side="bottom">
+                <Button size="sm" className="w-full gap-2" onClick={handleAddCharacter}>
+                  <Plus className="w-4 h-4" /> Register Character
+                </Button>
+              </HowToTooltip>
             </div>
             <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="grid grid-cols-1 gap-3">
@@ -179,9 +184,11 @@ export function FictionModePanel() {
                 value={eventDesc}
                 onChange={e => setEventDesc(e.target.value)}
               />
-              <Button size="sm" className="w-full gap-2" onClick={handleAddEvent}>
-                <Plus className="w-4 h-4" /> Add Timeline Event
-              </Button>
+              <HowToTooltip title="Add Event" description="Insert this event into the timeline sequence." side="bottom">
+                <Button size="sm" className="w-full gap-2" onClick={handleAddEvent}>
+                  <Plus className="w-4 h-4" /> Add Timeline Event
+                </Button>
+              </HowToTooltip>
             </div>
             <ScrollArea className="min-h-0 flex-1 pr-2">
               <div className="relative border-l-2 border-border ml-3 pl-4 space-y-4 py-2">

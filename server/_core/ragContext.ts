@@ -18,7 +18,7 @@
 import { getDb } from "../db.factory.js";
 import { neuralMaps } from "../../drizzle/schema.js";
 import { and, eq } from "drizzle-orm";
-import { MemoryArchitectService } from "../phase2/services/MemoryArchitectService.js";
+import { MemoryArchitectService } from "../core_services/services/MemoryArchitectService.js";
 import { createLogger } from "./logger.js";
 
 const log = createLogger("rag-context");

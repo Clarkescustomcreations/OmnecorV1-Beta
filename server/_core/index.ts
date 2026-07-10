@@ -11,7 +11,7 @@
  *
  * Architecture Notes:
  *  - This is the ONLY server entry point. The standalone Phase 2 server
- *    (server/phase2/app.ts) has been deprecated and removed.
+ *    (server/core_services/app.ts) has been deprecated and removed.
  *  - All tRPC endpoints are accessible at /api/trpc/
  *  - WebSocket is attached at /ws on the same HTTP server
  *  - Services are singletons resolved in the tRPC context factory
@@ -32,10 +32,10 @@ import { PairingService } from "./pairing.js";
 import { setBoundPort } from "./runtime-info.js";
 import { createContext } from "./context";
 import { serveStatic } from "./static";
-import { TokenRefreshService } from "../phase2/services/TokenRefreshService.js";
-import { AuditLogService } from "../phase2/services/AuditLogService.js";
+import { TokenRefreshService } from "../core_services/services/TokenRefreshService.js";
+import { AuditLogService } from "../core_services/services/AuditLogService.js";
 import { createLogger, closeAuditLog } from "./logger.js";
-import { SERVER_CONFIG, VECTOR_DB_CONFIG } from "../phase2/config/index.js";
+import { SERVER_CONFIG, VECTOR_DB_CONFIG } from "../core_services/config/index.js";
 import { version as APP_VERSION } from "../../package.json";
 import { ENV } from "./env.js";
 import { initPaths } from "./paths.js";
@@ -43,17 +43,18 @@ import { initPaths } from "./paths.js";
 const log = createLogger("core");
 
 // ─── Phase 2 Service Imports (for lifecycle management) ─────────────────────
-import { OmnecorWebSocketServer, setWsInstance } from "../phase2/websocket/WebSocketServer";
-import { ProcessManagerService } from "../phase2/services/ProcessManagerService";
-import { SecurityService } from "../phase2/services/SecurityService";
-import { VectorDBService, sanitizeCollectionName } from "../phase2/services/VectorDBService";
-import { FileSystemWatcherService } from "../phase2/services/FileSystemWatcherService";
+import { OmnecorWebSocketServer, setWsInstance } from "../core_services/websocket/WebSocketServer";
+import { ProcessManagerService } from "../core_services/services/ProcessManagerService";
+import { SecurityService } from "../core_services/services/SecurityService";
+import { VectorDBService, sanitizeCollectionName } from "../core_services/services/VectorDBService";
+import { FileSystemWatcherService } from "../core_services/services/FileSystemWatcherService";
 import { startBackupScheduler } from "./backupScheduler";
 import { startPublishWorker } from "./publishWorker";
 import { meshNode } from "../ommesh/core/MeshNode.js";
 import { securityManager } from "../ommesh/core/SecurityManager.js";
-import { ValetServerService } from "../phase2/services/ValetServerService.js";
-import { MCPClientService } from "../phase2/services/MCPClientService.js";
+import { ValetServerService } from "../core_services/services/ValetServerService.js";
+import { LocalLlmRuntimeService } from "../core_services/services/LocalLlmRuntimeService.js";
+import { MCPClientService } from "../core_services/services/MCPClientService.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Port Discovery
@@ -221,6 +222,14 @@ async function startServer() {
     log.warn("[Omnecor] Valet Router Server init warning:", (error as Error).message);
   });
 
+  // ─── Auto-start Omnecor-owned local LLM runtime (Model-Fabric Phase 1) ──
+  // Fire-and-forget for the same reason as Valet: no llama-server binary or
+  // no .gguf model is a normal, fully-supported state (Ollama/cloud still
+  // work) — never delay boot on it.
+  LocalLlmRuntimeService.getInstance().start().catch(error => {
+    log.warn("[Omnecor] Local LLM runtime init warning:", (error as Error).message);
+  });
+
   // ─── Create Express App ─────────────────────────────────────────────────
   const app = express();
   const server = createServer(app);
@@ -375,7 +384,17 @@ async function startServer() {
       architecture: "unified",
       uptime: process.uptime(),
       timestamp: new Date().toISOString(),
-      checks: { db: dbOk, migrationOk, ollama: ollamaOk, chromadb: chromaOk, jwtSecret: jwtSecretOk },
+      checks: {
+        db: dbOk,
+        migrationOk,
+        // Ollama and the local LLM runtime are both optional, informational
+        // only — neither gates `ready`/status 200. Omnecor "does both, requires
+        // neither" (Model-Fabric Phase 1).
+        ollama: ollamaOk,
+        localLlm: LocalLlmRuntimeService.getInstance().isReady(),
+        chromadb: chromaOk,
+        jwtSecret: jwtSecretOk,
+      },
       nonce: process.env.BACKEND_NONCE ?? "",
     });
   });
@@ -503,6 +522,11 @@ async function startServer() {
 
   // ─── Frontend (Vite dev or static production) ───────────────────────────
   if (process.env.NODE_ENV === "development") {
+    // Media/file routes (models, podcast audio, uploads) must be registered
+    // BEFORE Vite's catch-all, or a GLB/audio request falls through to
+    // index.html — which silently broke the mobile 3D viewer against dev.
+    const { serveMedia } = await import("./static.js");
+    serveMedia(app);
     const { setupVite } = await import("./vite.js");
     await setupVite(app, server);
   } else {
@@ -586,6 +610,7 @@ async function startServer() {
       { name: "Fal AI bridge",   url: `http://localhost:${process.env.FAL_LOCAL_PORT ?? "8004"}/health` },
       { name: "MAS bridge",      url: `http://127.0.0.1:${process.env.MAS_BRIDGE_PORT ?? "8011"}/health` },
       { name: "llama.cpp bridge",url: `http://127.0.0.1:${process.env.LLAMA_CPP_PORT ?? "8013"}/health` },
+      { name: "Local LLM runtime (llama-server)", url: `${LocalLlmRuntimeService.getInstance().getBaseUrl()}/health` },
       { name: "ComfyUI",         url: process.env.COMFYUI_URL ?? `http://127.0.0.1:${process.env.COMFYUI_PORT ?? "8188"}/system_stats` },
       { name: "Whisper STT",     url: process.env.WHISPER_SERVER_URL ?? "http://localhost:8001/health" },
       { name: "TTS service",     url: process.env.TTS_SERVER_URL ?? "http://localhost:8002/health" },
@@ -656,6 +681,7 @@ async function startServer() {
     // Stop the Valet Router inference server
     try {
       await ValetServerService.getInstance().stop();
+      await LocalLlmRuntimeService.getInstance().stop();
       log.info("[Omnecor] Valet Router Server shutdown complete");
     } catch (error) {
       log.warn("[Omnecor] Valet Router Server shutdown warning:", (error as Error).message);

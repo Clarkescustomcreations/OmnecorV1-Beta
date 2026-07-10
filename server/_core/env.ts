@@ -83,6 +83,25 @@ export const ENV = {
   honchoAppName: process.env.HONCHO_APP_NAME ?? "omnecor",
   honchoEnvironment: (process.env.HONCHO_ENVIRONMENT ?? "demo") as "demo" | "local" | "production",
   valetAutoStart: process.env.VALET_AUTO_START !== "false",
+  // Omnecor-owned local LLM runtime (Model-Fabric Phase 1) — a managed
+  // llama-server (llama.cpp OpenAI-compatible server) subprocess that serves
+  // the "llamacpp" provider directly, without requiring Ollama. Disable with
+  // LOCAL_LLM_AUTO_START=false if you only want Ollama/cloud providers.
+  localLlmAutoStart: process.env.LOCAL_LLM_AUTO_START !== "false",
+  localLlmPort: process.env.LOCAL_LLM_PORT ?? "8014",
+  // Explicit .gguf path override. Empty = auto-discover the newest .gguf
+  // under PATHS.models (excluding the Valet Router classifier's own model
+  // dir, which is a routing model, not a general chat model).
+  localLlmModelPath: process.env.LOCAL_LLM_MODEL_PATH ?? "",
+  localLlmBin: process.env.LLAMA_SERVER_BIN ?? "llama-server",
+  localLlmCtxSize: process.env.LOCAL_LLM_CTX_SIZE ?? "4096",
+  // Number of transformer layers to offload to GPU, or "auto" (llama.cpp's
+  // own default) to fit as many as the detected VRAM budget allows. A forced
+  // high number (e.g. 999) is NOT "harmless on a build without enough VRAM"
+  // — confirmed live on a 2GB card: requesting more layers than fit is a
+  // hard model-load OOM (Vulkan/CUDA backends don't overflow to CPU
+  // mid-tensor), not a graceful downgrade. "auto" is what avoids that.
+  localLlmGpuLayers: process.env.LOCAL_LLM_GPU_LAYERS ?? "auto",
   // Allowlist of Host header values accepted when building OAuth redirect URIs.
   // Prevents open-redirect / host-header injection. Defaults cover local-first.
   oauthAllowedHosts: (

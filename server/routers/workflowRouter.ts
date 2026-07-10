@@ -29,7 +29,7 @@ import { TRPCError } from "@trpc/server";
 import { validatePath } from "../_core/security.js";
 import { redactSensitive } from "../_core/redaction.js";
 import { PATHS } from "../_core/paths.js";
-import { AiProviderService } from "../phase2/services/AiProviderService.js";
+import { AiProviderService } from "../core_services/services/AiProviderService.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -126,6 +126,11 @@ export const workflowRouter = router({
         apiKey: z.string().optional(),
         baseUrl: z.string().optional(),
         messages: z.array(messageSchema).min(1),
+        /** Model-Fabric Phase 5/6 — honor the session's mesh-peer pin (see
+         *  aiRouter's chatInputSchema for the full rationale) so a save
+         *  summarization doesn't silently run somewhere other than the peer
+         *  the user selected for this chat. */
+        targetNodeId: z.string().max(256).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -143,6 +148,7 @@ export const workflowRouter = router({
           baseUrl: input.baseUrl,
           systemPrompt: REMEMBER_SAVE_SYSTEM,
           messages: [{ role: "user", content: transcript }],
+          targetNodeId: input.targetNodeId,
         });
       } catch (err) {
         throw new TRPCError({

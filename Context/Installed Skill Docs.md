@@ -1,4 +1,4 @@
-﻿# Installed Skill Docs — Usage Reference
+# Installed Skill Docs — Usage Reference
 
 > When to load each installed skill and why. Load the relevant skill *before*
 > working in its domain (per AGENTS.md "Available Skills — Always Use Them").
@@ -222,6 +222,7 @@ calls an external provider API must use `cloudProcedure`, not `protectedProcedur
 ### Built-in Omnecor Skills (project-specific)
 | Skill | Purpose |
 |---|---|
+| `mcp-simplified-tools` | Wraps complex file/bash operations into easy JSON tools for smaller models |
 | `code-sweep` | Beta-readiness sweep across all 10 domains |
 | `run-omnecor` | Launch + drive + screenshot the running app |
 | `update-config` | Configure settings.json / hooks / permissions |

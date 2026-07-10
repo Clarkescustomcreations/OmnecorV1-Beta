@@ -7,6 +7,7 @@ import { ScrollArea } from "../ui/scroll-area";
 import { Badge } from "../ui/badge";
 import { Activity, XCircle, Terminal, Clock } from "lucide-react";
 import { toast } from "sonner";
+import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 interface JobInfo { id: string; label?: string; createdAt: string; status: string; }
 
@@ -52,14 +53,16 @@ export const TaskManager: React.FC = () => {
                 </div>
               </div>
               <div className="flex gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                <Button 
-                  variant="ghost" 
-                  size="sm" 
-                  className="text-destructive hover:bg-destructive/10"
-                  onClick={() => killMutation.mutate({ jobId: job.id })}
-                >
-                  <XCircle className="w-4 h-4 mr-2" /> Kill Process
-                </Button>
+                <HowToTooltip title="Kill Process" description="Terminate this autonomous task immediately." side="left">
+                  <Button 
+                    variant="ghost" 
+                    size="sm" 
+                    className="text-destructive hover:bg-destructive/10"
+                    onClick={() => killMutation.mutate({ jobId: job.id })}
+                  >
+                    <XCircle className="w-4 h-4 mr-2" /> Kill Process
+                  </Button>
+                </HowToTooltip>
               </div>
             </CardContent>
           </Card>

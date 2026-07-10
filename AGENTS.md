@@ -238,14 +238,14 @@ Use the correct tier. Wrong tier = either a security hole or a broken Sovereign 
 
 **Note:** Any procedure that calls an external API must use one of the two cloud-gated tiers so Sovereign mode is enforced — never `protectedProcedure` for an external call. Pick by *what* it talks to: **`cloudProcedure`** for cloud AI inference (the data that must never reach a cloud model); **`externalServiceProcedure`** for non-AI services (email, repo/doc sync, OAuth, payments). Both are current, exported from `server/_core/trpc.ts`, and differ only in whether the `sovereignBlockAiOnly` sub-mode lets them through. Do **not** downgrade an `externalServiceProcedure` to `cloudProcedure` — that would wrongly block non-AI services (e.g. Gmail send) even when the operator has chosen "block AI providers only".
 
-Import all from `server/_core/trpc.ts`. The legacy `server/phase2/routers/trpc.ts`
+Import all from `server/_core/trpc.ts`. The legacy `server/core_services/routers/trpc.ts`
 shim was deleted — do not recreate it.
 
 ### Router Registration
 
 A router that is not registered in `server/routers.ts` does not exist at runtime.
 Before assessing any router's security posture, confirm it appears in `routers.ts`.
-All routers now live in `server/routers/` (the old `server/phase2/routers/` tree was
+All routers now live in `server/routers/` (the old `server/core_services/routers/` tree was
 emptied — its three surviving routers were relocated and the rest deleted). Check
 `routers.ts` first, always.
 
@@ -305,7 +305,7 @@ Every entry here is a real problem that was hit and solved in this codebase.
 | `execSync openssl "..."` shell string | RCE vulnerability | `execFileSync` with arg array |
 | `if (!db)` null-guards failing silently | Pre-unification pattern, `getDb()` now always returns live instance | Remove guards, don't add new ones |
 | `ManusDialog.tsx` template-brand leftover | Unused component from original template, zero importers | Deleted — do not recreate |
-| Phase2 router duplicates confusing security assessment | `server/phase2/routers/` had stale copies of live routers | Deleted 6 dead files — always check `routers.ts` registration first |
+| Phase2 router duplicates confusing security assessment | `server/core_services/routers/` had stale copies of live routers | Deleted 6 dead files — always check `routers.ts` registration first |
 | `pnpm/action-setup@v4` CI fail | Both `version:` in workflow and `packageManager` in package.json were set | Remove `version:` from workflow — let action read `packageManager` field |
 | Node 18 tests failing in CI | `globalThis.crypto.getRandomValues` undefined in Node 18 Vitest | Dropped Node 18 from matrix; use Node 22+ and 24+ only |
 | Integration OAuth creds ignored / "Missing OAuth credentials" despite Settings wizard | `oauthClients.ts` captured `process.env.*` once at module load | Resolve per-call via `SettingsService.getSecret(settingsKey, envVar)` — env→settings-file precedence, like AI keys. Never re-capture env at module load |
@@ -367,7 +367,7 @@ fails — it introduces a silent bug.
 
 **If a TypeScript error seems impossible to fix:** Check whether you are editing
 the right file. Several routers existed as both a live version (`server/routers/`)
-and a now-deleted phase2 duplicate. Confirm the file you are editing is actually
+and a now-deleted core_services duplicate. Confirm the file you are editing is actually
 imported somewhere in `server/routers.ts`.
 
 **If tests fail after your change:** Run `pnpm vitest run <specific-test-file>` to
