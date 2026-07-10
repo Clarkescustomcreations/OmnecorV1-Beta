@@ -8,6 +8,9 @@ on:
       - 'client/src/components/**/*.tsx'
       - 'client/src/components/**/*.ts'
 
+permissions:
+  contents: write
+  
 jobs:
   imprint:
     runs-on: ubuntu-latest
@@ -37,3 +40,5 @@ jobs:
         with:
           commit_message: "chore(ui): Auto-update ui-registry.md via imprint workflow"
           file_pattern: "Context/UI-Registry.md"
+          commit_user_name: "github-actions[bot]"
+          commit_user_email: "github-actions[bot]@users.noreply.github.com"
