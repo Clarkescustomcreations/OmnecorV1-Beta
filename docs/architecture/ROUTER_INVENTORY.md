@@ -14,7 +14,7 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
   - `cloudProcedure` — Protected + blocked when user is in sovereign execution mode (air-gapped deployments).
   - `adminProcedure` — Requires `admin` or `owner` role.
   - `ownerProcedure` — Requires `owner` role only.
-- **Formerly Phase 2 Routers**: Three routers (`agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter`) were relocated from `server/phase2/routers/` into `server/routers/`. They share the unified tRPC context; the services they call still live in `server/phase2/services/`.
+- **Formerly Phase 2 Routers**: Three routers (`agentRouter`, `aiProviderRouter`, `modelMarketplaceRouter`) were relocated from `server/core_services/routers/` into `server/routers/`. They share the unified tRPC context; the services they call still live in `server/core_services/services/`.
 
 ---
 
@@ -394,7 +394,7 @@ Omnecor's backend API is built on a unified tRPC architecture where all routers 
 
 ## Formerly Phase 2 Routers (now in server/routers/)
 
-These three were relocated from `server/phase2/routers/` into `server/routers/`; the services they call still live in `server/phase2/services/`.
+These three were relocated from `server/core_services/routers/` into `server/routers/`; the services they call still live in `server/core_services/services/`.
 
 ### Agent Router
 - **Namespace**: `agent`

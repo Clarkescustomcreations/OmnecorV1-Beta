@@ -93,6 +93,7 @@ import { scriptsRouter } from "./routers/scriptsRouter.js";
 import { chatRouter } from "./routers/chatRouter.js";
 import { datasetRouter } from "./routers/datasetRouter.js";
 import { penpotRouter } from "./routers/penpotRouter.js";
+import { blueprintRouter } from "./routers/blueprintRouter.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Unified App Router
@@ -252,6 +253,9 @@ export const appRouter = router({
   chat: chatRouter,
   dataset: datasetRouter,
   penpot: penpotRouter,
+
+  // ─── Blueprint Studio (AI-assisted fabrication planning) ──────────────────
+  blueprint: blueprintRouter,
 });
 
 export type AppRouter = typeof appRouter;

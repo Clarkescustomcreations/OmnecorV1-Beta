@@ -2,6 +2,22 @@
 
 This living document tracks the execution progress of the 5-phase build roadmap. Unchecked boxes represent pending features, and checked boxes indicate completed and verified items.
 
+> **Path note (2026-07-12):** `server/phase2/` was renamed to `server/core_services/`. In the historical entries below, any `server/phase2/services|websocket|python_scripts/…` path now lives under `server/core_services/…` (filenames unchanged). Note two exceptions that were **removed**, not moved: `server/phase2/routers/…` (the unregistered duplicate routers — deleted; the three kept routers now live in `server/routers/`) and `LlamaCppService.ts` (the standalone llama.cpp bridge — retired). Original paths are left as-written to preserve the record.
+
+---
+
+## ✅ 2026-07-13 — Blueprint Studio (AI-Assisted Fabrication Planning) — COMPLETE & LIVE-VERIFIED
+
+- [x] `/architect` session — 4 decisions locked (new top-level page; deterministic calcs + real FEA; parametric CAD + image-gen; offline materials DB + cloud-gated web search); dual CAD engine per user request (JSCAD built-in default + optional OpenSCAD binary)
+- [x] Schema: 6 `blueprint_*` tables, migration `0016` (+ repaired pre-existing `0015` migration drift that was silently blocking all future migrations on the live DB)
+- [x] Engineering calc engine + ~50-entry offline materials catalog (real NDS/ASTM/datasheet properties)
+- [x] Dual-engine CAD service → mesh/STL/dimensioned drawing SVG/DXF; true-scale tiled pattern PDFs; full plan-PDF booklet export
+- [x] Real FEA: `fea_bridge.py` (Gmsh + TET4 numpy/scipy) + availability-probed service wrapper
+- [x] `ChatAgentRunner` extraTools extension (backward compatible) + 11-tool Blueprint agent (sovereign-aware)
+- [x] `blueprintRouter` (24 procedures) + Blueprint Studio page + PlanTabs + FEA-heatmap 3D viewer; nav + route + command registration
+- [x] Tests: 56 new (calc golden values / CAD pipeline / router ownership); full suite 1,560 green
+- [x] Live verification (prod build): real Gemini agent turn → materials lookup → beam check SF 12.54 PASS → BOM/cut list written → CAD compiled → 3-page plan PDF exported clean. Fixed along the way: Gemini `alt=sse` streaming bug, pdfkit `__dirname` bundling crash, empty-turn history poisoning
+
 ---
 
 ## 📌 TODO — Expo SDK 55 / React Native 0.83 upgrade (Android HQ) — opened 2026-06-21
@@ -356,7 +372,7 @@ DB layer (no `insertId`/dialect-leak/unawaited `getDb`); no hardcoded secrets; `
     *   **Catalog + surface:** `ModelCatalogService` now lists **all** indexed models as `omnecor-runtime` (warm one flagged `loaded`, ready-gated) and **skips the live Ollama API source when the runtime is available** (the index already covers the store — no double-listing). New non-blocking `aiProvider.loadLocalModel` mutation; `ModelSelector` "loading… → loaded" pending indicator (`bg-accent-success`, 2.5 s refetch while pending, ceiling so a failed load can't stick). APK: `loaded` flag mirrored in the type; mobile picker indicator UI still TODO.
     *   **`/review` found 6 issues, all fixed same session** (1 Important + 5 Minor): serialized all lifecycle through one queue; `_waitForHealth` bails on proc-death; async non-blocking index scan; ready-gated `loaded` flag; content-clean source-gating; CPU-safe GPU fallback.
     *   **Live-verified on DadsPC (`.201`, RTX 4060 Ti):** all 10 Ollama GGUFs render as **"Omnecor · This PC"** (0 Ollama-branded); boot-resume + hot-swap + inference (`REVIEW_FIX_OK`) + persistence confirmed on real hardware.
-    *   **Still open:** HF browse/download UI; MoE-Chain still on the separate `LlamaCppService`/:8013 bridge; APK picker loaded-indicator UI.
+    *   **Still open:** ~~HF browse/download UI~~ (**shipped 2026-07-11** — Model Hub "HF GGUF" tab + LLM Builder base-model download); ~~MoE-Chain on the separate `LlamaCppService`/:8013 bridge~~ (**migrated to the managed runtime + bridge retired, 2026-07-11**); APK picker loaded-indicator UI remains.
     *   **Gates:** `pnpm check` (root + APK) ✅ · `pnpm test` **1469 passed | 4 skipped** ✅ (+22 from the 1447 baseline; new `ModelIndexService.test.ts` 8).
 *   **Built (2026-07-08): Model-Fabric Phase 7 — per-node "Omnecor hosts itself" grouping (web picker + APK picker + Model Hub) + all gates green.** Owner caught that although Model-Fabric made Ollama optional, no UI surfaced Omnecor as its own host — the pickers lumped the Omnecor runtime and Ollama into one "This PC" group and the web Model Hub was still Ollama+cloud only.
     *   **Fix:** new `describeCatalogHost()` (single source of truth in `shared/types/modelCatalog.ts`, hand-mirrored in APK `lib/_core/ai-models.ts`) derives host **brand** (omnecor/ollama/cloud/phone) + **node** per catalog entry. A mesh peer's brand is derived from its advertised `providerId` (llamacpp = the peer's own Omnecor runtime, ollama = Ollama), so with OMMESH **each node reads as its own "Omnecor · \<node\>" group** — the design the owner asked for (Omnecor can host on 4+ mesh nodes, each distinct). Ollama kept as a de-emphasized fallback brand.

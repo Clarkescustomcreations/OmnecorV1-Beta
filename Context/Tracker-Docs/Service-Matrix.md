@@ -5,6 +5,8 @@
 | Service | Installed | Running | Detected | Fallback Exists | Failure Handling | Verified |
 | :--- | :--- | :--- | :--- | :--- | :--- | :--- |
 | Ollama | [x] | [x] | [x] | [x] | [x] | [x] |
+| OpenSCAD (Blueprint CAD, optional) | [ ] | [ ] | [x] | [x] | [x] | [x] |
+| FEA python deps (gmsh/numpy/scipy, optional) | [ ] | [ ] | [x] | [x] | [x] | [ ] |
 | Whisper (STT) | [x] | [ ] | [x] | [x] | [x] | [x] |
 | TTS / Kokoro | [x] | [ ] | [x] | [x] | [x] | [x] |
 | RVC | [x] | [ ] | [x] | [x] | [x] | [x] |
@@ -111,7 +113,7 @@
 
 ### OMMESH (LAN Mesh Intelligence)
 - **Port**: `MESH_PORT` 3001 (mTLS HTTPS inference listener, `MeshServer.ts`); `PORT` 3000 (main app + mDNS advertisement)
-- **Service Files**: `server/ommesh/core/MeshNode.ts`, `server/ommesh/core/MeshServer.ts`, `server/phase2/services/MeshDiscoveryService.ts`
+- **Service Files**: `server/ommesh/core/MeshNode.ts`, `server/ommesh/core/MeshServer.ts`, `server/core_services/services/MeshDiscoveryService.ts`
 - **Detection**: `bonjour` mDNS — static `import bonjour from "bonjour"` (CJS `export =` pattern; dynamic `import()` breaks module resolution); `OMMESH_SECRET` env var required for secure peer auth
 - **Fallback (F22)**: mDNS unavailable → `console.warn` + graceful no-op; `routeInference()` falls back to local on remote failure/missing peer; `MeshServer` no-ops gracefully when certs unprovisioned or port taken
 - **Failure Handling**: `SecurityManager.isReady()` gates the inference listener; `MeshNode.executeLocal()` rejects cloud providers in sovereign mode; fingerprint pinning rejects MITM; secret compared with SHA-256 + `crypto.timingSafeEqual`; mobile nodes fail-closed when `OMMESH_SECRET` unset (except loopback/zero-login)
@@ -120,20 +122,19 @@
 
 ### Valet Router (ML Inference Routing)
 - **Port**: 8010 (FastAPI — `valet_router_inference.py`)
-- **Service Files**: `server/python_bridges/valet_router_inference.py`, `server/phase2/services/ValetServerService.ts`, `server/phase2/services/ValetArtifactRegistry.ts`, `server/phase2/services/ValetRouterService.ts`
+- **Service Files**: `server/python_bridges/valet_router_inference.py`, `server/core_services/services/ValetServerService.ts`, `server/core_services/services/ValetArtifactRegistry.ts`, `server/core_services/services/ValetRouterService.ts`
 - **Detection**: `trpc.valet.status` → `GET :8010/health`; `ValetServerService` auto-starts on server boot; registry seeded from repo `current.json` by `ValetArtifactRegistry.seedFromRepoIfMissing()` (checks `process.cwd()`, Electron `process.resourcesPath`, bundle-relative paths)
 - **Fallback**: Dynamic LLM intent classification via AiProviderService when model not loaded
 - **Failure Handling**: 45 s cold-load timeout (raised from 10 s to prevent premature fallback on first boot); `ValetRouterService` catches HTTP errors; pre-routing in `AiProviderService.streamChat()` uses result or skips routing on error
 - **Model**: `omnecor-valet-router:v2-q8` (Qwen2.5-1.5B-Instruct Q8_0, ~1.6 GB); `gguf_sha256: b0398f857ffb1dc6d9ae562304201c24e64ec4422cfb6b1b1391d66e21138eee`; route accuracy 0.7385 (Kaggle P100 eval — beats keyword baseline ~2.7×; below 0.85 config gate — sign-off pending GPU box)
 - **Packaging Gap (BLOCKER)**: `electron-builder.yml` `extraResources` must include `server/python_bridges/valet_router_inference.py` + `docs/ai-agents/valet-training/VALET_SYSTEM_PROMPT.md` + `routing_manifest.json`; Python + deps required in packaged app
 
-### llama.cpp (Local Model Inference)
-- **Port**: Embedded in `llamacpp_bridge.py` (FastAPI — started on demand by `LlamaCppService.ts`)
-- **Service File**: `server/python_bridges/llamacpp_bridge.py`
-- **Detection**: `trpc.system.checkDependencies` → `findExecutable("llama-cpp")` + `pip show llama-cpp-python`
-- **Warm Cache (F12)**: Module-level `_gen_cache` + `_emb_cache` dicts keyed by model path; `_get_or_load()` with double-checked locking; per-model `threading.Lock`; `/load` (pre-warm) + `/unload` (free memory) + `/loaded` (list cached) endpoints; `/health` reports loaded model lists
-- **Path Safety (F5)**: Separator-aware `_is_within()` — sibling-prefix dirs (`~/models-evil/`) can no longer bypass `~/models` allow-list
-- **Failure Handling**: `LlamaCppService.ts` catches all subprocess errors; returns structured error to `aiRouter`
+### Local LLM Runtime — `llama-server` (Local Model Inference)
+- **Port**: Managed `llama-server` subprocess (llama.cpp, OpenAI-compatible), default `http://127.0.0.1:8014`; supervised by `LocalLlmRuntimeService.ts`. (Superseded the standalone `llamacpp_bridge.py` on port 8013, retired 2026-07-11 once MoE-Chain moved onto this runtime.)
+- **Service File**: `server/core_services/services/LocalLlmRuntimeService.ts`
+- **Detection**: `LocalLlmRuntimeService.isAvailable()` — a `llama-server` binary (`LLAMA_SERVER_BIN`/PATH) + at least one indexed `.gguf` (`ModelIndexService`). `isReady()` flags whether a model is warm.
+- **Hot-swap**: `ensureModelLoaded(idOrPath)` stops the current server and spawns the requested model (the swap frees the prior model's RAM/VRAM); per-model `--n-gpu-layers` VRAM-fit; boot resumes the last model (`localLlmLastModel`).
+- **Failure Handling**: All lifecycle work (boot load, hot-swap, crash respawn) is serialized through one queue so nothing orphans a server; `chatLocalLlm`/`completeLocal` surface a clear error when no binary/model is available.
 
 ### ElevenLabs (Cloud TTS)
 - **Port**: N/A — external HTTPS API

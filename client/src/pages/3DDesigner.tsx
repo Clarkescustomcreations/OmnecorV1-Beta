@@ -12,13 +12,21 @@ import { toast } from "sonner";
 import { useNeuralMap } from "@/contexts/NeuralMapContext";
 
 import { ThreeViewer } from "@/components/designer/ThreeViewer";
-import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
-import { WebPreview } from "@/components/designer/WebPreview";
+import { LazyPreviewPane } from "@/components/designer/LazyPreviewPane";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
 import { ManufacturingPanel } from "@/components/designer/ManufacturingPanel";
 import { FloatingWindow } from "@/components/window-system/FloatingWindow";
 import { useDesignerStore } from "@/lib/stores/designerStore";
 import { cn } from "@/lib/utils";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
+
+// The PCB editor and web preview are code-split (lazyWithRetry) and rendered
+// behind <LazyPreviewPane> so a fault in their module graph can't crash the whole
+// Designer route. The 3D view is imported eagerly (it's the page's primary
+// content — no chunk-load flash on the default mode) but is still wrapped in
+// <LazyPreviewPane> for the same crash isolation.
+const EnhancedPCBEditor = lazyWithRetry(() => import("@/components/pcb/EnhancedPCBEditor").then(m => ({ default: m.EnhancedPCBEditor })));
+const WebPreview = lazyWithRetry(() => import("@/components/designer/WebPreview").then(m => ({ default: m.WebPreview })));
 
 type DesignMode = "3d" | "pcb" | "web" | "code";
 
@@ -595,18 +603,26 @@ export function Designer3D() {
   const renderDesignerContent = () => (
     <div className="relative w-full h-full flex flex-col overflow-hidden">
       {mode === "3d" && (
-        <ThreeViewer
-          code={activeFileCode}
-          onObjectSelect={(name) => setThreeDSelectionName(name || null)}
-        />
+        <LazyPreviewPane>
+          <ThreeViewer
+            code={activeFileCode}
+            onObjectSelect={(name) => setThreeDSelectionName(name || null)}
+          />
+        </LazyPreviewPane>
       )}
-      {mode === "pcb" && <EnhancedPCBEditor onAIToggle={setIsAIPanelOpen} />}
+      {mode === "pcb" && (
+        <LazyPreviewPane>
+          <EnhancedPCBEditor onAIToggle={setIsAIPanelOpen} />
+        </LazyPreviewPane>
+      )}
       {mode === "web" && (
-        <WebPreview
-          code={activeFileCode}
-          onChange={(newVal) => updateActiveFileContent(newVal)}
-          onTextHighlight={(text) => setSelectedText(text)}
-        />
+        <LazyPreviewPane>
+          <WebPreview
+            code={activeFileCode}
+            onChange={(newVal) => updateActiveFileContent(newVal)}
+            onTextHighlight={(text) => setSelectedText(text)}
+          />
+        </LazyPreviewPane>
       )}
       {mode === "code" && (
         <div className="w-full h-full flex flex-col overflow-hidden bg-background select-none">

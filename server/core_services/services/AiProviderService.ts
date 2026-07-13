@@ -288,6 +288,26 @@ export class AiProviderService {
   }
 
   /**
+   * Single-model local completion on Omnecor's own managed `llama-server`
+   * runtime (Model-Fabric). Hot-swaps to `modelId`/`modelPath` via
+   * `LocalLlmRuntimeService.ensureModelLoaded` and generates through the raw
+   * template-free `/completion` endpoint, returning the full text (and
+   * streaming to `onChunk` when supplied).
+   *
+   * Unlike the public `chat()`/`streamChat()` path this deliberately bypasses
+   * Valet routing AND the local sub-agent Try-Fail-Fix harness — the caller
+   * wants a plain single-model generation, not a tool loop. Used by
+   * `MoeChainService` for per-step chain execution: each step is one model, and
+   * the runtime's swap between steps replaces the old bridge's unload/preWarm.
+   */
+  async completeLocal(
+    input: ChatInput,
+    onChunk?: (chunk: ChatChunk) => void
+  ): Promise<string> {
+    return this.chatLocalLlm({ ...input, providerId: "llamacpp" }, onChunk);
+  }
+
+  /**
    * Async generator for streaming chat completions.
    */
   async *streamChat(
@@ -1540,7 +1560,11 @@ export class AiProviderService {
     if (!apiKey) throw new Error("Gemini API Key not configured");
 
     const customUrl = this.getProviderBaseUrl("gemini", input.baseUrl) || "https://generativelanguage.googleapis.com";
-    const baseUrl = `${customUrl.replace(/\/$/, "")}/v1beta/models/${input.modelId}:streamGenerateContent?key=${apiKey}`;
+    // `alt=sse` is required for streaming: without it Gemini returns one
+    // pretty-printed multi-line JSON array, which a per-line parser silently
+    // drops in full — the stream "completes" with zero chunks and no error.
+    // With it, every event is a single-line `data: {...}` the parser handles.
+    const baseUrl = `${customUrl.replace(/\/$/, "")}/v1beta/models/${input.modelId}:streamGenerateContent?alt=sse&key=${apiKey}`;
 
     // Simplistic Gemini mapping
     const contents = input.messages

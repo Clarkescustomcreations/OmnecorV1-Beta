@@ -25,6 +25,7 @@ This is the full map of the `docs/` tree. For top-level project docs
 | [user-guides/AGENT_NETWORKING.md](user-guides/AGENT_NETWORKING.md) | Social media automation — discovery, curation, scheduling, publishing |
 | [user-guides/PODCAST_STUDIO.md](user-guides/PODCAST_STUDIO.md) | Script generation, multi-speaker TTS, episode history |
 | [user-guides/3D_DESIGNER.md](user-guides/3D_DESIGNER.md) | 3D Viewer + PCB Schematic Editor — scope, AI context bridge, Blender/KiCad handoff |
+| [user-guides/BLUEPRINT_STUDIO.md](user-guides/BLUEPRINT_STUDIO.md) | Blueprint Studio — AI-assisted fabrication planning: BOM, cut lists, drawings, patterns, engineering verification, FEA, PDF export |
 | [user-guides/FICTION_MODE.md](user-guides/FICTION_MODE.md) | Creative writing mode — locks, personas, story-bible state |
 | [user-guides/ALWAYS_LISTEN.md](user-guides/ALWAYS_LISTEN.md) | Android wake-word voice mode setup |
 | [user-guides/SLASH_COMMANDS.md](user-guides/SLASH_COMMANDS.md) | All chat slash commands, including the `/architect /remember /review /recover /imprint` workflow skills |
@@ -63,6 +64,7 @@ generation, build instructions, serving runbook, I/O contract.
 | [architecture/DATA_FLOW.md](architecture/DATA_FLOW.md) | How data moves between frontend, backend, AI models, external services |
 | [architecture/OMMESH_NETWORKING.md](architecture/OMMESH_NETWORKING.md) | OMMESH networking & cross-node mTLS routing internals |
 | [architecture/ROUTER_INVENTORY.md](architecture/ROUTER_INVENTORY.md) | Reference for every tRPC router |
+| [architecture/BLUEPRINT_STUDIO.md](architecture/BLUEPRINT_STUDIO.md) | Blueprint Studio internals — data model, the `ChatAgentRunner` domain-tool extension, calc engine, dual CAD engines, FEA bridge |
 | [architecture/Omnecor System Design.md](<architecture/Omnecor System Design.md>) | High-level system design |
 | [backend/SERVICES_OVERVIEW.md](backend/SERVICES_OVERVIEW.md) | Backend singleton services |
 | [backend/DATABASE_SCHEMA.md](backend/DATABASE_SCHEMA.md) | Drizzle schema reference |

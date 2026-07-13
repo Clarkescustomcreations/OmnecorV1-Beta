@@ -10,8 +10,9 @@
  *   - throws when no active steps match
  *   - sovereign mode blocks cloud steps
  *
- * Local steps (LlamaCppService) require a loaded GGUF; they are tested via
- * mocked LlamaCppService to verify the call contract.
+ * Local steps run on Omnecor's own managed llama-server runtime via
+ * AiProviderService.completeLocal (which hot-swaps the runtime to each step's
+ * model); they are tested via a mocked completeLocal to verify the call contract.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import type { MoeChainStep } from "../../drizzle/schema.js";
@@ -22,24 +23,11 @@ vi.mock("../_core/sovereign.js", () => ({
   isSovereignMode: vi.fn().mockReturnValue(false),
 }));
 
-const mockGenerate = vi.fn();
-const mockUnload = vi.fn().mockResolvedValue(undefined);
-const mockPreWarm = vi.fn().mockResolvedValue(undefined);
-
-vi.mock("../core_services/services/LlamaCppService.js", () => ({
-  LlamaCppService: {
-    getInstance: () => ({
-      generate: mockGenerate,
-      unload: mockUnload,
-      preWarm: mockPreWarm,
-    }),
-  },
-}));
-
 const mockChat = vi.fn();
+const mockCompleteLocal = vi.fn();
 vi.mock("../core_services/services/AiProviderService.js", () => ({
   AiProviderService: {
-    getInstance: () => ({ chat: mockChat }),
+    getInstance: () => ({ chat: mockChat, completeLocal: mockCompleteLocal }),
   },
 }));
 
@@ -77,9 +65,7 @@ type Chunk = { content: string; done: boolean };
 beforeEach(() => {
   vi.mocked(isSovereignMode).mockReturnValue(false);
   mockChat.mockReset();
-  mockGenerate.mockReset();
-  mockUnload.mockReset().mockResolvedValue(undefined);
-  mockPreWarm.mockReset().mockResolvedValue(undefined);
+  mockCompleteLocal.mockReset();
   (MoeChainService as any).instance = null;
 });
 
@@ -237,8 +223,8 @@ describe("MoeChainService.execute — cloud chain", () => {
 // ── Local chain ───────────────────────────────────────────────────────────────
 
 describe("MoeChainService.execute — local chain", () => {
-  it("calls LlamaCppService.generate with the model path and prompt", async () => {
-    mockGenerate.mockResolvedValueOnce("llama output");
+  it("calls completeLocal targeting the step's model with the message history", async () => {
+    mockCompleteLocal.mockResolvedValueOnce("llama output");
 
     const steps: MoeChainStep[] = [
       makeStep({ order: 1, label: "Local", modelPath: "/models/expert.gguf" }),
@@ -248,15 +234,31 @@ describe("MoeChainService.execute — local chain", () => {
     );
 
     expect(result.output).toBe("llama output");
-    expect(mockGenerate).toHaveBeenCalledOnce();
-    const [prompt, modelPath] = mockGenerate.mock.calls[0]!;
-    expect(modelPath).toBe("/models/expert.gguf");
-    expect(typeof prompt).toBe("string");
-    expect(prompt).toContain("Hello"); // user message in prompt
+    expect(mockCompleteLocal).toHaveBeenCalledOnce();
+    const [input] = mockCompleteLocal.mock.calls[0]!;
+    expect(input.providerId).toBe("llamacpp");
+    expect(input.modelId).toBe("/models/expert.gguf");
+    expect(input.modelPath).toBe("/models/expert.gguf");
+    // The message history (not a hand-rolled flat string) is passed through so
+    // the runtime renders it with the model's own chat template.
+    expect(input.messages.some((m: { content: string }) => m.content === "Hello")).toBe(true);
   });
 
-  it("unloads model between steps to free RAM", async () => {
-    mockGenerate
+  it("joins modelPath (dir) + ggufFile into the full model file path the runtime resolves", async () => {
+    mockCompleteLocal.mockResolvedValueOnce("ok");
+    // scanLocalModels stores the directory in modelPath and the filename in ggufFile.
+    const steps: MoeChainStep[] = [
+      makeStep({ order: 1, label: "Local", modelPath: "/home/u/.omnecor/models", ggufFile: "expert-Q4_K_M.gguf" }),
+    ];
+    await MoeChainService.getInstance().execute(steps, "local", makeCtx(), () => {});
+
+    const input = mockCompleteLocal.mock.calls[0]![0];
+    expect(input.modelId).toBe("/home/u/.omnecor/models/expert-Q4_K_M.gguf");
+    expect(input.modelPath).toBe("/home/u/.omnecor/models/expert-Q4_K_M.gguf");
+  });
+
+  it("hot-swaps per step — completeLocal is called once per step with each model", async () => {
+    mockCompleteLocal
       .mockResolvedValueOnce("out1")
       .mockResolvedValueOnce("out2");
 
@@ -266,8 +268,29 @@ describe("MoeChainService.execute — local chain", () => {
     ];
     await MoeChainService.getInstance().execute(steps, "local", makeCtx(), () => {});
 
-    expect(mockUnload).toHaveBeenCalledOnce(); // called after first step, not last
-    expect(mockUnload).toHaveBeenCalledWith("/models/a.gguf");
+    // The runtime's swap (ensureModelLoaded inside completeLocal) frees the prior
+    // model — MoE no longer manages unload/preWarm itself. One call per step,
+    // each pointed at its own model, in order.
+    expect(mockCompleteLocal).toHaveBeenCalledTimes(2);
+    expect(mockCompleteLocal.mock.calls[0]![0].modelPath).toBe("/models/a.gguf");
+    expect(mockCompleteLocal.mock.calls[1]![0].modelPath).toBe("/models/b.gguf");
+  });
+
+  it("streams only the final step — intermediate steps run buffered (no onChunk)", async () => {
+    mockCompleteLocal
+      .mockResolvedValueOnce("intermediate")
+      .mockResolvedValueOnce("final");
+
+    const steps: MoeChainStep[] = [
+      makeStep({ order: 1, modelPath: "/models/a.gguf" }),
+      makeStep({ order: 2, modelPath: "/models/b.gguf" }),
+    ];
+    await MoeChainService.getInstance().execute(steps, "local", makeCtx(), () => {});
+
+    // Intermediate step: no streaming callback (content buffered silently).
+    expect(mockCompleteLocal.mock.calls[0]![1]).toBeUndefined();
+    // Final step: a streaming callback is supplied so the user sees the output.
+    expect(typeof mockCompleteLocal.mock.calls[1]![1]).toBe("function");
   });
 
   it("throws when a local step has no modelPath configured", async () => {

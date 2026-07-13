@@ -15,6 +15,11 @@ const svc = vi.hoisted(() => ({
   searchHuggingFace: vi.fn(),
   searchAll: vi.fn(),
   getHotModels: vi.fn(),
+  listRepoFiles: vi.fn(),
+  startHuggingFaceDownload: vi.fn(),
+  startBaseModelDownload: vi.fn(),
+  getDownloadStatus: vi.fn(),
+  listDownloads: vi.fn(),
 }));
 
 vi.mock("../db.factory.js", async importActual => {
@@ -92,5 +97,58 @@ describe("modelMarketplace.featured", () => {
     const res = await caller.modelMarketplace.featured();
     expect(res.total).toBe(3);
     expect(svc.getHotModels).toHaveBeenCalledOnce();
+  });
+});
+
+describe("modelMarketplace HF download surface", () => {
+  it("listRepoFiles delegates the repo id", async () => {
+    svc.listRepoFiles.mockResolvedValue([{ path: "m.gguf", filename: "m.gguf", sizeBytes: 1, quant: null }]);
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    const res = await caller.modelMarketplace.listRepoFiles({ repoId: "owner/repo" });
+    expect(svc.listRepoFiles).toHaveBeenCalledWith("owner/repo");
+    expect(res.files).toHaveLength(1);
+  });
+
+  it("downloadModel delegates repoId/filePath/sizeBytes and returns the tracking id", async () => {
+    svc.startHuggingFaceDownload.mockReturnValue({ id: "dl-1" });
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    const res = await caller.modelMarketplace.downloadModel({ repoId: "owner/repo", filePath: "m.gguf", sizeBytes: 42 });
+    expect(svc.startHuggingFaceDownload).toHaveBeenCalledWith("owner/repo", "m.gguf", 42);
+    expect(res.id).toBe("dl-1");
+  });
+
+  it("downloadBaseModel delegates the repo id to the whole-repo download", async () => {
+    svc.startBaseModelDownload.mockReturnValue({ id: "dl-base" });
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    const res = await caller.modelMarketplace.downloadBaseModel({ repoId: "org/base" });
+    expect(svc.startBaseModelDownload).toHaveBeenCalledWith("org/base");
+    expect(res.id).toBe("dl-base");
+  });
+
+  it("downloadStatus rejects a non-uuid id before touching the service", async () => {
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    await expect(caller.modelMarketplace.downloadStatus({ id: "nope" })).rejects.toBeTruthy();
+    expect(svc.getDownloadStatus).not.toHaveBeenCalled();
+  });
+
+  it("downloadStatus returns the status for a valid uuid", async () => {
+    svc.getDownloadStatus.mockReturnValue({ id: "abc", state: "done" });
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    const res = await caller.modelMarketplace.downloadStatus({ id: "123e4567-e89b-12d3-a456-426614174000" });
+    expect(svc.getDownloadStatus).toHaveBeenCalledWith("123e4567-e89b-12d3-a456-426614174000");
+    expect(res?.state).toBe("done");
+  });
+
+  it("downloads returns the service's list", async () => {
+    svc.listDownloads.mockReturnValue([{ id: "a" }, { id: "b" }]);
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    const res = await caller.modelMarketplace.downloads();
+    expect(res.downloads).toHaveLength(2);
   });
 });

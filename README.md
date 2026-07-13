@@ -156,6 +156,15 @@ Omnecor is engineered as a modular, production-grade workstation. Every feature 
 - **Floating Windows & External Monitors** — Detach any mode into a floating window or send to an external display for expanded workflow.
 - **Native App Bridges** — "Open in Blender" and "Open in KiCad" buttons spawn native GUI apps with bi-directional file sync.
 
+### Blueprint Studio — AI-Assisted Fabrication Planning
+- **Idea → Build Plan** — Describe any physical project (carpentry, metal fabrication, structures, vehicles, 3D printing, or multi-part costumes) and an agentic session at `/blueprint-studio` turns it into a persistent, followable **Build Plan**: overview, bill of materials, cut list (with miter/bevel angles), dimensioned drawings, 3D geometry, true-scale patterns, engineering verification, and assembly steps — attached to the active Neural Map and exportable as a PDF booklet.
+- **Never LLM math for safety-relevant numbers** — Every span, load, deflection, buckling, weld, bolt, torsion, joint-strength, printed-part, and heat-resistance figure runs through a **deterministic engineering calc engine** (13 solve types) or a real finite-element solve, recording the formula, substituted numbers, and a safety factor. The model is forbidden from doing structural math itself. (Includes a "will this plastic part survive the sun / a hot car?" thermal check.)
+- **Real, offline materials database** — 61 materials across 11 categories with published mechanical properties (NDS №2 lumber design values, ASTM A36/A500/6061/4130 metals, filament datasheets with layer-adhesion factors, fabrics/EVA/Worbla), so the whole tool works air-gapped in Sovereign mode.
+- **Dual-engine parametric CAD** — JSCAD (`@jscad/modeling`) in a `node:vm` sandbox as the zero-install default, plus optional OpenSCAD (external binary, `openscadPath` — same pattern as Blender/KiCad). Output: interactive mesh, binary STL, dimensioned three-view drawing (SVG), and DXF.
+- **Real FEA (optional)** — Gmsh tet-meshing + TET4 linear-static elasticity (`pip install gmsh numpy scipy`) with a von-Mises stress heatmap in the 3D tab; degrades gracefully when the Python deps are absent.
+- **True-scale patterns & cut optimization** — Tiled 1:1 pattern PDFs (calibration square, seam allowance, cut/stitch lines, grainlines) for fabric/foam pieces, and kerf-aware 1D/2D/fabric nesting that writes the buy-quantity straight onto the BOM.
+- **Import, revise, and shop** — Bring in an existing **STL or DXF** as a plan part; recompiling/re-importing keeps **revision history** (latest shown, older downloadable); export the BOM as a **CSV + supplier-grouped buy-list**, and the whole plan as a PDF booklet. See [Blueprint Studio](docs/user-guides/BLUEPRINT_STUDIO.md).
+
 ### Podcast Studio
 - **AI-Assisted Script Generation** — Automatic podcast script creation with multi-speaker dialogue turns and topic discovery via the content discovery engine.
 - **Voice Pipeline Integration** — Text-to-speech via the local voice pipeline with speaker assignment and audio source management.
@@ -292,6 +301,7 @@ Explore the comprehensive documentation suite in the [docs/](docs/) directory fo
 
 - [Podcast Studio](docs/user-guides/PODCAST_STUDIO.md) — script generation, multi-speaker TTS, episode history
 - [3D Designer & PCB Editor](docs/user-guides/3D_DESIGNER.md) — scope, AI context bridge, Blender/KiCad handoff
+- [Blueprint Studio](docs/user-guides/BLUEPRINT_STUDIO.md) — AI-assisted fabrication planning: BOM, cut lists, drawings, patterns, engineering verification, FEA
 - [Fiction Mode](docs/user-guides/FICTION_MODE.md) — creative writing mode, locks, story-bible state
 - [Always-Listening Voice Mode](docs/user-guides/ALWAYS_LISTEN.md) — Android wake-word setup
 - [Slash Commands & Workflow Skills](docs/user-guides/SLASH_COMMANDS.md) — `/architect /remember /review /recover /imprint` and all chat commands

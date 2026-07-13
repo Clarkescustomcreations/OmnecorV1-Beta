@@ -78,6 +78,11 @@ export const PATHS = {
   data: resolveDataPath("data"),
   logs: resolveDataPath("logs"),
   models: resolveDataPath("models"),
+  // Full Hugging Face base-model repos (config + tokenizer + safetensors)
+  // pre-downloaded for offline/sovereign fine-tuning in the LLM Builder. A
+  // sibling of the runtime GGUF dir; the GGUF index only scans for .gguf so
+  // safetensors repos here never collide with the runtime catalog.
+  baseModels: resolveDataPath(path.join("models", "base")),
   keystore: resolveDataPath("keystore"),
   security: resolveDataPath("security"),
   backups: resolveDataPath("backups"),

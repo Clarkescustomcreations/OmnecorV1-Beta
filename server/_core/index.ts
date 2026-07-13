@@ -609,7 +609,6 @@ async function startServer() {
     const localServices = [
       { name: "Fal AI bridge",   url: `http://localhost:${process.env.FAL_LOCAL_PORT ?? "8004"}/health` },
       { name: "MAS bridge",      url: `http://127.0.0.1:${process.env.MAS_BRIDGE_PORT ?? "8011"}/health` },
-      { name: "llama.cpp bridge",url: `http://127.0.0.1:${process.env.LLAMA_CPP_PORT ?? "8013"}/health` },
       { name: "Local LLM runtime (llama-server)", url: `${LocalLlmRuntimeService.getInstance().getBaseUrl()}/health` },
       { name: "ComfyUI",         url: process.env.COMFYUI_URL ?? `http://127.0.0.1:${process.env.COMFYUI_PORT ?? "8188"}/system_stats` },
       { name: "Whisper STT",     url: process.env.WHISPER_SERVER_URL ?? "http://localhost:8001/health" },

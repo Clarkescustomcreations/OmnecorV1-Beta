@@ -119,7 +119,6 @@ These run as separate processes and are proxied by the tRPC routers. All are opt
 | Fal AI bridge | 8004 | `falRouter` |
 | Valet Router inference | 8010 | `valetRouter` |
 | RecursiveMAS bridge | 8011 | `agentRouter` |
-| llama.cpp bridge | 8013 | `aiRouter` |
 | ComfyUI | 8188 | `comfyRouter` |
 
 ### OMMESH

@@ -161,9 +161,14 @@ export class LocalLlmRuntimeService {
         await this._loadModel(target);
         return this._ready;
       }
-      log.warn(
-        `[LocalLlmRuntime] Requested model "${idOrPath}" is not in the local index — ` +
-          "serving the currently-loaded model instead.",
+      // An explicit model was requested but can't be resolved even after a
+      // rescan. Do NOT silently serve whatever model happens to be loaded —
+      // that would run the wrong weights and return a confidently-wrong answer
+      // (e.g. a MoE chain step, or a chat pinned to a specific local model).
+      // Surface it so the caller can report a clear error instead.
+      throw new Error(
+        `Requested local model "${idOrPath}" is not in the local index. ` +
+          "Place its .gguf under the models directory (or select an indexed model).",
       );
     }
     if (this._ready) return true;

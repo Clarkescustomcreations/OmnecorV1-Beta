@@ -53,7 +53,7 @@ PY
 ## Step 3 — Fine-tune (LoRA via Unsloth)
 
 ```bash
-python3 server/phase2/python_scripts/localLLMfine-tuning.py \
+python3 server/core_services/python_scripts/localLLMfine-tuning.py \
   --model_name "Qwen/Qwen2.5-1.5B-Instruct" \
   --dataset_path data/valet/train.jsonl \
   --output_dir models/valet-router/adapter \

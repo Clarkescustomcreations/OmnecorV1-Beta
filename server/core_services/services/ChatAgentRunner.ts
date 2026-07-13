@@ -76,6 +76,22 @@ const MAX_TURNS = 8;
 /** Per-command wall-clock cap for `run_command` (5 minutes). */
 const COMMAND_TIMEOUT_MS = 5 * 60 * 1000;
 
+/**
+ * A feature-scoped domain tool injected into a run (e.g. Blueprint Studio's
+ * calc/CAD/plan tools). Offered to the model alongside — or instead of — the
+ * built-in actions, and dispatched before the MCP fallthrough. Executed
+ * without HITL gating: an extra tool's executor operates on its own feature's
+ * data (plan documents, deterministic calcs), never the filesystem/shell —
+ * anything needing approval should go through the built-in actions instead.
+ */
+export interface ExtraAgentTool {
+  definition: ToolDefinition;
+  /** Display title for the tool box (falls back to the tool name). */
+  title?: string;
+  /** Run the tool; the returned string is fed back to the model. */
+  execute: (args: Record<string, unknown>) => Promise<string>;
+}
+
 /** Everything a single agentic turn needs. */
 export interface AgentRunParams {
   /** Provider + model + conversation history (already RAG-injected upstream). */
@@ -95,6 +111,18 @@ export interface AgentRunParams {
    * with `autoApprove` on (another machine is outside "within the active map").
    */
   allowDelegation?: boolean;
+  /**
+   * Feature-scoped domain tools for this run (see `ExtraAgentTool`). Dispatched
+   * by action name before the MCP fallthrough.
+   */
+  extraTools?: ExtraAgentTool[];
+  /**
+   * Offer the built-in edit_file / run_command / start_job actions. Defaults
+   * to true (main chat). A feature surface running a pure domain toolset
+   * (Blueprint Studio) sets false so the model can't edit files or run
+   * commands from that context.
+   */
+  includeBuiltInTools?: boolean;
   /** Aborts the run when the client disconnects (subscription teardown). */
   signal?: AbortSignal;
 }
@@ -143,7 +171,13 @@ interface ToolProtocol {
  */
 const TextToolProtocol: ToolProtocol = {
   encode(base, defs) {
-    return { systemPrompt: buildTextToolSystemPrompt(base, defs.includes(DELEGATE_TOOL_DEFINITION)) };
+    // Membership is by reference — built-ins/delegate are module singletons, so
+    // anything else in `defs` is an injected ExtraAgentTool definition.
+    const includeBuiltins = defs.some((d) => AGENT_TOOL_DEFINITIONS.includes(d));
+    const extras = defs.filter((d) => !AGENT_TOOL_DEFINITIONS.includes(d) && d !== DELEGATE_TOOL_DEFINITION);
+    return {
+      systemPrompt: buildTextToolSystemPrompt(base, defs.includes(DELEGATE_TOOL_DEFINITION), extras, includeBuiltins),
+    };
   },
   decode(turn) {
     return parseToolCallText(turn.fullText);
@@ -243,9 +277,11 @@ export class ChatAgentRunner {
     // Mesh delegation is offered only to origin runs (never to a delegated run
     // on a peer). The prompt note names the currently-discoverable peers so the
     // model targets real nodes instead of guessing.
-    const defs: ToolDefinition[] = params.allowDelegation
-      ? [...AGENT_TOOL_DEFINITIONS, DELEGATE_TOOL_DEFINITION]
-      : AGENT_TOOL_DEFINITIONS;
+    const defs: ToolDefinition[] = [
+      ...(params.includeBuiltInTools === false ? [] : AGENT_TOOL_DEFINITIONS),
+      ...(params.extraTools?.map((t) => t.definition) ?? []),
+      ...(params.allowDelegation ? [DELEGATE_TOOL_DEFINITION] : []),
+    ];
     let baseSystemPrompt = params.input.systemPrompt;
     if (params.allowDelegation) {
       const peers = this.listPeerNames();
@@ -523,13 +559,20 @@ export class ChatAgentRunner {
     blocks: AssistantBlock[],
     pendingApprovalIds: Set<string>,
   ): AsyncGenerator<AgentStreamEvent, string> {
-    switch (req.action) {
+    // Injected domain tools win over the MCP fallthrough (and may shadow a
+    // built-in only when built-ins are disabled for the run).
+    const extra = params.extraTools?.find((t) => t.definition.name === req.action);
+    const builtinsEnabled = params.includeBuiltInTools !== false;
+    switch (builtinsEnabled || !extra ? req.action : "__extra__") {
       case "edit_file":
+        if (!builtinsEnabled) return "edit_file is not available in this context.";
         return yield* this.executeEdit(req, params, blocks, pendingApprovalIds);
       case "run_command":
       case "execute_sandbox": // back-compat alias with LocalSubAgentWorker
+        if (!builtinsEnabled) return "run_command is not available in this context.";
         return yield* this.executeCommand(req, params, blocks, pendingApprovalIds);
       case "start_job":
+        if (!builtinsEnabled) return "start_job is not available in this context.";
         return yield* this.executeStartJob(req, params, blocks, pendingApprovalIds);
       case "delegate_task":
         if (!params.allowDelegation) {
@@ -537,7 +580,44 @@ export class ChatAgentRunner {
         }
         return yield* this.executeDelegate(req, params, blocks, pendingApprovalIds);
       default:
+        if (extra) return yield* this.executeExtraTool(extra, req, blocks);
         return yield* this.executeMcp(req, params, blocks);
+    }
+  }
+
+  /**
+   * Run an injected `ExtraAgentTool`. Rendered as an MCP-style tool box (the
+   * generic name+args+result box the client already knows how to draw) with
+   * `server: "feature"` so it is distinguishable from real MCP calls.
+   */
+  private async *executeExtraTool(
+    tool: ExtraAgentTool,
+    req: ToolRequest,
+    blocks: AssistantBlock[],
+  ): AsyncGenerator<AgentStreamEvent, string> {
+    const { action: _action, ...args } = req;
+    const block: McpBlock = {
+      id: uuidv4(),
+      type: "mcp",
+      server: "feature",
+      tool: tool.definition.name,
+      title: tool.title ?? tool.definition.name,
+      status: "running",
+      args,
+    };
+    blocks.push(block);
+    yield { type: "block_start", block: { ...block } };
+    try {
+      const result = await tool.execute(args as Record<string, unknown>);
+      block.status = "success";
+      block.result = result;
+      yield { type: "block_end", block: { ...block } };
+      return `Tool "${tool.definition.name}" result:\n${result}`;
+    } catch (e) {
+      block.status = "error";
+      block.result = (e as Error).message;
+      yield { type: "block_end", block: { ...block } };
+      return `Tool "${tool.definition.name}" failed: ${(e as Error).message}. Adjust the arguments or take a different approach.`;
     }
   }
 
@@ -1028,16 +1108,52 @@ export class ChatAgentRunner {
 /** Compose the tool-usage system prompt on top of any caller system prompt —
  *  the text protocol's encode(). Unchanged wording from before Model-Fabric
  *  Phase 2 (proven working); the native protocol never calls this. */
-export function buildTextToolSystemPrompt(base?: string, includeDelegation = false): string {
-  const delegation = includeDelegation
-    ? `\n4. "delegate_task" — Delegate a self-contained task to another Omnecor node on the mesh. Provide "node" (a discoverable peer name) and "task" (the complete instruction); optional "label", "scope_path" (an explicit directory ON THE PEER), and "model". A full sub-agent runs it there. Requires user approval; end your turn after delegating and you will be re-prompted with the result when it finishes.`
-    : "";
+export function buildTextToolSystemPrompt(
+  base?: string,
+  includeDelegation = false,
+  extraDefs: ToolDefinition[] = [],
+  includeBuiltins = true,
+): string {
+  const lines: string[] = [];
+  let n = 0;
+  if (includeBuiltins) {
+    lines.push(
+      `${++n}. "edit_file"  — Create or modify a file scoped to the active project. Provide "path" plus EITHER "content" (the full new file) OR "search" and "replace" (an exact, unique snippet to swap). Edits require user approval and are only written on approval.`,
+      `${++n}. "run_command" — Run a CLI command to completion. Provide "command" (string, never a shell line) and "args" (string array). Requires user approval. Use for quick commands whose output you need now.`,
+      `${++n}. "start_job"  — Start a long-running command (builds, downloads, training). Same fields as run_command plus an optional "label". It runs asynchronously; end your turn after starting it and you will be re-prompted with the result when it finishes.`,
+    );
+  }
+  if (includeDelegation) {
+    lines.push(
+      `${++n}. "delegate_task" — Delegate a self-contained task to another Omnecor node on the mesh. Provide "node" (a discoverable peer name) and "task" (the complete instruction); optional "label", "scope_path" (an explicit directory ON THE PEER), and "model". A full sub-agent runs it there. Requires user approval; end your turn after delegating and you will be re-prompted with the result when it finishes.`,
+    );
+  }
+  // Injected domain tools — rendered generically from their JSON Schema.
+  for (const def of extraDefs) {
+    const params = def.parameters?.properties ?? {};
+    const required = new Set(def.parameters?.required ?? []);
+    const fields = Object.entries(params)
+      .map(([key, schema]) => {
+        const s = schema as { type?: string; description?: string };
+        return `"${key}" (${s.type ?? "any"}${required.has(key) ? ", required" : ""})${s.description ? `: ${s.description}` : ""}`;
+      })
+      .join("; ");
+    lines.push(`${++n}. "${def.name}" — ${def.description}${fields ? `\n   Fields: ${fields}` : ""}`);
+  }
+
+  const exampleCall = includeBuiltins
+    ? `{"action":"edit_file","path":"src/index.ts","search":"const x = 1","replace":"const x = 2"}`
+    : extraDefs.length > 0
+      ? `{"action":"${extraDefs[0].name}"${(extraDefs[0].parameters?.required ?? [])
+          .slice(0, 2)
+          .map((k) => `,"${k}":"…"`)
+          .join("")}}`
+      : `{"action":"tool_name","field":"value"}`;
+
   const tools = `You are Omnecor's agentic assistant. You can take real actions by emitting exactly one JSON tool call wrapped in <tool_call> tags, then stopping so the harness can run it and return the result. Write any prose for the user BEFORE the tag.
 
 Available actions:
-1. "edit_file"  — Create or modify a file scoped to the active project. Provide "path" plus EITHER "content" (the full new file) OR "search" and "replace" (an exact, unique snippet to swap). Edits require user approval and are only written on approval.
-2. "run_command" — Run a CLI command to completion. Provide "command" (string, never a shell line) and "args" (string array). Requires user approval. Use for quick commands whose output you need now.
-3. "start_job"  — Start a long-running command (builds, downloads, training). Same fields as run_command plus an optional "label". It runs asynchronously; end your turn after starting it and you will be re-prompted with the result when it finishes.${delegation}
+${lines.join("\n")}
 Any other action name is treated as an MCP tool call.
 
 Rules:
@@ -1047,7 +1163,7 @@ Rules:
 
 Example:
 <tool_call>
-{"action":"edit_file","path":"src/index.ts","search":"const x = 1","replace":"const x = 2"}
+${exampleCall}
 </tool_call>`;
   return base ? `${base}\n\n=== TOOL INSTRUCTIONS ===\n${tools}` : tools;
 }

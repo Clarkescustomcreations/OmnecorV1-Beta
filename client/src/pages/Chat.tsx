@@ -61,9 +61,16 @@ import { useNeuralContextStore } from "@/lib/neuralContextStore";
 import { useFictionMode } from "@/contexts/FictionModeContext";
 import { ChevronLeft, ChevronRight, Coins, FolderOpen, Box, Cpu, Globe, Maximize2, X, UserCircle2, Network } from "lucide-react";
 
-import { ThreeViewer } from "@/components/designer/ThreeViewer";
-import { EnhancedPCBEditor } from "@/components/pcb/EnhancedPCBEditor";
-import { WebPreview } from "@/components/designer/WebPreview";
+import { LazyPreviewPane } from "@/components/designer/LazyPreviewPane";
+import { lazyWithRetry } from "@/lib/lazyWithRetry";
+
+// Heavy preview panels are code-split and rendered behind <LazyPreviewPane> so a
+// failure in their module graph is isolated to the preview pane instead of
+// crashing the whole Chat route (see LazyPreviewPane). lazyWithRetry auto-retries
+// a transient chunk-load blip before ever surfacing an error.
+const ThreeViewer = lazyWithRetry(() => import("@/components/designer/ThreeViewer").then(m => ({ default: m.ThreeViewer })));
+const EnhancedPCBEditor = lazyWithRetry(() => import("@/components/pcb/EnhancedPCBEditor").then(m => ({ default: m.EnhancedPCBEditor })));
+const WebPreview = lazyWithRetry(() => import("@/components/designer/WebPreview").then(m => ({ default: m.WebPreview })));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -1959,9 +1966,9 @@ export function Chat() {
                 </div>
               </div>
               <div className="min-h-0 flex-1 overflow-hidden relative bg-background">
-                {previewMode === "3d" && <ThreeViewer code={previewCode} />}
-                {previewMode === "pcb" && <EnhancedPCBEditor />}
-                {previewMode === "web" && <WebPreview code={previewCode} />}
+                {previewMode === "3d" && <LazyPreviewPane><ThreeViewer code={previewCode} /></LazyPreviewPane>}
+                {previewMode === "pcb" && <LazyPreviewPane><EnhancedPCBEditor /></LazyPreviewPane>}
+                {previewMode === "web" && <LazyPreviewPane><WebPreview code={previewCode} /></LazyPreviewPane>}
               </div>
             </div>
           )}

@@ -26,7 +26,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Optional (local Ollama fallback available)
 - **Use Case:** Cloud LLM inference (GPT-4, GPT-3.5-turbo)
 - **Rate Limiting:** Built-in circuit breaker (5 retries, 60s cooldown)
-- **Files:** `server/phase2/services/AiProviderService.ts`
+- **Files:** `server/core_services/services/AiProviderService.ts`
 
 ### Anthropic (Claude)
 - **Endpoint:** `https://api.anthropic.com/v1/messages`
@@ -34,7 +34,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Optional (local Ollama fallback available)
 - **Use Case:** Cloud LLM inference (Claude Opus, Sonnet, Haiku)
 - **Rate Limiting:** Built-in circuit breaker (5 retries, 60s cooldown)
-- **Files:** `server/phase2/services/AiProviderService.ts`
+- **Files:** `server/core_services/services/AiProviderService.ts`
 
 ### xAI (Grok)
 - **Endpoint:** `https://api.x.ai/v1/chat/completions`
@@ -42,7 +42,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Optional (local Ollama fallback available)
 - **Use Case:** Cloud LLM inference (Grok models)
 - **Rate Limiting:** Built-in circuit breaker (5 retries, 60s cooldown)
-- **Files:** `server/phase2/services/AiProviderService.ts`
+- **Files:** `server/core_services/services/AiProviderService.ts`
 
 ### Google Gemini
 - **Endpoint:** `https://generativelanguage.googleapis.com/v1beta/models/{modelId}:streamGenerateContent`
@@ -50,7 +50,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Optional (local Ollama fallback available)
 - **Use Case:** Cloud LLM inference (Gemini Pro, Ultra)
 - **Rate Limiting:** Built-in circuit breaker (5 retries, 60s cooldown)
-- **Files:** `server/phase2/services/AiProviderService.ts`
+- **Files:** `server/core_services/services/AiProviderService.ts`
 
 ### Ollama (Local)
 - **Endpoint:** `http://localhost:11434/api/chat` (configurable)
@@ -58,7 +58,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Default/Required for sovereign mode
 - **Use Case:** Local LLM inference (Llama3, Mistral, etc.)
 - **Reliability:** Fails gracefully if unavailable
-- **Files:** `server/phase2/services/AiProviderService.ts`, `server/routers/ollamaRouter.ts`
+- **Files:** `server/core_services/services/AiProviderService.ts`, `server/routers/ollamaRouter.ts`
 
 ### Forge (Internal)
 - **Endpoint:** `https://forge.manus.im/v1/chat/completions`
@@ -79,7 +79,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - **Status:** Optional (Zero-login mode available)
 - **Token Refresh:** Automatic with pre-flight expiry check
-- **Files:** `server/_core/oauth.ts`, `server/phase2/services/TokenRefreshService.ts`
+- **Files:** `server/_core/oauth.ts`, `server/core_services/services/TokenRefreshService.ts`
 
 ### Microsoft OAuth
 - **Endpoints:**
@@ -89,7 +89,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `MICROSOFT_CLIENT_ID`, `MICROSOFT_CLIENT_SECRET`
 - **Status:** Optional (Zero-login mode available)
 - **Token Refresh:** Automatic with pre-flight expiry check
-- **Files:** `server/_core/oauth.ts`, `server/phase2/services/TokenRefreshService.ts`
+- **Files:** `server/_core/oauth.ts`, `server/core_services/services/TokenRefreshService.ts`
 
 ---
 
@@ -103,28 +103,28 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Optional (local TTS fallback available)
 - **Rate Limiting:** Circuit breaker (5 retries, 60s cooldown)
 - **Error Handling:** Safe error wrapping, no PII in responses
-- **Files:** `server/phase2/services/ElevenLabsService.ts`
+- **Files:** `server/core_services/services/ElevenLabsService.ts`
 
 ### Whisper (Local STT)
 - **Endpoint:** `http://localhost:8001/transcribe` (configurable)
 - **Config:** `WHISPER_SERVER_URL` (default: `http://localhost:8001`)
 - **Status:** Optional (graceful degradation)
 - **Port Configuration:** `WHISPER_SERVER_URL` env var
-- **Files:** `server/phase2/services/VoiceService.ts`
+- **Files:** `server/core_services/services/VoiceService.ts`
 
 ### TTS Synthesis (Local)
 - **Endpoint:** `http://localhost:8002/synthesize` (configurable)
 - **Config:** `TTS_SERVER_URL` (default: `http://localhost:8002`)
 - **Status:** Optional (graceful degradation)
 - **Port Configuration:** `TTS_SERVER_URL` env var
-- **Files:** `server/phase2/services/VoiceService.ts`
+- **Files:** `server/core_services/services/VoiceService.ts`
 
 ### RVC Voice Conversion (Local)
 - **Endpoint:** `http://127.0.0.1:8003/convert_voice` (configurable)
 - **Config:** `RVC_SERVER_URL` (default: `http://127.0.0.1:8003`)
 - **Status:** Optional (graceful degradation)
 - **Port Configuration:** `RVC_SERVER_URL` env var
-- **Files:** `server/phase2/services/VoiceService.ts`
+- **Files:** `server/core_services/services/VoiceService.ts`
 
 ---
 
@@ -137,7 +137,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `FAL_LOCAL_PORT` (default: `8004`)
 - **Status:** Optional (graceful degradation)
 - **Port Configuration:** `FAL_LOCAL_PORT` env var
-- **Files:** `server/phase2/services/FalApiService.ts`
+- **Files:** `server/core_services/services/FalApiService.ts`
 
 ### OpenArt.ai
 - **Endpoint:** `https://openart.ai/api/v1/image_request`
@@ -145,7 +145,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Optional
 - **Rate Limiting:** Circuit breaker via `apiClient` wrapper
 - **Error Handling:** Safe error wrapping, no sensitive data in responses
-- **Files:** `server/phase2/services/OpenArtService.ts`
+- **Files:** `server/core_services/services/OpenArtService.ts`
 
 ### ComfyUI (Local)
 - **Endpoints:**
@@ -156,7 +156,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `COMFYUI_URL`, `COMFYUI_PORT` (defaults: `http://127.0.0.1:8188`)
 - **Status:** Optional (graceful degradation)
 - **Port Configuration:** `COMFYUI_PORT` env var
-- **Files:** `server/phase2/services/ComfyService.ts`
+- **Files:** `server/core_services/services/ComfyService.ts`
 
 ---
 
@@ -209,7 +209,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
   - Users see safe `CardOperationError`
   - Audit trail recorded for compliance
 - **Encryption:** Card PAN encrypted immediately with AES-256-GCM; plaintext never stored
-- **Files:** `server/phase2/services/VirtualCardService.ts`, `server/routers/virtualCardRouter.ts`
+- **Files:** `server/core_services/services/VirtualCardService.ts`, `server/routers/virtualCardRouter.ts`
 
 ---
 
@@ -224,7 +224,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Status:** Optional
 - **Rate Limiting:** Circuit breaker via `apiClient` wrapper
 - **Error Handling:** Safe error wrapping, no sensitive data in responses
-- **Files:** `server/phase2/services/PCBWayService.ts`
+- **Files:** `server/core_services/services/PCBWayService.ts`
 
 ---
 
@@ -235,7 +235,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `CHROMADB_URL` (default: `http://localhost:8000`)
 - **Status:** Optional (memory features degrade gracefully)
 - **Health Check:** Monitored on startup and during operations
-- **Files:** `server/phase2/services/VectorDBService.ts`, `server/routers/knowledgeBase.ts`
+- **Files:** `server/core_services/services/VectorDBService.ts`, `server/routers/knowledgeBase.ts`
 
 ---
 
@@ -252,17 +252,14 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `VALET_ROUTER_URL` (default: `http://127.0.0.1:8010`)
 - **Status:** Optional (keyword fallback mode available)
 - **Port Configuration:** `VALET_ROUTER_URL` env var
-- **Files:** `server/phase2/services/ValetRouterService.ts`
+- **Files:** `server/core_services/services/ValetRouterService.ts`
 
-### Llama.cpp Bridge (Local)
-- **Endpoints:**
-  - Health: `http://127.0.0.1:8013/health`
-  - Generate: `http://127.0.0.1:8013/generate`
-  - Embeddings: `http://127.0.0.1:8013/embeddings`
-- **Config:** `LLAMA_CPP_PORT` (default: `8013`)
-- **Status:** Optional (graceful degradation)
-- **Port Configuration:** `LLAMA_CPP_PORT` env var
-- **Files:** `server/phase2/services/LlamaCppService.ts`
+### Local LLM Runtime — `llama-server` (Local)
+- **What:** Omnecor's own managed `llama-server` subprocess (llama.cpp, OpenAI-compatible) — supervised by `LocalLlmRuntimeService`. Replaced the standalone `llamacpp_bridge.py` (port 8013), which was retired once MoE-Chain moved onto this runtime.
+- **Endpoints (managed):** `/health`, `/completion`, `/apply-template` on the runtime's base URL (default `http://127.0.0.1:8014`).
+- **Config:** `LLAMA_SERVER_BIN`, `LOCAL_LLM_MODEL_PATH`, `LOCAL_LLM_GPU_LAYERS`
+- **Status:** Optional (Ollama-independent; the app serves local inference itself when a `.gguf` + `llama-server` binary are present).
+- **Files:** `server/core_services/services/LocalLlmRuntimeService.ts`
 
 ### MAS Bridge (Local)
 - **Endpoints:**
@@ -272,7 +269,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `MAS_BRIDGE_PORT` (default: `8011`)
 - **Status:** Optional (graceful degradation)
 - **Port Configuration:** `MAS_BRIDGE_PORT` env var
-- **Files:** `server/phase2/services/AgentService.ts`
+- **Files:** `server/core_services/services/AgentService.ts`
 
 ---
 
@@ -283,7 +280,7 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `MISP_URL`, `MISP_AUTH_KEY`
 - **Status:** Optional (returns empty array if unconfigured)
 - **Use Case:** Indicators of Compromise (IoC) threat feed
-- **Files:** `server/phase2/services/ThreatIntelService.ts`
+- **Files:** `server/core_services/services/ThreatIntelService.ts`
 
 ---
 
@@ -294,14 +291,14 @@ See [SECURITY_FEATURES.md](../user-guides/SECURITY_FEATURES.md#8-external-api-se
 - **Config:** `NOTION_CLIENT_ID`, `NOTION_CLIENT_SECRET`
 - **Status:** Optional
 - **Token Refresh:** Automatic via `TokenRefreshService`
-- **Files:** `server/phase2/services/TokenRefreshService.ts`
+- **Files:** `server/core_services/services/TokenRefreshService.ts`
 
 ### Honcho (Plastic Labs)
 - **Endpoints:** (Configured externally, uses Honcho SDK)
 - **Config:** `HONCHO_API_KEY`, `HONCHO_APP_NAME`, `HONCHO_ENVIRONMENT`
 - **Status:** Optional (degrades silently if unconfigured)
 - **Use Case:** Cross-session user memory and conversation history
-- **Files:** `server/phase2/services/HonchoService.ts`
+- **Files:** `server/core_services/services/HonchoService.ts`
 
 ---
 
@@ -351,7 +348,6 @@ CHROMADB_URL=http://localhost:8000
 # ============ WORKFLOW / AUTOMATION ============
 N8N_URL=http://localhost:5678
 VALET_ROUTER_URL=http://127.0.0.1:8010
-LLAMA_CPP_PORT=8013
 MAS_BRIDGE_PORT=8011
 
 # ============ THREAT INTELLIGENCE ============

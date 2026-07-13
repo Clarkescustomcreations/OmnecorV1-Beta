@@ -65,6 +65,11 @@ await build({
     "lightningcss",
     "@babel/core",
     "@tailwindcss/oxide",
+    // pdfkit/fontkit load their font-metric data files via `__dirname`
+    // relative paths at runtime — inlining them into the ESM bundle breaks
+    // that ("__dirname is not defined"). Loaded from node_modules instead.
+    "pdfkit",
+    "svg-to-pdfkit",
   ],
   alias: { "path-to-regexp": resolveClassicPathToRegexp() },
 });

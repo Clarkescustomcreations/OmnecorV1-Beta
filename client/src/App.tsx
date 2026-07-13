@@ -29,6 +29,7 @@ const SetupWizard = lazy(() => import("@/pages/SetupWizard").then(m => ({ defaul
 const ExternalBrainMapWindow = lazy(() => import("./components/window-system/ExternalBrainMapWindow").then(m => ({ default: m.ExternalBrainMapWindow })));
 const TermsPage = lazy(() => import("@/pages/Terms").then(m => ({ default: m.TermsPage })));
 const LLMBuilder = lazy(() => import("@/pages/LLMBuilder").then(m => ({ default: m.LLMBuilder })));
+const BlueprintStudio = lazy(() => import("@/pages/BlueprintStudio").then(m => ({ default: m.BlueprintStudio })));
 
 /** Per-route error boundary that renders RouteErrorBoundary on failure. */
 class RouteBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -86,6 +87,7 @@ function RouterRoutes() {
         <Route path="/pipelines" component={withBoundary(Pipelines)} />
         <Route path="/3d-designer" component={withBoundary(Designer3D)} />
         <Route path="/3d-designer-external" component={withBoundary(Designer3D)} />
+        <Route path="/blueprint-studio" component={withBoundary(BlueprintStudio)} />
         <Route path="/integrations" component={withBoundary(Integrations)} />
         <Route path="/agent-networking" component={withBoundary(AgentNetworking)} />
         <Route path="/podcast-studio" component={withBoundary(PodcastStudio)} />

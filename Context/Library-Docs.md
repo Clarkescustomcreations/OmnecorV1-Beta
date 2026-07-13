@@ -132,7 +132,7 @@ mandatory*. Cross-cutting workflow skills (`architect`, `review`, `recover`, `im
 | # | Project Area | Paths / Trigger | Required skills (load first) | Required MCP |
 | :-- | :--- | :--- | :--- | :--- |
 | A | **DB schema, queries & migrations** | `drizzle/schema.ts`, `server/db.ts`, `server/db.factory.ts`, any `getDb()` query, `pnpm build:push` | `api-database-drizzle`, `drizzle-orm-patterns`, `drizzle-best-practices`, `drizzle-queries`, `drizzle-orm-expert` | `sqlite` (inspect/backup the live DB; never raw `sqlite3`) |
-| B | **tRPC routers & API procedures** | `server/routers/*`, `server/phase2/routers/*`, `server/_core/trpc.ts`, `server/routers.ts` | `trpc-router`, `trpc-patterns`, `react-query-setup` (client wiring) | — |
+| B | **tRPC routers & API procedures** | `server/routers/*`, `server/core_services/routers/*`, `server/_core/trpc.ts`, `server/routers.ts` | `trpc-router`, `trpc-patterns`, `react-query-setup` (client wiring) | — |
 | C | **Input validation (all `z.*` schemas)** | Any procedure input, form schema, env/config parsing | `zod-validation-expert`, `zod-validation-utilities`, `form-validation-with-zod` | — |
 | D | **React pages & components** | `client/src/**` pages/components, `App.tsx` lazy routes | `react`, `react-patterns`; `react-flow-node-ts` for `SchematicEditor`/ReactFlow nodes; `transformers-js` only for in-browser ML | — |
 | E | **Styling & design tokens** | Any `.tsx` className, `client/src/Globals.css` (with `Context/UI-Tokens.md` + `UI-Rules.md`) | `tailwind-css-patterns`, `tailwind-best-practices` | — |

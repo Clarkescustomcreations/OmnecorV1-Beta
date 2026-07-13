@@ -25,7 +25,7 @@ enforces it in CI.
 |---|-----------|-----|-------------|
 | M1 | `server/python_bridges/valet_dataset_builder.py` | emitted `{provider, model, local_capable, cost_tier, reasoning}` | emits the canonical 11-field Routing Decision schema (`manifest_decision()`) |
 | M2 | `server/python_bridges/valet_router_inference.py` `/route` | parsed a narrower schema → model output never matched | `RouteDecision` pydantic model matches the contract exactly (drift check: 11/11 fields) |
-| M3 | `server/phase2/python_scripts/localLLMfine-tuning.py` | trained on `dataset_text_field="text"` with no `text` field written | builder writes the ChatML `text` field via `--emit-text` |
+| M3 | `server/core_services/python_scripts/localLLMfine-tuning.py` | trained on `dataset_text_field="text"` with no `text` field written | builder writes the ChatML `text` field via `--emit-text` |
 
 > **Trainer takeaway:** you do **not** need to fix M1/M2/M3 before training — they are
 > done. Your job is to keep the seeds, knowledge base, and manifest accurate and current

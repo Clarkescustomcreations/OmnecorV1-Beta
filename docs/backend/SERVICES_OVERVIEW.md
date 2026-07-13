@@ -19,7 +19,7 @@ graph TD
 
 ## 2. Core Services
 
-### 2.1. `SecurityService` (`server/phase2/services/SecurityService.ts`)
+### 2.1. `SecurityService` (`server/core_services/services/SecurityService.ts`)
 
 -   **Purpose**: Manages all security-related aspects of the application, including authentication, authorization, and cryptographic operations.
 -   **Key Responsibilities**:
@@ -29,7 +29,7 @@ graph TD
     -   Performing data encryption (e.g., AES-256-GCM for sensitive local data).
     -   Protecting against common web vulnerabilities like CSRF and path traversal.
 
-### 2.2. `VectorDBService` (`server/phase2/services/VectorDBService.ts`)
+### 2.2. `VectorDBService` (`server/core_services/services/VectorDBService.ts`)
 
 -   **Purpose**: Implements the knowledge base functionality, responsible for semantic indexing and retrieval of project data.
 -   **Key Responsibilities**:
@@ -39,7 +39,7 @@ graph TD
     -   Performing semantic search and retrieval for Retrieval-Augmented Generation (RAG).
     -   Graceful degradation if the vector database cannot be initialized.
 
-### 2.3. `ProcessManagerService` (`server/phase2/services/ProcessManagerService.ts`)
+### 2.3. `ProcessManagerService` (`server/core_services/services/ProcessManagerService.ts`)
 
 -   **Purpose**: Orchestrates and monitors external child processes, primarily for integrating with Python-based hardware bridges and other external tools.
 -   **Key Responsibilities**:
@@ -56,7 +56,7 @@ graph TD
     -   Maintaining a registry of active Omnecor nodes in the mesh.
     -   Facilitating secure communication setup between nodes.
 
-### 2.5. `AiProviderService` (`server/phase2/services/AiProviderService.ts`)
+### 2.5. `AiProviderService` (`server/core_services/services/AiProviderService.ts`)
 
 -   **Purpose**: Manages connections to various local and cloud AI models and intelligently routes inference requests.
 -   **Key Responsibilities**:
@@ -66,7 +66,7 @@ graph TD
     -   Handling model loading and unloading.
     -   **Context Overflow Protection**: Explicitly calculates token estimations before prompting; throws `ContextOverflowError` to prevent out-of-memory (OOM) crashes, seamlessly downgrading or rejecting oversized payloads.
 
-### 2.6. `FileSystemWatcherService` (`server/phase2/services/FileSystemWatcherService.ts`)
+### 2.6. `FileSystemWatcherService` (`server/core_services/services/FileSystemWatcherService.ts`)
 
 -   **Purpose**: Monitors specified directories for file system changes, triggering automated workflows like re-indexing or data processing.
 -   **Key Responsibilities**:
@@ -74,7 +74,7 @@ graph TD
     -   Detecting file creation, modification, and deletion events.
     -   Notifying other services (e.g., `VectorDBService`) about relevant changes.
 
-### 2.7. `MemoryArchitectService` (`server/phase2/services/MemoryArchitectService.ts`)
+### 2.7. `MemoryArchitectService` (`server/core_services/services/MemoryArchitectService.ts`)
 
 -   **Purpose**: Manages the AI context and memory layers, leveraging the `VectorDBService` to provide Retrieval-Augmented Generation (RAG) capabilities.
 -   **Key Responsibilities**:
@@ -82,7 +82,7 @@ graph TD
     -   Providing contextual information to AI models based on semantic search.
     -   Ensuring persistent storage and retrieval of AI context across sessions.
 
-### 2.8. `HITLApprovalService` (`server/phase2/services/HITLApprovalService.ts`)
+### 2.8. `HITLApprovalService` (`server/core_services/services/HITLApprovalService.ts`)
 
 -   **Purpose**: Integrates Human-In-The-Loop (HITL) approval workflows into AI-driven tasks.
 -   **Key Responsibilities**:
@@ -90,7 +90,7 @@ graph TD
     -   Managing approval requests and decisions via a live polling queue accessible through `security.getPendingHitlActions` and `security.resolveHitlAction`.
     -   Resuming workflows based on human input (Approve/Reject).
 
-### 2.9. `HashTrackerService` (`server/phase2/services/HashTrackerService.ts`)
+### 2.9. `HashTrackerService` (`server/core_services/services/HashTrackerService.ts`)
 
 -   **Purpose**: Tracks content hashes for data integrity, change detection, and efficient caching.
 -   **Key Responsibilities**:
@@ -98,7 +98,7 @@ graph TD
     -   Detecting changes in content by comparing hashes.
     -   Optimizing operations by avoiding reprocessing unchanged data.
 
-### 2.10. `HonchoService` (`server/phase2/services/HonchoService.ts`)
+### 2.10. `HonchoService` (`server/core_services/services/HonchoService.ts`)
 
 -   **Purpose**: Integrates Honcho (Plastic Labs) for cross-session, cloud-backed user and session memory. Complements the local ChromaDB/MemoryArchitectService with persistent external memory.
 -   **Key Responsibilities**:
@@ -108,7 +108,7 @@ graph TD
     -   Maintaining a hierarchy: app → user → session → messages + metamessages.
 -   **Configuration**: Controlled by `HONCHO_API_KEY` (enable/disable), `HONCHO_APP_NAME` (default `"omnecor"`), and `HONCHO_ENVIRONMENT` (`"demo"`, `"local"`, or `"production"`, default `"demo"`).
 
-### 2.11. `ValetRouterService` (`server/phase2/services/ValetRouterService.ts`)
+### 2.11. `ValetRouterService` (`server/core_services/services/ValetRouterService.ts`)
 
 -   **Purpose**: TypeScript bridge to the Python Valet Router inference server (:8010). Routes tasks to appropriate providers/models based on task category, execution mode, and available resources.
 -   **Key Responsibilities**:
@@ -117,7 +117,7 @@ graph TD
     -   Enforcing the HARDCODED_RULE: every task/project must create `todo.md` and `status.md`.
     -   Supporting 13 task categories and 10 routing modes; provider and model names are runtime-updatable via `routing_manifest.json`.
 
-### 2.12. `ValetServerService` (`server/phase2/services/ValetServerService.ts`)
+### 2.12. `ValetServerService` (`server/core_services/services/ValetServerService.ts`)
 
 -   **Purpose**: Manages the lifecycle of the Valet Router inference server (`valet_router_inference.py` on :8010).
 -   **Key Responsibilities**:
@@ -126,7 +126,7 @@ graph TD
     -   Wiring the server shutdown into the application's graceful shutdown process.
     -   Respecting `VALET_AUTO_START` environment variable (set to `"false"` to disable auto-start without removing the artifact).
 
-### 2.13. `AuditLogService` (`server/phase2/services/AuditLogService.ts`)
+### 2.13. `AuditLogService` (`server/core_services/services/AuditLogService.ts`)
 
 -   **Purpose**: Maintains an append-only audit trail of all privileged system actions for compliance and security monitoring, with automatic time-based retention so the log never grows without bound.
 -   **Key Responsibilities**:
@@ -144,7 +144,7 @@ graph TD
     -   Handling client subscriptions and delivering filtered messages based on channel subscriptions.
     -   Enabling real-time streaming of progress updates from long-running operations (e.g., model training, file processing).
 
-### 2.15. `TokenRefreshService` (`server/phase2/services/TokenRefreshService.ts`)
+### 2.15. `TokenRefreshService` (`server/core_services/services/TokenRefreshService.ts`)
 
 -   **Purpose**: Automatically refreshes OAuth tokens on a recurring interval to maintain valid authentication without user intervention.
 -   **Key Responsibilities**:
@@ -184,7 +184,7 @@ graph TD
     -   Sanitizing long opaque authentication tokens and `.env` file contents.
     -   Applied to: Lithic card operations, API error messages, audit logs, and service logs.
 
-### 2.15d. `PublishingService` (`server/phase2/services/PublishingService.ts`)
+### 2.15d. `PublishingService` (`server/core_services/services/PublishingService.ts`)
 
 -   **Purpose**: Executes outbound social media publishing requests to connected external platforms.
 -   **Key Responsibilities**:
@@ -192,21 +192,21 @@ graph TD
     -   Handles API communication using decrypted OAuth tokens from the secure integrations store.
     -   Catches external HTTP errors (e.g., 403 Forbidden) and writes honest status failure messages back to the database.
 
-### 2.15e. `BirdClawService` (`server/phase2/services/BirdClawService.ts`)
+### 2.15e. `BirdClawService` (`server/core_services/services/BirdClawService.ts`)
 
 -   **Purpose**: A Playwright-based scraper specialized in fetching and rendering JavaScript-heavy web pages and social media platforms.
 -   **Key Responsibilities**:
     -   Utilizes stealth plugins to bypass basic bot-mitigation techniques naturally.
     -   Integrates with `ArticleDiscoveryService` to pull deep content where standard fetch requests fail or get blocked.
 
-### 2.15f. `PenpotService` (`server/phase2/services/PenpotService.ts`)
+### 2.15f. `PenpotService` (`server/core_services/services/PenpotService.ts`)
 
 -   **Purpose**: A headless bridge integrating the open-source Penpot design tool into Omnecor's frontend generation.
 -   **Key Responsibilities**:
     -   Fetches and parses raw design tokens (colors, typography, spacing) directly from Penpot.
     -   Assists AI UI builder agents in generating React components that perfectly match the design source-of-truth.
 
-### 2.16. `UpdateCheckerService` (`server/phase2/services/UpdateCheckerService.ts`)
+### 2.16. `UpdateCheckerService` (`server/core_services/services/UpdateCheckerService.ts`)
 
 -   **Purpose**: Periodically checks for new Omnecor releases on GitHub and notifies the user of available updates.
 -   **Key Responsibilities**:
@@ -238,7 +238,7 @@ graph TD
     -   Monitoring serial output from microcontroller devices in real time.
     -   Managing flash partition layout, erasing, and verifying firmware integrity.
 
-### 2.20. `MemoryArchitectService` (Extended) (`server/phase2/services/MemoryArchitectService.ts`)
+### 2.20. `MemoryArchitectService` (Extended) (`server/core_services/services/MemoryArchitectService.ts`)
 
 -   **Purpose**: Manages the complete memory and context layers, including both local ChromaDB and cloud-backed Honcho integration.
 -   **Key Responsibilities**:
@@ -247,7 +247,7 @@ graph TD
     -   Integrating with `HonchoService` for cross-session persistent user facts and preferences.
     -   Providing a unified RAG interface that transparently combines local and persistent memory.
 
-### 2.21. `VoiceService` (`server/phase2/services/VoiceService.ts` + FastAPI bridge)
+### 2.21. `VoiceService` (`server/core_services/services/VoiceService.ts` + FastAPI bridge)
 
 -   **Purpose**: Manages speech-to-text (STT), text-to-speech (TTS), and real-time voice cloning (RVC).
 -   **Key Responsibilities**:

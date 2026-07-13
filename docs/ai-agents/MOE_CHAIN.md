@@ -17,8 +17,8 @@ Two chain types are supported. Each is stored as a separate row in the `moe_chai
 
 ### Local Chain — `moe_chain`
 
-- **Models:** GGUF files served by `llamacpp_bridge.py` on port 8013.
-- **RAM conservation:** Between each step, `LlamaCppService.unload()` is called on the current model before `preWarm()` loads the next. Only one model occupies memory at any time.
+- **Models:** GGUF files served by Omnecor's own managed `llama-server` runtime (`LocalLlmRuntimeService`) — no separate Python bridge, no Ollama required.
+- **RAM conservation:** Each step calls `AiProviderService.completeLocal()`, which hot-swaps the runtime to that step's model (`ensureModelLoaded`: stop current → spawn next). The swap itself frees the prior model's RAM, so only one model occupies memory at any time.
 - **Hardware target:** 8–16 GB RAM machines with locally-stored GGUF specialist models.
 - **Sovereign mode:** Allowed. Local inference only; no external calls.
 
@@ -48,8 +48,8 @@ AiProviderService.streamChat() — moe_chain / moe_chain_omesh branch
 MoeChainService.runChain()
      │
      ├─► Step 1 (knowledge_retrieval)
-     │     └─ LlamaCppService or AiProviderService per step
-     │         • Local: llamacpp_bridge.py (port 8013) — load → infer → unload
+     │     └─ AiProviderService per step
+     │         • Local: completeLocal() → managed llama-server (hot-swap per step)
      │         • Cloud: cloud API provider call
      │
      ├─► Step 2 (research) — receives Step 1 output as context
@@ -65,9 +65,9 @@ MoeChainService.runChain()
 
 | Service | File | Role |
 |---|---|---|
-| `MoeChainService` | `server/phase2/services/MoeChainService.ts` | Sequential executor — loops over steps, manages context accumulation |
-| `LlamaCppService` | `server/phase2/services/LlamaCppService.ts` | llama.cpp bridge; `unload()` frees model RAM; `preWarm()` loads the next model |
-| `AiProviderService` | `server/phase2/services/AiProviderService.ts` | Cloud branch in `streamChat()` handles `moe_chain_omesh` steps |
+| `MoeChainService` | `server/core_services/services/MoeChainService.ts` | Sequential executor — loops over steps, manages context accumulation |
+| `LocalLlmRuntimeService` | `server/core_services/services/LocalLlmRuntimeService.ts` | Omnecor's managed `llama-server`; `ensureModelLoaded()` hot-swaps to each step's model (swap frees prior RAM) |
+| `AiProviderService` | `server/core_services/services/AiProviderService.ts` | `completeLocal()` runs each local step on the runtime; cloud branch in `streamChat()` handles `moe_chain_omesh` steps |
 
 ### Database
 
@@ -149,11 +149,11 @@ Change the active routing mode to **MoE Chain (No OMMESH)** (`moe_chain`) or **M
 
 ## RAM Conservation Details (Local Chain)
 
-`MoeChainService` calls `LlamaCppService.unload(previousModelId)` before each step transition. This posts to `llamacpp_bridge.py`'s `/unload` endpoint, which removes the model from the bridge's warm cache and frees the memory held by the `Llama` instance. The next model is then loaded fresh via `LlamaCppService.preWarm(nextModelId)`, which calls the `/load` endpoint.
+Each local step calls `AiProviderService.completeLocal()`, which invokes `LocalLlmRuntimeService.ensureModelLoaded(step.modelPath)`. If a different model is warm, the runtime **stops the current `llama-server` and spawns a fresh one for the requested model** — the swap itself releases the prior model's RAM (and VRAM); there is no separate unload step to manage. Per-model `--n-gpu-layers` VRAM-fit means a step's model is offloaded only as far as the GPU can hold it, with the rest on CPU (no OOM crash-loop).
 
 The net effect: at any moment during local chain execution, only one GGUF model occupies RAM. A chain of seven 4-bit quantized 7B models (each ~4 GB) can run on a machine with 8 GB RAM without out-of-memory failures.
 
-This approach trades latency (each model load takes several seconds) for RAM headroom. It is the correct trade-off for the target hardware profile.
+This approach trades latency (each model swap respawns `llama-server` and reloads weights) for RAM headroom. It is the correct trade-off for the target hardware profile — on constrained hardware only one model can be resident anyway.
 
 ---
 
@@ -161,7 +161,7 @@ This approach trades latency (each model load takes several seconds) for RAM hea
 
 | Chain type | Sovereign mode |
 |---|---|
-| `moe_chain` (local) | Allowed — all inference stays on-device via llamacpp_bridge.py |
+| `moe_chain` (local) | Allowed — all inference stays on-device via the managed `llama-server` runtime |
 | `moe_chain_omesh` (cloud) | Blocked — calls cloud providers; `assertProviderAllowedInMode()` in `AiProviderService` throws FORBIDDEN |
 
 ---
@@ -171,9 +171,9 @@ This approach trades latency (each model load takes several seconds) for RAM hea
 | File | Purpose |
 |---|---|
 | `drizzle/schema.ts` | `moeChainConfigs` table + `MoeChainStep` interface |
-| `server/phase2/services/MoeChainService.ts` | Sequential chain executor |
-| `server/phase2/services/LlamaCppService.ts` | `unload()` + `preWarm()` for RAM management |
-| `server/phase2/services/AiProviderService.ts` | `streamChat()` MoE branch (cloud chain) |
+| `server/core_services/services/MoeChainService.ts` | Sequential chain executor |
+| `server/core_services/services/LocalLlmRuntimeService.ts` | Managed `llama-server`; `ensureModelLoaded()` hot-swap for RAM management |
+| `server/core_services/services/AiProviderService.ts` | `completeLocal()` (local steps) + `streamChat()` MoE branch (cloud chain) |
 | `server/routers/valetRouter.ts` | `getMoeChain`, `saveMoeChain`, `initMoeChain`, `scanLocalModels` tRPC procedures |
 | `server/routers/aiRouter.ts` | `chatInputSchema` — `routingMode` + `userId` fields |
 | `client/src/components/settings/MoeChainPanel.tsx` | Two-card settings UI |

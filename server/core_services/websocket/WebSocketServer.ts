@@ -288,12 +288,30 @@ export class OmnecorWebSocketServer {
   private notificationService: NotificationService;
 
   constructor(httpServer: HttpServer) {
-    // Create WebSocket server attached to the HTTP server (upgrade path)
+    // Use noServer + manual upgrade routing instead of `{ server, path }`. Bound
+    // directly to the shared HTTP server, `ws` aborts (HTTP 400) EVERY upgrade
+    // whose path isn't "/ws" — including the Vite dev-server HMR client's socket,
+    // which then logs "WebSocket closed without opened." on every page load. With
+    // noServer we claim only "/ws" and leave all other upgrades for their own
+    // listener (the Vite HMR socket in dev). Origin/security is unchanged:
+    // `verifyClient` still runs inside `handleUpgrade`.
     this.wss = new WSServer({
-      server: httpServer,
-      path: "/ws",
+      noServer: true,
       // Verify origin for security (allow localhost and configured origins)
       verifyClient: (info: any) => this.verifyClient(info),
+    });
+
+    httpServer.on("upgrade", (req, socket, head) => {
+      let pathname: string;
+      try {
+        pathname = new URL(req.url ?? "/", "http://localhost").pathname;
+      } catch {
+        return; // malformed request-target — leave the socket for other listeners
+      }
+      if (pathname !== "/ws") return; // e.g. the Vite HMR socket ("/") in dev
+      this.wss.handleUpgrade(req, socket, head, (ws) => {
+        this.wss.emit("connection", ws, req);
+      });
     });
 
     // Attach tRPC WebSocket handler

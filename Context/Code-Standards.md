@@ -39,6 +39,7 @@ The client is a React 19 Single Page Application located under `/client/src/`.
 ### 1.3 Routing & Error Boundaries
 *   **Lazy Loading:** All page components in [App.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/App.tsx) must be loaded lazily using `React.lazy()` to reduce initial bundle weights.
 *   **Error Isolation:** Wrap all lazy routes in `RouteBoundary` using the `withBoundary()` helper in [App.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/App.tsx) to isolate crashes and prevent them from bringing down the entire application.
+*   **Heavy conditionally-rendered components:** A heavy, optional, conditionally-rendered component (a preview pane, a canvas editor, a 3D viewer) must **not** be statically imported at page top-level — that couples the whole page's load and stability to the component's entire module graph, so a throw during its module evaluation crashes the entire route. Code-split it with `lazyWithRetry()` ([client/src/lib/lazyWithRetry.ts](file:///home/linux/Documents/OmnecorV1-Beta/client/src/lib/lazyWithRetry.ts)) and render it inside `LazyPreviewPane` ([client/src/components/designer/LazyPreviewPane.tsx](file:///home/linux/Documents/OmnecorV1-Beta/client/src/components/designer/LazyPreviewPane.tsx)) — Suspense + a per-pane `ErrorBoundary` — so a failure is contained to the pane with a working Retry. A component that must stay eager (a page's always-on primary view) can still be wrapped in `LazyPreviewPane` for crash isolation without being made lazy.
 
 ---
 
@@ -55,7 +56,7 @@ You must use the correct tRPC procedure tier defined in [trpc.ts](file:///home/l
 *   `adminProcedure` / `ownerProcedure`: Restrict to operations altering configuration tables, rotating mesh credentials, or deleting logs.
 
 ### 2.2 Singleton Services Pattern
-*   All backend logic systems must run as managed singletons inside `/server/phase2/services/` (e.g., `ProcessManagerService`, `AiProviderService`, `VectorDBService`).
+*   All backend logic systems must run as managed singletons inside `/server/core_services/services/` (e.g., `ProcessManagerService`, `AiProviderService`, `VectorDBService`).
 *   **Access via Context:** Access these services using the `ctx.services` context container in tRPC procedures instead of calling class static imports directly.
     ```typescript
     // Correct

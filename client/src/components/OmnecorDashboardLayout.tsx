@@ -22,6 +22,7 @@ import {
   Mic2,
   Lock,
   Bell,
+  DraftingCompass,
 } from "lucide-react";
 import { Wallet } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -114,6 +115,12 @@ export function OmnecorDashboardLayout({
       description: "Design 3D models, PCBs, and Web UIs",
     },
     {
+      label: "Blueprint Studio",
+      href: "/blueprint-studio",
+      icon: DraftingCompass,
+      description: "AI-assisted fabrication planning — plans, cut lists, patterns & simulations",
+    },
+    {
       label: "Integrations",
       href: "/integrations",
       icon: Plug,
@@ -177,7 +184,7 @@ export function OmnecorDashboardLayout({
           )}>
             <Link href="/" className="flex items-center gap-3 cursor-pointer hover:opacity-80 transition-opacity">
               <div className={cn("w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-colors", isFictionMode ? "bg-accent-purple/20" : "bg-primary/10")}>
-                <Brain className={cn("w-5 h-5", isFictionMode ? "text-accent-purple" : "text-accent-foreground")} />
+                <Brain className={cn("w-5 h-5", isFictionMode ? "text-accent-purple" : "text-primary")} />
               </div>
               {sidebarOpen && (
                 <span className="text-xl font-bold text-sidebar-foreground animate-in fade-in slide-in-from-left-2 duration-300">
@@ -252,7 +259,7 @@ export function OmnecorDashboardLayout({
                             ? "gap-3 px-4 py-3 rounded-lg"
                             : "justify-center w-10 h-10 rounded-full",
                           active
-                            ? "bg-primary/10 text-accent-foreground shadow-md"
+                            ? "bg-primary/10 text-sidebar-foreground shadow-md"
                             : "text-sidebar-foreground hover:bg-surface-hover"
                         )}
                       >

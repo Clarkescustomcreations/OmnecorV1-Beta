@@ -231,6 +231,26 @@ describe("LocalLlmRuntimeService", () => {
     expect(spawnMock).toHaveBeenCalledTimes(1); // no second spawn
   });
 
+  it("ensureModelLoaded throws for an unindexed model instead of silently serving the loaded one", async () => {
+    binaryFound();
+    settingsMock.getSetting.mockReturnValue("a.gguf"); // boots a.gguf
+    indexMock.state.models = [model({ id: "a.gguf" })];
+    spawnMock.mockReturnValue(makeFakeProc());
+    vi.stubGlobal("fetch", vi.fn(async () => ({ ok: true } as Response)));
+    vi.useFakeTimers();
+
+    const svc = LocalLlmRuntimeService.getInstance();
+    const start = svc.start();
+    await vi.advanceTimersByTimeAsync(1100);
+    await start;
+    expect(svc.getLoadedModelId()).toBe("a.gguf");
+
+    // "ghost.gguf" isn't in the index → must reject, NOT serve the warm a.gguf.
+    await expect(svc.ensureModelLoaded("ghost.gguf")).rejects.toThrow(/not in the local index/);
+    expect(svc.getLoadedModelId()).toBe("a.gguf"); // loaded model untouched
+    expect(spawnMock).toHaveBeenCalledTimes(1); // no second spawn
+  });
+
   describe("_computeGpuLayers (VRAM fitting)", () => {
     it("honors an explicit numeric LOCAL_LLM_GPU_LAYERS without querying the GPU", async () => {
       envMock.localLlmGpuLayers = "50";

@@ -2,19 +2,22 @@
  * MoeChainService — sequential MoE chain executor.
  *
  * Runs an ordered list of domain-specialist models one at a time, passing each
- * step's output as context into the next. Only one model loads in RAM at once
- * (explicit unload between local steps) — the design target is 8–16 GB machines.
+ * step's output as context into the next. Only one model loads in RAM at once —
+ * the design target is 8–16 GB machines.
  *
  * Chain types:
- *   local  — GGUF specialists via the llamacpp bridge (port 8013)
+ *   local  — GGUF specialists on Omnecor's own managed `llama-server` runtime
+ *            (LocalLlmRuntimeService). `ensureModelLoaded` hot-swaps the runtime
+ *            to each step's model (stop current → spawn next), so the swap
+ *            itself frees the prior model's RAM — no separate unload needed.
  *   cloud  — configured API providers via AiProviderService
  *
  * Step skipping: if a step has non-empty taskCategories[] and the Valet's
  * classified category doesn't match, that step is skipped to save compute.
  * Empty taskCategories means the step always runs.
  */
+import nodePath from "node:path";
 import type { MoeChainStep } from "../../../drizzle/schema.js";
-import { LlamaCppService } from "./LlamaCppService.js";
 import { isSovereignMode } from "../../_core/sovereign.js";
 import type { Message } from "./AiProviderService.js";
 
@@ -83,8 +86,7 @@ export class MoeChainService {
       onChunk({ content: `\n\n*[MoE Chain — Step ${stepNum}/${total}: ${step.label}…]*\n\n`, done: false });
 
       if (chainType === "local") {
-        const nextModelPath = activeSteps[i + 1]?.modelPath;
-        lastOutput = await this.runLocalStep(step, rollingContext, ctx, isLast, onChunk, nextModelPath);
+        lastOutput = await this.runLocalStep(step, rollingContext, ctx, isLast, onChunk);
       } else {
         lastOutput = await this.runCloudStep(step, rollingContext, ctx, isLast, onChunk);
       }
@@ -109,38 +111,38 @@ export class MoeChainService {
     ctx: ChainContext,
     isLast: boolean,
     onChunk: ChunkCallback,
-    nextModelPath?: string,
   ): Promise<string> {
-    const modelPath = step.modelPath ?? "";
-    if (!modelPath) throw new Error(`MoE local step "${step.label}" has no modelPath configured.`);
+    const dir = step.modelPath ?? "";
+    if (!dir) throw new Error(`MoE local step "${step.label}" has no modelPath configured.`);
+    // `scanLocalModels` stores the containing directory in `modelPath` and the
+    // filename separately in `ggufFile`; the actual .gguf the runtime must load
+    // is their join — which is exactly the absolute path ModelIndexService
+    // indexes, so `ensureModelLoaded` resolves it. Fall back to `modelPath`
+    // alone for a step that predates `ggufFile` (may already be a full path).
+    const modelFile = step.ggufFile ? nodePath.join(dir, step.ggufFile) : dir;
 
-    const llama = LlamaCppService.getInstance();
+    // Lazy import to avoid the circular dep (AiProviderService → MoeChainService → AiProviderService).
+    const { AiProviderService } = await import("./AiProviderService.js") as typeof import("./AiProviderService.js");
+    const svc = AiProviderService.getInstance();
 
-    // Build a flat prompt from the message history
-    const prompt = messages
-      .map(m => `[${m.role.toUpperCase()}]: ${m.content}`)
-      .join("\n\n");
-
-    const text = await llama.generate(prompt, modelPath, {
-      maxTokens: ctx.maxTokensPerStep ?? 512,
-      temperature: ctx.temperature ?? 0.7,
-    });
-
-    // Stream the output (for intermediate steps, emit silently; only last step
-    // streams to the user visibly so intermediate content doesn't clutter the
-    // chat — the status chunk above already signals progress)
-    if (isLast) {
-      onChunk({ content: text, done: false });
-    }
-
-    // Unload to free RAM before the next step loads its model
-    if (!isLast) {
-      await llama.unload(modelPath);
-      // Pre-warm the next step's model to pipeline load latency
-      if (nextModelPath) {
-        llama.preWarm(nextModelPath).catch(() => {});
-      }
-    }
+    // `completeLocal` hot-swaps the managed llama-server to this step's model
+    // (ensureModelLoaded: stop current → spawn requested — the swap itself frees
+    // the prior step's model), renders the prompt with the model's own template,
+    // and generates via the raw /completion endpoint. Intermediate steps run
+    // non-streaming (buffered silently so their content doesn't clutter the
+    // chat — the status chunk above already signals progress); only the final
+    // step streams visibly to the user.
+    const text = await svc.completeLocal(
+      {
+        providerId: "llamacpp",
+        modelId: modelFile,
+        modelPath: modelFile,
+        messages,
+        maxTokens: ctx.maxTokensPerStep ?? 512,
+        temperature: ctx.temperature ?? 0.7,
+      },
+      isLast ? (chunk) => onChunk({ content: chunk.content, done: false }) : undefined,
+    );
 
     return text;
   }

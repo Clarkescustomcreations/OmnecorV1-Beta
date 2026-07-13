@@ -45,7 +45,7 @@ Omnecor's **MoE Chain** feature (`/MOE-Chain`) allows users with 8GB VRAM to cha
 * **Step 2 (Code Generation):** Omnecor automatically unloads the reasoning model and loads `qwen2.5-coder:7b` to write the actual code based on the plan.
 * **Step 3 (Review):** Omnecor unloads the coder and loads a strict context-evaluation model to review the output.
 
-By hot-swapping models through `LlamaCppService.unload()` and `preWarm()`, Omnecor achieves ensemble-level intelligence while adhering to strict local hardware constraints.
+By hot-swapping models through the managed `llama-server` runtime (`LocalLlmRuntimeService.ensureModelLoaded` — stop current → spawn next, the swap freeing the prior model's RAM), Omnecor achieves ensemble-level intelligence while adhering to strict local hardware constraints.
 
 ---
 

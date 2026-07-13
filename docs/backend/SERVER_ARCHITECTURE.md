@@ -54,14 +54,15 @@ Omnecor utilizes tRPC for its API layer, providing end-to-end type safety betwee
 -   **Sub-Routers**: Organized by domain (e.g., `aiRouter.ts`, `projectRouter.ts`, `securityRouter.ts`, `blenderRouter.ts`, `kicadRouter.ts`, `ommesh.router.ts`, `voiceRouter.ts`). These define the API endpoints for their respective domains.
 -   **`createContext`**: A factory function that creates the tRPC context for each request, providing access to singleton services and other request-scoped data.
 
-### 2.4. WebSocket Server (`server/phase2/websocket/WebSocketServer.ts`)
+### 2.4. WebSocket Server (`server/core_services/websocket/WebSocketServer.ts`)
 
 Integrated into the same HTTP server as the Express application, the WebSocket server (`/ws`) enables real-time, bi-directional communication.
 
 -   **Real-time Updates**: Used for broadcasting updates related to Neural Node-Tree changes, AI training progress, hardware job statuses, and chat messages.
 -   **Event-Driven**: Services can emit events that are then broadcast to connected clients, ensuring the UI remains synchronized with backend processes.
+-   **Upgrade routing**: The server uses `ws` in **`noServer` mode** and registers its own `httpServer.on("upgrade")` handler that claims **only** the `/ws` path — every other upgrade is left for its own listener. Do **not** revert to `new WSServer({ server, path: "/ws" })`: bound directly to the shared HTTP server, `ws` aborts (HTTP 400) any non-`/ws` upgrade, which in development kills the Vite HMR client's socket. Origin/auth security is unchanged (`verifyClient` still runs inside `handleUpgrade`).
 
-### 2.5. Internal Services (`server/phase2/services/`)
+### 2.5. Internal Services (`server/core_services/services/`)
 
 These are singleton classes that encapsulate specific business logic and resource management. They are initialized at server startup and made available through the tRPC context.
 

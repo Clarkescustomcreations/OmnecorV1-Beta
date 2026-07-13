@@ -2,6 +2,114 @@
 
 ## [Unreleased]
 
+### 2026-07-13 — Blueprint Studio enhancements (7 additions across 3 waves)
+
+*A follow-on pass that deepens the engineering coverage, closes the workflow loop, and lets you bring in existing geometry. All additive; every change gated by `pnpm check` + the blueprint suite (56 → 86 tests), including a `/review` hardening pass.*
+
+#### Added
+
+- **Six new deterministic calcs** in `engineering_calc` (each with formula workings + safety factor): `fillet_weld` (throat/length capacity vs. electrode strength), `bolted_connection` (governs bolt-shear / plate-bearing / edge tear-out), `torsion` (round bar/tube shaft — max shear + angle of twist), `wood_joinery` (NDS lag/wood-screw withdrawal, end-grain refused), `printed_part` (FDM strength on the effective walls+infill section, layer-adhesion knockdown), and `heat_check` ("will this plastic part survive the sun / a hot car without softening" — service-temp vs. a scenario peak with a documented solar-gain model). +12 golden-value tests.
+- **Cut-optimization → BOM link**: `optimize_cuts` now takes `writeToBom` to record the computed buy-quantity straight onto the matching BOM stock line (upsert by `materialKey`, else name) and saves the nesting run for provenance — no re-keying into `set_bom`.
+- **Part revision history** (migration `0017`): recompiling (or re-importing) a part supersedes its prior file instead of piling up — `blueprint_files` gains `version` / `supersedesId` / `isLatest`; the Drawings/3D/PDF read the latest, and the Files tab shows the version and dims superseded rows (still downloadable).
+- **Async FEA**: `run_fea` records a `running` row up-front and solves **decoupled from the chat-stream signal** — a client disconnect no longer kills a multi-minute solve; it finishes and updates the row in the background. The Simulation tab shows a RUNNING badge → completed.
+- **Shopping export**: `blueprint.exportBom` produces an RFC-4180 CSV + a supplier-grouped printable buy-list with a known-price rollup (Sovereign-safe, no network); "Export list" button on the BOM tab.
+- **Geometry import** (`blueprint.importGeometry`): bring in an existing **STL** (reuses `parseStl` → a full part: 3D viewer + drawings + FEA-ready) or a **DXF** outline (minimal LINE/LWPOLYLINE reader → outline-preview SVG + the original DXF). STEP/IGES intentionally out of scope (no heavy CAD kernel). "Import STL/DXF" control on the 3D tab.
+
+#### Changed
+
+- `ChatAgentRunner`-injected Blueprint tools' file persistence extracted to a shared `persistPlanFile` (fileStore.ts) carrying the revision-lineage logic, reused by compile_cad and geometry import.
+
+#### Tests
+
+- +30 (56 → 86): the 6 calcs (golden values), cut→BOM upsert + provenance, revision lineage, async-FEA running→completed + signal-decoupling, CSV/buy-list export, DXF reader + STL import, input-guard errors, plus two new files — `blueprintAgentStream.test.ts` (subscription-level turn persistence + empty-history filtering) and `blueprintPlanPdf.test.ts` (booklet structure + WinAnsi transliteration).
+
+#### Fixed (`/review` pass)
+
+- `heat_check` crashed on an out-of-enum scenario (`HEAT_SCENARIOS[bad].peakC`); `printed_part` silently treated an unknown mode as bending; `requiredSafetyFactor` returned `undefined` on a bad basis (→ every SF check silently false) — all three now throw a clear, guiding error. Persistence (`persistPlanFile`) now clears the old `isLatest` and inserts the new latest **atomically** via `db.batch` (crash-safe). Dropped an unused `printedPart` modulus param; corrected a non-existent `opacity-55` Tailwind class to `opacity-60`.
+
+### 2026-07-13 — Blueprint Studio: AI-assisted fabrication planning (new page + agent toolset)
+
+*A full general-purpose Creation/Fabrication planning system: describe any physical project (carpentry, metal fab, structures, vehicles, 3D printing, multi-part costumes) and an agentic session turns it into a persistent Build Plan — materials, cut lists with angles, dimensioned drawings, 3D geometry, true-scale patterns, deterministic engineering verification, and step-by-step assembly. Live-verified end-to-end: a real Gemini agent turn looked up catalog materials, ran the beam check (SF 12.54 PASS), wrote the BOM/cut list, compiled CAD geometry to mesh/STL/drawing/DXF, and the plan exported as a clean 3-page PDF booklet.*
+
+#### Added
+
+- **Blueprint Studio page** (`/blueprint-studio`): plans rail (attached to the active Neural Map) → planning conversation (reuses the agentic `AssistantStream` + `ModelSelector`) → Build Plan document tabs (Overview / BOM / Cut List / Drawings / 3D / Patterns / Simulation / Steps / Files). BOM and cut list are hand-editable; blueprint SVGs render inline; the 3D tab shows compiled parts with an FEA von-Mises heatmap overlay; Export PDF produces the full booklet.
+- **`ChatAgentRunner` domain-tool extension**: `AgentRunParams.extraTools` (injectable `ExtraAgentTool[]`, dispatched before the MCP fallthrough, rendered as the existing mcp tool box) + `includeBuiltInTools:false` so a feature surface can run a pure domain toolset with no file-edit/shell access. Text-protocol prompt now renders injected tools generically from their JSON Schema; proven built-in wording unchanged.
+- **Blueprint agent toolset** (11 tools): materials catalog search, deterministic `engineering_calc` (beam/column/fastener/rafter/stairs/compound-miter/triangle — results persisted with formula workings + safety factors), cut/sheet/fabric `optimize_cuts`, plan document writers (`update_plan`/`set_bom`/`set_cut_list`), `compile_cad`, `generate_pattern`, `run_fea`, `generate_concept_image`, and cloud-gated `search_materials_web` (omitted entirely for sovereign users).
+- **Engineering calc engine** (`calcEngine.ts`): pure-TS, SI-metric, basis-aware safety factors (allowable/yield/ultimate + FDM layer-adhesion knockdown); 23 golden-value tests against textbook formulas.
+- **Offline materials database** (~50 entries with real mechanical properties: NDS №2 lumber design values, ASTM A36/A500/6061/4130 metals, filament datasheets incl. layer-adhesion factors, fabrics/EVA/Worbla) — keeps Sovereign mode fully functional.
+- **Dual-engine parametric CAD** (`BlueprintCadService`): JSCAD (`@jscad/modeling`) in a `node:vm` sandbox as the zero-install default; OpenSCAD as an optional external binary (Settings `openscadPath`, `--version` probe — same pattern as Blender/KiCad). Output: viewer mesh JSON, binary STL, dimensioned three-view drawing SVG (real feature-edge projection + title block), R12 DXF.
+- **True-scale pattern PDFs** (`patternPdf.ts`): seam-allowance polygon offsetting, tiled US-Letter pages with 100 mm calibration square, registration crosses, glue-grid labels, cut vs stitch lines, grainline arrows.
+- **Real FEA** (`fea_bridge.py` + `BlueprintFeaService`): Gmsh tet-meshing of compiled STLs + TET4 linear-static elasticity (numpy/scipy), von-Mises nodal field for the 3D heatmap; optional dependency (`pip install gmsh numpy scipy`) probed with graceful degradation.
+- **Schema**: 6 new tables (`blueprint_plans/_bom_items/_cut_items/_files/_sim_results/_messages`), migration `0016`; all dimensions stored in mm, displayed per plan units.
+- **Tests**: 56 new (calc golden values, CAD compile/sandbox/STL round-trip/drawings, router ownership + toolset against the real in-memory DB).
+
+#### Fixed
+
+- **Migration drift on live installs silently blocked all new migrations.** The runtime DB had an older-generation `0015` applied (different hash/timestamp than the regenerated file), so the auto-migrator re-ran it, failed on `model_assets already exists`, and **warn-and-continued — every future migration (including `0016`) was silently skipped**. Repaired the drifted DB (created the one missing unique index, recorded the current `0015` in `__drizzle_migrations`), after which `pnpm db:migrate` applies cleanly and `/health` reports `migrationOk: true`.
+- **Gemini streaming returned empty responses with no error.** `chatGemini` called `:streamGenerateContent` without `alt=sse`, so Gemini answered with one pretty-printed multi-line JSON array; the per-line parser silently dropped every line and the stream "completed" with zero chunks. Added `alt=sse` (single-line `data: {...}` events the parser already handles).
+- **`exportPdf` crashed in production builds** (`__dirname is not defined`): pdfkit/fontkit load font-metric data via `__dirname`-relative paths, which esbuild inlining breaks. Marked `pdfkit` + `svg-to-pdfkit` as bundle externals.
+- **Blueprint conversation self-poisoning**: a failed/empty turn used to persist an empty assistant row that later turns replayed to providers (Gemini 400s on empty parts). Empty turns are no longer persisted, and history rows with empty content are filtered from provider requests.
+- **Plan-PDF text fidelity**: Greek/math symbols in calc workings (σ τ δ ⁴ ≥ ✓) transliterated for pdfkit's WinAnsi Helvetica; wrapped table headers no longer overlap rows; cut-list notes no longer truncate.
+
+### 2026-07-12 — `/review` + `/architect` pass: preview crash-isolation, dev HMR noise silenced
+
+*A review pass on the 2026-07-11 model-download work. It fixed a real whole-page crash class, eliminated the dev-only console noise, and hardened the lazy-load recovery path. All changes live-verified via chrome-devtools against the running dev server (Chat + 3D Designer render clean; console error log empty; `/ws` still upgrades).*
+
+#### Fixed
+
+- **Chat & 3D Designer no longer crash when a preview panel's module graph faults.** `EnhancedPCBEditor` / `ThreeViewer` / `WebPreview` were statically imported at page top-level, so a throw during *their* module evaluation failed the *page's own* module and dropped the whole route to its RouteBoundary. They're now code-split and rendered behind a new **`LazyPreviewPane`** (Suspense + a per-pane `ErrorBoundary`), so a failure is contained to the pane with a Retry. Also reverted an inert import-alias change (`EditorToolbar as EditorToolbarComponent`) that had masqueraded as the fix — a named-import rename can't fix a `ReferenceError`; the real cause was the eager static import.
+- **Dev HMR console noise gone.** `OmnecorWebSocketServer` bound `ws` with `{ server, path: "/ws" }`, which makes `ws` abort (HTTP 400) *every* non-`/ws` upgrade on the shared HTTP server — including the Vite HMR client's socket (`"WebSocket closed without opened."` + an unhandled promise rejection on every page load). Switched to `noServer` + a manual `upgrade` router that claims only `/ws` and leaves other upgrades (Vite HMR) untouched. Dev-only; `verifyClient`/origin/auth are unchanged (still applied by `handleUpgrade`), and mesh mTLS is a separate server. Verified: the app `/ws` still opens and the console error log is now empty.
+
+#### Added
+
+- **`lazyWithRetry()`** (`client/src/lib/lazyWithRetry.ts`) — a `React.lazy` drop-in that retries the dynamic import with exponential backoff before settling, so a transient chunk-load blip self-heals without surfacing an error. Used by the preview panels.
+- **`ErrorBoundary` optional `fallback` prop** — `ReactNode | ((reset, error) => ReactNode)` (backward compatible; default full-screen UI unchanged). `LazyPreviewPane`'s Retry is error-aware: it **reloads** for a genuine chunk-load failure (the only thing that re-fetches a cached-rejected chunk / fixes a stale deploy) and **resets** in place for a transient render error.
+
+#### Changed
+
+- **`modelMarketplace.downloadModel` input `filename` → `filePath`** (it carries a repo-relative `.gguf` path that may include a subfolder, not just a basename); caller + test updated. No external-API change.
+
+**Gates:** `pnpm check` ✅ · affected tests (`modelMarketplaceRouter`) ✅ · live-verified via chrome-devtools MCP.
+
+---
+
+### 2026-07-11 — Fixable-now gaps: MoE on the unified runtime, PCBWay closed, Hugging Face model download
+
+*Three self-contained fixes with no hardware needed: local inference is now **fully** unified on Omnecor's own runtime (the standalone Python `llama.cpp` bridge is retired), the PCBWay manufacturing path got its missing test coverage, and you can now **download models from Hugging Face** — GGUFs to run locally, and whole base-model repos to fine-tune offline.*
+
+#### Added
+
+- **Hugging Face → local runtime downloads** (`ModelMarketplaceService` + `modelMarketplaceRouter`): browse Hugging Face (now **keyless** for public models) and download either
+  - a single **GGUF quant** into the models dir — auto-indexed by `ModelIndexService`, runnable on the local `llama-server` with no Ollama, surfaced as a new **"HF GGUF"** tab in the Model Hub (search → open a repo → pick the exact quant with its real size → download with live progress); or
+  - a whole **base-model repo** (config + tokenizer + safetensors — skipping GGUF/other-framework blobs and redundant PyTorch weights) into a new base-models dir for **offline/sovereign fine-tuning** — wired into the **LLM Builder** ("Browse HF" → downloads the full repo → sets the base model to the local path so training runs with no network).
+  - Downloads stream atomically (`.part` → rename), are idempotent (an already-present file reports done), report byte/file progress via a polled status, and are **not** Sovereign-gated (a download is a fetch, not inference). A compatibility note tells users Omnecor isn't in HF's "Use this model" menu — pick a GGUF (the same files Ollama/llama.cpp use).
+- **`AiProviderService.completeLocal()`** — single-model local completion on the managed `llama-server` runtime, bypassing Valet routing and the sub-agent harness (used by MoE-Chain).
+
+#### Changed
+
+- **MoE-Chain local steps now run on Omnecor's own `llama-server` runtime**, not the standalone Python bridge. Each step calls `completeLocal()`, which hot-swaps the runtime to that step's model (`ensureModelLoaded` — the swap itself frees the prior model's RAM), rendering the prompt with the model's real chat template. The old crude flat-prompt + manual `unload`/`preWarm` dance is gone. **Also fixes a latent bug** (self-review): a chain step's model is now resolved as `modelPath` (directory) **joined with** `ggufFile` (filename) — previously the bare directory was passed to the loader, so a local chain would have failed to resolve and silently served the wrong/loaded model. Guarded by a regression test.
+
+#### Removed
+
+- **Retired the standalone `llama.cpp` Python bridge** — `server/python_bridges/llamacpp_bridge.py`, `LlamaCppService.ts`, and the `:8013` startup health entry. It was fully dead once MoE-Chain migrated (its only live caller); local inference lives entirely on the managed `llama-server` runtime now. Cloud and Ollama paths are unaffected (they never went through this bridge).
+
+#### Fixed
+
+- **TD-042 (PCBWay) closed.** The quote/order path has been real since 2026-06-23 (parametric quote from extracted board specs + a real Gerber/drill ZIP multipart-uploaded at order time); the lingering gap was **test coverage** and a stale "Open" header. Added `pcbwayService.test.ts` (quote body with no path leaked, order multipart uploads the real ZIP bytes, config/HITL gates) + `kicadRouterPcbway.test.ts` (router wiring + HITL-deny) and corrected the record.
+
+#### Fixed (self-review pass)
+
+- **LLM Builder base model now actually reaches the trainer.** The **Start Training** button passes the selected/downloaded base model as `modelName` — previously the base-model field (pre-existing) was set in the UI but never sent, so the trainer silently used its default. (This is what completes the base-model download feature end-to-end.)
+- **`LocalLlmRuntimeService.ensureModelLoaded` now throws for an unindexed model** instead of silently serving whatever model is already loaded — a wrong-weights/confidently-wrong-answer risk (e.g. a MoE step or a chat pinned to a specific local model). The caller surfaces a clear "not in the local index" error.
+- **HF downloads: free-space pre-flight guard** (fails fast with a friendly message instead of streaming GBs into a full disk) and **concurrent-download de-dup** (a double-click on the same file returns the in-flight download rather than racing a second write). The in-memory download registry is also capped so finished entries don't accumulate.
+
+**Live-verified** the real Hugging Face tree + resolve-URL contract (LFS sizes, 302→CDN redirect) via curl.
+
+**Gates:** `pnpm check` ✅ · `pnpm test` **1504 passed / 4 skipped** (+35) · `pnpm build` ✅ · `pnpm audit --prod` ✅.
+
+---
+
 ### 2026-07-10 — Model-Fabric Phase 8: local GGUF auto-discovery + hot-swap
 
 *Omnecor's own runtime now hosts **every** local GGUF with no manual registration — the app models dir **and** the Ollama blob store — and hot-swaps between them on selection. Ollama can be stopped and every model it ever pulled is still served by Omnecor.*
@@ -23,7 +131,7 @@
 
 **Live-verified on DadsPC (`.201`, RTX 4060 Ti):** all 10 of the box's Ollama GGUFs render as **"Omnecor · This PC"** (0 Ollama-branded), and boot-resume + hot-swap + inference (answered `REVIEW_FIX_OK`) + last-model persistence were all confirmed on real hardware.
 
-**Still open:** a Hugging Face browse/download UI; MoE-Chain still runs on the separate `LlamaCppService` / port-8013 bridge (a different use case); the APK picker's loaded-indicator UI (the `loaded` flag is mirrored in the type, but the mobile picker doesn't render it yet).
+**Still open (at the time of Phase 8):** ~~a Hugging Face browse/download UI~~ and ~~MoE-Chain on the separate `LlamaCppService` / port-8013 bridge~~ — **both shipped 2026-07-11 (see the entry above)**; the APK picker's loaded-indicator UI (the `loaded` flag is mirrored in the type, but the mobile picker doesn't render it yet) remains.
 
 **Gates:** `pnpm check` (root + APK) ✅ · `pnpm test` **1469 passed / 4 skipped** (+22 from the 1447 Mesh-Delegation baseline; 1 new file `ModelIndexService.test.ts`, 8 tests)
 

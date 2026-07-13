@@ -18,6 +18,7 @@ import {
   sqliteTable,
   integer,
   text,
+  real,
   index,
   uniqueIndex,
 } from "drizzle-orm/sqlite-core";
@@ -1205,6 +1206,250 @@ export const curatedTrainingExamplesRelations = relations(curatedTrainingExample
     fields: [curatedTrainingExamples.projectId],
     references: [neuralMaps.id],
   }),
+}));
+
+/**
+ * ── Blueprint Studio (AI-assisted fabrication planning) ─────────────────────
+ *
+ * A blueprint plan is the persistent "Build Plan" document produced by the
+ * Blueprint Studio agentic session: overview + assembly steps on the plan row,
+ * with BOM items, cut-list items, generated files (CAD source, meshes,
+ * drawings, patterns, concept renders, FEA results) and simulation results in
+ * child tables. Dimensions are stored canonically in millimeters (`*Mm`) and
+ * converted to the plan's display `units` in the UI/agent layer.
+ */
+export const blueprintPlans = sqliteTable(
+  "blueprint_plans",
+  {
+    id: text("id").primaryKey(), // UUID
+    userId: integer("userId")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    // Attached Project/Neural Map. Nullable so a plan survives its map being
+    // deleted (set null) and can exist before a map is chosen.
+    mapId: text("mapId").references(() => neuralMaps.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    /** The user's plain-language project description — the planning brief. */
+    brief: text("brief").notNull().default(""),
+    category: text("category", {
+      enum: ["carpentry", "metal_fab", "structure", "vehicle", "printing", "costume", "mixed", "other"],
+    })
+      .notNull()
+      .default("other"),
+    status: text("status", { enum: ["draft", "planning", "ready", "building", "complete"] })
+      .notNull()
+      .default("draft"),
+    units: text("units", { enum: ["imperial", "metric"] }).notNull().default("imperial"),
+    /** Parametric CAD engine for this plan — JSCAD is built-in; OpenSCAD is the
+     *  optional external binary (Settings → Advanced, like Blender/KiCad). */
+    cadEngine: text("cadEngine", { enum: ["jscad", "openscad"] }).notNull().default("jscad"),
+    /** Markdown overview of the design (what/why/approach). */
+    overview: text("overview").notNull().default(""),
+    /** Ordered assembly instructions. */
+    assemblySteps: text("assemblySteps", { mode: "json" }).$type<
+      { title: string; detail: string; parts?: string[]; tools?: string[] }[]
+    >(),
+    /** Markdown safety notes + engineering disclaimers for the build. */
+    safetyNotes: text("safetyNotes").notNull().default(""),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+    updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+  },
+  (t) => [
+    index("blueprint_plans_user_idx").on(t.userId),
+    index("blueprint_plans_map_idx").on(t.mapId),
+  ]
+);
+
+export type BlueprintPlan = typeof blueprintPlans.$inferSelect;
+export type InsertBlueprintPlan = typeof blueprintPlans.$inferInsert;
+
+/** Bill-of-materials line item (materials, hardware, tools, consumables). */
+export const blueprintBomItems = sqliteTable(
+  "blueprint_bom_items",
+  {
+    id: text("id").primaryKey(), // UUID
+    planId: text("planId")
+      .notNull()
+      .references(() => blueprintPlans.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["material", "hardware", "tool", "consumable"] })
+      .notNull()
+      .default("material"),
+    name: text("name").notNull(),
+    /** Catalog key when the item came from the built-in materials database. */
+    materialKey: text("materialKey"),
+    /** Free-form spec, e.g. "2×4 SPF, 96 in" or "M8×40 hex bolt, grade 8.8". */
+    spec: text("spec").notNull().default(""),
+    quantity: real("quantity").notNull().default(1),
+    unit: text("unit").notNull().default("pcs"),
+    unitCost: real("unitCost"),
+    currency: text("currency").notNull().default("USD"),
+    supplier: text("supplier"),
+    url: text("url"),
+    notes: text("notes"),
+    sortOrder: integer("sortOrder").notNull().default(0),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  },
+  (t) => [index("blueprint_bom_items_plan_idx").on(t.planId)]
+);
+
+export type BlueprintBomItem = typeof blueprintBomItems.$inferSelect;
+export type InsertBlueprintBomItem = typeof blueprintBomItems.$inferInsert;
+
+/** Cut-list line item — exact member dimensions and end-cut angles. */
+export const blueprintCutItems = sqliteTable(
+  "blueprint_cut_items",
+  {
+    id: text("id").primaryKey(), // UUID
+    planId: text("planId")
+      .notNull()
+      .references(() => blueprintPlans.id, { onDelete: "cascade" }),
+    /** Part name, e.g. "Left rear leg", "Rafter A". */
+    partLabel: text("partLabel").notNull(),
+    /** Which stock it is cut from, e.g. "2×4 SPF 96 in" — ties back to a BOM line. */
+    stockName: text("stockName").notNull().default(""),
+    materialKey: text("materialKey"),
+    quantity: integer("quantity").notNull().default(1),
+    lengthMm: real("lengthMm"),
+    widthMm: real("widthMm"),
+    thicknessMm: real("thicknessMm"),
+    /** End-cut geometry (degrees): miter = in-plane angle, bevel = through-thickness tilt. */
+    miter1Deg: real("miter1Deg"),
+    bevel1Deg: real("bevel1Deg"),
+    miter2Deg: real("miter2Deg"),
+    bevel2Deg: real("bevel2Deg"),
+    notes: text("notes"),
+    sortOrder: integer("sortOrder").notNull().default(0),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  },
+  (t) => [index("blueprint_cut_items_plan_idx").on(t.planId)]
+);
+
+export type BlueprintCutItem = typeof blueprintCutItems.$inferSelect;
+export type InsertBlueprintCutItem = typeof blueprintCutItems.$inferInsert;
+
+/** A generated artifact on disk (under the data dir's blueprints/ tree). */
+export const blueprintFiles = sqliteTable(
+  "blueprint_files",
+  {
+    id: text("id").primaryKey(), // UUID
+    planId: text("planId")
+      .notNull()
+      .references(() => blueprintPlans.id, { onDelete: "cascade" }),
+    kind: text("kind", {
+      enum: [
+        "cad_source",
+        "mesh_json",
+        "stl",
+        "drawing_svg",
+        "drawing_dxf",
+        "pattern_svg",
+        "pattern_pdf",
+        "concept_image",
+        "fea_result",
+        "plan_pdf",
+      ],
+    }).notNull(),
+    name: text("name").notNull(),
+    /** Absolute path under resolveDataPath("blueprints") — validated on read. */
+    path: text("path").notNull(),
+    mimeType: text("mimeType").notNull().default("application/octet-stream"),
+    sizeBytes: integer("sizeBytes"),
+    /** e.g. { partLabel, engine, boundsMm, volumeMm3, massG, sourceFileId }. */
+    meta: text("meta", { mode: "json" }).$type<Record<string, unknown>>(),
+    /** Revision lineage: recompiling a part supersedes its prior file rather
+     *  than piling up. `version` bumps per (planId, kind, name); `supersedesId`
+     *  points at the file this one replaced; only the newest per part carries
+     *  `isLatest` (drawings/3D/PDF read the latest, older stay downloadable). */
+    version: integer("version").notNull().default(1),
+    supersedesId: text("supersedesId"),
+    isLatest: integer("isLatest", { mode: "boolean" }).notNull().default(true),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  },
+  (t) => [index("blueprint_files_plan_idx").on(t.planId)]
+);
+
+export type BlueprintFile = typeof blueprintFiles.$inferSelect;
+export type InsertBlueprintFile = typeof blueprintFiles.$inferInsert;
+
+/** A structural verification run — deterministic calc or FEA job. */
+export const blueprintSimResults = sqliteTable(
+  "blueprint_sim_results",
+  {
+    id: text("id").primaryKey(), // UUID
+    planId: text("planId")
+      .notNull()
+      .references(() => blueprintPlans.id, { onDelete: "cascade" }),
+    kind: text("kind", { enum: ["calc", "fea"] }).notNull(),
+    /** Human title, e.g. "Shelf mid-span deflection @ 60 kg". */
+    name: text("name").notNull(),
+    status: text("status", { enum: ["pending", "running", "completed", "failed"] })
+      .notNull()
+      .default("completed"),
+    inputs: text("inputs", { mode: "json" }).$type<Record<string, unknown>>(),
+    results: text("results", { mode: "json" }).$type<Record<string, unknown>>(),
+    /** AsyncJobService job id for FEA runs. */
+    jobId: text("jobId"),
+    /** Result artifact (mesh/field data) in blueprint_files, when produced. */
+    fileId: text("fileId"),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  },
+  (t) => [index("blueprint_sim_results_plan_idx").on(t.planId)]
+);
+
+export type BlueprintSimResult = typeof blueprintSimResults.$inferSelect;
+export type InsertBlueprintSimResult = typeof blueprintSimResults.$inferInsert;
+
+/** Blueprint planning conversation — one thread per plan. */
+export const blueprintMessages = sqliteTable(
+  "blueprint_messages",
+  {
+    id: text("id").primaryKey(), // UUID
+    planId: text("planId")
+      .notNull()
+      .references(() => blueprintPlans.id, { onDelete: "cascade" }),
+    role: text("role", { enum: ["user", "assistant"] }).notNull(),
+    /** Flattened text (persistence/copy/export). */
+    content: text("content").notNull(),
+    /** Ordered AssistantBlock[] — the agentic render source of truth. */
+    blocks: text("blocks", { mode: "json" }).$type<unknown[]>(),
+    tokenCount: integer("tokenCount"),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  },
+  (t) => [index("blueprint_messages_plan_idx").on(t.planId)]
+);
+
+export type BlueprintMessage = typeof blueprintMessages.$inferSelect;
+export type InsertBlueprintMessage = typeof blueprintMessages.$inferInsert;
+
+export const blueprintPlansRelations = relations(blueprintPlans, ({ one, many }) => ({
+  user: one(users, { fields: [blueprintPlans.userId], references: [users.id] }),
+  map: one(neuralMaps, { fields: [blueprintPlans.mapId], references: [neuralMaps.id] }),
+  bomItems: many(blueprintBomItems),
+  cutItems: many(blueprintCutItems),
+  files: many(blueprintFiles),
+  simResults: many(blueprintSimResults),
+  messages: many(blueprintMessages),
+}));
+
+export const blueprintBomItemsRelations = relations(blueprintBomItems, ({ one }) => ({
+  plan: one(blueprintPlans, { fields: [blueprintBomItems.planId], references: [blueprintPlans.id] }),
+}));
+
+export const blueprintCutItemsRelations = relations(blueprintCutItems, ({ one }) => ({
+  plan: one(blueprintPlans, { fields: [blueprintCutItems.planId], references: [blueprintPlans.id] }),
+}));
+
+export const blueprintFilesRelations = relations(blueprintFiles, ({ one }) => ({
+  plan: one(blueprintPlans, { fields: [blueprintFiles.planId], references: [blueprintPlans.id] }),
+}));
+
+export const blueprintSimResultsRelations = relations(blueprintSimResults, ({ one }) => ({
+  plan: one(blueprintPlans, { fields: [blueprintSimResults.planId], references: [blueprintPlans.id] }),
+}));
+
+export const blueprintMessagesRelations = relations(blueprintMessages, ({ one }) => ({
+  plan: one(blueprintPlans, { fields: [blueprintMessages.planId], references: [blueprintPlans.id] }),
 }));
 
 

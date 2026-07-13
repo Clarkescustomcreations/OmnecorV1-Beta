@@ -109,6 +109,8 @@ export const PYTHON_SCRIPTS = {
   ),
   /** Path to the ESP flash tool wrapper */
   espFlash: path.resolve(__dirname, "../../python_bridges/esptool_bridge.py"),
+  /** Path to the Blueprint Studio FEA bridge (Gmsh + TET4 linear statics) */
+  feaBridge: path.resolve(__dirname, "../../python_bridges/fea_bridge.py"),
   /** Path to the Valet dataset builder script */
   valetDatasetBuilder: path.resolve(
     __dirname,

@@ -12,6 +12,7 @@ import { Switch } from "../ui/switch";
 import { useNeuralMap } from "../../contexts/NeuralMapContext";
 import { Tabs, TabsList, TabsTrigger, TabsContent } from "../ui/tabs";
 import { DatasetCurationPanel } from "./DatasetCurationPanel";
+import { HfModelBrowser } from "./HfModelBrowser";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
 
 export const UnslothPanel: React.FC = () => {
@@ -19,6 +20,7 @@ export const UnslothPanel: React.FC = () => {
   const [loraRank, setLoraRank] = useState(16);
   const [datasetPath, setDatasetPath] = useState("");
   const [baseModel, setBaseModel] = useState("unsloth/llama-3-8b-bnb-4bit");
+  const [showBaseBrowser, setShowBaseBrowser] = useState(false);
 
   // Model scope: "project" saves the trained model into the active map's folder; "global" saves to main models folder
   const [modelScope, setModelScope] = useState<"project" | "global">(() => {
@@ -111,8 +113,23 @@ export const UnslothPanel: React.FC = () => {
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
-                    <Label>Base Model</Label>
-                    <Input value={baseModel} onChange={e => setBaseModel(e.target.value)} />
+                    <div className="flex items-center justify-between">
+                      <Label>Base Model</Label>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        className="h-6 px-2 text-[10px]"
+                        onClick={() => setShowBaseBrowser(v => !v)}
+                      >
+                        <FolderOpen className="w-3 h-3 mr-1" /> {showBaseBrowser ? "Hide" : "Browse HF"}
+                      </Button>
+                    </div>
+                    <Input
+                      value={baseModel}
+                      onChange={e => setBaseModel(e.target.value)}
+                      placeholder="HF repo id or local path"
+                    />
+                    <p className="text-[10px] text-muted-foreground">HF repo id (downloaded at train time) or a local path from a pre-download below.</p>
                   </div>
                   <div className="space-y-2">
                     <Label>Dataset Path (JSONL)</Label>
@@ -138,6 +155,16 @@ export const UnslothPanel: React.FC = () => {
                   </div>
                 </div>
 
+                {showBaseBrowser && (
+                  <div className="rounded-lg border bg-muted/10 p-3">
+                    <p className="mb-2 text-xs font-semibold">Download a base model for offline training</p>
+                    <HfModelBrowser
+                      mode="base-model"
+                      onModelReady={(localPath) => { setBaseModel(localPath); setShowBaseBrowser(false); }}
+                    />
+                  </div>
+                )}
+
                 <div className="space-y-4">
                   <div className="flex justify-between items-center">
                     <Label>LoRA Rank (R)</Label>
@@ -158,6 +185,7 @@ export const UnslothPanel: React.FC = () => {
                 <div className="flex gap-2">
                    <HowToTooltip title="Start Training" description="Begin fine-tuning using Unsloth engine" side="top">
                      <Button className="flex-1 bg-accent-warning hover:bg-accent-warning/90" onClick={() => startFineTuning.mutate({
+                       modelName: baseModel || undefined,
                        datasetPath: datasetPath || "/path/to/dataset.jsonl",
                        r: loraRank,
                        loraAlpha: 32,

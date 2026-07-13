@@ -139,14 +139,14 @@ The fullest routing mode. Multiple cloud providers handle specialized tasks in p
 
 Designed for users who have multiple specialist GGUF models on their local machine. The Valet creates a sequential processing chain: each model handles the specific sub-task it was specialized for, then passes its output as context to the next model in the chain.
 
-**Key constraint:** Only one model runs at a time to conserve RAM. Between each step, the current GGUF model is explicitly unloaded from `llamacpp_bridge.py` before the next model loads. This allows chains of large models to run on 8–16 GB machines.
+**Key constraint:** Only one model runs at a time to conserve RAM. Between each step, Omnecor's managed `llama-server` runtime hot-swaps to the next model (`LocalLlmRuntimeService.ensureModelLoaded` — stop current → spawn next), so the swap itself frees the prior model's RAM. This allows chains of large models to run on 8–16 GB machines.
 
 **Logical step order** (hardcoded in `valetRouter.ts`):
 `knowledge_retrieval` → `research` → `code_generation` → `code_review` → `integration` → `synthesis` → `reporting`
 
 **Step skipping:** Steps whose `taskCategories[]` is non-empty are skipped when the Valet's task classification does not match any listed category. Steps with an empty `taskCategories` always run.
 
-**Sovereign mode:** Allowed — all inference stays on-device via `llamacpp_bridge.py` (port 8013).
+**Sovereign mode:** Allowed — all inference stays on-device via the managed `llama-server` runtime (`LocalLlmRuntimeService`).
 
 **Setup:** Run `/MOE-Chain L` in chat to initialize, then configure steps at **Settings → Valet Router → MoE Chain**.
 

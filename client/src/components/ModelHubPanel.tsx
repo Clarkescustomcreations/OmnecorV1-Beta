@@ -22,6 +22,7 @@ import {
   Wrench,
 } from "lucide-react";
 import { HowToTooltip } from "@/components/shell/HowToTooltip";
+import { HfModelBrowser } from "@/components/hardware/HfModelBrowser";
 import { cn } from "@/lib/utils";
 import {
   getActiveModels,
@@ -96,6 +97,7 @@ export function ModelHubPanel({
       { id: "active", label: "Active Models" },
       { id: "omnecor", label: "Omnecor" },
       { id: "ollama", label: "Ollama" },
+      { id: "hf-gguf", label: "HF GGUF" },
     ];
     if (aiProviders?.openai) list.push({ id: "openai", label: "OpenAI" });
     if (aiProviders?.anthropic) list.push({ id: "anthropic", label: "Claude" });
@@ -351,10 +353,10 @@ export function ModelHubPanel({
         {/* TAB: OMNECOR SELF-HOSTED RUNTIME (per node) */}
         {activeTab === "omnecor" && (
           <div className="space-y-5">
-            <div className="flex items-start gap-2 border border-accent-purple/20 bg-accent-purple/5 p-3 rounded text-xs">
-              <Zap className="w-4 h-4 text-accent-purple mt-0.5 flex-shrink-0" />
+            <div className="flex items-start gap-2 border border-accent-info/20 bg-accent-info/5 p-3 rounded text-xs">
+              <Zap className="w-4 h-4 text-accent-info mt-0.5 flex-shrink-0" />
               <div>
-                <p className="font-semibold text-accent-purple">Omnecor hosts these itself.</p>
+                <p className="font-semibold text-accent-info">Omnecor hosts these itself.</p>
                 <p className="text-muted-foreground mt-0.5">
                   Omnecor's own runtime serves these models with full tool access — no Ollama required.
                   With OMMESH, each PC running Omnecor appears as its own node below.
@@ -626,8 +628,18 @@ export function ModelHubPanel({
           </div>
         )}
 
+        {/* HF GGUF: browse Hugging Face + download a quant into Omnecor's runtime */}
+        {activeTab === "hf-gguf" && (
+          <div className="space-y-3">
+            <h2 className="text-xs uppercase font-bold tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <Server className="w-3.5 h-3.5" /> Hugging Face → Omnecor Runtime
+            </h2>
+            <HfModelBrowser mode="gguf" />
+          </div>
+        )}
+
         {/* TAB 3: DYNAMIC API PROVIDERS */}
-        {!["active", "omnecor", "ollama"].includes(activeTab) && (
+        {!["active", "omnecor", "ollama", "hf-gguf"].includes(activeTab) && (
           <div className="space-y-4">
             {/* Status & Fallback Banner */}
             <div className="flex items-center justify-between border border-border p-2.5 rounded bg-muted/20 text-xs">

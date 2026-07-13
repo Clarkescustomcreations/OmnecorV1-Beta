@@ -263,7 +263,7 @@ export const Settings: React.FC = () => {
                         className={cn(
                           "flex items-center gap-2 md:gap-3 px-3 py-2 rounded-lg text-sm font-medium transition-colors whitespace-nowrap md:whitespace-normal md:w-full",
                           activeTab === tab.id
-                            ? "bg-primary/10 text-accent-foreground shadow-sm"
+                            ? "bg-primary/10 text-foreground shadow-sm"
                             : "text-muted-foreground hover:bg-muted/50 hover:text-foreground"
                         )}
                       >
