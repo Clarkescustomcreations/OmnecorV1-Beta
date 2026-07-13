@@ -3674,3 +3674,2047 @@ New shared component **`HfModelBrowser`** (`client/src/components/hardware/HfMod
 **Pattern notes:**
 - One reusable component, two modes — `gguf` downloads a single quant into the runtime models dir (auto-indexed → chat-selectable); `base-model` downloads the whole HF repo into the base-models dir and hands its local path back to the trainer for offline fine-tuning.
 - Progress is polled via `modelMarketplace.downloads` (in-memory server registry), filtered to the component's `mode`. Tokens: `bg-muted/30`, `text-accent-success`, `text-destructive`, `text-primary`, `Progress` — no raw colors.
+
+### ChatInterface.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-primary/10 bg-card bg-destructive/10 bg-accent-purple/5 bg-accent-cyan/5 bg-background/40 bg-muted bg-accent-purple/10 bg-transparent bg-muted/50 bg-muted/30 bg-background bg-primary/20 |
+| Border | border border-border border-destructive/30 border-accent-purple/30 border-accent-cyan/30 border-border/50 border-b border-accent-purple/40 border-t |
+| Border radius | rounded-full rounded-lg rounded |
+| Text | text-[10px] font-bold text-primary text-card-foreground text-sm text-xs text-destructive text-muted-foreground/60 text-accent-purple text-accent-cyan text-accent-success text-muted-foreground font-semibold text-foreground text-accent-purple/70 text-accent-purple/60 font-mono text-[11px] font-medium text-center text-2xl |
+| Spacing | gap-3 gap-1 px-4 py-3 p-2 gap-2 px-1 px-1.5 gap-0.5 py-0.5 space-y-4 py-2 space-y-1.5 gap-1.5 px-2 py-2.5 p-4 space-y-1 space-y-3 pt-2 pt-1 space-y-0.5 py-4 pt-3 pb-1 |
+| Hover | hover:bg-accent-purple/10 hover:bg-accent-cyan/10 hover:text-destructive hover:text-foreground hover:text-primary |
+| Shadow | shadow-sm |
+
+### ComponentLibrary.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-destructive/10 bg-muted bg-foreground/50 |
+| Border | border border-border border-destructive/50 |
+| Border radius | rounded-lg rounded |
+| Text | text-sm text-foreground/70 text-destructive font-semibold text-destructive/80 text-center text-muted-foreground text-lg text-foreground text-xs font-medium |
+| Spacing | gap-2 gap-1 p-4 gap-3 py-12 px-4 px-2 py-1 p-6 py-2 |
+| Hover | hover:bg-muted/80 |
+| Shadow | — |
+
+### ContextTransparencyIndicator.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted bg-accent-warning/10 bg-destructive/10 |
+| Border | border border-accent-warning/30 border-destructive/30 |
+| Border radius | rounded-lg |
+| Text | text-destructive text-accent-warning text-accent-success text-base text-xs text-sm text-muted-foreground font-mono font-medium |
+| Spacing | gap-2 space-y-4 space-y-2 p-2 p-3 |
+| Hover | — |
+| Shadow | — |
+
+### CriticalActionChecklist.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted |
+| Border | — |
+| Border radius | rounded-md |
+| Text | text-destructive font-mono text-sm text-xs text-muted-foreground |
+| Spacing | py-4 space-y-4 p-4 space-y-1 |
+| Hover | — |
+| Shadow | — |
+
+### ErrorBoundary.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-muted |
+| Border | — |
+| Border radius | rounded |
+| Text | text-destructive text-xl text-sm text-muted-foreground |
+| Spacing | p-8 p-4 |
+| Hover | — |
+| Shadow | — |
+
+### HITLAlertPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-warning/10 bg-muted/50 bg-muted |
+| Border | border border-accent-warning/30 |
+| Border radius | rounded-lg |
+| Text | text-accent-warning text-sm font-medium text-xs text-accent-warning/80 font-mono text-destructive text-primary text-lg font-semibold text-muted-foreground text-foreground |
+| Spacing | p-3 gap-2 space-y-0.5 pb-3 gap-4 gap-3 space-y-4 space-y-2 space-y-1 p-2 pt-2 |
+| Hover | — |
+| Shadow | shadow-lg |
+
+### IntegrationsHub.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/50 bg-primary/20 bg-primary/10 bg-background/50 bg-accent-success/10 bg-muted/20 |
+| Border | border border-2 border-dashed border-primary/10 border-accent-success/20 border-destructive/20 |
+| Border radius | rounded rounded-lg rounded-xl rounded-full |
+| Text | text-3xl text-sm text-xs text-[10px] text-accent-foreground text-[9px] text-primary font-semibold text-muted-foreground font-medium text-center font-bold text-accent-success text-destructive |
+| Spacing | pb-3 gap-3 gap-1 px-1.5 py-0.5 gap-2 space-y-3 p-3 pt-2 space-y-4 gap-4 p-12 p-6 py-2 space-y-2 |
+| Hover | hover:bg-destructive/10 |
+| Shadow | — |
+
+### Map.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### ModelHubPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-purple/10 bg-accent-cyan/10 bg-accent-success/10 bg-accent-success/20 bg-accent-info/5 bg-muted/20 bg-destructive/10 |
+| Border | border-b border-border border border-dashed border-accent-purple/20 border-accent-cyan/20 border-accent-success/20 border-accent-success/30 border-accent-info/20 border-t border-destructive/20 border-muted-foreground/20 |
+| Border radius | rounded-lg rounded |
+| Text | text-muted-foreground text-xs font-semibold text-sm text-[10px] text-[9px] text-accent-purple text-accent-cyan text-accent-success font-mono text-accent-info text-center font-bold text-destructive text-[8px] font-medium text-accent-warning text-destructive-foreground text-muted-foreground/60 |
+| Spacing | gap-4 gap-1.5 pb-2 pr-1 space-y-4 pl-10 space-y-3 p-4 gap-2 gap-3 space-y-5 p-3 py-8 gap-2.5 p-3.5 gap-0.5 space-y-6 pt-4 space-y-2 py-6 gap-1 px-1 py-0 px-2.5 p-2.5 p-2 space-y-2.5 |
+| Hover | hover:text-destructive hover:bg-destructive/10 hover:border-primary/20 |
+| Shadow | — |
+
+### OmnecorDashboardLayout.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-purple bg-destructive bg-primary/10 bg-sidebar-hover bg-foreground/50 |
+| Border | border border-accent-purple/40 border-sidebar border-sidebar-border/30 border-primary/20 |
+| Border radius | rounded-full rounded-lg |
+| Text | text-xl font-bold text-sidebar-foreground font-medium text-sm text-accent-purple/70 text-accent-purple text-white text-[10px] text-[9px] text-primary text-xs text-sidebar-foreground/70 |
+| Spacing | gap-3 px-1.5 px-1 px-3 py-2 |
+| Hover | hover:opacity-80 |
+| Shadow | shadow-[0_0_8px_theme(colors.accent.DEFAULT)] shadow-2xl |
+
+### PageSkeleton.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | p-6 space-y-6 space-y-2 gap-6 p-4 pt-0 |
+| Hover | — |
+| Shadow | — |
+
+### ProcessManagerPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card/50 bg-background/50 |
+| Border | border-border/50 border-b border border-border |
+| Border radius | rounded-lg |
+| Text | text-accent-success text-destructive text-muted-foreground text-primary text-lg text-center text-sm font-medium text-xs font-mono |
+| Spacing | pb-4 gap-2 p-0 p-4 space-y-4 py-8 p-3 |
+| Hover | — |
+| Shadow | — |
+
+### RouteErrorBoundary.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-destructive-foreground/10 |
+| Border | — |
+| Border radius | rounded |
+| Text | text-sm text-xs |
+| Spacing | p-6 space-y-4 p-2 gap-2 |
+| Hover | — |
+| Shadow | — |
+
+### SettingsPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/50 bg-primary/10 bg-muted/30 bg-muted |
+| Border | border border-primary/20 border-border |
+| Border radius | rounded-lg rounded-md rounded |
+| Text | text-sm font-semibold font-mono text-xs text-muted-foreground text-primary text-accent-success text-destructive font-medium |
+| Spacing | space-y-4 space-y-2 gap-4 space-y-0.5 space-y-3 p-3 gap-2 space-y-1 pl-6 px-1 |
+| Hover | — |
+| Shadow | — |
+
+### SpecializedModuleLauncher.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/50 bg-primary/5 bg-primary/10 bg-muted |
+| Border | border border-primary/20 |
+| Border radius | rounded-lg rounded |
+| Text | text-center font-semibold text-sm text-muted-foreground font-mono text-xs text-primary text-foreground text-[10px] text-accent-warning text-3xl font-bold |
+| Spacing | p-8 space-y-4 gap-4 pb-3 space-y-2 gap-2 p-3 p-2 space-y-1.5 gap-1 space-y-3 px-1 |
+| Hover | — |
+| Shadow | — |
+
+### VisualContextMap.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted bg-primary/10 bg-muted/50 |
+| Border | border border-primary/30 border-t border-border |
+| Border radius | rounded-lg |
+| Text | text-lg font-mono font-medium text-sm text-xs text-muted-foreground text-accent-success text-destructive text-primary text-base text-center font-semibold text-foreground |
+| Spacing | p-3 space-y-2 gap-2 gap-1 p-0 space-y-4 p-2 p-8 px-1 pt-2 |
+| Hover | hover:text-destructive hover:underline |
+| Shadow | — |
+
+### VoiceProviderSelector.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-warning/10 bg-muted |
+| Border | border border-accent-warning/30 |
+| Border radius | rounded-md rounded |
+| Text | text-[10px] text-xs text-muted-foreground font-mono |
+| Spacing | gap-2 space-y-4 py-0 px-3 py-2 px-1 space-y-3 space-y-1.5 |
+| Hover | — |
+| Shadow | — |
+
+### RecursiveMASPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-accent-success bg-background bg-muted |
+| Border | border border-primary |
+| Border radius | rounded-lg rounded-md |
+| Text | text-lg font-semibold text-sm text-muted-foreground font-medium font-normal text-destructive text-xs text-primary text-white text-center |
+| Spacing | gap-4 p-4 gap-3 gap-1 gap-2 p-2 py-4 p-3 |
+| Hover | — |
+| Shadow | — |
+
+### ChatPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-muted/20 bg-primary bg-card bg-muted/50 |
+| Border | border-r border-b border-none border-t |
+| Border radius | rounded-full |
+| Text | font-bold text-xs text-muted-foreground font-mono text-white text-sm text-primary |
+| Spacing | p-4 space-y-4 p-3 gap-3 gap-2 pr-24 gap-1 |
+| Hover | hover:text-foreground hover:bg-primary |
+| Shadow | shadow-sm shadow-inner shadow-md |
+
+### TaskManager.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/30 bg-background |
+| Border | border-none border border-dashed |
+| Border radius | rounded-lg rounded-xl |
+| Text | text-2xl font-bold text-accent-success text-sm text-muted-foreground text-[10px] font-mono font-medium text-destructive text-center |
+| Spacing | p-6 gap-6 gap-2 gap-4 pr-2 p-4 gap-3 gap-1 py-24 |
+| Hover | hover:bg-destructive/10 |
+| Shadow | shadow-sm shadow-inner |
+
+### BlueprintMeshViewer.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background/85 |
+| Border | border border-border/60 |
+| Border radius | rounded-md rounded-sm |
+| Text | text-xs font-medium text-muted-foreground |
+| Spacing | px-3 py-2 space-y-0.5 gap-2 |
+| Hover | — |
+| Shadow | — |
+
+### PlanTabs.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/40 bg-background bg-white bg-accent-success bg-primary/10 |
+| Border | border border-border/60 border-accent-danger/40 border-input border-t border-border/50 |
+| Border radius | rounded-md rounded-full |
+| Text | text-sm text-muted-foreground font-semibold text-accent-danger text-foreground text-xs text-right font-medium text-[10px] text-destructive font-mono text-left font-bold text-primary text-center |
+| Spacing | pt-3 space-y-4 gap-2 p-3 gap-3 space-y-3 gap-1 px-2 py-1.5 p-2 space-y-2 space-y-1 pt-2 |
+| Hover | hover:bg-accent-success |
+| Shadow | — |
+
+### ChatInput.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-accent-cyan/10 bg-primary/20 bg-transparent |
+| Border | border border-border border-b border-accent-cyan/30 border-0 |
+| Border radius | rounded-lg rounded-full rounded-xl rounded |
+| Text | text-[10px] text-muted-foreground font-medium font-mono font-semibold text-primary text-xs text-[9px] text-accent-cyan text-muted-foreground/70 text-sm |
+| Spacing | px-2 py-1 gap-1.5 py-0.5 gap-1 gap-2 px-3 py-3 p-0 gap-2.5 px-1 px-2.5 |
+| Hover | hover:text-destructive |
+| Shadow | shadow-lg shadow-none shadow-sm |
+
+### ChatIntegrationBar.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | text-[10px] text-muted-foreground font-semibold text-[11px] |
+| Spacing | gap-2 px-1 px-2 gap-1 |
+| Hover | — |
+| Shadow | — |
+
+### CliTerminalWindow.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-card bg-transparent bg-primary |
+| Border | border-t border-border border-none border border-primary/50 |
+| Border radius | rounded |
+| Text | font-mono text-xs text-primary font-bold text-foreground text-[10px] text-white text-sm text-muted-foreground text-[11px] |
+| Spacing | p-3 space-y-1 p-2 gap-2 gap-1.5 space-y-4 py-2 |
+| Hover | hover:bg-primary |
+| Shadow | — |
+
+### ConversationList.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card/50 bg-border bg-muted/50 bg-muted/30 bg-accent-cyan/15 bg-background/90 bg-primary/10 bg-primary/5 bg-background/80 |
+| Border | border-r border-border border-b border border-border/50 border-border/40 border-transparent border-primary/20 |
+| Border radius | rounded-lg rounded-md rounded |
+| Text | text-muted-foreground text-xs text-center font-medium text-[9px] text-accent-cyan text-[10px] text-primary font-semibold text-foreground text-primary/80 text-destructive |
+| Spacing | gap-1.5 py-2 gap-2 p-3 p-0.5 gap-0.5 pl-6 pr-2 px-2 space-y-0.5 py-8 py-0 px-1 gap-1 px-2.5 |
+| Hover | hover:text-destructive hover:bg-muted/50 hover:border-border/50 |
+| Shadow | — |
+
+### LoadingQuote.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | text-primary text-xs font-medium |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### MemoryArchiverPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-card/50 bg-primary/10 bg-accent-success/5 bg-card bg-card/20 |
+| Border | border-l border-border border-b border-primary/20 border-none border border-t border-accent-success/20 border-2 border-dashed |
+| Border radius | rounded-lg rounded rounded-xl |
+| Text | text-primary text-xs font-bold text-[10px] text-sm text-muted-foreground font-medium text-[9px] text-foreground text-center text-accent-success text-[11px] text-accent-cyan |
+| Spacing | p-4 gap-2 space-y-6 px-4 pb-4 space-y-3 p-2 space-y-4 px-1 pt-4 space-y-2 space-y-1.5 p-3 pt-6 p-8 |
+| Hover | hover:bg-primary/90 hover:text-primary-foreground |
+| Shadow | shadow-none |
+
+### ModelSelector.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-success |
+| Border | — |
+| Border radius | rounded-full |
+| Text | text-accent-purple text-xs text-muted-foreground font-medium text-[10px] |
+| Spacing | px-2 py-1.5 |
+| Hover | — |
+| Shadow | — |
+
+### TerminalPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-card/60 bg-accent-success bg-card bg-transparent |
+| Border | border-b border-border border-t border-none |
+| Border radius | rounded-full rounded |
+| Text | text-accent-success text-[9px] text-accent-success/70 font-mono text-muted-foreground text-xs text-accent-warning text-foreground text-[10px] text-accent-warning/50 |
+| Spacing | gap-3 px-3 py-1.5 gap-1.5 gap-1 p-1 p-3 space-y-0.5 p-2 gap-2 pb-2 |
+| Hover | hover:text-foreground hover:bg-card hover:text-destructive |
+| Shadow | — |
+
+### AgenticBlocks.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-success/90 bg-muted/50 bg-muted/40 |
+| Border | border border-border border-l border-border/60 |
+| Border radius | rounded-md |
+| Text | text-xs text-[11px] text-white text-left text-muted-foreground font-mono text-foreground/90 text-muted-foreground/70 text-[10px] text-sm font-semibold text-muted-foreground/80 |
+| Spacing | gap-1.5 px-2 gap-1 gap-2 py-0.5 p-2 pl-2 |
+| Hover | hover:bg-accent-success hover:text-muted-foreground |
+| Shadow | — |
+
+### AssistantStream.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-primary/10 bg-destructive/10 |
+| Border | border-l border-border/40 border border-destructive/30 border-border/50 |
+| Border radius | rounded-full rounded |
+| Text | text-sm text-[10px] font-bold text-primary text-xs text-destructive text-muted-foreground/60 text-accent-success text-muted-foreground |
+| Spacing | gap-3 pl-4 space-y-2 py-0.5 p-2 gap-2 gap-0.5 px-1 |
+| Hover | hover:text-destructive hover:text-foreground |
+| Shadow | — |
+
+### LazyPreviewPane.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | border |
+| Border radius | rounded-md |
+| Text | text-center text-destructive text-sm text-muted-foreground text-xs |
+| Spacing | gap-3 p-6 gap-1.5 px-3 py-1.5 |
+| Hover | hover:bg-muted |
+| Shadow | — |
+
+### ManufacturingPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-background bg-background/50 bg-primary/10 bg-accent-warning/5 bg-primary bg-accent-success |
+| Border | border-l border-border border-b border-primary/20 border border-accent-warning/10 border-none border-t |
+| Border radius | rounded-lg rounded-xl |
+| Text | text-primary text-xs font-bold text-[10px] text-sm text-muted-foreground font-mono text-accent-foreground text-accent-warning text-white text-lg text-primary/70 text-center |
+| Spacing | p-4 gap-2 p-2 gap-1.5 space-y-6 px-4 pb-4 space-y-4 space-y-2 space-y-3 p-3 pt-2 |
+| Hover | hover:bg-primary/90 hover:bg-card hover:bg-primary hover:bg-accent-success |
+| Shadow | shadow-none |
+
+### SchematicEditor.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-slate-900 bg-amber-500 bg-[#0a192f] bg-slate-800 |
+| Border | border-2 border-amber-500 border-none border-b border-amber-500/50 border-slate-700 |
+| Border radius | rounded rounded-none rounded-md |
+| Text | text-amber-500 font-mono text-xs font-bold text-center |
+| Spacing | p-2 pb-1 |
+| Hover | — |
+| Shadow | shadow-lg |
+
+### ThreeViewer.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-slate-900 bg-red-900/70 bg-black/50 bg-slate-900/95 bg-slate-950 bg-orange-600 bg-slate-700 |
+| Border | border-2 border-orange-500/50 border border-slate-700 |
+| Border radius | rounded-md rounded-full rounded-xl rounded rounded-lg |
+| Text | text-white/50 text-sm text-red-200 text-[10px] font-sans text-white/60 text-xs font-semibold text-orange-400 text-slate-400 text-slate-200 text-white |
+| Spacing | px-3 py-1 p-4 gap-1.5 p-2 gap-2 py-1.5 |
+| Hover | hover:text-slate-200 hover:bg-orange-500 hover:bg-slate-600 |
+| Shadow | shadow-2xl |
+
+### WebPreview.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-slate-900 bg-slate-950 bg-white bg-slate-800 bg-transparent |
+| Border | border border-slate-800 border-b border-none border-l border-slate-700 border-t border-slate-800/60 |
+| Border radius | rounded-md rounded |
+| Text | text-xs font-semibold text-slate-300 text-[10px] text-slate-500 font-mono text-primary text-white/50 text-sm text-slate-100 text-slate-400 text-[9px] font-bold text-[11px] |
+| Spacing | px-4 py-2 gap-2 p-4 pb-2 gap-1.5 space-y-4 space-y-2 space-y-1 p-1.5 px-2 py-1 pt-2 space-y-1.5 gap-1 pb-6 |
+| Hover | — |
+| Shadow | — |
+
+### BlenderPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-card bg-white/20 bg-primary |
+| Border | border-b |
+| Border radius | rounded-full |
+| Text | text-xl font-bold text-sm font-medium font-mono text-xs text-muted-foreground text-[10px] text-white |
+| Spacing | gap-4 p-4 gap-2 py-3 p-0 space-y-1 |
+| Hover | — |
+| Shadow | — |
+
+### DatasetCurationPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-transparent bg-card bg-muted bg-primary bg-muted/20 bg-muted/5 bg-card/65 bg-primary/80 |
+| Border | border border-input border-primary/40 border-t border-border/40 border-dashed border-b border-primary border-border/80 |
+| Border radius | rounded-md rounded rounded-lg |
+| Text | text-lg font-semibold text-primary text-xs text-muted-foreground text-sm font-medium text-[11px] text-foreground text-[10px] font-mono text-primary-foreground text-center text-muted-foreground/45 text-muted-foreground/30 text-destructive text-muted-foreground/60 |
+| Spacing | space-y-6 gap-1 gap-2 gap-6 py-4 space-y-4 pt-0 space-y-2 px-3 pr-8 px-0.5 gap-4 space-y-3 pr-1 p-2 space-y-1.5 pt-1 px-2 py-6 pb-2 pr-2 py-16 py-3 gap-1.5 p-0 px-2.5 p-4 |
+| Hover | hover:bg-primary/95 hover:bg-primary/10 hover:bg-card hover:bg-destructive/15 hover:bg-primary/90 |
+| Shadow | — |
+
+### ESPToolPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted bg-black |
+| Border | — |
+| Border radius | rounded-md |
+| Text | text-sm text-xs font-mono text-accent-success |
+| Spacing | gap-4 p-4 gap-2 space-y-4 space-y-2 p-3 space-y-0 pb-2 p-0 |
+| Hover | — |
+| Shadow | — |
+
+### HfModelBrowser.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/30 |
+| Border | border border-dashed border-t |
+| Border radius | rounded-md |
+| Text | text-xs text-muted-foreground text-primary font-medium text-foreground text-destructive text-sm font-mono text-[10px] font-semibold text-accent-success |
+| Spacing | space-y-3 gap-2 px-3 py-2 space-y-2 pt-3 space-y-1 |
+| Hover | — |
+| Shadow | — |
+
+### KiCadPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/50 bg-muted bg-accent-success/5 dark:bg-card |
+| Border | border border-dashed border-accent-success/20 |
+| Border radius | rounded-lg rounded-md |
+| Text | text-primary font-bold text-xs text-muted-foreground text-sm font-semibold text-center font-medium text-accent-success |
+| Spacing | p-4 space-y-4 gap-3 gap-2 space-y-2 p-3 py-12 p-8 p-6 gap-4 |
+| Hover | — |
+| Shadow | — |
+
+### ModelHubPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-success bg-background |
+| Border | border border-input |
+| Border radius | rounded-md |
+| Text | text-2xl font-bold text-primary text-sm text-muted-foreground text-center font-mono font-medium text-xs text-accent-warning font-semibold text-destructive |
+| Spacing | p-6 space-y-6 gap-2 space-y-0 pb-3 py-4 space-y-2 px-4 py-3 py-8 space-y-4 gap-3 pr-4 p-3 gap-1 px-3 py-2 |
+| Hover | — |
+| Shadow | — |
+
+### PCBViewer3D.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | text-gray-500 text-sm |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### UnslothPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/20 bg-muted/10 bg-muted bg-accent-warning |
+| Border | border border-dashed |
+| Border radius | rounded-lg rounded-full rounded-md rounded |
+| Text | text-2xl font-bold text-accent-warning text-sm text-muted-foreground font-medium text-primary text-xs font-semibold text-[10px] font-mono text-accent-success |
+| Spacing | p-6 space-y-6 gap-2 gap-6 px-4 py-3 gap-4 space-y-2 px-2 gap-1.5 p-3 space-y-4 space-y-1 p-2 space-y-3 px-1 |
+| Hover | hover:bg-accent-warning/90 |
+| Shadow | — |
+
+### MCPToolDirectory.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-secondary bg-muted bg-accent-success |
+| Border | border border-border border-transparent border-b |
+| Border radius | rounded-lg rounded-full rounded-md rounded |
+| Text | text-xs font-medium text-muted-foreground text-destructive text-secondary-foreground text-sm text-white font-mono text-center font-semibold text-foreground font-normal |
+| Spacing | gap-2 p-4 space-y-3 gap-3 space-y-1 pt-1 gap-1 px-3 py-1 p-0.5 space-y-2 p-3 gap-0 py-0 px-4 pt-4 pb-0 pt-2 pb-4 px-1 py-0.5 space-y-6 gap-4 py-16 pb-2 |
+| Hover | hover:bg-muted |
+| Shadow | — |
+
+### DocumentLibrary.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card/50 bg-muted/50 bg-primary/10 bg-muted/30 |
+| Border | border-none border-b border-t |
+| Border radius | rounded rounded-lg |
+| Text | text-3xl font-bold text-muted-foreground text-lg text-primary text-xs text-right font-medium text-center text-sm font-mono font-semibold |
+| Spacing | p-8 space-y-8 gap-6 gap-3 pl-9 pb-4 gap-2 p-0 p-2 py-20 p-4 pt-3 space-y-1 |
+| Hover | hover:bg-muted/30 |
+| Shadow | shadow-md shadow-xl |
+
+### ComfyPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/20 bg-primary/5 |
+| Border | border-b border border-primary/40 |
+| Border radius | rounded-md |
+| Text | text-2xl font-bold text-accent-warning text-sm text-muted-foreground font-medium font-mono text-xs text-primary text-center |
+| Spacing | p-6 space-y-6 gap-2 gap-6 space-y-4 space-y-0 pb-2 p-0 p-4 space-y-3 space-y-2 p-3 py-12 |
+| Hover | — |
+| Shadow | — |
+
+### ImageGeneratorPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | rounded-lg |
+| Text | text-sm text-muted-foreground text-destructive |
+| Spacing | space-y-4 gap-2 gap-3 |
+| Hover | — |
+| Shadow | — |
+
+### ImageStudioPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/30 bg-gradient-to-r bg-background bg-accent-purple bg-muted/50 bg-muted bg-gradient-to-t bg-white/20 |
+| Border | border-b border border-none |
+| Border radius | rounded-lg rounded rounded-xl rounded-full |
+| Text | text-accent-purple text-xl font-bold text-muted-foreground text-xs text-sm text-[10px] text-white/90 text-white |
+| Spacing | p-6 space-y-4 gap-2 pr-12 px-8 p-4 space-y-2 px-3 py-2 pl-9 gap-4 py-24 |
+| Hover | hover:text-foreground hover:opacity-90 hover:bg-accent-purple hover:ring-2 hover:ring-accent-purple hover:bg-white/40 |
+| Shadow | shadow-inner shadow-lg shadow-sm |
+
+### MeshTopologyGraph.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | border border-border |
+| Border radius | rounded-lg |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### FictionModePanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-primary/5 bg-muted/20 bg-background |
+| Border | border-b border-border border-primary/30 border border-l-2 border-2 |
+| Border radius | rounded-lg rounded-full |
+| Text | text-lg font-semibold text-primary text-sm text-xs text-muted-foreground text-[10px] text-foreground |
+| Spacing | gap-4 p-2 pb-2 gap-2 space-y-3 p-3 pr-2 p-4 pt-0 gap-3 pl-4 space-y-4 py-2 space-y-1 |
+| Hover | — |
+| Shadow | — |
+
+### MapManager.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-primary/20 bg-muted/50 bg-primary/5 |
+| Border | border-t border border-accent-warning border-primary/20 |
+| Border radius | rounded rounded-lg |
+| Text | text-sm font-semibold text-muted-foreground text-lg text-primary text-center text-xs font-medium text-[10px] text-accent-foreground text-destructive font-mono text-accent-warning text-accent-success |
+| Spacing | py-2 gap-2 gap-4 px-2 space-y-3 py-8 p-4 space-y-1 gap-1 px-1.5 py-0.5 px-1 space-y-5 pr-2 gap-3 space-y-1.5 pt-3 px-3 pb-3 gap-1.5 py-1 space-y-2 gap-0.5 |
+| Hover | hover:text-primary hover:text-destructive |
+| Shadow | — |
+
+### NeuralGraphView.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-primary/15 bg-accent-success/20 bg-card/95 bg-card bg-background/50 bg-background/60 bg-card/90 |
+| Border | border-primary/20 border-b border-border/50 border border-border |
+| Border radius | rounded rounded-lg rounded-md |
+| Text | font-bold font-mono text-muted-foreground text-primary text-accent-success text-[10px] text-[9px] text-xs text-foreground/90 text-foreground text-left text-accent-purple text-sm |
+| Spacing | gap-1.5 gap-0.5 px-1 py-0.5 p-3 space-y-1.5 gap-4 pb-1 py-1 px-3 py-1.5 py-2 gap-2 px-4 |
+| Hover | hover:bg-primary/10 |
+| Shadow | shadow-2xl shadow-xl shadow-lg |
+
+### NeuralTreeView.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card/95 bg-background/50 |
+| Border | border-primary/20 border-l border-border/50 |
+| Border radius | rounded |
+| Text | text-muted-foreground text-primary text-primary/70 text-muted-foreground/70 text-[10px] text-muted-foreground/50 font-bold text-xs text-foreground/90 text-[9px] font-mono text-sm |
+| Spacing | p-0.5 p-3 space-y-1 p-2 gap-2 space-y-0.5 |
+| Hover | hover:bg-primary/20 |
+| Shadow | shadow-2xl |
+
+### AIAssistantPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-primary/10 bg-muted bg-background |
+| Border | border-l border-border border-b border-primary/20 border-t |
+| Border radius | rounded-lg |
+| Text | text-sm font-semibold text-foreground text-xs text-muted-foreground text-lg text-primary text-accent-foreground |
+| Spacing | p-3 px-3 py-2 space-y-3 gap-2 |
+| Hover | hover:text-foreground hover:bg-primary/90 |
+| Shadow | shadow-sm |
+
+### ComponentLibraryPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-muted/50 bg-muted/40 bg-background bg-muted |
+| Border | border-r border-border border-b border-b-2 border-transparent border-t border |
+| Border radius | rounded-none rounded |
+| Text | text-sm font-semibold text-foreground text-muted-foreground text-[10px] text-xs text-center |
+| Spacing | p-3 pl-8 p-2 space-y-2 py-4 p-0 gap-2 gap-1 px-1.5 py-0.5 |
+| Hover | hover:text-foreground |
+| Shadow | shadow-sm |
+
+### CustomEdge.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### EditorToolbar.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card |
+| Border | border-b border-border |
+| Border radius | — |
+| Text | text-xs font-semibold text-destructive |
+| Spacing | gap-2 p-3 gap-1.5 px-4 |
+| Hover | hover:text-destructive |
+| Shadow | shadow-sm |
+
+### EnhancedPCBEditor.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-card |
+| Border | border-b border-border border border-t |
+| Border radius | rounded-md rounded |
+| Text | text-muted-foreground text-xs font-medium text-foreground text-[10px] text-left |
+| Spacing | gap-2 px-3 py-1.5 gap-1.5 py-1 pt-1 px-2 gap-1 py-0.5 |
+| Hover | hover:text-primary hover:bg-muted |
+| Shadow | shadow-lg |
+
+### NetlistPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-muted/40 bg-primary/10 bg-muted |
+| Border | border-l border-border border-b border border-t |
+| Border radius | rounded rounded-full |
+| Text | text-sm font-semibold text-foreground text-muted-foreground text-lg text-xs text-center font-mono text-muted-foreground/60 |
+| Spacing | p-3 px-3 py-2 space-y-1 space-y-3 py-8 p-2 gap-2 px-1 |
+| Hover | hover:text-foreground |
+| Shadow | shadow-sm |
+
+### PCBNode.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-warning bg-destructive/10 bg-white bg-opacity-70 |
+| Border | border border-accent-warning border-2 border-destructive |
+| Border radius | rounded-none rounded |
+| Text | text-xs text-destructive font-bold text-muted-foreground font-semibold |
+| Spacing | p-1 px-1 |
+| Hover | hover:bg-accent-warning |
+| Shadow | — |
+
+### PropertiesPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-background |
+| Border | border-l border-border border-b border |
+| Border radius | rounded |
+| Text | text-muted-foreground text-sm font-semibold text-foreground text-xs |
+| Spacing | p-4 p-3 space-y-4 px-2 gap-2 space-y-1 |
+| Hover | — |
+| Shadow | shadow-sm |
+
+### SchematicNode.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-warning bg-destructive/10 |
+| Border | border-2 border-accent-warning border-destructive |
+| Border radius | rounded-none rounded |
+| Text | text-xs text-destructive font-bold text-accent-warning |
+| Spacing | p-2 |
+| Hover | hover:bg-accent-warning |
+| Shadow | — |
+
+### JobsPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-card/50 bg-card |
+| Border | border-border border border-dashed |
+| Border radius | rounded-xl rounded-lg |
+| Text | text-sm font-bold text-primary text-[10px] text-muted-foreground text-center text-xs text-[9px] font-mono text-destructive text-accent-success |
+| Spacing | pb-2 gap-2 space-y-3 p-8 p-3 gap-3 |
+| Hover | hover:text-destructive hover:bg-destructive/10 |
+| Shadow | — |
+
+### PhaseOutputPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-black/30 |
+| Border | — |
+| Border radius | rounded |
+| Text | text-muted-foreground text-sm text-white font-semibold font-medium text-foreground text-xs font-mono |
+| Spacing | p-4 space-y-4 gap-2 space-y-3 p-2 |
+| Hover | — |
+| Shadow | — |
+
+### ThreatDashboard.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card |
+| Border | border-b border-border border |
+| Border radius | rounded |
+| Text | text-destructive text-sm text-xs text-foreground text-muted-foreground text-left font-mono text-accent-success |
+| Spacing | space-y-4 gap-2 pb-2 space-y-3 py-1 pr-3 p-4 space-y-2 gap-3 p-2 |
+| Hover | — |
+| Shadow | — |
+
+### AgenticWalletPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-primary/5 bg-card bg-gradient-to-br bg-white/5 bg-accent-success/20 bg-muted/10 bg-destructive/10 bg-muted/40 |
+| Border | border-muted/50 border border-primary/30 border-border border-accent-success/30 border-muted border-primary/40 border-destructive/40 |
+| Border radius | rounded-md rounded-2xl rounded-lg rounded-xl rounded |
+| Text | text-lg text-xs font-semibold text-muted-foreground text-sm font-medium text-[10px] font-bold text-primary text-primary/80 text-white/40 font-mono text-accent-success text-foreground text-accent-warning text-destructive text-center text-[11px] |
+| Spacing | space-y-6 space-y-4 space-y-2 px-3 py-2 pl-9 space-y-3 gap-2 gap-3 p-4 gap-4 px-4 py-1 gap-6 p-5 py-4 p-3 p-2 gap-1 |
+| Hover | hover:bg-primary/10 |
+| Shadow | shadow-md shadow-inner shadow-sm shadow-lg |
+
+### AuditRetentionPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-warning/10 |
+| Border | border-t border border-accent-warning/40 |
+| Border radius | rounded-md |
+| Text | text-lg font-semibold text-primary text-xs text-muted-foreground font-medium text-accent-warning |
+| Spacing | pt-6 space-y-6 gap-2 gap-3 p-3 |
+| Hover | — |
+| Shadow | — |
+
+### CloudComputePanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/40 bg-muted |
+| Border | border border-t border-border |
+| Border radius | rounded-md rounded-lg rounded |
+| Text | font-semibold text-sm text-xs text-muted-foreground text-base text-center text-accent-success font-medium font-mono text-accent-warning text-left text-right text-destructive text-primary text-lg |
+| Spacing | gap-2 space-y-4 gap-3 gap-4 space-y-1 px-4 py-2 py-4 space-y-3 py-3 px-3 space-y-2 space-y-6 px-1 |
+| Hover | hover:bg-muted/40 hover:text-destructive |
+| Shadow | — |
+
+### MoeChainPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card/50 |
+| Border | border |
+| Border radius | rounded-lg |
+| Text | text-sm text-xs text-muted-foreground text-destructive text-accent-success text-accent-warning font-semibold |
+| Spacing | p-3 space-y-2 gap-2 gap-0.5 gap-1.5 pb-3 gap-1 space-y-3 py-4 space-y-4 |
+| Hover | hover:text-destructive |
+| Shadow | — |
+
+### PairDevicePanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background |
+| Border | border border-border |
+| Border radius | rounded-lg |
+| Text | text-center text-sm text-muted-foreground font-mono text-3xl font-bold text-xs font-medium |
+| Spacing | space-y-6 gap-2 space-y-4 gap-6 p-2 space-y-2 py-3 gap-3 |
+| Hover | — |
+| Shadow | — |
+
+### PersonaCreationPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/30 bg-gradient-to-t bg-accent-success/20 bg-primary/20 bg-secondary bg-muted/10 bg-muted/20 bg-accent-warning/10 bg-muted bg-background bg-primary/5 bg-muted/40 bg-accent-success/10 bg-card bg-background/90 |
+| Border | border-2 border-border border-accent-success/30 border border-dashed border-accent-warning/30 border-primary/20 border-accent-success/20 border-t border-border/50 border-muted |
+| Border radius | rounded-xl rounded rounded-full rounded-md rounded-lg |
+| Text | text-muted-foreground text-xs text-center text-base font-semibold text-accent-success text-[10px] text-accent-foreground text-sm font-medium text-right text-secondary-foreground text-primary font-mono text-destructive text-accent-warning text-foreground text-left text-lg |
+| Spacing | gap-4 gap-2 space-y-1.5 gap-1.5 gap-1 px-1.5 py-0.5 space-y-5 space-y-2 px-2.5 py-1 px-4 py-3 space-y-3 p-3 p-6 px-3 py-2 px-1 py-0 p-4 gap-3 space-y-4 py-2.5 pb-3 pt-1 p-2 space-y-8 gap-6 pr-1 pr-2 pt-5 py-14 |
+| Hover | hover:bg-accent-success/20 hover:text-foreground hover:border-primary hover:bg-primary/5 hover:text-destructive hover:underline hover:bg-destructive/10 |
+| Shadow | — |
+
+### ValetRouterPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-success bg-muted/40 bg-muted |
+| Border | border-transparent border |
+| Border radius | rounded-md rounded |
+| Text | text-base text-xs text-white text-muted-foreground font-medium font-mono text-[10px] text-sm text-accent-warning text-accent-success font-normal text-muted-foreground/70 |
+| Spacing | pb-3 gap-2 space-y-5 space-y-2 gap-3 space-y-1 px-3 py-2 px-2 p-3 space-y-6 space-y-3 px-1 gap-1 space-y-4 |
+| Hover | — |
+| Shadow | — |
+
+### CommandPalette.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | text-xs text-muted-foreground |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### ExecutionModeBadge.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### Header.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background/95 |
+| Border | border-b |
+| Border radius | — |
+| Text | font-bold text-lg |
+| Spacing | gap-2 gap-1.5 px-2 py-0.5 gap-4 |
+| Hover | — |
+| Shadow | — |
+
+### HowToTooltip.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card/95 |
+| Border | border-primary/20 |
+| Border radius | — |
+| Text | text-[11px] font-bold text-primary text-xs text-foreground/90 |
+| Spacing | p-3 space-y-1.5 |
+| Hover | — |
+| Shadow | shadow-2xl |
+
+### PeerCard.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-sidebar-hover bg-muted-foreground bg-accent-success bg-muted-foreground/40 bg-background/40 |
+| Border | border border-sidebar-border border-t |
+| Border radius | rounded-lg rounded-full rounded |
+| Text | text-xs text-sidebar-foreground/80 font-medium text-muted-foreground text-[10px] text-accent-success font-mono text-sidebar-foreground text-[9px] |
+| Spacing | px-3 py-2 gap-2 gap-1.5 px-2 pb-2 pt-1 space-y-1 px-1 py-1 py-1.5 gap-1 py-0 gap-0.5 |
+| Hover | hover:bg-sidebar-hover/80 |
+| Shadow | — |
+
+### UpdateBanner.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-info/10 |
+| Border | border-b border-accent-info/30 |
+| Border radius | — |
+| Text | text-sm text-accent-info |
+| Spacing | px-4 py-2 |
+| Hover | hover:text-foreground |
+| Shadow | — |
+
+### UserIdentityCard.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-sidebar-hover bg-muted/30 |
+| Border | border border-sidebar-border/30 border-b |
+| Border radius | rounded-lg |
+| Text | text-left text-xs font-semibold text-sidebar-foreground text-[10px] text-muted-foreground text-sm |
+| Spacing | gap-3 px-3 py-2.5 p-0 px-4 py-3 p-4 space-y-3 gap-2 space-y-1 space-y-1.5 gap-1.5 gap-1 px-1.5 |
+| Hover | hover:border-primary/30 hover:bg-destructive/20 |
+| Shadow | — |
+
+### ZeroLoginBanner.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-warning/10 |
+| Border | border-b border-accent-warning/30 |
+| Border radius | — |
+| Text | text-xs text-accent-warning font-medium |
+| Spacing | px-4 py-2 gap-2 |
+| Hover | hover:text-accent-warning/80 |
+| Shadow | — |
+
+### EmbeddedTerminal.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-[#020817] bg-slate-900/80 bg-slate-800 |
+| Border | border-b border-slate-800 border border-slate-700 |
+| Border radius | rounded |
+| Text | text-slate-500 text-slate-700 text-[10px] text-slate-300 text-slate-400 |
+| Spacing | gap-2 px-3 py-1.5 px-1.5 py-0.5 p-1 |
+| Hover | hover:bg-slate-700 hover:text-slate-200 |
+| Shadow | — |
+
+### HITLCommandApproval.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-black/50 bg-card bg-accent-warning/5 bg-accent-warning/20 bg-background bg-muted |
+| Border | border border-border border-b border-accent-success/30 border-primary/30 border-accent-purple/30 |
+| Border radius | rounded-xl rounded-full rounded-lg rounded |
+| Text | text-accent-warning text-sm font-semibold text-foreground text-[11px] text-muted-foreground text-accent-success text-xs font-mono text-primary text-accent-purple text-destructive text-[10px] |
+| Spacing | gap-3 px-5 py-4 space-y-3 gap-2 p-3 gap-1.5 px-1 pb-5 space-y-2 |
+| Hover | hover:border-accent-success/60 hover:bg-accent-success/5 hover:border-primary/60 hover:bg-primary/5 hover:border-accent-purple/60 hover:bg-accent-purple/5 |
+| Shadow | shadow-2xl |
+
+### accordion.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | text-muted-foreground text-sm |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### alert-dialog.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### alert.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### aspect-ratio.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### avatar.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### badge.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### breadcrumb.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### button-group.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### button.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### calendar.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | text-center |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### card.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### carousel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### chart.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | rounded-[2px] |
+| Text | text-muted-foreground text-foreground font-mono font-medium |
+| Spacing | gap-1.5 |
+| Hover | — |
+| Shadow | — |
+
+### checkbox.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | text-current |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### collapsible.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### command.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | border-b |
+| Border radius | — |
+| Text | text-center text-sm |
+| Spacing | gap-2 px-3 py-6 |
+| Hover | — |
+| Shadow | — |
+
+### context-menu.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### dialog.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | rounded-xs |
+| Text | — |
+| Spacing | — |
+| Hover | hover:opacity-100 |
+| Shadow | — |
+
+### drawer.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted |
+| Border | — |
+| Border radius | rounded-full |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### dropdown-menu.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### empty.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### field.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background |
+| Border | — |
+| Border radius | — |
+| Text | text-muted-foreground |
+| Spacing | px-2 gap-1 |
+| Hover | — |
+| Shadow | — |
+
+### form.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### hover-card.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### input-group.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### input-otp.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-foreground |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### input.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### item.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### kbd.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### label.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### menubar.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### navigation-menu.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-border |
+| Border | — |
+| Border radius | rounded-tl-sm |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | shadow-md |
+
+### pagination.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### popover.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### progress.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-primary |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### radio-group.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### resizable.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-border |
+| Border | border |
+| Border radius | rounded-xs |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### scroll-area.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-border |
+| Border | — |
+| Border radius | rounded-[inherit] rounded-full |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### select.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### separator.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### sheet.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | rounded-xs |
+| Text | — |
+| Spacing | — |
+| Hover | hover:opacity-100 |
+| Shadow | — |
+
+### sidebar.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-sidebar |
+| Border | — |
+| Border radius | rounded-md |
+| Text | text-sidebar-foreground |
+| Spacing | p-0 |
+| Hover | — |
+| Shadow | — |
+
+### skeleton.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### slider.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-white |
+| Border | border-primary border |
+| Border radius | rounded-full |
+| Text | — |
+| Spacing | — |
+| Hover | hover:ring-4 |
+| Shadow | shadow-sm |
+
+### sonner.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### spinner.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### switch.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### table.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### tabs.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### textarea.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### toggle-group.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### toggle.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### tooltip.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-foreground |
+| Border | — |
+| Border radius | rounded-[2px] |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### TTSPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-accent-info/10 bg-primary |
+| Border | border-primary |
+| Border radius | rounded-full |
+| Text | text-xs font-bold text-muted-foreground text-white text-sm font-medium |
+| Spacing | p-4 space-y-6 gap-2 space-y-4 gap-4 space-y-2 p-3 |
+| Hover | — |
+| Shadow | — |
+
+### VoiceInputButton.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | — |
+| Border radius | — |
+| Text | — |
+| Spacing | — |
+| Hover | — |
+| Shadow | — |
+
+### BudgetConfigDialog.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted |
+| Border | border border-muted |
+| Border radius | rounded-md rounded |
+| Text | font-normal font-medium text-center text-muted-foreground text-sm text-xs font-mono |
+| Spacing | gap-1.5 space-y-5 pt-4 space-y-2 space-y-1 gap-2 space-y-4 p-4 px-1 p-3 |
+| Hover | — |
+| Shadow | — |
+
+### BudgetPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | — |
+| Border | border-accent-warning |
+| Border radius | — |
+| Text | text-sm font-medium text-accent-warning text-xs font-bold font-mono text-primary text-2xl text-muted-foreground |
+| Spacing | pb-2 gap-2 gap-4 gap-1 space-y-1 space-y-0.5 |
+| Hover | — |
+| Shadow | — |
+
+### VirtualCardPanel.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/30 bg-muted bg-gradient-to-br bg-primary/10 bg-card/50 bg-muted/20 bg-primary/5 bg-card |
+| Border | border-dashed border-border border-t border-primary/10 border border-primary/20 |
+| Border radius | rounded-full rounded-lg rounded |
+| Text | text-center text-muted-foreground font-bold text-sm text-xs text-white text-primary text-[9px] text-[10px] font-mono text-lg text-accent-foreground text-base text-right |
+| Spacing | pt-6 space-y-4 space-y-1 space-y-6 gap-6 pb-8 gap-2 gap-4 pt-2 space-y-2 p-3 pb-3 gap-1 p-0 p-4 gap-3 |
+| Hover | hover:text-white hover:bg-card hover:bg-muted/10 |
+| Shadow | shadow-sm |
+
+### ExternalBrainMapWindow.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-card/80 bg-primary/10 bg-border bg-accent-warning/50 bg-accent-success/50 bg-[#0B0F14] bg-background/80 |
+| Border | border-b border-border border border-primary/20 border-primary/30 border-accent-warning/20 border-accent-success/20 |
+| Border radius | rounded-lg rounded-full |
+| Text | text-primary text-sm font-bold text-[10px] text-muted-foreground font-mono text-xs |
+| Spacing | px-6 py-3 gap-3 gap-2 gap-1.5 px-3 py-1.5 |
+| Hover | hover:bg-primary/10 |
+| Shadow | shadow-xl |
+
+### FloatingWindow.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/30 bg-background/50 |
+| Border | border-b border-border |
+| Border radius | — |
+| Text | text-xs font-semibold text-muted-foreground |
+| Spacing | px-4 py-2 gap-2 gap-1 |
+| Hover | hover:bg-destructive/20 hover:text-destructive |
+| Shadow | — |
+
+### NeuralWorkspaceCanvas.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-background bg-background/80 bg-border bg-muted |
+| Border | border border-border |
+| Border radius | rounded-lg rounded-full |
+| Text | text-xs text-[10px] font-bold text-muted-foreground text-yellow-500 text-accent-success text-sm |
+| Spacing | gap-2 p-2 gap-1 px-4 py-2 gap-4 space-y-3 |
+| Hover | — |
+| Shadow | shadow-sm shadow-lg |
+
+### FileNode.tsx
+
+Captured: 2026-07-13
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card/90 bg-muted |
+| Border | border-border |
+| Border radius | rounded-md |
+| Text | text-primary text-muted-foreground text-accent-purple text-accent-warning text-accent-success text-sm font-medium text-[10px] |
+| Spacing | p-3 gap-3 p-2 gap-2 px-1 py-0 |
+| Hover | — |
+| Shadow | shadow-lg |
