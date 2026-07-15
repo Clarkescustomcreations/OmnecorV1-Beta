@@ -13,6 +13,7 @@ import modeler3d from "./3d-modeler.cases.js";
 import audioProducer from "./audio-producer.cases.js";
 import contentWriter from "./content-writer.cases.js";
 import workflowBlueprinter from "./workflow-blueprinter.cases.js";
+import generalist from "./generalist.cases.js";
 
 export const EVAL_SPECS: EvalSpec[] = [
   coding,
@@ -23,6 +24,7 @@ export const EVAL_SPECS: EvalSpec[] = [
   audioProducer,
   contentWriter,
   workflowBlueprinter,
+  generalist,
 ];
 
 export function getEvalSpec(slug: string): EvalSpec | undefined {

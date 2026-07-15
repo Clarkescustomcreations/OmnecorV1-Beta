@@ -188,8 +188,8 @@ inflating the context window. A Brain Pack is a portable `.obp` file bundling a 
   resolves another user's brains.
 * **Team of Experts.** Multiple brains attach at once and are merged, so a single small model can
   answer with a coding brain, a PCB brain, and a writing brain simultaneously (shipped packs
-  include `coding`, `pcb-engineer`, `software-architect`, `content-writer`, `3d-modeler`,
-  `omnecor-expert`, `workflow-blueprinter`). Attach per-chat (BrainToggle) or durably on a
+  include `generalist`, `coding`, `pcb-engineer`, `software-architect`, `content-writer`,
+  `3d-modeler`, `audio-producer`, `omnecor-expert`, `workflow-blueprinter`). Attach per-chat (BrainToggle) or durably on a
   persona/Valet route; packs sync across the mesh over OMMESH.
 
 The effect: a generalist 7B gains specialist grounding on demand, and only the relevant slices

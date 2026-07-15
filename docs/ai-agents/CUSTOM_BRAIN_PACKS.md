@@ -4,9 +4,9 @@ Omnecor ships with a built-in **"Team of Experts"** — a roster of highly speci
 
 By attaching one of these Brain Packs to an agent or persona, you can accomplish complex, domain-specific tasks completely offline in **Sovereign mode**, without relying on expensive cloud API calls.
 
-Each brain is two parts: an always-on **Charter** (imperative rules the model follows on every turn) and a curated **Corpus** of one-fact-per-chunk reference knowledge retrieved top-k at inference time. Seven of the eight are **general-purpose** domain experts usable on any project; only the **Omnecor Expert** is intentionally Omnecor-specific. All are authored from reviewable sources in [`brains/sources/`](../../brains/sources/) and built through the real on-device pipeline (`pnpm brains:build:all`).
+Each brain is two parts: an always-on **Charter** (imperative rules the model follows on every turn) and a curated **Corpus** of one-fact-per-chunk reference knowledge retrieved top-k at inference time. Most are **general-purpose** domain experts usable on any project; only the **Omnecor Expert** is intentionally Omnecor-specific (the **Generalist** is general-purpose discipline but also knows Omnecor's empowerment ecosystem so it can steer a model toward the right layer). All are authored from reviewable sources in [`brains/sources/`](../../brains/sources/) and built through the real on-device pipeline (`pnpm brains:build:all`).
 
-Here is an overview of the 8 expert Brain Packs included in Omnecor:
+Here is an overview of the 9 expert Brain Packs included in Omnecor:
 
 ---
 
@@ -50,6 +50,11 @@ Here is an overview of the 8 expert Brain Packs included in Omnecor:
 **What it does:** The original proven exemplar — 50 curated facts on JS/TS pitfalls, async/concurrency, security & OWASP (SQL injection, password hashing, timing-safe comparison, path traversal, JWT), algorithms & complexity, data structures, SQL, git, testing, and HTTP/distributed systems. Distinct from the Software Architect (which is framework/architecture-oriented); this brain is the *fundamentals under the code*.
 **When to use it:** Attach this for correctness-critical coding — hardening input handling, avoiding language footguns, and getting the security details right.
 
+## 9. The Generalist
+**Role:** General-purpose operating discipline for ANY task — the "how to work" brain.
+**What it does:** Teaches a small model to work like a disciplined senior engineer: plan before acting and confirm consequential decisions with the user, track plan + progress in a maintained `TODO.md`, reason through complex tasks with worked examples, hunt edge cases (empty/boundary/concurrency/scale) and vulnerabilities (injection, IDOR, path traversal, secrets) before declaring done, and verify instead of guess — read the real code, run the change, reproduce the bug, and never trust stale training data (use web search, docs, or skills to check anything that can change). Critically, its charter makes training data the **last resort, never the default**: every Omnecor empowerment layer is written as an operating order — a multi-step procedure means `list_agent_skills`/`read_agent_skill` first; an action means a tool call, never improvised shell; a must-be-correct number means a deterministic engine; a too-big task means mesh offload or `delegate_task`; a long command means `start_job`; injected project context outranks the model's weights. It also knows the whole Team-of-Experts roster and attaches (or recommends) the matching specialist per domain. When a task exceeds the model's ability — or routing fails with no API keys available — it falls back to the Valet's **Guided Walk-Through Scrapper Mode** ([VALET_ROUTER.md §4](VALET_ROUTER.md)): analyze locally, produce a copy-paste-ready prompt, recommend the best free-tier cloud web UI, guide the user through submitting it, integrate the pasted result, and keep the workflow moving — zero dead-ends.
+**When to use it:** Attach it by default, to any agent, on any task — it stacks with the domain experts (attach the Generalist for *how* to work, a specialist for *what* it's working on).
+
 ---
 
 ## Measured impact (live A/B eval)
@@ -59,15 +64,16 @@ Every brain is proven, not assumed. `pnpm brains:eval:all` runs a clean A/B agai
 | # | Brain | Base model | Baseline | With brain | Δ | Q improved/regressed |
 |---|-------|-----------|:---:|:---:|:---:|:---:|
 | 1 | Omnecor Expert | qwen2.5-coder:7b | 27.8% | **88.9%** | **+61.1pt** | 12↑ / 0↓ |
-| 2 | Software Architect | qwen2.5-coder:7b | 58.3% | **97.2%** | **+38.9pt** | 9↑ / 0↓ |
-| 3 | Workflow Blueprinter | qwen2.5-coder:7b | 61.1% | **97.2%** | **+36.1pt** | 10↑ / 0↓ |
-| 4 | PCB & Schematics Engineer | qwen2.5:7b | 75.0% | **97.2%** | **+22.2pt** | 7↑ / 0↓ |
-| 5 | Audio & Podcast Producer | qwen2.5:7b | 77.8% | **100.0%** | **+22.2pt** | 6↑ / 0↓ |
-| 6 | 3D Modeler | qwen2.5-coder:7b | 80.6% | **100.0%** | **+19.4pt** | 7↑ / 0↓ |
-| 7 | Content Writer | qwen2.5:7b | 72.2% | **91.7%** | **+19.4pt** | 6↑ / 1↓ |
-| 8 | Coding Expert | qwen2.5-coder:7b | 73.3% | **90.0%** | **+16.7pt** | 5↑ / 0↓ |
+| 2 | Generalist | qwen2.5:7b | 47.6% | **100.0%** | **+52.4pt** | 14↑ / 0↓ |
+| 3 | Software Architect | qwen2.5-coder:7b | 58.3% | **97.2%** | **+38.9pt** | 9↑ / 0↓ |
+| 4 | Workflow Blueprinter | qwen2.5-coder:7b | 61.1% | **97.2%** | **+36.1pt** | 10↑ / 0↓ |
+| 5 | Coding Expert | qwen2.5-coder:7b | 70.0% | **100.0%** | **+30.0pt** | 8↑ / 0↓ |
+| 6 | PCB & Schematics Engineer | qwen2.5:7b | 75.0% | **97.2%** | **+22.2pt** | 7↑ / 0↓ |
+| 7 | Audio & Podcast Producer | qwen2.5:7b | 77.8% | **100.0%** | **+22.2pt** | 6↑ / 0↓ |
+| 8 | 3D Modeler | qwen2.5-coder:7b | 80.6% | **100.0%** | **+19.4pt** | 7↑ / 0↓ |
+| 9 | Content Writer | qwen2.5:7b | 72.2% | **91.7%** | **+19.4pt** | 6↑ / 1↓ |
 
-**8/8 brains posted a measurable improvement.** Retrieval surfaced a relevant curated fact in the top results for the large majority of questions in every domain. Rebuild the packs with `pnpm brains:build:all` and reproduce these numbers with `pnpm brains:eval:all` (point `OMNECOR_EVAL_BASE_URL` / `OMNECOR_EVAL_MODEL` at any OpenAI-compatible local runtime, including Omnecor's own llama-server).
+**9/9 brains posted a measurable improvement.** (The Coding Expert was originally capped at 50 curated facts and plateaued at 90.0%; raising the authoring cap to 60 and adding three targeted facts — float tolerance comparison, dynamic-identifier allow-listing, the full JWT verification checklist — lifted it to 100.0% with-brain coverage.) Retrieval surfaced a relevant curated fact in the top results for the large majority of questions in every domain. Rebuild the packs with `pnpm brains:build:all` and reproduce these numbers with `pnpm brains:eval:all` (point `OMNECOR_EVAL_BASE_URL` / `OMNECOR_EVAL_MODEL` at any OpenAI-compatible local runtime, including Omnecor's own llama-server).
 
 *(Fact-coverage is a deliberately strict proxy: a fact only counts when the answer contains one of its accepted terms. Absolute percentages depend on the question set and grader; the meaningful signal is the consistent, regression-free lift the brain adds on top of the same model.)*
 

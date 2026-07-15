@@ -7,8 +7,10 @@
  * and the eval harness read to (re)build and grade every shipped `.obp`. Each
  * entry is a reviewable, diffable TS module producing exactly one pack.
  *
- * Only the **Omnecor Expert** is intentionally Omnecor-specific; the other seven
- * are general-purpose domain experts usable by any local model on any project.
+ * Only the **Omnecor Expert** is intentionally Omnecor-specific; the rest are
+ * general-purpose experts usable by any local model on any project (the
+ * **Generalist** additionally knows Omnecor's empowerment ecosystem so it can
+ * steer a model toward the right layer).
  */
 import type { BrainSourceModule } from "./_types.js";
 
@@ -20,6 +22,7 @@ import { MODELER_3D_CHARTER, MODELER_3D_SOURCES } from "./3d-modeler.js";
 import { AUDIO_PRODUCER_CHARTER, AUDIO_PRODUCER_SOURCES } from "./audio-producer.js";
 import { CONTENT_WRITER_CHARTER, CONTENT_WRITER_SOURCES } from "./content-writer.js";
 import { WORKFLOW_BLUEPRINTER_CHARTER, WORKFLOW_BLUEPRINTER_SOURCES } from "./workflow-blueprinter.js";
+import { GENERALIST_CHARTER, GENERALIST_SOURCES } from "./generalist.js";
 
 export const BRAIN_MODULES: BrainSourceModule[] = [
   {
@@ -109,6 +112,18 @@ export const BRAIN_MODULES: BrainSourceModule[] = [
       "retries/backoff, scheduling, observability, and workflow design.",
     charter: WORKFLOW_BLUEPRINTER_CHARTER,
     sources: WORKFLOW_BLUEPRINTER_SOURCES,
+  },
+  {
+    slug: "generalist",
+    id: "omnecor-generalist",
+    name: "Generalist",
+    domain: "general",
+    description:
+      "General-purpose operating discipline for any task: plan-before-acting, TODO.md tracking, " +
+      "edge-case and vulnerability reasoning, verify-don't-guess, the Team-of-Experts roster, " +
+      "Omnecor's empowerment layers, and Guided Walkthrough escalation.",
+    charter: GENERALIST_CHARTER,
+    sources: GENERALIST_SOURCES,
   },
 ];
 

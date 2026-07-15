@@ -61,6 +61,10 @@ export const CODING_SOURCES: CodingSource[] = [
     text: `IEEE-754 doubles cannot represent most decimal fractions exactly, so 0.1 + 0.2 === 0.30000000000000004, not 0.3. Never compare floats with ===; compare with a tolerance: Math.abs(a - b) < Number.EPSILON * scale. Never store money as a float — represent it as an integer number of the smallest unit (cents), or use a decimal library. Rounding for display should happen only at the very end.`,
   },
   {
+    name: "num-float-comparison-epsilon",
+    text: `Never compare floating-point numbers for exact equality (=== or ==) — accumulated binary rounding error makes mathematically-equal expressions compare unequal (0.1 + 0.2 !== 0.3). Always compare with a TOLERANCE (an epsilon): Math.abs(a - b) < epsilon, where epsilon is scaled to the magnitude of the values (Number.EPSILON is the unit of least precision at 1.0, so multiply it by the operand scale). The same rule applies in tests: use closeTo/approx assertions for floats, never exact equality. When you need exact decimal arithmetic (money, quantities), don't use floats at all — use integers of the smallest unit (cents) or a decimal library, and mention the tolerance rule whenever explaining float behavior.`,
+  },
+  {
     name: "js-this-binding",
     text: `In JavaScript, 'this' is determined by how a function is CALLED, not where it is defined. A plain function called standalone has 'this' as undefined (strict mode) or the global object. Arrow functions do NOT have their own 'this'; they capture it lexically from the enclosing scope — which is why arrows are correct for callbacks that need the surrounding 'this', but wrong as object methods that rely on the caller. To fix a lost 'this' from a detached method, use .bind(obj), an arrow wrapper, or class field syntax.`,
   },
@@ -105,6 +109,10 @@ export const CODING_SOURCES: CodingSource[] = [
     text: `SQL injection is prevented by parameterized queries (prepared statements / bound parameters), never by string concatenation or manual escaping. Write "SELECT * FROM users WHERE id = ?" with the value passed separately, so the driver sends data out-of-band from the SQL text and the value can never be parsed as SQL. This also applies to LIKE patterns and IN lists (bind each element). Table and column names cannot be bound as parameters — if they must be dynamic, validate them against a fixed allow-list.`,
   },
   {
+    name: "sec-sql-dynamic-identifiers-allowlist",
+    text: `Bound parameters only work for VALUES — table names, column names, ORDER BY targets, and sort directions cannot be parameterized, so dynamic identifiers are the part of SQL injection defense people forget. When an identifier must be dynamic (a user-selected sort column, a per-tenant table), validate it against a fixed ALLOW-LIST of known-good identifiers and reject anything else — never interpolate the raw string, and never rely on escaping it. A complete SQL-injection answer therefore has three parts: (1) parameterized queries / prepared statements for all values, (2) no string concatenation of user input into SQL ever, and (3) an allow-list for any dynamic identifier that can't be a bound parameter.`,
+  },
+  {
     name: "sec-xss-output-encoding",
     text: `Cross-site scripting (XSS) is prevented by context-aware output encoding at the point of rendering, not by input filtering. HTML body context escapes < > & " '; HTML attribute, JavaScript, CSS, and URL contexts each need different encoding. Prefer a templating engine or framework that auto-escapes (React escapes text nodes by default). Treat dangerouslySetInnerHTML / innerHTML as dangerous: sanitize with a vetted library (e.g. DOMPurify) if you must render user HTML. A Content-Security-Policy header is defense-in-depth, not a substitute.`,
   },
@@ -123,6 +131,10 @@ export const CODING_SOURCES: CodingSource[] = [
   {
     name: "sec-jwt-pitfalls",
     text: `Validate JWTs correctly: verify the signature with the expected algorithm pinned server-side, and reject tokens whose 'alg' header you did not expect — the classic attack sets alg to "none" or swaps RS256 for HS256 to trick the server into verifying with a public key as an HMAC secret. Always check 'exp' (expiry) and, where relevant, 'iss', 'aud', and 'nbf'. A JWT is signed, not encrypted: never put secrets in the payload; anyone can base64-decode and read it. Keep tokens short-lived and use refresh tokens for longevity.`,
+  },
+  {
+    name: "sec-jwt-verification-checklist",
+    text: `The complete JWT verification checklist — every item, every time: (1) PIN the algorithm server-side and reject any token whose 'alg' header differs — accept alg "none" and you accept unsigned tokens; accept HS256 when you expect RS256 and an attacker can sign tokens using your PUBLIC key as the HMAC secret (the RS256→HS256 confusion attack). (2) Verify the signature against the pinned key. (3) Check 'exp' (expiration) and reject expired tokens; check 'nbf' (not-before) if present. (4) Validate 'iss' (issuer) and 'aud' (audience) match your service. (5) Remember the payload is readable by anyone (base64, not encrypted) — no secrets in claims. Skipping any single item — especially the alg pin or exp check — re-opens a known, actively exploited attack.`,
   },
   {
     name: "sec-path-traversal",

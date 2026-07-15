@@ -36,7 +36,7 @@ const log = createLogger("BrainAuthoring");
 
 // ── Bounds — keep a single build finite (cloud spend, on-device embed time). ──
 /** Max source docs per build. */
-const MAX_SOURCES = 50;
+const MAX_SOURCES = 60;
 /** Max characters consumed from any one source (guards a runaway scrape). */
 const MAX_SOURCE_CHARS = 500_000;
 /** Max total corpus chunks (raw + distilled) in a single pack. */
