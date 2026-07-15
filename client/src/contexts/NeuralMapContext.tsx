@@ -13,6 +13,12 @@ interface NeuralMapContextType {
   updateMap: (id: string, updates: Partial<NeuralBrainMap>) => void;
   setActiveMap: (id: string) => void;
   duplicateMap: (id: string) => void;
+  /**
+   * Adopt a map that was created server-side (e.g. the chat's create_blueprint
+   * auto-bootstrapped a new Project). Fetches authoritative server state, merges
+   * the row into local state, and makes it active. No-op if already present.
+   */
+  adoptServerMap: (id: string) => Promise<void>;
 }
 
 const NeuralMapContext = createContext<NeuralMapContextType | undefined>(undefined);
@@ -286,6 +292,26 @@ export const NeuralMapProvider: React.FC<{ children: ReactNode }> = ({ children 
     setActiveMapId(id);
   }, []);
 
+  const adoptServerMap = useCallback(async (id: string) => {
+    // Called for a map that was just created server-side (not yet in local
+    // state), so fetch authoritative state and merge it in. The setMaps guard
+    // makes a re-adopt idempotent; on fetch failure we still activate the id so
+    // the chat/blueprint stays anchored and a later list load fills it in.
+    try {
+      const fresh = await utils.neuralMaps.list.fetch(undefined, { staleTime: 0 });
+      if (Array.isArray(fresh)) {
+        const row = (fresh as Record<string, unknown>[]).find((r) => r.id === id);
+        if (row) {
+          const adopted = rowToMap(row);
+          setMaps((prev) => (prev.some((m) => m.id === id) ? prev : [...prev, adopted]));
+        }
+      }
+    } catch {
+      // Server unreachable — activate anyway; a later list load fills it in.
+    }
+    setActiveMapId(id);
+  }, [utils]);
+
   const duplicateMap = useCallback((id: string) => {
     setMaps(prev => {
       const original = prev.find(m => m.id === id);
@@ -316,7 +342,7 @@ export const NeuralMapProvider: React.FC<{ children: ReactNode }> = ({ children 
 
   return (
     <NeuralMapContext.Provider
-      value={{ maps, activeMapId, activeMap, dbReady, createMap, deleteMap, updateMap, setActiveMap, duplicateMap }}
+      value={{ maps, activeMapId, activeMap, dbReady, createMap, deleteMap, updateMap, setActiveMap, duplicateMap, adoptServerMap }}
     >
       {children}
     </NeuralMapContext.Provider>

@@ -9,7 +9,7 @@
 // Express 4's correct 0.1.x copy lives under .pnpm; we resolve it and alias the
 // server bundle's single path-to-regexp consumer (Express 4) to it.
 import { build } from "esbuild";
-import { readdirSync, writeFileSync, existsSync, readFileSync } from "fs";
+import { readdirSync, writeFileSync, existsSync, readFileSync, cpSync, mkdirSync } from "fs";
 import { join } from "path";
 
 // Locate the 0.1.x path-to-regexp that Express 4 needs (callable default export).
@@ -37,6 +37,40 @@ function resolveClassicPathToRegexp() {
     "Could not find path-to-regexp@0.1.x (Express 4 needs the callable 0.1.x API). " +
       "Checked node_modules/express/node_modules and node_modules/.pnpm. Run `pnpm install`.",
   );
+}
+
+// The libSQL driver loads its prebuilt native addon through a DYNAMIC
+// `require(`@libsql/${target}`)` (libsql/index.js → requireNative()). esbuild
+// bundles all the surrounding JS but cannot bundle a `.node` addon, so it leaves
+// that require to run at runtime — resolved relative to `dist/index.js`. A
+// standalone bundle (installer payload / Electron / any `dist/` without the repo's
+// hoisted node_modules as a parent) therefore dies on first DB connect with
+// `Cannot find module '@libsql/linux-x64-gnu'`. Copy every installed native
+// binding package next to the bundle so `dist/` is self-sufficient.
+function copyNativeLibsqlBindings(outDir) {
+  const srcRoot = join(process.cwd(), "node_modules", "@libsql");
+  if (!existsSync(srcRoot)) {
+    throw new Error("node_modules/@libsql is missing — run `pnpm install`.");
+  }
+  // A native binding package is any @libsql/<platform> dir shipping an index.node.
+  const nativeDirs = readdirSync(srcRoot).filter((name) =>
+    existsSync(join(srcRoot, name, "index.node")),
+  );
+  if (nativeDirs.length === 0) {
+    throw new Error(
+      "No @libsql/<platform> prebuilt binding (index.node) found under " +
+        "node_modules/@libsql — the libSQL database driver cannot load at runtime. " +
+        "Run `pnpm install` on the target platform.",
+    );
+  }
+  const destRoot = join(outDir, "node_modules", "@libsql");
+  mkdirSync(destRoot, { recursive: true });
+  for (const name of nativeDirs) {
+    // dereference: true — pnpm/hoisted layouts may hardlink/symlink into the store;
+    // copy the real files so the bundle carries the addon, not a dangling link.
+    cpSync(join(srcRoot, name), join(destRoot, name), { recursive: true, dereference: true });
+  }
+  return nativeDirs;
 }
 
 // OMNECOR_BUNDLE_DEV=1 produces a local-only bundle that does NOT hard-code
@@ -75,4 +109,9 @@ await build({
 });
 
 writeFileSync("dist/package.json", JSON.stringify({ type: "module" }));
-console.log("server bundle written → dist/index.js");
+
+// Make dist/ self-sufficient for the libSQL native addon (see comment above).
+const copiedBindings = copyNativeLibsqlBindings("dist");
+console.log(`copied libSQL native binding(s) → dist/node_modules/@libsql/: ${copiedBindings.join(", ")}`);
+
+console.log(`server bundle written → ${devBundle ? "dist/index.dev.js" : "dist/index.js"}`);

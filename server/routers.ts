@@ -41,6 +41,7 @@ import { updateUserExecutionMode, acceptTosForUser } from "./db.factory.js";
 
 // ─── Unified Feature Routers ────────────────────────────────────────────────
 import { knowledgeBaseRouter } from "./routers/knowledgeBase.js";
+import { brainRouter } from "./routers/brainRouter.js";
 import { aiRouter } from "./routers/aiRouter.js";
 import { aiProviderRouter } from "./routers/aiProviderRouter.js";
 import { delegationRouter } from "./routers/delegationRouter.js";
@@ -135,6 +136,9 @@ export const appRouter = router({
 
   // ─── Knowledge Base (VectorDB + MemoryArchitect) ──────────────────────────
   knowledgeBase: knowledgeBaseRouter,
+
+  // ─── Brain Packs (portable external brains for local models) ──────────────
+  brains: brainRouter,
 
   // ─── AI Providers (Ollama, OpenAI, Anthropic, Gemini) ─────────────────────
   ai: aiRouter,

@@ -6,6 +6,26 @@ This living document tracks the execution progress of the 5-phase build roadmap.
 
 ---
 
+## ✅ 2026-07-15 — Blueprint Studio de-isolation + Local-Model Empowerment doc — COMPLETE
+
+- [x] `/architect` session — de-isolate Blueprint Studio: bidirectional context sharing, chat-native blueprint creation, project attachment options (4 decisions locked)
+- [x] **Chat-native creation** — default-off "Fabrication" toggle (`chatDisplaySettings.fabricationTools`) → `enableBlueprintTools` on `agentChatStream` appends `buildChatBlueprintTools()` (new `server/core_services/blueprint/chatBlueprintTools.ts`: `create_blueprint` + `open_blueprint` + reused domain tools via a getter-backed plan holder) alongside built-ins
+- [x] **Auto-project bootstrap** — `create_blueprint`/Studio "＋ New project" create a Neural Map/Project **server-side** via shared `resolveProjectMap()` (fixes a real FK race — two client mutations could insert the plan before the map row committed); client adopts it via new `NeuralMapContext.adoptServerMap()`
+- [x] **Bidirectional shared context** (gated by map `enableAIContext`) — new `injectBlueprintContext` (`server/_core/blueprintContext.ts`) folds attached Build Plans into `chatStream` + `agentChatStream`; `blueprintRouter.agentStream` folds the parent Project's brief/goals into the Blueprint agent
+- [x] Tests: new `server/__tests__/chatBlueprintTools.test.ts`; gates `pnpm check` ✅ · full `pnpm test` 1,727 pass (only unrelated tokenCrypto scrypt-timeout flake) · prod `pnpm build` ✅ · self-review 2 nits fixed. NOT yet live-driven end-to-end; APK parity pending
+- [x] **Docs:** rewrote `docs/ai-agents/LOCAL_MODEL_EMPOWERMENT.md` into the full grounded inventory of every SLM-empowerment system (owned runtime, unified catalog, OMMESH VRAM routing, background sub-agents/delegation, Try-Fail-Fix, MCP + skills hosting, external Brain Packs, RAG, deterministic domain toolsets, MoE chains, Valet routing); enriched its `docs/README.md` index entry
+
+---
+
+## ✅ 2026-07-14 — Brains-Upgrade Phase 5 & 6 (Team of Experts / Custom Brain Packs) — COMPLETE
+
+- [x] Defined Brain Pack guidelines in `Context/Brain-Curation-Guide.md` (roster, charter format, corpus rules).
+- [x] Curated 7 Expert Brains via subagents (`omnecor-expert`, `3d-modeler`, `pcb-engineer`, `software-architect`, `audio-producer`, `content-writer`, `workflow-blueprinter`).
+- [x] Created `server/scripts/build-custom-brains.ts` to automate the local embedding and `.obp` generation process.
+- [x] Executed build pipeline successfully; generated 7 `.obp` packs in `brains/` directory using on-device `all-MiniLM-L6-v2`.
+- [x] Reviewed and fixed the script hanging issue (added `process.exit(0)`).
+
+---
 ## ✅ 2026-07-13 — Blueprint Studio (AI-Assisted Fabrication Planning) — COMPLETE & LIVE-VERIFIED
 
 - [x] `/architect` session — 4 decisions locked (new top-level page; deterministic calcs + real FEA; parametric CAD + image-gen; offline materials DB + cloud-gated web search); dual CAD engine per user request (JSCAD built-in default + optional OpenSCAD binary)

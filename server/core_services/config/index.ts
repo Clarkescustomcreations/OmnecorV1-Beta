@@ -70,6 +70,71 @@ export const VECTOR_DB_CONFIG = {
 } as const;
 
 // ---------------------------------------------------------------------------
+// Embedding Model (local, ONNX — powers the embedded vector store)
+// ---------------------------------------------------------------------------
+
+/**
+ * Local sentence-embedding model used by the EmbeddedVectorStore (libSQL
+ * native vectors) and any code needing on-device embeddings. Defaults to
+ * all-MiniLM-L6-v2 (384-dim, mean-pooled) — the SAME model ChromaDB uses by
+ * default, so the embedded backend stays vector-compatible with the Chroma
+ * path. Runs fully offline once the model is cached; the model is fetched once
+ * (verified by SHA-256) into the cache dir when first needed and online, or
+ * pre-seeded by the packager / OMNECOR_EMBED_MODEL_DIR for air-gapped installs.
+ */
+export const EMBEDDING_CONFIG = {
+  /** Model identifier (informational + cache subdir name). */
+  modelId: "all-MiniLM-L6-v2",
+  /** Embedding dimensionality produced by the model. */
+  dimensions: 384,
+  /** Max input tokens (sentence-transformers all-MiniLM default seq length). */
+  maxSeqLength: 256,
+  /** Directory holding the model + tokenizer. Env override wins; else cache. */
+  modelDir:
+    process.env.OMNECOR_EMBED_MODEL_DIR ||
+    path.resolve(
+      process.env.HOME || os.homedir(),
+      ".omnecor/models/all-MiniLM-L6-v2"
+    ),
+  /** Relative path (within modelDir) to the ONNX weights. */
+  onnxRelPath: "onnx/model_quantized.onnx",
+  /** Relative path (within modelDir) to the WordPiece vocab. */
+  vocabRelPath: "vocab.txt",
+  /** Pinned download source (HuggingFace) used only when the cache is empty. */
+  downloadBaseUrl:
+    process.env.OMNECOR_EMBED_MODEL_URL ||
+    "https://huggingface.co/Xenova/all-MiniLM-L6-v2/resolve/main",
+  /** SHA-256 of the quantized ONNX weights — integrity gate on download. */
+  onnxSha256:
+    "afdb6f1a0e45b715d0bb9b11772f032c399babd23bfc31fed1c170afc848bdb1",
+  /** Disable the auto-download (air-gapped installs that pre-seed the dir). */
+  offlineOnly: process.env.OMNECOR_EMBED_OFFLINE === "true",
+} as const;
+
+// ---------------------------------------------------------------------------
+// Brain Packs (portable external "brains" for local models)
+// ---------------------------------------------------------------------------
+
+/**
+ * Storage locations + limits for `.obp` Brain Packs. Built-ins ship in-repo
+ * (`brains/` at the repo root); user-imported packs are cached under
+ * `~/.omnecor/brains`. Both are self-contained and load with zero external
+ * infra, honoring the air-gapped Sovereign promise.
+ */
+export const BRAINS_CONFIG = {
+  /** In-repo directory holding built-in `.obp` packs shipped with Omnecor. */
+  builtinDir:
+    process.env.OMNECOR_BRAINS_BUILTIN_DIR ||
+    path.resolve(__dirname, "../../../brains"),
+  /** Cache directory for user-imported packs (also where exports default). */
+  userDir:
+    process.env.OMNECOR_BRAINS_DIR ||
+    path.resolve(process.env.HOME || os.homedir(), ".omnecor/brains"),
+  /** Hard cap on a single `.obp` upload/import (bytes) — 256 MB. */
+  maxPackBytes: parseInt(process.env.OMNECOR_BRAINS_MAX_BYTES || String(256 * 1024 * 1024), 10),
+} as const;
+
+// ---------------------------------------------------------------------------
 // File System Watcher
 // ---------------------------------------------------------------------------
 

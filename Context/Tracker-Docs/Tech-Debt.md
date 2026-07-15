@@ -392,6 +392,16 @@
 - **Risk**: Medium (unit-tested, build-verified; live end-to-end not yet confirmed on real multi-peer hardware)
 - **Status**: Open — bundle with the next available joint hardware session. Steps: deploy current build to DadsPC + .201, confirm "Omnecor · DadsPC" group renders in the APK picker, spawn a `delegate_task` from the APK parent chat, approve a `run_command` on the peer, confirm the parent re-prompt.
 
+### TD-059: Migration tooling resolved a DIFFERENT DB file than the server + dev DB drift (RESOLVED 2026-07-15)
+- **File**: `server/scripts/migrate.ts`, `drizzle.config.ts`, `server/_core/paths.ts` (source of truth), `server/db.ts` (correct pattern)
+- **Reason**: Two independent traps, surfaced while verifying the new `brains`/`brain_chunks` tables (migration `0018`) in the live dev UI:
+  1. **Dual DB paths.** The running server resolves the local DB via `PATHS.sqlite` → `resolveDataPath("data/omnecor.db")`; in non-prod on Linux `getBaseDataDir()` picks `<cwd>/data`, so the server actually opens **`<project>/data/data/omnecor.db`**. But `pnpm db:migrate` (`migrate.ts`) and `drizzle.config.ts` both **hardcoded `~/.omnecor/data/omnecor.db`** — a *different* file. So `pnpm db:migrate` reported "success" while the server still 500'd with `no such table: brains` (migrated the wrong file). A silent, high-friction foot-gun for anyone verifying a schema change locally.
+  2. **Migration drift blocked boot-time auto-migrate.** The dev DB had `model_assets` already existing, so the runtime-fallback `migrate()` in `db.ts init()` aborted the whole batch **before** reaching migration 0018 — and fails *silently* (non-fatal warn "Auto-migration failed — server continuing", boot continues). Net effect: a newly-added table never got created and the failure was invisible unless you read the boot log.
+- **Risk**: Medium (dev-verification friction + silent schema-apply failure; not a production data risk — prod sets `SQLITE_PATH`/`LIBSQL_URL` explicitly so the paths already coincide there)
+- **Status**: **RESOLVED (2026-07-15).** Two-part fix:
+  1. **Path unified (permanent).** `migrate.ts` and `drizzle.config.ts` now import `PATHS` and resolve `SQLITE_PATH ?? PATHS.sqlite`, matching `server/db.ts` `resolveUrl()` exactly. `pnpm db:migrate` now prints `Target: file:.../OmnecorV1-Beta/data/data/omnecor.db`; `drizzle-kit check` loads the config cleanly ("Everything's fine"); `pnpm check` 0 errors. The tooling and runtime can no longer diverge — a single `PATHS.sqlite` source of truth.
+  2. **Dev DB drift cleared.** The drifted dev DB was backed up then rebuilt from an empty file → all 19 migrations apply onto a clean `__drizzle_migrations` journal. Fresh boot now logs "Database initialized and migrations applied" with **zero** drift warnings; `brains.list` works out-of-the-box (no manual DDL). **Note for a *production* DB with real data:** baseline the journal (insert the already-applied migrations' rows into `__drizzle_migrations`) rather than rebuilding; never `drizzle-kit push` a drifted DB (it can over-diff destructively). Prevention rule: any new DB-path/env logic must go through `PATHS`/`server/db.ts`, never a second hardcoded path.
+
 ---
 
 ## Key Insights & Gotchas (2026-06-20 sweep + live verification)

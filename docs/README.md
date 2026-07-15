@@ -42,7 +42,7 @@ This is the full map of the `docs/` tree. For top-level project docs
 |---|---|
 | [ai-agents/VALET_ROUTER.md](ai-agents/VALET_ROUTER.md) | The 1.5B routing classifier — architecture, serving, fallback behavior |
 | [ai-agents/MOE_CHAIN.md](ai-agents/MOE_CHAIN.md) | Mixture-of-Experts chain — multi-model reasoning pipeline |
-| [ai-agents/LOCAL_MODEL_EMPOWERMENT.md](ai-agents/LOCAL_MODEL_EMPOWERMENT.md) | Empowering small local models (SLMs) with Omnecor tooling |
+| [ai-agents/LOCAL_MODEL_EMPOWERMENT.md](ai-agents/LOCAL_MODEL_EMPOWERMENT.md) | The full inventory of how Omnecor empowers small local models — owned runtime, unified catalog, OMMESH VRAM routing, background sub-agents/delegation, Try-Fail-Fix harness, MCP + skills hosting, external Brain Packs, RAG, deterministic domain toolsets, MoE chains, Valet routing |
 | [ai-agents/DATASET_CURATION.md](ai-agents/DATASET_CURATION.md) | LLM Builder dataset discovery & curation |
 | [ai-agents/BIRD_CLAW_SCRAPER.md](ai-agents/BIRD_CLAW_SCRAPER.md) | Bird Claw Scraper (Agent Reach) — data acquisition agent |
 | [ai-agents/WORKFLOW_SEQUENCING.md](ai-agents/WORKFLOW_SEQUENCING.md) | Multi-step pipeline orchestration |

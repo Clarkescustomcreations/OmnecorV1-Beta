@@ -106,6 +106,19 @@ export async function getDb(): Promise<Db> {
   return _initPromise;
 }
 
+/**
+ * Get the underlying libSQL client, sharing the SAME connection as `getDb()`
+ * (critical for in-memory test DBs, where a second connection sees no data).
+ * Ensures the DB is initialized first. Use this only for features that need raw
+ * SQL beyond Drizzle's builder — e.g. libSQL-native vector search
+ * (`vector_top_k` / `libsql_vector_idx`), which Drizzle has no helper for.
+ */
+export async function getLibsqlClient(): Promise<Client> {
+  await getDb();
+  if (!_client) throw new Error("libSQL client not initialized");
+  return _client;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // Users
 // ─────────────────────────────────────────────────────────────────────────────

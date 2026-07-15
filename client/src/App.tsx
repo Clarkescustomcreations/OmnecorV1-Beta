@@ -30,6 +30,7 @@ const ExternalBrainMapWindow = lazy(() => import("./components/window-system/Ext
 const TermsPage = lazy(() => import("@/pages/Terms").then(m => ({ default: m.TermsPage })));
 const LLMBuilder = lazy(() => import("@/pages/LLMBuilder").then(m => ({ default: m.LLMBuilder })));
 const BlueprintStudio = lazy(() => import("@/pages/BlueprintStudio").then(m => ({ default: m.BlueprintStudio })));
+const BrainsManager = lazy(() => import("@/pages/BrainsManager").then(m => ({ default: m.BrainsManager })));
 
 /** Per-route error boundary that renders RouteErrorBoundary on failure. */
 class RouteBoundary extends Component<{ children: ReactNode }, { error: Error | null }> {
@@ -82,6 +83,7 @@ function RouterRoutes() {
         <Route path="/" component={withBoundary(Dashboard)} />
         <Route path="/chat" component={withBoundary(Chat)} />
         <Route path="/brain-map" component={withBoundary(BrainMap)} />
+        <Route path="/brains" component={withBoundary(BrainsManager)} />
         <Route path="/brain-map-external" component={withBoundary(ExternalBrainMapWindow)} />
         <Route path="/model-hub" component={withBoundary(ModelHub)} />
         <Route path="/pipelines" component={withBoundary(Pipelines)} />

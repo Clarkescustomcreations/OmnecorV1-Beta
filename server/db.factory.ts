@@ -13,6 +13,7 @@ import { users } from "../drizzle/schema.js";
 
 export {
   getDb,
+  getLibsqlClient,
   getMigrationStatus,
   upsertUser,
   getUserByOpenId,

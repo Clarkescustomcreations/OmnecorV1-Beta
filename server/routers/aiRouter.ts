@@ -28,6 +28,7 @@ import { getWsInstance } from "../core_services/websocket/WebSocketServer.js";
 import { NotificationService } from "../_core/NotificationService.js";
 import { assertProviderAllowedInMode } from "../_core/sovereign.js";
 import { injectMapRagContext } from "../_core/ragContext.js";
+import { injectBrainContext } from "../_core/brainContext.js";
 import { guardedEmit } from "../_core/streamEmit.js";
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -112,6 +113,13 @@ const chatInputSchema = z.object({
   /** Active neural map — when set (and its enableAIContext is on), the map's
    *  indexed knowledge is retrieved and injected as system context. */
   ragMapId: z.string().max(256).optional(),
+  /** Attached Brain Packs — their charters (always-on) + retrieved corpus are
+   *  injected as system context. Owner-scoped; incompatible brains contribute
+   *  charter only. See {@link injectBrainContext}. */
+  brainIds: z.array(z.string().max(128)).max(16).optional(),
+  /** Active persona — its durable `data.brains` are resolved server-side and
+   *  unioned with `brainIds` (Brains-Upgrade Phase 4). Owner-scoped. */
+  personaId: z.string().max(128).optional(),
   /** Model-Fabric Phase 5/6 — pin mesh routing to the specific OMMESH peer the
    *  caller selected in the catalog picker (`SelectedModel.targetNodeId`).
    *  Unset → the mesh auto-scorer picks a peer as before. Threaded through
@@ -327,12 +335,22 @@ ${transcript}
         messages: input.messages,
         systemPrompt: input.systemPrompt,
       });
+      // Attached Brain Packs: charters (always-on) + retrieved corpus. Layered
+      // after map RAG so both knowledge sources augment the same prompt. Local
+      // retrieval → Sovereign-safe.
+      const brain = await injectBrainContext({
+        brainIds: input.brainIds,
+        personaId: input.personaId,
+        userId: ctx.user?.id,
+        messages: rag.messages,
+        systemPrompt: rag.systemPrompt,
+      });
       // Pass userId/executionMode like the streaming path so moe_chain routing and
       // Sovereign enforcement work identically on the blocking endpoint.
       const content = await ctx.services.aiProvider.chat({
         ...input,
-        messages: rag.messages,
-        systemPrompt: rag.systemPrompt,
+        messages: brain.messages,
+        systemPrompt: brain.systemPrompt,
         userId: ctx.user?.id,
         executionMode: ctx.user?.executionMode,
       });

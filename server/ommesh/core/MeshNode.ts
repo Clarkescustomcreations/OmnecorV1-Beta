@@ -33,6 +33,23 @@ export interface InferenceResult {
   fellBack?: boolean;
 }
 
+/** Outcome of a Brain Pack sync to / from a peer (Brains-Upgrade Phase 7). */
+export interface BrainSyncResult {
+  ok: boolean;
+  /** The pack id that was imported (present on success). */
+  brainId?: string;
+  /** Whether the pack's embedder matched the receiver's running embedder. */
+  embedderMatch?: boolean;
+  /** Receiver's brain status after import: ready | incompatible | error. */
+  status?: string;
+  /** Chunks persisted to the receiver's durable store. */
+  chunksStored?: number;
+  /** Chunks loaded into the receiver's vector index (0 when incompatible). */
+  vectorsLoaded?: number;
+  /** Failure reason when ok is false. */
+  error?: string;
+}
+
 /** Minimal persona shape received from or sent to a peer. */
 export interface PeerPersona {
   id: string;
@@ -340,6 +357,83 @@ export class MeshNode {
     }
   }
 
+  /**
+   * Called when a peer delivers a portable `.obp` Brain Pack via POST /brain
+   * (Brains-Upgrade Phase 7). The pack is imported into this node's local store
+   * on behalf of the local owner account: embedder compatibility is verified by
+   * BrainPackService (a mismatch is persisted as `incompatible`, its charter kept
+   * but corpus never indexed), and the result surfaces that verdict so the sender
+   * learns whether the brain landed queryable. Best-effort: a corrupt/oversized
+   * pack, a missing local owner, or a DB error returns { ok: false } rather than
+   * throwing (the caller reports it as a 400).
+   */
+  async receivePeerBrain(nodeId: string, brainB64: string): Promise<BrainSyncResult> {
+    try {
+      const buf = Buffer.from(brainB64, "base64");
+      if (buf.byteLength === 0) return { ok: false, error: "empty_pack" };
+
+      const ownerId = await this.resolveLocalOwnerId();
+      if (ownerId == null) {
+        log.warn("Brain sync: no local owner account to receive the pack", { nodeId });
+        return { ok: false, error: "no_local_owner" };
+      }
+
+      const { BrainPackService } = await import("../../core_services/services/BrainPackService.js");
+      const res = await BrainPackService.getInstance().importFromBuffer(ownerId, buf);
+      log.info("Peer brain pack imported", {
+        nodeId,
+        brainId: res.brain.id,
+        embedderMatch: res.embedderMatch,
+        status: res.brain.status,
+      });
+
+      // Notify subscribed WS clients so the Brains manager UI refreshes live.
+      try {
+        const { getWsInstance } = await import("../../core_services/websocket/WebSocketServer.js");
+        getWsInstance()?.broadcastAll("ommesh:brain_received", {
+          nodeId,
+          brainId: res.brain.id,
+          embedderMatch: res.embedderMatch,
+          status: res.brain.status,
+        });
+      } catch {
+        // WS not yet initialized — acceptable during early boot.
+      }
+
+      return {
+        ok: true,
+        brainId: res.brain.id,
+        embedderMatch: res.embedderMatch,
+        status: res.brain.status,
+        chunksStored: res.chunksStored,
+        vectorsLoaded: res.vectorsLoaded,
+      };
+    } catch (err) {
+      log.warn("Brain sync import failed", { nodeId, error: (err as Error).message });
+      return { ok: false, error: (err as Error).message };
+    }
+  }
+
+  /**
+   * Resolve which local account a peer-pushed brain is imported under. A pushed
+   * pack has no target user, so it lands with the workstation owner: prefer the
+   * `owner` role, then `admin`, then the lowest-id user (deterministic). Returns
+   * null when the DB holds no user at all (fresh install) — the caller fails the
+   * sync closed rather than guessing.
+   */
+  private async resolveLocalOwnerId(): Promise<number | null> {
+    const { getDb } = await import("../../db.factory.js");
+    const { users } = await import("../../../drizzle/schema.js");
+    const { eq, asc } = await import("drizzle-orm");
+    const db = await getDb();
+    for (const role of ["owner", "admin"] as const) {
+      const [row] = await db.select({ id: users.id }).from(users).where(eq(users.role, role)).limit(1);
+      if (row) return row.id;
+    }
+    const [any] = await db.select({ id: users.id }).from(users).orderBy(asc(users.id)).limit(1);
+    return any?.id ?? null;
+  }
+
   // ─── Outbound methods ─────────────────────────────────────────────────────
 
   /**
@@ -447,6 +541,43 @@ export class MeshNode {
     }
   }
 
+  /**
+   * Push a portable `.obp` Brain Pack to a specific peer over the pinned mTLS
+   * channel (Brains-Upgrade Phase 7). The pack is base64-embedded in a signed,
+   * timestamped envelope (identical auth contract to /sync and /discourse). The
+   * peer verifies the signature, imports the pack, checks embedder compatibility,
+   * and returns the outcome — which we relay so the caller (and UI) can show the
+   * sender exactly how it landed (ready vs. incompatible).
+   */
+  async sendBrainToPeer(peer: PeerInfo, brain: Buffer): Promise<BrainSyncResult> {
+    const timestamp = Date.now();
+    const brainB64 = brain.toString("base64");
+    const canonical = JSON.stringify({ nodeId: this.identity.id, brain: brainB64, timestamp });
+    const sig = this.signPayload(canonical);
+    const body = JSON.stringify({ nodeId: this.identity.id, brain: brainB64, timestamp, sig });
+
+    // Brain packs are larger than a prompt/persona sync and travel over LAN;
+    // give the transfer a generous timeout.
+    const text = await this.postToPeer(peer, "/brain", body, 120_000);
+    try {
+      return JSON.parse(text) as BrainSyncResult;
+    } catch {
+      return { ok: false, error: `peer ${peer.name} returned invalid JSON` };
+    }
+  }
+
+  /**
+   * Resolve a peer by its advertised node name and push a Brain Pack to it.
+   * @throws if the named peer is not currently in the discovery table.
+   */
+  async sendBrainToPeerByName(peerName: string, brain: Buffer): Promise<BrainSyncResult> {
+    const peer = this.discovery.getPeers().find(p => p.name === peerName);
+    if (!peer) {
+      throw new Error(`Mesh peer "${peerName}" is not in the discovery table — is it online?`);
+    }
+    return this.sendBrainToPeer(peer, brain);
+  }
+
   // ─── Shared private helpers ───────────────────────────────────────────────
 
   /**
@@ -464,7 +595,7 @@ export class MeshNode {
    * `routeToRemote`. Returns the response body string (for callers that don't
    * need it) or rejects on non-2xx status.
    */
-  private postToPeer(peer: PeerInfo, path: string, body: string): Promise<string> {
+  private postToPeer(peer: PeerInfo, path: string, body: string, timeoutMs = 15_000): Promise<string> {
     const tlsOptions = this.security.getClientTlsOptions(peer.fingerprint || undefined);
 
     return new Promise<string>((resolve, reject) => {
@@ -479,7 +610,7 @@ export class MeshNode {
             "Content-Length": Buffer.byteLength(body),
           },
           ...tlsOptions,
-          timeout: 15_000,
+          timeout: timeoutMs,
         },
         (res) => {
           const chunks: Buffer[] = [];

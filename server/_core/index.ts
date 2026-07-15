@@ -46,7 +46,8 @@ const log = createLogger("core");
 import { OmnecorWebSocketServer, setWsInstance } from "../core_services/websocket/WebSocketServer";
 import { ProcessManagerService } from "../core_services/services/ProcessManagerService";
 import { SecurityService } from "../core_services/services/SecurityService";
-import { VectorDBService, sanitizeCollectionName } from "../core_services/services/VectorDBService";
+import { sanitizeCollectionName } from "../core_services/services/VectorDBService";
+import { getVectorStore } from "../core_services/services/VectorStore.js";
 import { FileSystemWatcherService } from "../core_services/services/FileSystemWatcherService";
 import { startBackupScheduler } from "./backupScheduler";
 import { startPublishWorker } from "./publishWorker";
@@ -119,14 +120,14 @@ async function startServer() {
   }
 
   try {
-    const vectorDB = VectorDBService.getInstance();
+    const vectorDB = getVectorStore();
     await vectorDB.init();
     log.info(
-      "[Omnecor] VectorDBService initialized (or degraded gracefully)"
+      "[Omnecor] Vector store initialized (or degraded gracefully)"
     );
   } catch (error) {
     log.warn(
-      "[Omnecor] VectorDBService init warning:",
+      "[Omnecor] Vector store init warning:",
       (error as Error).message
     );
   }
@@ -134,7 +135,7 @@ async function startServer() {
   // ─── Restore File Watchers + Wire VectorDB Auto-Index ───────────────────
   try {
     const fileWatcher = FileSystemWatcherService.getInstance();
-    const vectorDB = VectorDBService.getInstance();
+    const vectorDB = getVectorStore();
     const fsp = await import("fs/promises");
     fileWatcher.on("fileEvent", (event: { projectId: string; filePath: string; eventType: string }) => {
       // Use the SHARED collection name so local-file ingestion lands in the

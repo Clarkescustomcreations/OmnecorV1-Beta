@@ -23,8 +23,16 @@ export interface AppState {
     quoteStyle: "random" | "funny" | "serious";
     /** Auto-approve agentic tool actions (commands/edits/jobs) scoped to the active map. */
     autoApproveTools: boolean;
+    /** "Fabrication" toggle — expose the Blueprint Studio toolset in the main chat
+     *  so the AI can create + build a Build Plan inline. Default off. */
+    fabricationTools: boolean;
   };
   setChatDisplaySettings: (settings: Partial<AppState['chatDisplaySettings']>) => void;
+
+  /** Brain Packs toggled on for the current chat (per-chat attach, Brains-Upgrade Phase 8). */
+  activeBrainIds: string[];
+  setActiveBrainIds: (ids: string[]) => void;
+  toggleActiveBrain: (id: string) => void;
 
   // Command Palette
   commandPaletteOpen: boolean;
@@ -116,9 +124,18 @@ export const useAppStore = create<AppState>()(
     showThinkingQuotes: true,
     quoteStyle: "random",
     autoApproveTools: false,
+    fabricationTools: false,
   },
-  setChatDisplaySettings: (settings) => set((state) => ({ 
-    chatDisplaySettings: { ...state.chatDisplaySettings, ...settings } 
+  setChatDisplaySettings: (settings) => set((state) => ({
+    chatDisplaySettings: { ...state.chatDisplaySettings, ...settings }
+  })),
+
+  activeBrainIds: [],
+  setActiveBrainIds: (ids) => set({ activeBrainIds: ids.slice(0, 16) }),
+  toggleActiveBrain: (id) => set((state) => ({
+    activeBrainIds: state.activeBrainIds.includes(id)
+      ? state.activeBrainIds.filter((b) => b !== id)
+      : [...state.activeBrainIds, id].slice(0, 16),
   })),
 
   commandPaletteOpen: false,
@@ -202,6 +219,7 @@ export const useAppStore = create<AppState>()(
         executionMode: state.executionMode,
         valetFallbackModel: state.valetFallbackModel,
         chatDisplaySettings: state.chatDisplaySettings,
+        activeBrainIds: state.activeBrainIds,
       }),
     }
   )

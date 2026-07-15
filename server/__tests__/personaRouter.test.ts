@@ -23,6 +23,7 @@ vi.mock("../core_services/services/AuditLogService.js", () => ({
 }));
 
 import { appRouter } from "../routers.js";
+import { brains } from "../../drizzle/schema.js";
 import {
   createTestDb,
   seedUser,
@@ -30,6 +31,16 @@ import {
   type TestDb,
 } from "./_helpers/trpcHarness.js";
 import type { Db } from "../db.js";
+
+/** Insert a minimal owned brain row so attach's ownership gate passes. */
+async function seedBrainRow(database: Db, userId: number, id: string) {
+  await database.insert(brains).values({
+    id, userId, name: id, version: "1.0.0", domain: id,
+    charter: "c", charterSha256: "x".repeat(64),
+    embedderId: "all-MiniLM-L6-v2", embedderDim: 384, embedderMatch: 1,
+    status: "ready", collectionName: `brain_${id}`, chunkCount: 0,
+  });
+}
 
 type Caller = ReturnType<typeof appRouter.createCaller>;
 
@@ -208,6 +219,69 @@ describe("personas.delete", () => {
 
     const aliceList = await aliceCaller.personas.list();
     expect(aliceList).toHaveLength(1);
+  });
+});
+
+// ─── personas.attachBrain / detachBrain (Brains-Upgrade Phase 4) ──────────────
+
+describe("personas.attachBrain / detachBrain", () => {
+  it("attaches an owned brain into the persona's data.brains (idempotent)", async () => {
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    const id = randomUUID();
+    await caller.personas.upsert({ id, name: "P", type: "self_clone", alwaysOn: false, data: {} });
+    await seedBrainRow(db, user.id, "coding");
+
+    const first = await caller.personas.attachBrain({ personaId: id, brainId: "coding" });
+    expect(first.brains).toEqual(["coding"]);
+    // Idempotent — attaching again doesn't duplicate.
+    const again = await caller.personas.attachBrain({ personaId: id, brainId: "coding" });
+    expect(again.brains).toEqual(["coding"]);
+
+    const list = await caller.personas.list();
+    expect((list[0] as Record<string, unknown>).brains).toEqual(["coding"]);
+  });
+
+  it("refuses to attach a brain the caller does not own", async () => {
+    const alice = await seedUser(db, { openId: "alice-attach" });
+    const bob = await seedUser(db, { openId: "bob-attach" });
+    const aliceCaller: Caller = appRouter.createCaller(makeContext(alice, db));
+    const id = randomUUID();
+    await aliceCaller.personas.upsert({ id, name: "P", type: "self_clone", alwaysOn: false, data: {} });
+    await seedBrainRow(db, bob.id, "bobs-brain");
+
+    await expect(aliceCaller.personas.attachBrain({ personaId: id, brainId: "bobs-brain" }))
+      .rejects.toThrow(/Brain not found/i);
+  });
+
+  it("refuses to attach to a persona the caller does not own", async () => {
+    const alice = await seedUser(db, { openId: "alice-ap" });
+    const bob = await seedUser(db, { openId: "bob-ap" });
+    const aliceCaller: Caller = appRouter.createCaller(makeContext(alice, db));
+    const bobCaller: Caller = appRouter.createCaller(makeContext(bob, db));
+    const id = randomUUID();
+    await aliceCaller.personas.upsert({ id, name: "P", type: "self_clone", alwaysOn: false, data: {} });
+    await seedBrainRow(db, bob.id, "coding");
+
+    await expect(bobCaller.personas.attachBrain({ personaId: id, brainId: "coding" }))
+      .rejects.toThrow(/Persona not found/i);
+  });
+
+  it("detaches a brain and preserves other data fields", async () => {
+    const user = await seedUser(db);
+    const caller: Caller = appRouter.createCaller(makeContext(user, db));
+    const id = randomUUID();
+    await caller.personas.upsert({ id, name: "P", type: "self_clone", alwaysOn: false, data: { tone: "direct" } });
+    await seedBrainRow(db, user.id, "a");
+    await seedBrainRow(db, user.id, "b");
+    await caller.personas.attachBrain({ personaId: id, brainId: "a" });
+    await caller.personas.attachBrain({ personaId: id, brainId: "b" });
+
+    const res = await caller.personas.detachBrain({ personaId: id, brainId: "a" });
+    expect(res.brains).toEqual(["b"]);
+    const list = await caller.personas.list();
+    expect((list[0] as Record<string, unknown>).tone).toBe("direct");
+    expect((list[0] as Record<string, unknown>).brains).toEqual(["b"]);
   });
 });
 

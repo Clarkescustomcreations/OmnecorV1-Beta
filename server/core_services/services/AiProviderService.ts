@@ -24,6 +24,7 @@ import { spendLog, projectBudgets, walletAlertLog } from "../../../drizzle/schem
 import { and, eq, gt } from "drizzle-orm";
 import { calculateCostMicrocents } from "../config/providerPricing.js";
 import { SettingsService } from "./SettingsService.js";
+import { resolveOllamaUrl } from "./ollamaUrl.js";
 import { NotificationService } from "../../_core/NotificationService.js";
 import { type PeerInfo } from "../../ommesh/core/DiscoveryService.js";
 import {
@@ -271,9 +272,10 @@ export class AiProviderService {
   }
 
   private getOllamaUrl(inputUrl?: string): string {
-    if (inputUrl) return inputUrl;
-    const settings = SettingsService.getInstance();
-    return settings.getSecret("OLLAMA_BASE_URL", settings.getSecret("ollamaUrl", ENV.ollamaUrl || "http://localhost:11434"));
+    // Delegate to the single shared resolver so inference and every status/probe
+    // path (system.aiProviders / detectHardware / checkDependencies) agree on the
+    // endpoint. See ollamaUrl.ts for the resolution order.
+    return resolveOllamaUrl(inputUrl);
   }
 
   /**

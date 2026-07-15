@@ -20,6 +20,7 @@
 
 import { VECTOR_DB_CONFIG } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
+import type { IVectorStore } from "./VectorStore.js";
 const log = createLogger("VectorDB");
 
 // ---------------------------------------------------------------------------
@@ -111,7 +112,7 @@ export interface VectorDBStatus {
  * const results = await vectorDB.semanticSearch("omnecor_proj123", "greeting function", 5);
  * ```
  */
-export class VectorDBService {
+export class VectorDBService implements IVectorStore {
   private static instance: VectorDBService | null = null;
   private client: any = null; // ChromaClient — dynamically imported
   private isInitialized: boolean = false;
@@ -283,6 +284,35 @@ export class VectorDBService {
       embeddings,
       metadatas: (metadatas ?? documents.map(() => ({}))) as Record<string, any>[],
     });
+  }
+
+  /**
+   * Insert-or-replace documents carrying stable ids AND prebuilt embeddings —
+   * the primitive Brain Packs use to load a precomputed corpus without
+   * re-embedding. Uses `upsert` so re-import with the same ids is idempotent.
+   */
+  public async addDocumentsWithEmbeddings(
+    collectionName: string,
+    documents: Array<{
+      id: string;
+      text: string;
+      metadata: Record<string, unknown>;
+      embedding: number[];
+    }>,
+  ): Promise<void> {
+    if (!this.isInitialized) return;
+    if (documents.length === 0) return;
+    const collection = await this.getOrCreateCollection(collectionName);
+    const batchSize = VECTOR_DB_CONFIG.maxBatchSize;
+    for (let i = 0; i < documents.length; i += batchSize) {
+      const batch = documents.slice(i, i + batchSize);
+      await collection.upsert({
+        ids: batch.map(d => d.id),
+        documents: batch.map(d => d.text),
+        embeddings: batch.map(d => d.embedding),
+        metadatas: batch.map(d => d.metadata) as Record<string, any>[],
+      });
+    }
   }
 
   /**

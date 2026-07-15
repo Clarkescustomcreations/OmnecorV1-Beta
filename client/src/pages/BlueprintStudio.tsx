@@ -63,7 +63,7 @@ const CATEGORY_LABELS: Record<string, string> = {
 };
 
 export function BlueprintStudio() {
-  const { activeMap } = useNeuralMap();
+  const { activeMap, adoptServerMap } = useNeuralMap();
   const utils = trpc.useUtils();
 
   // ── Plans rail ────────────────────────────────────────────────────────────
@@ -88,9 +88,21 @@ export function BlueprintStudio() {
     units: "imperial" as "imperial" | "metric",
     cadEngine: "jscad" as "jscad" | "openscad",
   });
+  // Project (Neural Map) attachment: keep the active map by default, or spin up a
+  // brand-new Project for this plan ("＋ New project" shortcut). "new" is forced
+  // when there is no active map so a plan is never left orphaned.
+  const [projectMode, setProjectMode] = useState<"active" | "new">("active");
+  const [newProjectName, setNewProjectName] = useState("");
+  const effectiveProjectMode = activeMap ? projectMode : "new";
   const createPlan = trpc.blueprint.create.useMutation({
     onSuccess: async (res) => {
       setShowIntake(false);
+      // A "＋ New project" plan created its Project server-side — adopt it as the
+      // active map so the whole app (chat, map page) anchors to it.
+      if (res.mapCreated && res.mapId) {
+        await adoptServerMap(res.mapId);
+        toast.success(`New project "${res.mapName}" created`);
+      }
       await utils.blueprint.list.invalidate();
       setSelectedPlanId(res.id);
       setIntake({ title: "", brief: "", category: "other", units: "imperial", cadEngine: "jscad" });
@@ -104,6 +116,24 @@ export function BlueprintStudio() {
     },
     onError: (e) => toast.error(e.message),
   });
+
+  const handleCreatePlan = useCallback(() => {
+    // Attach to the active Project, or bootstrap a fresh one server-side ("＋ New
+    // project" / no active map). The server creates the map + plan on one
+    // connection so the plan's mapId FK is always valid.
+    const isNew = effectiveProjectMode === "new";
+    createPlan.mutate({
+      title: intake.title.trim(),
+      brief: intake.brief.trim(),
+      category: intake.category,
+      units: intake.units,
+      cadEngine: intake.cadEngine,
+      mapId: isNew ? undefined : activeMap?.id,
+      newMapName: isNew ? (newProjectName.trim() || intake.title.trim() || "New Project").slice(0, 120) : undefined,
+    });
+    setProjectMode("active");
+    setNewProjectName("");
+  }, [activeMap?.id, effectiveProjectMode, newProjectName, intake, createPlan]);
 
   // ── Conversation ─────────────────────────────────────────────────────────
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -501,21 +531,33 @@ export function BlueprintStudio() {
                 OpenSCAD binary not found — install it and set its path in Settings → Advanced, or use the built-in JSCAD engine.
               </p>
             )}
+            {/* Project (Neural Map) attachment */}
+            <div className="space-y-2 rounded-md border border-border/60 p-2">
+              <div className="text-xs font-medium text-muted-foreground">Project (Neural Map)</div>
+              <Select value={effectiveProjectMode} onValueChange={(v) => setProjectMode(v as "active" | "new")}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {activeMap && <SelectItem value="active">Active project — {activeMap.name}</SelectItem>}
+                  <SelectItem value="new">＋ New project…</SelectItem>
+                </SelectContent>
+              </Select>
+              {effectiveProjectMode === "new" && (
+                <Input
+                  value={newProjectName}
+                  onChange={(e) => setNewProjectName(e.target.value)}
+                  placeholder={intake.title.trim() ? `Defaults to "${intake.title.trim()}"` : "New project name"}
+                />
+              )}
+              {!activeMap && effectiveProjectMode === "new" && (
+                <p className="text-[11px] text-muted-foreground">No active project — a new one will be created and this plan attached to it.</p>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button variant="outline" onClick={() => setShowIntake(false)}>Cancel</Button>
             <Button
               disabled={!intake.title.trim() || createPlan.isPending}
-              onClick={() =>
-                createPlan.mutate({
-                  title: intake.title.trim(),
-                  brief: intake.brief.trim(),
-                  category: intake.category,
-                  units: intake.units,
-                  cadEngine: intake.cadEngine,
-                  mapId: activeMap?.id,
-                })
-              }
+              onClick={handleCreatePlan}
             >
               {createPlan.isPending && <Loader2 className="mr-1 h-4 w-4 animate-spin" />} Create plan
             </Button>

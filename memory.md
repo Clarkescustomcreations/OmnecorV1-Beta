@@ -1,176 +1,201 @@
-# Memory — two active workstreams (NPU pathway + Agentic Chat)
+# Memory — MASTER TODO (remaining tasks & tests)
 
-Last updated: 2026-07-07
+Compiled 2026-07-15 from a full sweep of the trackers: `Task-Brains-Upgrade.md`
+(Phase 9), `Chats-Agentic-Upgrade.md` (Phase 7 + on-device bugs),
+`Context/Tracker-Docs/Verification-Pass.md` (Sections 8/10/11/12), and
+`Context/Tracker-Docs/Workflow-Matrix.md` (unchecked `[ ]` journeys).
 
-> **OWNER DIRECTIVE — the single rebuild is now DUE.** APK rebuilds take ~25 min.
-> The agentic-chat APK port (Phase 6, Session B) is now **COMPLETE**, so the one
-> pending rebuild should happen next and verify **BOTH** features in the same
-> on-device pass: the NPU manifest fix (Session A) **and** the agentic chat
-> stream + HITL (Session B). Don't burn a rebuild on anything smaller first.
+**All completed feature work is recorded** — Brains Upgrade Phases 0–8, Chats
+Agentic Phases 0–6, Model-Fabric Phases 0–8, and Mesh-Delegation Phases 1–9 are
+all SHIPPED with green static gates (last measured baseline **1590 passing / 4
+skipped, 140 files**). What remains below is **verification + a few deferred
+gaps**, not core building. Record every result into
+`Context/Tracker-Docs/Verification-Pass.md` as items land.
 
-# Session A — NPU-First On-Device Models (APK)
-
-Full durable detail: `npu-execution-pathway.md` in the auto-memory dir; CHANGELOG
-2026-07-05 entry; corrected Progress-Tracker entry.
-
-## What was built
-
-- Deleted the entire llama.rn patch apparatus (subagent's `use_npu` C++ patch was dead
-  code) — llama.rn 0.12.4 natively supports `initLlama({ devices: ["HTP*"] })` and
-  reports truth via `context.devices`.
-- `lib/_core/model-catalog.ts` (variants: quality Q4_K_M + NPU Q4_0/IQ4_NL/Q8_0, all
-  URLs HEAD-verified; capabilities → chat attach-button gating; 11 vitest tests),
-  `acceleration.ts` (app-wide auto|cpu|gpu|npu, Auto default, legacy-key migration),
-  `phone-model.ts` (ONE resident model across both engines; **selection in the Chat
-  picker is the only lifecycle verb**; Settings = download/delete/Unload/badges only;
-  auto re-arm on start). Settings/Chat/AI Node/Status all rewired; mediapipe loads
-  pass `validate:true` on GPU/NPU.
-
-## Problems solved (do NOT re-solve)
-
-- **`expo prebuild --clean` wipes `android/local.properties`** → recreate
-  `sdk.dir=/home/linux/Android/Sdk` before `pnpm apk:debug`.
-- **pnpm virtual store had a HALF-PATCHED llama.rn extract** (JSIParams.cpp patched,
-  common.h pristine → NDK compile error `no member named 'use_npu'`). Fixed by full
-  `rm -rf node_modules*` + reinstall → clean hoisted layout. Verify with
-  `grep -c use_npu node_modules/llama.rn/cpp/jsi/JSIParams.cpp` == 0.
-- **Metro ENOSPC on Linux** (inotify 60k, no sudo): moved 2.5 GB `node_modules_broken/`
-  out of repo + added watcher blockList to `metro.config.js` (.git, appimage-build,
-  electron-app, dist, docs, coverage, attached_assets, data, .cxx, android build dirs).
-- **THE BIG ONE — why NPU (and GPU!) never engaged for GGUF:** Android 12+ refuses to
-  link vendor libs unless the manifest declares them. Logcat:
-  `dlopen failed: library "libcdsprpc.so" not found: needed by
-  librnllama_v8_2_dotprod_i8mm_hexagon_opencl.so` → llama.rn fell back to the CPU-only
-  JNI lib → zero HTP devices, zero OpenCL. **Every past GGUF "GPU" load was secretly
-  CPU.** Fix: registered the `"llama.rn"` Expo plugin in `app.config.ts` (adds
-  `<uses-native-library>` libcdsprpc.so + libOpenCL.so); prebuild re-run; both entries
-  verified present in the generated AndroidManifest.xml.
-
-## Current on-device state (S25 Ultra, verified live)
-
-- New APK (build 1, WITHOUT the manifest fix) installed + driven over adb: Acceleration
-  selector works; variant catalog with ⚡NPU-ready badges + "matches your setting"
-  works; downloaded Llama-3.2-1B Q8_0; **Chat-picker selection loads/swaps correctly**
-  (Gemma LiteRT → 1B GGUF swap verified, Unload freed native heap 1.84 GB → 0.38 GB);
-  honest backend badge showed **CPU** — correctly, because of the libcdsprpc issue above.
-- Owner observed both facts live (badge=CPU; "didn't seem to unload" was the identical
-  CPU badge + Android page-cache, state was actually correct).
-
-## Next session starts with
-
-1. **Phase 6 agentic-chat APK port is DONE** (Session B) — go straight to the rebuild.
-2. ONE rebuild: `pnpm prebuild:android` → recreate `local.properties` →
-   `ANDROID_HOME=/home/linux/Android/Sdk pnpm apk:debug` (~25 min) → `adb install -r`.
-3. On-device NPU verify: Metro via `npx expo start --port 8081` + `adb reverse
-   tcp:8081 tcp:8081`; select Llama-3.2-1B Q8_0 (already downloaded) with AUTO;
-   logcat must show the hexagon_opencl lib loading (no libcdsprpc error) + HTP devices;
-   badge must flip to ⚡NPU; then tok/s CPU vs GPU vs NPU; test agentic chat stream in
-   the same pass. Update tracker gates + UI-Registry with results.
-
-## Open questions
-
-- Does `librnllama_jni_v8_2_dotprod_i8mm_hexagon_opencl.so` now link with the manifest
-  fix, and do HTP0..N devices register? (Expected yes — SM8750 is in llama.rn's known
-  list; libcdsprpc.so exists on Samsung vendor partition.)
-- LiteRT NPU remains experimental (needs NPU-built .litertlm via Edge Gallery).
+> **The big unlock:** one **live multi-peer / on-device session** (Group B) closes
+> the most at once — it's the shared gate behind Chats Phase 7, Brains Phase 9
+> end-to-end, Model-Fabric Phase 7, Mesh-Delegation Phase 10, and the whole APK +
+> OMMESH manual checklist. Group A needs no hardware and can be done at the desk
+> first. See the `ommesh-mesh-test` + `run-omnecor` skills.
 
 ---
 
-# Session B — Agentic Chat: Phase 6 (APK port) COMPLETE
+## GROUP A — Harness-drivable NOW (no hardware, no paid creds) — do first
 
-Last updated: 2026-07-07
+These are verifiable at the desk via `appRouter.createCaller`, the dev server under
+`ZERO_LOGIN_MODE`, a local Ollama, Playwright, or the OAuth emulator skills.
 
-Multi-session upgrade turning the **main Omnecor chat (web + APK)** from symmetric
-bubbles into an agentic, Claude-Code-style stream. Phased checklist + progress log live
-in `Chats-Agentic-Upgrade.md` (repo root); fullest persistent detail in
-`chats-agentic-upgrade.md` (auto-memory). **Phases 0–5 (web) + Phase 6 (APK) are DONE.**
-This session ported the whole feature to the APK. Gates: APK `tsc`/`eslint` clean · root
-`pnpm check` clean · root `pnpm test` **1315 passed | 4 skipped**. Owner framing: mobile =
-the **Claude-Code-APK experience** — you remote-control the PC-side agent from the phone;
-on-device *phone* models are text(+reasoning) only (no tool loop).
+### A1 — Close-out gates on the two shipped workstreams
+- [ ] **Brains Phase 9** — end-to-end drive: attach the Coding brain → real local-model
+      chat (Ollama/own runtime) → confirm grounded, **cited** output. Then coverage
+      ratchet + `pnpm check`/`pnpm test`. (`Task-Brains-Upgrade.md` Phase 9 = the only 🔄.)
+- [ ] **Chats Phase 7 static close-out** — `/review` the full feature · `pnpm check` ·
+      `pnpm test` · `pnpm build` · `pnpm audit --prod` all green · then `/remember save`.
+      (On-device tool-loop part of Phase 7 is in Group B.)
 
-## What was built (Phase 6 — this session)
+### A2 — Verification-Pass §8 Priority 1 (core server, ZERO_LOGIN dev server)
+- [ ] Health endpoint 200 · tRPC `auth.me` · zero-login banner
+- [ ] Execution-mode selector persists (reload check)
+- [ ] Chat session create/rename/delete + two-tab per-user isolation
+- [ ] Script save/load reloads from server (not localStorage)
+- [ ] Neural Map create/delete + local-dir root renders tree
+- [ ] Notifications WS badge increment + clear→0
+- [ ] Settings JSON write hits `.omnecor/settings.json`
+- [ ] HITL queue: trigger (crew > 3) → appears → approve/reject
 
-All under `packaging/android/omnecor-hq/` unless noted:
-- **Transport (the spine):** `lib/trpc.ts` → `getAgentTrpc()` — lazily-built, base-URL-cached
-  `createTRPCProxyClient` with `splitLink` → `wsLink`(subscriptions, to the token-authed
-  `/ws`, `lazy` socket) + `httpBatchLink`. Extended the self-contained stub
-  `lib/_core/app-router.ts` with `aiProvider.{agentChatStream,resolveToolApproval,runCodeSnippet}`
-  (agentChatStream typed via an **async-generator stub** returning `AgentStreamEvent` so
-  `.subscribe()` infers it — deliberately NOT importing the real server `AppRouter`, which
-  would drag the whole server type-graph into the mobile tsc).
-- **Shared contract:** `lib/_core/agent-blocks.ts` re-exports the pure `shared/chatBlocks.ts` +
-  `shared/chatAgentEvents.ts` via **relative path** (`../../../../../shared/…`; Metro already
-  watches the workspace root, so runtime helpers bundle). `lib/_core/agent-stream.ts` vendors
-  the pure `applyAgentEvent`/`applyJobCompletion` reducer. `ChatMessage` gained `blocks?`/`error?`.
-- **Server fix (found on sight, real prod gap):** the tRPC WS path
-  (`applyWSSHandler`→`createContext`→`sdk.authenticateRequest`, cookie/Bearer ONLY) never read
-  the mobile `?token=` query param → subscription authenticated under zero-login but would 403 in
-  prod. New `server/core_services/websocket/wsAuthBridge.ts` promotes `?token=`→`Authorization:
-  Bearer` in the WS `createContext` wrapper (guarded; cookie/Bearer callers untouched). 7 unit
-  tests (`server/__tests__/wsAuthBridge.test.ts`).
-- **Renderers:** `components/agentic/assistant-stream.tsx` (flush-left guide-line stream via
-  `react-native-markdown-display`, one **shared** `Modal` overlay, typewriter `LoadingQuote`
-  tail, fenced-code ▶Run/⚡Preview) + `components/agentic/agentic-blocks.tsx` (`StatusDot` via
-  shared `blockDotIntent`, command/edit/job/mcp `ToolChip`, inline `ApprovalRow`→
-  `resolveToolApproval`, dependency-free LCS `computeLineDiff`, `ThinkingSection`).
-- **On-device streaming:** `runInference`(GGUF, delta `onToken`) + `generateTask`(LiteRT,
-  cumulative `onToken`) already streamed — wired into a text/thinking block fold with `<think>`
-  parsing. `ommesh`/non-agent providers fall back to the non-streaming `ai.chat` one-shot.
-- **Rewrote `app/(tabs)/index.tsx`:** agentic renderItem, message queue (component-state FIFO,
-  tap-a-chip to recall — no hardware ↑ on touch), drain-on-idle (held on error, drains on Stop),
-  Run(→PC `runCodeSnippet`, JobBlock)/Preview(WebView), `asyncjob:all`→`applyJobCompletion`,
-  debounced+flush-on-unmount persistence. Preserved all prior session/model/map/persona/
-  attachment/voice behavior.
-- **Quote parity + settings:** `LoadingQuote` rebuilt on `lib/_core/quote-bag.ts` (module-scoped
-  no-repeat shuffle bag) + typewriter; 3 quote styles + show/hide + `autoApproveTools` shield
-  surfaced in the chat UI (`hooks/use-chat-display-settings.ts` gained `autoApproveTools`).
-- **Docs:** `Chats-Agentic-Upgrade.md` Phase 6 ✅ + 2 progress rows; UI-Registry **Session 32**
-  (`/imprint`); Progress-Tracker Current-Status entry.
+### A3 — Verification-Pass §8 Priority 2 (AI inference via local Ollama/stub)
+- [ ] Chat → streaming AI response · Stop mid-stream aborts cleanly
+- [ ] Memory Archiver auto-compress at 50+ messages
+- [ ] RAG injection references an indexed file
+- [ ] Sovereign blocks cloud AI (FORBIDDEN) · Sovereign allows Ollama
+- [ ] Valet Router classifies a coding prompt as `code_generation`
+- [ ] MoE Chain: 2-step local chain runs two sequential local invocations
 
-## Decisions made
+### A4 — Remaining honest 🧪 residue (unit/route tests, no deps) — Verification-Pass §12 Batch J tail
+- [ ] `system.detectHardware` / `checkDependencies` / `saveKeys`
+- [ ] `chat.filterScope` localStorage round-trip · scripts localStorage-migration helper
+- [ ] `comfy` live `getQueue` · SecurityService service-level (YARA / AES / ZIP)
+- [ ] Token-refresh pipeline (OAuth pre-emptive renew + 401 intercept) — Workflow-Matrix Auth
 
-- **Transport = real tRPC WS client**, not a custom WS-frame bridge (APK already ships
-  `@trpc/client` + `superjson`; reuses the exact reducer + `resolveToolApproval` mutation).
-- **Vendor the pure reducer + quote-bag** (not cross-import from `client/src/`) — matches the
-  APK's self-contained `app-router.ts` philosophy; contract TYPES come from shared so they can't
-  drift. Relative shared import chosen over adding a `@shared` Metro/tsconfig alias (lower risk).
-- **On-device replies stream** (owner chose parity); Run/Preview **included** (owner). Diffs/
-  cmd-output **collapsed/simplified on mobile** (Claude-APK style) — LCS line-diff, no full patch.
-- **HITL via HTTP** `resolveToolApproval` mutation (only the event stream needs the WS).
+### A5 — Batch H remaining per-widget interactions (Playwright, prod build + seeded cookie)
+- [ ] Write/interaction assertions: scope filters + localStorage round-trips, BrainMap
+      sliders/lazy-expand, ModelHub toggles, Pipelines tabs, Wallet HITL dialog,
+      Settings persistence writes, Notifications badge clear. (Page render + read-side
+      already ✅; these are the write-side.)
 
-## Problems solved (do NOT re-solve)
+---
 
-- Async-generator subscription stub is enough to type `.subscribe()` as `AgentStreamEvent` —
-  no `@trpc/server/observable` import, no server type-graph. Verified: APK `tsc` exit 0.
-- **`/review` found + fixed 5:** (important) assistant markdown `image` rule was rendering a
-  text link → restored real `<Image>`; (important) Stop+queue on a *phone* turn could fire a 2nd
-  native completion on the single engine (Hermes SIGSEGV) → `startPhoneStream` now waits for both
-  engines idle before touching the model; (minor) `RUN_LANGS` trimmed to the server's real
-  `resolveInterpreter` set (dropped `tsx`/`zsh`); (minor) persistence flush-on-unmount; (minor)
-  removed dead `blockSubtitle`.
+## GROUP B — The one live multi-peer / on-device session (unblocks the most)
 
-## Current state
+Shared gate for: Chats Phase 7 on-device, Brains OMMESH sync live, Model-Fabric
+Phase 7, Mesh-Delegation Phase 10, Verification-Pass §8 Priority 5 (OMMESH) + 6 (APK).
+Use the `ommesh-mesh-test` skill (4-way: Linux + DadsPC + StudioOnePC + S25 APK).
 
-Web agentic chat: fully functional + live-verified (prior sessions). APK agentic chat:
-**code-complete, all static gates green, NOT yet run on device.** Nothing partial in code.
+### B1 — APK on-device agentic tool-loop (⛔ the last unverified agentic piece)
+- [ ] Rebuild APK (~25 min: `pnpm prebuild:android` → recreate `local.properties` →
+      `ANDROID_HOME=… pnpm apk:debug` → `adb install -r`).
+- [ ] Drive PC chat from phone: WS stream types out · command/edit box appears ·
+      **Approve/Deny from the phone** works · ▶Run returns a JobBlock · ⚡Preview opens
+      WebView · queue type-ahead + chip-recall · reasoning/quotes render.
+- [ ] **Re-check bug #3 (mesh-model discovery in picker)** — Model-Fabric shipped the
+      unified catalog since this was logged; confirm PC/mesh models are now selectable.
 
-## Next session starts with
+### B2 — 4 on-device APK bugs (from Chats-Agentic-Upgrade "Bugs found on-device")
+- [ ] **#1 crypto chat-persistence** — `Native crypto module could not be used to get
+      secure random number`; encrypted chat persist broken (data-loss, recurring).
+- [ ] **#2 prompt-bubble contrast** — user text black on blue; mirror the web-app fix.
+- [ ] **#3 model picker omits OMMESH/PC models** — see B1 re-check.
+- [ ] **#4 "Test" button false-negative** — sticky "Cannot reach server" while WS
+      actually connects (separate broken preflight code path).
 
-1. **The single APK rebuild** (see Session A steps) — it now tests BOTH the NPU manifest fix
-   AND the agentic chat. On-device verify: pair against a dev server (adb reverse + ZERO_LOGIN),
-   drive a PC chat → confirm the WS stream types out, a command/edit box appears and **Approve/
-   Deny from the phone** works, ▶Run returns a JobBlock, ⚡Preview opens the WebView, the queue
-   type-ahead + chip-recall work, and reasoning/quotes render.
-2. **Phase 7 close-out:** `pnpm build` + `pnpm audit --prod` (don't need the device), then finish
-   the Progress-Tracker + `/remember save`.
+### B3 — OMMESH multi-node (§8 Priority 5) + Workflow-Matrix
+- [ ] mDNS discovery bidirectional · cross-node mTLS inference both directions
+- [ ] Cert pinning rejects non-pinned peer · Sovereign mesh guard blocks cloud
+- [ ] Android as 3rd/4th peer (`OMMESH_SECRET`, `mobile_node_register`, trust queue)
 
-## Open questions
+### B4 — APK full device verify (§8 Priority 6 + Workflow-Matrix Mobile/TD-006/008)
+- [ ] Sideload + launch (no `libcdsprpc.so` error) · WS `?token=` auth in logs
+- [ ] Chat round-trip · audio recorder · dark-mode · Desktop-IP ping · SecureStore no plaintext
+- [ ] `react-native-gesture-handler` Pressable no crash on RN 0.83
+- [ ] Always-Listen wake-word with app backgrounded/closed (TD-008)
+- [ ] GGUF download + on-device inference full path (TD-006)
 
-- **`wsAuthBridge` isn't exercised by the zero-login on-device test** (zero-login bypasses
-  `authenticateRequest`) — covered by the 7 unit tests instead; a real-token prod session would
-  be the true end-to-end check.
-- On-device Stop→queue concurrency is now guarded (wait-for-idle), but the abandoned native
-  generation still runs to completion in the background (wasted compute, not a crash).
-- Carried: `runCodeSnippet` run-path is live-verified (web) not route-tested; no RN DOM test
-  harness in the APK — mobile verified by typecheck + lint + on-device driving.
+### B5 — Voice live round-trip (needs mic/speaker; data-path already ✅)
+- [ ] Full STT → LLM → TTS live round-trip (Workflow-Matrix Voice Pipeline last item)
+
+---
+
+## GROUP C — GPU / training (RTX 4060 8GB / DadsPC / Win box 192.168.1.78)
+
+- [ ] **Valet production sign-off** — `pnpm valet:build` clean GPU box; 0.85 accuracy
+      gate (currently 0.7385 — TD-010)
+- [ ] Small-model (0.5B–3B) 4-bit **QLoRA pipeline smoke test** (dataset→Unsloth→LoRA→GGUF)
+- [ ] Local GGUF inference via llama.cpp / Valet / MoE-local on the 4060 or CPU
+
+---
+
+## GROUP D — External paid creds (deliberate manual smoke — do when ready)
+
+Logic is ✅/mockable; only the real side-effecting call is manual. (Verification-Pass §11.)
+- [ ] Social publish — webhook (X/LinkedIn/FB/IG via live n8n blueprint) + native
+      (Bluesky/Mastodon/Discord/Telegram real account) — TD-020
+- [ ] Lithic VCC live sandbox · PCBWay live order · Gmail live delivery
+- [ ] Google/Microsoft OAuth live (or emulator exchange) · Drive/Dropbox/OneDrive sources
+- [ ] Honcho memory layer (real key) · ElevenLabs · Fal
+
+---
+
+## GROUP E — Build / packaging clean-machine (§8 Priority 7 + F27)
+
+- [ ] Windows installer on clean Windows (PORT 37291, OAuth redirect, SQLite round-trip — TD-005)
+- [ ] Linux AppImage + `.deb` launch · Desktop OAuth (port 37291)
+- [ ] Web smoke on isolated clean machine · Ollama auto-install on clean machine
+
+---
+
+## GROUP F — Deferred feature gaps (real TODO, not just tests)
+
+> **Re-scoped 2026-07-15 after reading the code** (the Workflow-Matrix `[ ]`s I first
+> pulled from were audited 2026-06-20, before the 2026-06-23 code-sweep fixes). This
+> group turned out to be the **smallest** problem area, not the biggest — two entries
+> were already shipped. Ranked by real production impact:
+
+- [x] ~~**[HIGH — real production-run blocker] Standalone prod-bundle libSQL native
+      binding**~~ — **DONE 2026-07-15.** `scripts/build-server.mjs` now copies every
+      installed `@libsql/<platform>` native binding (any dir with an `index.node`) into
+      `dist/node_modules/@libsql/` after the esbuild step, so the bundle is
+      self-sufficient (libsql's dynamic `require(`@libsql/${target}`)` resolves next to
+      `dist/index.js`). **Verified:** built bundle → binding present, `require.resolve`
+      lands in `dist/node_modules` (not repo hoisting), and `node dist/index.js`
+      (NODE_ENV=production, isolated temp data dir) boots to `/health`
+      `{db:true, migrationOk:true}` and writes `omnecor.db` — previously threw
+      `Cannot find module '@libsql/linux-x64-gnu'`.
+- [x] ~~**[MEDIUM — correctness/UX] Two Ollama settings readers disagree**~~ — **DONE
+      2026-07-15.** New `server/core_services/services/ollamaUrl.ts` `resolveOllamaUrl()`
+      is the single source of truth (reads via `SettingsService`, chain
+      `input → OLLAMA_BASE_URL → legacy ollamaUrl → ENV`). Wired into
+      `AiProviderService.getOllamaUrl` (inference) **and** all three systemRouter reads
+      (`aiProviders` status, `detectHardware` probe, `checkDependencies` probe — the
+      last two previously ignored settings entirely / read the raw file). +4 regression
+      tests (`ollamaUrl.test.ts`, incl. the legacy-key case). ([[settings-architecture]].)
+- [ ] **[LOW-MED — enhancement] Real Blender/ComfyUI mesh into mobile 3D scene** — UI
+      wired, but real generated meshes not yet loaded end-to-end into the mobile WebView
+      (primitives demo + desktop mesh both work) — F24.
+- [ ] **[LOW — polish] APK model-picker loaded-indicator UI** — type mirrored only
+      (Model-Fabric Phase 8 leftover).
+- [ ] **[LOW — test infra] WS+PTY integration test seam** — `OmnecorWebSocketServer`
+      needs an isolated/DB-injectable construction mode before the full round-trip test
+      is safe (it currently touches the real DB + 7 singletons) — §12 Session-30 addendum.
+
+**Already RESOLVED (do NOT re-do — verify only):**
+- ~~Server-backed podcast episode history (TD-026)~~ — **DONE 2026-06-23**: `podcastEpisodes`
+  table + `podcast.listEpisodes`/`deleteEpisode` + frontend rewired off localStorage.
+- ~~VRAM-weighted mesh routing (TD-018)~~ — **DONE 2026-06-23**: `HostTelemetry` producer +
+  `RoutingEngine` scoring fix built; only **live 2-GPU-node proof** remains → that's a
+  Group B (hardware) verify item, not a build gap.
+
+---
+---
+
+# APPENDIX — Prior handoff (2026-07-07, largely SUPERSEDED)
+
+> The NPU manifest fix and the agentic-chat APK port referenced below **shipped**;
+> the NPU on-device badge was **verified 2026-07-07** (HTP0–HTP3, no libcdsprpc
+> error). Model-Fabric + Brains have landed since. The one live item that survives
+> from here is the **agentic tool-loop on-device verify** — now tracked as Group B1.
+> Full durable detail lives in the auto-memory dir (`npu-execution-pathway.md`,
+> `chats-agentic-upgrade.md`, `model-fabric-workstream.md`, `brain-packs-workstream.md`).
+
+Key non-obvious gotchas retained for the next rebuild:
+- `expo prebuild --clean` wipes `android/local.properties` → recreate
+  `sdk.dir=/home/linux/Android/Sdk` before `pnpm apk:debug`.
+- NPU/GPU for GGUF only engages because the `"llama.rn"` Expo plugin is registered in
+  `app.config.ts` (adds `<uses-native-library>` libcdsprpc.so + libOpenCL.so). Verify
+  both are in the generated AndroidManifest.xml after a prebuild.
+- Verify no half-patched llama.rn: `grep -c use_npu
+  node_modules/llama.rn/cpp/jsi/JSIParams.cpp` must be `0`.
+- Metro ENOSPC on Linux: watcher blockList in `metro.config.js`; keep big dirs out of repo.
+- Pair APK to a localhost dev server via `adb reverse tcp:3000` + ZERO_LOGIN loopback;
+  Metro on `:8081` via `adb reverse tcp:8081 tcp:8081`.
+</content>
+</invoke>

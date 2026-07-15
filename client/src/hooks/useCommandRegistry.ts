@@ -162,6 +162,13 @@ export function useCommandRegistry(): CommandEntry[] {
       action: () => navigate("/brain-map"),
     },
     {
+      id: "nav-brains",
+      label: "Brains",
+      description: "Manage portable external knowledge packs",
+      group: "Navigation",
+      action: () => navigate("/brains"),
+    },
+    {
       id: "nav-model-hub",
       label: "Model Hub",
       description: "Browse and manage AI models",

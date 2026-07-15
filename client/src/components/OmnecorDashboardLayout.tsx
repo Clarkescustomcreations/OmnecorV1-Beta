@@ -23,6 +23,7 @@ import {
   Lock,
   Bell,
   DraftingCompass,
+  BrainCircuit,
 } from "lucide-react";
 import { Wallet } from "lucide-react";
 import { Link, useLocation } from "wouter";
@@ -95,6 +96,12 @@ export function OmnecorDashboardLayout({
       href: "/brain-map",
       icon: Brain,
       description: "Project organization & context",
+    },
+    {
+      label: "Brains",
+      href: "/brains",
+      icon: BrainCircuit,
+      description: "Portable external knowledge packs for local models",
     },
     {
       label: "Model Hub",

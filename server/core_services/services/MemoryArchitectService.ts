@@ -2,22 +2,23 @@
  * @file server/services/MemoryArchitectService.ts
  * @description Omnecor — Memory Architect Service
  *
- * Implements the Memory Architect layer that connects the VectorDBService
- * (ChromaDB semantic search) to Omnecor's multi-layered memory system:
+ * Implements the Memory Architect layer that connects the pluggable vector
+ * store (embedded libSQL native vectors by default — zero infra, air-gappable;
+ * ChromaDB optional) to Omnecor's multi-layered memory system:
  *
  *   Layer 1: Working Memory (active context window — managed by frontend)
  *   Layer 2: Long-Term Memory (vector-indexed project knowledge — THIS SERVICE)
  *   Layer 3: Episodic Memory (conversation history — database-backed)
  *
  * This service manages:
- *   - Per-project ChromaDB collections (isolated "brains")
+ *   - Per-project vector collections (isolated "brains")
  *   - Document ingestion with chunking for knowledge base directories
  *   - Semantic search across project memory
  *   - Memory consolidation (summarization of episodic → long-term)
  *   - Collection lifecycle (create, delete, list, stats)
  *
- * The VectorDBService handles the raw ChromaDB operations; this service
- * adds the domain logic, chunking strategy, and memory architecture.
+ * The selected vector store backend handles the raw vector operations; this
+ * service adds the domain logic, chunking strategy, and memory architecture.
  *
  * Integration:
  *   This service is instantiated as a singleton in the backend and
@@ -25,11 +26,11 @@
  */
 
 import {
-  VectorDBService,
   sanitizeCollectionName,
   type VectorDocument,
   type SearchResult,
 } from "./VectorDBService.js";
+import { getVectorStore, type IVectorStore } from "./VectorStore.js";
 import crypto from "crypto";
 import fs from "fs";
 import path from "path";
@@ -132,11 +133,11 @@ export interface MemorySearchResult extends SearchResult {
 
 export class MemoryArchitectService {
   private static instance: MemoryArchitectService | null = null;
-  private vectorDB: VectorDBService;
+  private vectorDB: IVectorStore;
   private initialized: boolean = false;
 
   private constructor(chromaUrl?: string) {
-    this.vectorDB = VectorDBService.getInstance();
+    this.vectorDB = getVectorStore();
   }
 
   /** Retrieve the singleton instance */
@@ -148,9 +149,11 @@ export class MemoryArchitectService {
   }
 
   /**
-   * Initialize the Memory Architect by connecting to ChromaDB.
-   * Must be called before any other operations.
-   * Gracefully handles ChromaDB being offline (degrades to no-op).
+   * Initialize the Memory Architect by connecting to the active vector store
+   * (embedded libSQL vectors by default — zero infra — or ChromaDB when
+   * OMNECOR_VECTOR_BACKEND=chroma). Must be called before any other operations.
+   * Gracefully degrades to a no-op when the store is unavailable (e.g. the
+   * on-device embedding model isn't loaded, or the Chroma container is down).
    */
   async init(): Promise<boolean> {
     try {
@@ -163,7 +166,7 @@ export class MemoryArchitectService {
       return this.initialized;
     } catch (error) {
       console.warn(
-        "[Omnecor MemoryArchitect] ChromaDB unavailable — Layer 2 memory disabled.",
+        "[Omnecor MemoryArchitect] Vector store unavailable — Layer 2 memory disabled.",
         (error as Error).message
       );
       this.initialized = false;

@@ -15,6 +15,7 @@ import { vanillaTrpc, trpc } from "@/lib/trpc";
 import { IS_DEMO } from "@/lib/demo";
 import { applyAgentEvent, applyJobCompletion } from "@/lib/agentStream";
 import type { AssistantBlock } from "@shared/chatBlocks";
+import type { AgentStreamEvent } from "@shared/chatAgentEvents";
 import {
   ChatMessage,
   ContextFile,
@@ -161,7 +162,7 @@ export function Chat() {
 
   // ── Peer card context ─────────────────────────────────────────────────────
   const { card: userPeerCard } = useUserPeerCard();
-  const { activeMap } = useNeuralMap();
+  const { activeMap, adoptServerMap } = useNeuralMap();
   const { entries: neuralContextFiles } = useNeuralContextStore();
   const { isFictionMode } = useFictionMode();
 
@@ -869,6 +870,30 @@ export function Chat() {
         streamRef.current = null;
       };
 
+      // When the Fabrication toolset creates a Build Plan, surface it: adopt an
+      // auto-bootstrapped Project as the active map, refresh the plan list, and
+      // offer a jump into Blueprint Studio. Parses the create_blueprint tool box.
+      const handleBlueprintBlock = (ev: Extract<AgentStreamEvent, { type: "block_end" }>) => {
+        const block = ev.block;
+        if (block.type !== "mcp" || block.server !== "feature" || block.tool !== "create_blueprint") return;
+        if (!block.result) return;
+        let info: { planId?: string; title?: string; mapId?: string; mapCreated?: boolean; mapName?: string };
+        try {
+          info = JSON.parse(block.result);
+        } catch {
+          return; // tool errored (non-JSON message) — nothing to adopt
+        }
+        if (!info.planId || !info.mapId) return;
+        if (info.mapCreated) void adoptServerMap(info.mapId);
+        void chatUtils.blueprint.list.invalidate();
+        toast.success(
+          info.mapCreated
+            ? `New Project "${info.mapName ?? info.title}" + Build Plan created — open in Blueprint Studio`
+            : `Build Plan "${info.title ?? "created"}" — open it in Blueprint Studio`,
+          { action: { label: "Open Studio", onClick: () => setLocation("/blueprint-studio") } },
+        );
+      };
+
       const startStream = (providerId: SelectedModel["providerId"], modelId: string) => {
         const sub = vanillaTrpc.aiProvider.agentChatStream.subscribe(
           {
@@ -887,7 +912,15 @@ export function Chat() {
             rootDirectories: activeMap?.rootDirectories,
             // Session "auto-approve within active map" toggle (chat header).
             autoApprove: useAppStore.getState().chatDisplaySettings.autoApproveTools,
+            // Brains toggled on for this chat (Brains-Upgrade Phase 8): the server
+            // injects each brain's charter + retrieves its top-k corpus, unioned
+            // with any persona-durable brains and merged after map RAG.
+            brainIds: useAppStore.getState().activeBrainIds,
             conversationId: conversationRef.current.id,
+            // Fabrication toggle (chat header): exposes the Blueprint toolset so
+            // the AI can create + build a Build Plan inline. create_blueprint
+            // bootstraps a new Project when no map is active.
+            enableBlueprintTools: useAppStore.getState().chatDisplaySettings.fabricationTools,
             // Model-Fabric Phase 5 — pins mesh routing to the exact peer the
             // user picked in the catalog (undefined for This PC / Cloud /
             // auto-valet selections, which never go through mesh offload).
@@ -896,6 +929,7 @@ export function Chat() {
           {
             onData(ev) {
               assistantBlocks = applyAgentEvent(assistantBlocks, ev);
+              if (ev.type === "block_end") handleBlueprintBlock(ev);
               if (ev.type === "done") {
                 finalize(ev.content, ev.totalTokens);
               } else if (ev.type === "error") {
@@ -933,7 +967,7 @@ export function Chat() {
         startStream(selectedModel.providerId, selectedModel.modelId);
       }
     },
-    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, excludedMessageIds, activeMap?.id, activeMap?.settings.enableAIContext, activeMap?.rootDirectories]
+    [selectedModel, buildFullSystemPrompt, openId, addHonchoMessage, excludedMessageIds, activeMap?.id, activeMap?.settings.enableAIContext, activeMap?.rootDirectories, adoptServerMap, chatUtils, setLocation]
   );
 
   // ── HITL tool approval (agentic stream) ──────────────────────────────────

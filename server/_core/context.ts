@@ -32,7 +32,7 @@ import type { Db } from "../db.js";
 // They are imported here to provide type information and getInstance() access.
 import { FileSystemWatcherService } from "../core_services/services/FileSystemWatcherService.js";
 import { HashTrackerService } from "../core_services/services/HashTrackerService.js";
-import { VectorDBService } from "../core_services/services/VectorDBService.js";
+import { getVectorStore, type IVectorStore } from "../core_services/services/VectorStore.js";
 import { ProcessManagerService } from "../core_services/services/ProcessManagerService.js";
 import { AgentService } from "../core_services/services/AgentService.js";
 import { VoiceService } from "../core_services/services/VoiceService.js";
@@ -89,7 +89,7 @@ export type TrpcContext = {
   services: {
     fileWatcher: FileSystemWatcherService;
     hashTracker: HashTrackerService;
-    vectorDB: VectorDBService;
+    vectorDB: IVectorStore;
     processManager: ProcessManagerService;
     agent: AgentService;
     voice: VoiceService;
@@ -196,7 +196,7 @@ export async function createContext(
     services: {
       fileWatcher: FileSystemWatcherService.getInstance(),
       hashTracker: HashTrackerService.getInstance(),
-      vectorDB: VectorDBService.getInstance(),
+      vectorDB: getVectorStore(),
       processManager: ProcessManagerService.getInstance(),
       agent: AgentService.getInstance(),
       voice: VoiceService.getInstance(),

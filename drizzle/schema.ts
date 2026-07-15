@@ -638,6 +638,90 @@ export type PersonaRow = typeof personas.$inferSelect;
 export type InsertPersona = typeof personas.$inferInsert;
 
 /**
+ * Brain Packs — portable, curated, versioned external "brains" a local model
+ * attaches at inference time (Brains-Upgrade Phase 2). Distinct from personal
+ * writable neural maps: a brain is read-only, model-agnostic, and imported from
+ * a self-contained `.obp` package.
+ *
+ * The corpus chunks live in {@link brainChunks} (the durable, backend-agnostic
+ * source of truth); their vectors are also loaded into the pluggable vector
+ * store for retrieval. `embedderMatch` records whether the pack's embedder
+ * matches the running one — a mismatch means the corpus is NOT loaded into the
+ * vector index (it would be mis-queried), so the pack is flagged as
+ * `incompatible` rather than silently returning garbage.
+ */
+export const brains = sqliteTable(
+  "brains",
+  {
+    id: text("id").primaryKey(), // stable pack id (slug/UUID) from the manifest
+    userId: integer("userId").notNull(), // importer / owner (scoping key)
+    name: text("name").notNull(),
+    version: text("version").notNull(),
+    domain: text("domain").notNull(),
+    description: text("description").notNull().default(""),
+    /** Always-on skill/rules text prepended to prompts. */
+    charter: text("charter").notNull().default(""),
+    charterSha256: text("charterSha256").notNull(),
+    /** Embedder the pack's vectors were built with. */
+    embedderId: text("embedderId").notNull(),
+    embedderDim: integer("embedderDim").notNull(),
+    /** Whether the pack's embedder matches the running one (corpus queryable). */
+    embedderMatch: integer("embedderMatch").notNull().default(1), // boolean as int
+    /** Lifecycle: ready (queryable) | incompatible (embedder mismatch) | error. */
+    status: text("status", { enum: ["ready", "incompatible", "error"] })
+      .notNull()
+      .default("ready"),
+    /** Vector store collection holding this brain's corpus. */
+    collectionName: text("collectionName").notNull(),
+    chunkCount: integer("chunkCount").notNull().default(0),
+    /** Provenance record (source, builtBy, model, license, …). */
+    provenance: text("provenance", { mode: "json" }).$type<Record<string, unknown>>(),
+    /** True when shipped in-repo as a built-in (vs. user-imported). */
+    builtin: integer("builtin").notNull().default(0), // boolean as int
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+    updatedAt: integer("updatedAt", { mode: "timestamp" }).notNull().$defaultFn(now).$onUpdate(now),
+  },
+  (t) => [
+    index("brains_user_id_idx").on(t.userId),
+    index("brains_user_domain_idx").on(t.userId, t.domain),
+  ]
+);
+
+export type BrainRow = typeof brains.$inferSelect;
+export type InsertBrain = typeof brains.$inferInsert;
+
+/**
+ * Brain Pack corpus chunks — the durable, vector-backend-agnostic source of
+ * truth for a brain's retrieved knowledge. Each row keeps the chunk text,
+ * metadata, and its prebuilt embedding (base64 little-endian Float32) so the
+ * vector index can be rebuilt on demand (e.g. after a backend switch) and the
+ * brain can be re-exported to a `.obp` without loss.
+ */
+export const brainChunks = sqliteTable(
+  "brain_chunks",
+  {
+    id: integer("id").primaryKey({ autoIncrement: true }),
+    brainId: text("brainId")
+      .notNull()
+      .references(() => brains.id, { onDelete: "cascade" }),
+    /** Stable id within the pack — mirrored as the vector store doc_id. */
+    chunkId: text("chunkId").notNull(),
+    text: text("text").notNull(),
+    metadata: text("metadata", { mode: "json" }).$type<Record<string, unknown>>(),
+    /** Prebuilt embedding, base64 little-endian Float32. */
+    embedding: text("embedding").notNull(),
+    createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
+  },
+  (t) => [
+    index("brain_chunks_brain_id_idx").on(t.brainId),
+    uniqueIndex("brain_chunks_brain_chunk_uq").on(t.brainId, t.chunkId),
+  ]
+);
+
+export type BrainChunkRow = typeof brainChunks.$inferSelect;
+export type InsertBrainChunk = typeof brainChunks.$inferInsert;
+
+/**
  * Saved Scripts library.
  *
  * Python tools/scripts the AI generates in chat, saved per-user so they are
@@ -1098,6 +1182,21 @@ export const personasRelations = relations(personas, ({ one }) => ({
   user: one(users, {
     fields: [personas.userId],
     references: [users.id],
+  }),
+}));
+
+export const brainsRelations = relations(brains, ({ one, many }) => ({
+  user: one(users, {
+    fields: [brains.userId],
+    references: [users.id],
+  }),
+  chunks: many(brainChunks),
+}));
+
+export const brainChunksRelations = relations(brainChunks, ({ one }) => ({
+  brain: one(brains, {
+    fields: [brainChunks.brainId],
+    references: [brains.id],
   }),
 }));
 

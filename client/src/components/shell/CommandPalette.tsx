@@ -19,6 +19,7 @@ import {
 import { useLocation } from "wouter";
 import {
   Brain,
+  BrainCircuit,
   MessageCircle,
   Zap,
   GitBranch,
@@ -54,6 +55,7 @@ function iconForCommand(cmd: CommandEntry): React.ReactNode {
     case "nav-dashboard":          return <Monitor className={cls} />;
     case "nav-chat":               return <MessageCircle className={cls} />;
     case "nav-brain-map":          return <Brain className={cls} />;
+    case "nav-brains":             return <BrainCircuit className={cls} />;
     case "nav-model-hub":          return <Zap className={cls} />;
     case "nav-pipelines":          return <GitBranch className={cls} />;
     case "nav-integrations":       return <Plug className={cls} />;

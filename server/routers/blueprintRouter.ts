@@ -26,6 +26,7 @@ import {
   blueprintMessages,
   blueprintPlans,
   blueprintSimResults,
+  neuralMaps,
 } from "../../drizzle/schema.js";
 import { ChatAgentRunner } from "../core_services/services/ChatAgentRunner.js";
 import { assertImageProviderAllowedInMode, assertProviderAllowedInMode, isSovereignMode } from "../_core/sovereign.js";
@@ -37,6 +38,7 @@ import {
   buildBlueprintTools,
   loadPlanSnapshot,
 } from "../core_services/blueprint/blueprintAgentTools.js";
+import { resolveProjectMap } from "../core_services/blueprint/chatBlueprintTools.js";
 import { MATERIALS_CATALOG, listCategories, searchMaterials } from "../core_services/blueprint/materialsCatalog.js";
 import { generateConceptImage } from "../core_services/blueprint/conceptRender.js";
 import { buildPlanPdf } from "../core_services/blueprint/planPdf.js";
@@ -51,6 +53,38 @@ import { BLUEPRINT_CATEGORIES } from "@shared/blueprint";
 const agentsRunProcedure = protectedProcedure.use(requirePermission("agents", "run"));
 
 const planIdSchema = z.object({ planId: z.string().min(1) });
+
+/**
+ * Build a `<project_context>` block from the plan's parent Neural Map / Project
+ * (name + projectContext: description/goals/techStack/notes), gated by the map's
+ * `enableAIContext`. Returns null when there's no map, the gate is off, or there's
+ * nothing worth injecting — so the Blueprint agent sees the project's intent but
+ * only when the user has opted into map AI context.
+ */
+async function buildProjectContextBlock(mapId: string | null, userId: number): Promise<string | null> {
+  if (!mapId) return null;
+  const db = await getDb();
+  const [map] = await db
+    .select({ name: neuralMaps.name, projectContext: neuralMaps.projectContext, settings: neuralMaps.settings })
+    .from(neuralMaps)
+    .where(and(eq(neuralMaps.id, mapId), eq(neuralMaps.userId, userId)))
+    .limit(1);
+  if (!map) return null;
+  if ((map.settings as Record<string, unknown> | null)?.enableAIContext === false) return null;
+  const pc = (map.projectContext ?? {}) as {
+    description?: string;
+    techStack?: string[];
+    goals?: string[];
+    notes?: string;
+  };
+  const lines: string[] = [];
+  if (pc.description) lines.push(pc.description.slice(0, 800));
+  if (pc.goals?.length) lines.push(`Goals: ${pc.goals.join("; ").slice(0, 400)}`);
+  if (pc.techStack?.length) lines.push(`Stack/materials focus: ${pc.techStack.join(", ").slice(0, 300)}`);
+  if (pc.notes) lines.push(`Notes: ${pc.notes.slice(0, 400)}`);
+  if (lines.length === 0) return null;
+  return `PARENT PROJECT (Neural Map "${map.name}") — this plan belongs to this project; keep the design consistent with it:\n${lines.join("\n")}`;
+}
 
 async function requireOwnedPlan(planId: string, userId: number) {
   const db = await getDb();
@@ -90,15 +124,35 @@ export const blueprintRouter = router({
         units: z.enum(["imperial", "metric"]).default("imperial"),
         cadEngine: z.enum(["jscad", "openscad"]).default("jscad"),
         mapId: z.string().optional(),
+        /** "＋ New project": create a fresh Project and attach this plan to it.
+         *  Server-side creation keeps the plan's mapId FK valid (no client race). */
+        newMapName: z.string().max(120).optional(),
       }),
     )
     .mutation(async ({ ctx, input }) => {
       const db = await getDb();
+      // Attach to the given map, or bootstrap a new Project (server-side so the
+      // FK is satisfied before the plan insert). mapId undefined + no newMapName
+      // → an unattached plan (allowed; mapId is nullable).
+      let mapId = input.mapId;
+      let mapCreated = false;
+      let mapName = "";
+      if (input.newMapName !== undefined) {
+        const resolved = await resolveProjectMap(db, ctx.user.id, {
+          mapId: input.mapId,
+          newMapName: input.newMapName,
+          brief: input.brief,
+          fallbackName: input.title,
+        });
+        mapId = resolved.mapId;
+        mapCreated = resolved.mapCreated;
+        mapName = resolved.mapName;
+      }
       const id = uuidv4();
       await db.insert(blueprintPlans).values({
         id,
         userId: ctx.user.id,
-        mapId: input.mapId,
+        mapId,
         title: input.title,
         brief: input.brief,
         category: input.category,
@@ -106,7 +160,7 @@ export const blueprintRouter = router({
         cadEngine: input.cadEngine,
         status: "draft",
       });
-      return { id };
+      return { id, mapId, mapCreated, mapName };
     }),
 
   get: protectedProcedure.input(planIdSchema).query(async ({ ctx, input }) => {
@@ -228,11 +282,15 @@ export const blueprintRouter = router({
             BlueprintFeaService.getInstance().checkAvailability(),
           ]);
           const sovereign = isSovereignMode(ctx.user?.executionMode);
-          const systemPrompt = buildBlueprintSystemPrompt(snapshot, {
+          let systemPrompt = buildBlueprintSystemPrompt(snapshot, {
             sovereign,
             feaAvailable: feaStatus.available,
             openscadAvailable: engineStatus.openscad.available,
           });
+          // Bidirectional sharing: fold the parent Project (Neural Map) context in
+          // so the Blueprint agent designs with the project's goals/notes in mind.
+          const projectBlock = await buildProjectContextBlock(snapshot.plan.mapId, ctx.user.id);
+          if (projectBlock) systemPrompt = `${systemPrompt}\n\n${projectBlock}`;
 
           // Conversation history from persistence (assistant turns flattened).
           // Empty-content rows are dropped: providers reject empty parts

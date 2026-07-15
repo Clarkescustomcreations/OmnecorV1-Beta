@@ -5718,3 +5718,52 @@ Captured: 2026-07-13
 | Spacing | p-3 gap-3 p-2 gap-2 px-1 py-0 |
 | Hover | — |
 | Shadow | shadow-lg |
+
+### BrainsManager.tsx
+
+Captured: 2026-07-15
+
+| Property | Class |
+| --- | --- |
+| Background | bg-card bg-muted/40 bg-muted/30 hover:bg-bg-elevated/40 |
+| Border | border-b border-border border rounded-lg |
+| Border radius | rounded-lg rounded-md |
+| Text | text-xl font-bold text-sm text-muted-foreground text-xs font-mono |
+| Spacing | px-4 sm:px-6 py-3 sm:py-4 gap-3 gap-2 space-y-4 p-2 |
+| Hover | transition-colors hover:bg-bg-elevated/40 hover:bg-destructive/10 |
+| Shadow | — |
+| Accent usage | text-accent-purple text-accent-success text-accent-cyan ring-accent-purple/60 bg-accent-success/15 |
+
+**Pattern notes:**
+Management page under OmnecorDashboardLayout, matching Model Hub's header idiom
+(`<header>` with icon + h1 + muted subtitle, right-aligned action buttons). Status
+health badges use semantic accent tokens: ready → `bg-accent-success/15
+text-accent-success`, incompatible → `bg-amber-500/15 text-amber-500`, error →
+`bg-destructive/15 text-destructive`. Brain cards use the standard `Card` +
+`rounded-lg`; an attached card is ringed with `ring-1 ring-accent-purple/60`. All
+interactive elements carry unique `id`s (`btn-brain-*-<id>`) per UI-Rules §5.2 and
+long text is wrapped in `.card-content-safe` / `truncate`.
+
+### BrainToggle.tsx
+
+Captured: 2026-07-15
+
+| Property | Class |
+| --- | --- |
+| Background | bg-muted/40 bg-accent-purple/10 hover:bg-bg-elevated/50 |
+| Border | border border-border border-accent-purple/50 rounded-md |
+| Border radius | rounded-md |
+| Text | text-xs text-[10px] text-muted-foreground text-accent-purple |
+| Spacing | px-2.5 py-1 gap-1.5 |
+| Hover | transition-colors hover:bg-bg-elevated/50 |
+| Shadow | — |
+| Accent usage | text-accent-purple border-accent-purple/50 bg-accent-purple/10 bg-accent-purple (count badge) |
+
+**Pattern notes:**
+Compact pill toggle (DropdownMenu of checkbox items) mounted in the chat header
+**beside the model selector** (`ChatInterface.tsx`, `layout === "stream"` only) —
+NOT a standalone bar, so it never creates a top void. Inactive =
+`border-border bg-muted/40 text-muted-foreground`; active (≥1 selected) switches to
+the `accent-purple` family with a small count `Badge`. Same active/inactive accent
+pattern any future toolbar toggle should follow. Disabled rows (embedder
+incompatible) show an amber `AlertTriangle`. Unique id `btn-chat-brains-toggle`.

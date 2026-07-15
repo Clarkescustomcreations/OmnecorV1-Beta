@@ -33,6 +33,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   UserCircle2,
+  DraftingCompass,
 } from "lucide-react";
 import {
   Popover,
@@ -49,6 +50,7 @@ import { ChatInput, type SlashCommand } from "@/components/chat/ChatInput";
 import { AssistantStream } from "@/components/chat/agentic/AssistantStream";
 import { useCodeBlockActions } from "@/components/chat/agentic/useCodeBlockActions";
 import { ModelSelector } from "@/components/chat/ModelSelector";
+import { BrainToggle } from "@/components/chat/BrainToggle";
 import { trpc } from "@/lib/trpc";
 import {
   Dialog,
@@ -792,8 +794,42 @@ export function ChatInterface({
             </div>
           )}
 
+          {/* Brain Packs — per-chat attach, beside the model selector (Brains-Upgrade Phase 8) */}
+          {layout === "stream" && <BrainToggle />}
+
           {/* Spacer */}
           <div className="flex-1" />
+
+          {/* Fabrication (Blueprint) tools toggle (agentic stream only) */}
+          {layout === "stream" && (
+            <HowToTooltip
+              title="Fabrication tools"
+              description="When on, the AI can create and build a real fabrication Build Plan (Blueprint) right here in chat — materials, cut lists, drawings, engineering checks — attached to the active Project. Off by default to keep the chat lean."
+            >
+              <Button
+                size="sm"
+                variant={chatSettings.fabricationTools ? "default" : "outline"}
+                className={cn(
+                  "h-7 text-[11px] gap-1 px-2",
+                  chatSettings.fabricationTools
+                    ? "bg-primary/90 hover:bg-primary text-primary-foreground border-transparent"
+                    : "text-muted-foreground",
+                )}
+                onClick={() => {
+                  const next = !chatSettings.fabricationTools;
+                  setChatDisplaySettings({ fabricationTools: next });
+                  toast[next ? "success" : "info"](
+                    next
+                      ? "Fabrication ON — ask the AI to design something and it builds a Blueprint"
+                      : "Fabrication OFF — blueprint tools hidden",
+                  );
+                }}
+              >
+                <DraftingCompass className="w-3.5 h-3.5" />
+                Fab
+              </Button>
+            </HowToTooltip>
+          )}
 
           {/* Auto-approve tools toggle (agentic stream only) */}
           {layout === "stream" && (

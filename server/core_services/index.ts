@@ -18,6 +18,9 @@
 export { FileSystemWatcherService } from "./services/FileSystemWatcherService";
 export { HashTrackerService } from "./services/HashTrackerService";
 export { VectorDBService } from "./services/VectorDBService";
+export { EmbeddedVectorStore } from "./services/EmbeddedVectorStore";
+export { EmbeddingService } from "./services/EmbeddingService";
+export { getVectorStore, resolveVectorBackend, type IVectorStore } from "./services/VectorStore";
 export { ProcessManagerService } from "./services/ProcessManagerService";
 export { AgentService } from "./services/AgentService";
 export { VoiceService } from "./services/VoiceService";

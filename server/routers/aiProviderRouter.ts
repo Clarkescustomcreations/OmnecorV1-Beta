@@ -15,6 +15,9 @@ import { ProcessManagerService } from "../core_services/services/ProcessManagerS
 import { AsyncJobService } from "../core_services/services/AsyncJobService.js";
 import { validatePath } from "../_core/security.js";
 import { injectMapRagContext } from "../_core/ragContext.js";
+import { injectBrainContext } from "../_core/brainContext.js";
+import { injectBlueprintContext } from "../_core/blueprintContext.js";
+import { buildChatBlueprintTools } from "../core_services/blueprint/chatBlueprintTools.js";
 import { assertProviderAllowedInMode, isSovereignMode } from "../_core/sovereign.js";
 import { guardedEmit } from "../_core/streamEmit.js";
 import { createLogger } from "../_core/logger.js";
@@ -100,6 +103,12 @@ const chatInputSchema = z.object({
   /** Active neural map — when set (and its enableAIContext is on), the map's
    *  indexed knowledge is retrieved and injected as system context. */
   ragMapId: z.string().optional(),
+  /** Attached Brain Packs — charters (always-on) + retrieved corpus injected
+   *  as system context. Owner-scoped. See {@link injectBrainContext}. */
+  brainIds: z.array(z.string().max(128)).max(16).optional(),
+  /** Active persona — its durable `data.brains` are resolved server-side and
+   *  unioned with `brainIds` (Brains-Upgrade Phase 4). Owner-scoped. */
+  personaId: z.string().max(128).optional(),
   /** Model-Fabric Phase 2 — use native (structured) tool-calling instead of the
    *  text `<tool_call>` protocol for this turn. Curated per-model (Phase 3's
    *  unified catalog will set this automatically); defaults to the text
@@ -185,10 +194,25 @@ export const aiProviderRouter = router({
               messages: input.messages,
               systemPrompt: input.systemPrompt,
             });
+            const brain = await injectBrainContext({
+              brainIds: input.brainIds,
+              personaId: input.personaId,
+              userId: ctx.user?.id,
+              messages: rag.messages,
+              systemPrompt: rag.systemPrompt,
+            });
+            // Blueprint sharing: fold the active Project's attached Build Plans in
+            // as context (gated by the map's enableAIContext). Local read.
+            const bp = await injectBlueprintContext({
+              mapId: input.ragMapId,
+              userId: ctx.user?.id,
+              messages: brain.messages,
+              systemPrompt: brain.systemPrompt,
+            });
             for await (const chunk of svc.streamChat(
               input,
-              rag.messages,
-              rag.systemPrompt
+              bp.messages,
+              bp.systemPrompt
             )) {
               if (g.closed) break; // client gone — stop pulling from the model
               g.next(chunk);
@@ -223,6 +247,9 @@ export const aiProviderRouter = router({
         autoApprove: z.boolean().optional(),
         /** Conversation id, echoed to the async-job continuation path. */
         conversationId: z.string().optional(),
+        /** Chat "Fabrication" toggle — exposes the Blueprint Studio toolset
+         *  (create_blueprint + domain tools) in the main chat when on. */
+        enableBlueprintTools: z.boolean().optional(),
       })
     )
     .subscription(({ ctx, input }) => {
@@ -237,6 +264,33 @@ export const aiProviderRouter = router({
             messages: input.messages,
             systemPrompt: input.systemPrompt,
           });
+          const brain = await injectBrainContext({
+            brainIds: input.brainIds,
+            personaId: input.personaId,
+            userId: ctx.user?.id,
+            messages: rag.messages,
+            systemPrompt: rag.systemPrompt,
+          });
+          // Blueprint sharing: attached Build Plans become chat context (gated by
+          // the map's enableAIContext) — independent of the Fabrication toggle
+          // below (awareness always flows; the toggle only gates the tool loop).
+          const bp = await injectBlueprintContext({
+            mapId: input.ragMapId ?? input.mapId,
+            userId: ctx.user?.id,
+            messages: brain.messages,
+            systemPrompt: brain.systemPrompt,
+          });
+          // Fabrication toggle: expose the Blueprint toolset in the main chat.
+          // create_blueprint bootstraps a new Project when no map is active.
+          const extraTools =
+            input.enableBlueprintTools && ctx.user?.id
+              ? buildChatBlueprintTools({
+                  userId: ctx.user.id,
+                  executionMode: ctx.user?.executionMode,
+                  activeMapId: input.mapId,
+                  signal: controller.signal,
+                })
+              : undefined;
           const runner = new ChatAgentRunner();
           for await (const event of runner.run({
             input: {
@@ -244,8 +298,8 @@ export const aiProviderRouter = router({
               modelId: input.modelId,
               apiKey: input.apiKey,
               baseUrl: input.baseUrl,
-              messages: rag.messages,
-              systemPrompt: rag.systemPrompt,
+              messages: bp.messages,
+              systemPrompt: bp.systemPrompt,
               maxTokens: input.maxTokens,
               supportsNativeTools: input.supportsNativeTools,
               targetNodeId: input.targetNodeId,
@@ -256,6 +310,7 @@ export const aiProviderRouter = router({
             mapId: input.mapId,
             rootDirectories: input.rootDirectories,
             autoApprove: input.autoApprove,
+            extraTools,
             // Origin runs may delegate to mesh peers (Mesh-Delegation.md);
             // delegated runs themselves never get this (SubAgentHostService
             // doesn't set it), so delegation can't chain.

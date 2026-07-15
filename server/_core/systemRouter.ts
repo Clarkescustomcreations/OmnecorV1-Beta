@@ -17,6 +17,7 @@ import { getPermissionsForRole, type Role } from "../core_services/config/rbac.j
 import { PATHS } from "./paths.js";
 import { type OmnecorSettings } from "../core_services/services/SettingsService.js";
 import { LocalLlmRuntimeService } from "../core_services/services/LocalLlmRuntimeService.js";
+import { resolveOllamaUrl } from "../core_services/services/ollamaUrl.js";
 
 const execFileAsync = promisify(execFile);
 
@@ -110,7 +111,7 @@ export const systemRouter = router({
       elevenlabs: !!ENV.elevenLabsApiKey || !!settings.elevenLabsApiKey,
       falai: !!ENV.falaiApiKey || !!settings.falaiApiKey,
       forge: !!ENV.forgeApiKey || !!settings.forgeApiKey,
-      ollamaUrl: settings.OLLAMA_BASE_URL || ENV.ollamaUrl || "http://localhost:11434",
+      ollamaUrl: resolveOllamaUrl(),
       n8nUrl: settings.n8nUrl || ENV.n8nUrl || "http://localhost:5678",
       comfyUrl: settings.comfyUrl || "",
     };
@@ -423,10 +424,10 @@ export const systemRouter = router({
       }
     }
 
-    // Ollama detection
+    // Ollama detection — probe the same endpoint inference resolves (settings > env).
     let ollamaVersion: string | null = null;
     try {
-      const res = await fetch(`${ENV.ollamaUrl}/api/version`);
+      const res = await fetch(`${resolveOllamaUrl()}/api/version`);
       if (res.ok) {
         const data = await res.json() as { version?: string };
         ollamaVersion = data.version ?? null;
@@ -581,11 +582,8 @@ export const systemRouter = router({
       }
     };
 
-    // ── Ollama: ping its local API ──
-    const ollamaUrl = (readSettingsFile() as Record<string, unknown>)?.OLLAMA_BASE_URL
-      ?? process.env.OLLAMA_BASE_URL
-      ?? "http://localhost:11434";
-    const ollamaResult = httpOk(`${ollamaUrl}/api/version`);
+    // ── Ollama: ping the same endpoint inference resolves (settings > env) ──
+    const ollamaResult = httpOk(`${resolveOllamaUrl()}/api/version`);
 
     // ── Python 3.10+ ──
     const pythonBin = plt === "win32" ? "python" : "python3";

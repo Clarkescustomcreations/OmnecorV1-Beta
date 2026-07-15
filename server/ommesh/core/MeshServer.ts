@@ -31,6 +31,14 @@ const MAX_SYNC_BYTES = 1 * 1024 * 1024;
 const MAX_DISCOURSE_BYTES = 64 * 1024;
 
 /**
+ * Brain-pack sync body size cap: 48 MB. A `.obp` crosses the wire base64-encoded
+ * inside a signed JSON envelope (~33% inflation), so this admits raw packs up to
+ * ~36 MB — well above any realistic built-in or user-authored brain, while still
+ * bounding memory for a hostile oversized push.
+ */
+const MAX_BRAIN_BYTES = 48 * 1024 * 1024;
+
+/**
  * Canonical peer-fingerprint form used across the whole mesh: SHA-256 with the
  * colons stripped. This is what DiscoveryService advertises, what
  * `ommesh.approvePeer` pins, and what the outbound `checkServerIdentity`
@@ -149,6 +157,11 @@ export class MeshServer {
 
     if (req.method === "POST" && req.url === "/discourse") {
       await this.handleDiscourse(req, res, peerCn);
+      return;
+    }
+
+    if (req.method === "POST" && req.url === "/brain") {
+      await this.handleBrain(req, res, peerCn);
       return;
     }
 
@@ -490,6 +503,70 @@ export class MeshServer {
       parsed.content as string,
     );
 
+    this.sendJson(res, 200, result);
+  }
+
+  /**
+   * Handle POST /brain — receive a portable `.obp` Brain Pack from a remote peer
+   * (Brains-Upgrade Phase 7). Same fail-closed posture as /sync and /discourse:
+   * pinned-peer mTLS trust (enforced upstream in handleRequest) + a fresh HMAC
+   * signature over the whole envelope. On receive the pack's embedder id/dim is
+   * checked against this node's running embedder; a mismatch is imported as
+   * `incompatible` (charter kept, corpus not indexed) rather than mis-queried, and
+   * the match verdict is returned so the sender learns it landed usable or not.
+   */
+  private async handleBrain(req: IncomingMessage, res: ServerResponse, peerCn: string): Promise<void> {
+    const rawBody = await this.readBodyCapped(req, MAX_BRAIN_BYTES);
+    if (rawBody === null) {
+      this.sendJson(res, 413, { error: "payload_too_large" });
+      return;
+    }
+
+    let parsed: Record<string, unknown>;
+    try {
+      parsed = JSON.parse(rawBody) as Record<string, unknown>;
+    } catch {
+      this.sendJson(res, 400, { error: "invalid_json" });
+      return;
+    }
+
+    if (typeof parsed.nodeId !== "string" || !parsed.nodeId) {
+      this.sendJson(res, 400, { error: "missing_nodeId" });
+      return;
+    }
+    if (typeof parsed.brain !== "string" || !parsed.brain) {
+      this.sendJson(res, 400, { error: "missing_brain" });
+      return;
+    }
+
+    // Replay-guard: timestamp must be present and within 5 minutes.
+    const ts = typeof parsed.timestamp === "number" ? parsed.timestamp : NaN;
+    if (!Number.isFinite(ts) || Math.abs(Date.now() - ts) > 300_000) {
+      log.warn("Brain sync rejected: timestamp out of window", { from: peerCn, nodeId: parsed.nodeId });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    // Signature verification — fail-closed.
+    if (typeof parsed.sig !== "string" || !parsed.sig) {
+      log.warn("Brain sync rejected: missing signature", { from: peerCn });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+    if (!verifyHmacSig(parsed, parsed.sig as string, process.env.OMMESH_SECRET)) {
+      log.warn("Brain sync rejected: signature mismatch", { from: peerCn, nodeId: parsed.nodeId });
+      this.sendJson(res, 401, { error: "unauthorized" });
+      return;
+    }
+
+    log.info("Received peer brain pack", { from: peerCn, nodeId: parsed.nodeId, bytesB64: (parsed.brain as string).length });
+
+    const result = await this.node.receivePeerBrain(parsed.nodeId as string, parsed.brain as string);
+    if (!result.ok) {
+      // Import genuinely failed (corrupt/oversized pack, no local owner, DB error).
+      this.sendJson(res, 400, result);
+      return;
+    }
     this.sendJson(res, 200, result);
   }
 
