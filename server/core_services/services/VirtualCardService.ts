@@ -337,6 +337,15 @@ export class VirtualCardService {
   }
 
   /**
+   * Derive the AES key from ENV.lithicApiKey via scrypt rather than a bare
+   * SHA-256 hash — scrypt's cost factor means a leaked/guessed API key can't
+   * be turned into the card-encryption key with a single cheap hash (CWE-916).
+   */
+  private static deriveCardKey(): Buffer {
+    return crypto.scryptSync(ENV.lithicApiKey, "omnecor-virtualcard-v1", 32);
+  }
+
+  /**
    * Encrypt a sensitive token using AES-256-GCM.
    * Key is derived from ENV.lithicApiKey so no extra secret is needed.
    */
@@ -345,10 +354,7 @@ export class VirtualCardService {
     ivHex: string;
     authTagHex: string;
   } {
-    const key = crypto
-      .createHash("sha256")
-      .update(ENV.lithicApiKey + "virtualcard")
-      .digest(); // 32 bytes
+    const key = VirtualCardService.deriveCardKey();
 
     const iv = crypto.randomBytes(IV_LENGTH);
     const cipher = crypto.createCipheriv(ALGORITHM, key, iv);
@@ -366,10 +372,7 @@ export class VirtualCardService {
   }
 
   private decryptToken(encryptedData: string, ivHex: string, authTagHex: string): string {
-    const key = crypto
-      .createHash("sha256")
-      .update(ENV.lithicApiKey + "virtualcard")
-      .digest();
+    const key = VirtualCardService.deriveCardKey();
     const iv = Buffer.from(ivHex, "hex");
     const authTag = Buffer.from(authTagHex, "hex");
     const decipher = crypto.createDecipheriv(ALGORITHM, key, iv);

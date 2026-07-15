@@ -145,10 +145,12 @@ class SynthesisRequest(BaseModel):
     speaker_wav_path: str = Field(
         ...,
         description=(
-            "Absolute path to a reference WAV file (3–30 s of clean speech) "
-            "used for voice cloning.  Must be accessible by this server process."
+            "Path to a reference WAV file (3–30 s of clean speech) used for "
+            "voice cloning. May be absolute or relative, but must resolve "
+            "inside SPEAKER_WAV_ROOT (default: assets/speakers) — paths "
+            "outside that root are rejected."
         ),
-        examples=["/home/user/voices/reference.wav"],
+        examples=["reference.wav"],
     )
     language: str = Field(
         default="en",
@@ -198,6 +200,19 @@ def is_safe_path(path: Path, base: Path) -> bool:
 # Helpers
 # ---------------------------------------------------------------------------
 
+def _reject_unsafe_path(raw_path: str) -> None:
+    """403s obviously-unsafe input before any filesystem call touches it
+    (CWE-22 defense in depth) — ".." segments are never legitimate for a
+    speaker reference file, so they're rejected lexically up front rather
+    than only after resolve()/stat() has already run on tainted input."""
+    if ".." in Path(raw_path).parts:
+        log.warning("Path traversal attempt blocked (parent traversal): %s", raw_path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access to the specified speaker reference path is restricted.",
+        )
+
+
 def _resolve_speaker_wav(raw_path: str) -> Path:
     """
     Resolve and validate the speaker reference WAV path.
@@ -207,12 +222,20 @@ def _resolve_speaker_wav(raw_path: str) -> Path:
     - non-existent files
     - non-.wav extensions (XTTS-v2 requires WAV input for the reference)
     """
+    _reject_unsafe_path(raw_path)
+
+    candidate = Path(raw_path)
+    # Relative input is joined onto the configured root explicitly rather
+    # than resolved against the process's CWD, so a relative path can only
+    # ever land under SPEAKER_WAV_ROOT.
+    target = candidate if candidate.is_absolute() else SPEAKER_WAV_ROOT / candidate
+
     try:
-        resolved = Path(raw_path).resolve(strict=True)
+        resolved = target.resolve(strict=True)
     except (FileNotFoundError, OSError) as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
-            detail=f"Speaker reference file not found: {raw_path}",
+            detail="Speaker reference file not found.",
         ) from exc
 
     if not is_safe_path(resolved, SPEAKER_WAV_ROOT):

@@ -70,13 +70,24 @@ function decodeDdgUrl(href: string): string {
 }
 
 function stripTags(s: string): string {
-  return s
-    .replace(/<[^>]+>/g, "")
-    .replace(/&amp;/g, "&")
+  // Loop until stable: a single pass can leave a reconstituted tag behind
+  // when tags are interleaved (e.g. "<<script>x</script>>").
+  let stripped = s;
+  let previous: string;
+  do {
+    previous = stripped;
+    stripped = stripped.replace(/<[^>]+>/g, "");
+  } while (stripped !== previous);
+
+  // Decode "&amp;" last — decoding it first would turn a double-encoded
+  // entity like "&amp;lt;" into "&lt;" and then into "<" on the next line,
+  // double-unescaping content the source never intended as a raw "<".
+  return stripped
     .replace(/&lt;/g, "<")
     .replace(/&gt;/g, ">")
     .replace(/&#x27;|&apos;/g, "'")
     .replace(/&quot;/g, '"')
+    .replace(/&amp;/g, "&")
     .replace(/\s+/g, " ")
     .trim();
 }

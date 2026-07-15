@@ -232,7 +232,7 @@ graph TD
     SVC --> MCP[MCPService\nExternal Tool Providers]
     BE --> DB[(SQLite / libSQL)]
     BE --> OM[OMMESH Mesh\nmTLS Federation]
-    3D[3D Designer\nBlender / KiCad GUI] -.->|Bridge| PM
+    Design3D[3D Designer\nBlender / KiCad GUI] -.->|Bridge| PM
     Podcast[Podcast Studio] --> SVC
 ```
 
