@@ -169,7 +169,7 @@ describe("built-in Coding brain — persona attach → injection", () => {
     expect(result.usedBrainIds).toContain("omnecor-coding");
     // Charter is always-on; retrieved corpus is cited by brain + source.
     const carrier = (result.systemPrompt ?? "") + JSON.stringify(result.messages);
-    expect(carrier).toMatch(/curated software-engineering brain/i); // charter text
+    expect(carrier).toMatch(/Domain layer — software engineering/i); // charter domain layer (reasoning base + domain, blueprint pattern)
     expect(carrier).toMatch(/\[Brain: Coding ·/); // per-source citation
     expect(carrier.toLowerCase()).toMatch(/parameter|prepared statement/); // the retrieved fact
   }, 60_000);

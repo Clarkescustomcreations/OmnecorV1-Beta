@@ -359,8 +359,26 @@ navigation. Follows `Context/UI-Tokens.md` + `Context/UI-Rules.md`; imprinted.
 - **Imprinted** — `BrainsManager` + `BrainToggle` captured to
   `Context/UI-Registry.md`. Typecheck clean; production build clean.
 
-### Phase 9 — Tests + verify (gate every phase)
+### Phase 9 — Tests + verify (gate every phase) ✅ (end-to-end live-proven 2026-07-15)
 - Unit (vector KNN, pack import/embedder-match rejection, charter-always-on + top-k merge), route tests via `appRouter.createCaller`, and an end-to-end drive: attach the Coding brain → real local-model chat → confirm grounded, cited output. Typecheck + coverage ratchet each phase.
+- **Live end-to-end drive (2026-07-15) — brain over OMMESH to Omnecor's own model hosting (NOT Ollama):**
+  Linux node (`omnecor-linux`) ↔ DadsPC `.201` (`omnecor-dadspc`) over strict-mTLS OMMESH, mutual
+  fingerprint approval. Coding brain imported (`omnecor-coding`, status `ready`, 53 chunks, embedder
+  match). `ai.chat` called with `providerId:"llamacpp"` + `targetNodeId:"omnecor-dadspc"` +
+  `brainIds:["omnecor-coding"]` against **qwen2.5-coder:7b on .201's own `llama-server` runtime**
+  (proven remote: this box has no local runtime, and a pinned `targetNodeId` throws on offload failure
+  rather than falling back — a returned answer *must* have executed on .201).
+  - **Grounded:** baseline gave muddled/incorrect dynamic-SQL-identifier advice; with the brain the
+    model returned the exact curated guidance ("Allow-List for Any Dynamic Identifier … reject input
+    not in the allow-list", "No String Concatenation of User Input into SQL Ever").
+  - **Cited:** model emitted real source tags — `[Brain: Coding · sec-sql-dynamic-identifiers-allowlist]`
+    and `[Brain: Coding · sec-sql-injection-parameterized]`.
+  - **Impossible→success:** Omnecor Expert brain (`omnecor-expert`, ready, 32 chunks) on an
+    Omnecor-internal question. Baseline hallucinated ("Omnecor is part of Alibaba Cloud", invented
+    "Standard/Enterprise" modes); with the brain the 7B answered correctly — Sovereign/Scrapper/
+    Big-Spender modes + `cloudProcedure` as the Sovereign-enforcing tier, cited
+    `[Omnecor Expert · security-execution-modes]`.
+  - **Static gate:** `pnpm check` ✅ 0 errors · `pnpm test` **1741 passed / 4 skipped (152 files)** ✅.
 
 ---
 
@@ -377,7 +395,7 @@ navigation. Follows `Context/UI-Tokens.md` + `Context/UI-Rules.md`; imprinted.
 | 6 | Coding exemplar brain (real, proven) | ✅ Done 2026-07-14 |
 | 7 | OMMESH pack sync | ✅ Done 2026-07-14 |
 | 8 | Brains manager UI | ✅ Done 2026-07-15 |
-| 9 | Tests + end-to-end verification (per-phase gate) | 🔄 Ongoing |
+| 9 | Tests + end-to-end verification (per-phase gate) | ✅ Live-proven 2026-07-15 (brain→OMMESH→.201 own runtime; grounded + cited; `pnpm check`✅ / `pnpm test` 1741✅) |
 
 ---
 

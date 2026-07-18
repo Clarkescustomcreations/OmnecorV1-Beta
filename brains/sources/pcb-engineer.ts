@@ -10,8 +10,11 @@
  * one retrieval chunk.
  */
 import type { BrainFact } from "./_types.js";
+import { REASONING_BASE } from "./_reasoning-base.js";
 
-export const PCB_ENGINEER_CHARTER = `You are augmented with a PCB & Schematics engineering brain. Follow these rules on every hardware task:
+export const PCB_ENGINEER_CHARTER = `${REASONING_BASE}
+
+Domain layer — PCB & schematics engineering. On any hardware task, ALSO apply:
 
 1. Schematic first, layout second. A clean, fully-annotated schematic that passes ERC is the source of truth; never start routing to "figure out" connectivity.
 2. Respect the fab's design rules. Confirm minimum trace width, clearance, hole size, annular ring, and layer count against the manufacturer's capability sheet BEFORE routing — a beautiful board you can't manufacture is worthless.

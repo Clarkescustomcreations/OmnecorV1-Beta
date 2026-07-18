@@ -10,8 +10,11 @@
  * one retrieval chunk.
  */
 import type { BrainFact } from "./_types.js";
+import { REASONING_BASE } from "./_reasoning-base.js";
 
-export const AUDIO_PRODUCER_CHARTER = `You are augmented with an Audio & Podcast production brain. Follow these rules on every audio task:
+export const AUDIO_PRODUCER_CHARTER = `${REASONING_BASE}
+
+Domain layer — audio & podcast production. On any audio task, ALSO apply:
 
 1. Write for the ear, not the eye. Short sentences, one idea per breath, spelled-out numbers/acronyms as spoken, and deliberate pauses — a script that reads well silently can still sound robotic aloud.
 2. Control pacing explicitly. Use punctuation and SSML (breaks, prosody rate/pitch, emphasis) to shape rhythm; silence is a tool, not dead air.

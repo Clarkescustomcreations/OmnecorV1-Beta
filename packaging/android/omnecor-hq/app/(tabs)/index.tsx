@@ -4,7 +4,7 @@ import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { WebView } from "react-native-webview";
 import { Pressable } from "@/components/pressable";
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useFocusEffect } from "expo-router";
+import { useFocusEffect, router } from "expo-router";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Clipboard from "expo-clipboard";
 import { ScreenContainer } from "@/components/screen-container";
@@ -23,6 +23,7 @@ import { applyAgentEvent, applyJobCompletion } from "@/lib/_core/agent-stream";
 import { flattenBlocksToText, type AssistantBlock } from "@/lib/_core/agent-blocks";
 import { subscribeChannel } from "@/lib/_core/ws-channels";
 import { AssistantStream } from "@/components/agentic/assistant-stream";
+import { BrainToggle } from "@/components/chat/BrainToggle";
 import {
   listCatalogGroups, listPhoneModels, type ChatModel, type ModelGroup,
   PHONE_PROVIDER, PHONE_PROVIDER_ID, parsePhoneModelId,
@@ -31,6 +32,8 @@ import * as ImagePicker from "expo-image-picker";
 import * as DocumentPicker from "expo-document-picker";
 import * as FileSystem from "expo-file-system/legacy";
 import { loadChats, saveChats, type StoredChatSession } from "@/lib/_core/chat-store";
+import { loadActiveBrains, saveActiveBrains } from "@/lib/_core/brain-store";
+import { parseCreateBlueprint } from "@/lib/_core/blueprint-handoff";
 import { useChatDisplaySettings } from "@/hooks/use-chat-display-settings";
 import { useConnection } from "@/hooks/use-connection";
 
@@ -131,6 +134,18 @@ export default function ChatScreen() {
   const [personaList, setPersonaList]     = useState<{ id: string; name: string }[]>([]);
   const [selectedNeuralMapId, setSelectedNeuralMapId] = useState<string | null>(null);
   const [selectedPersonaId, setSelectedPersonaId]     = useState<string | null>(null);
+  // Brains-Upgrade Phase 8 — Brain Packs attached to this chat (persisted via
+  // brain-store; threaded to agentChatStream as `brainIds`). No zustand on the
+  // APK, so this lives in component state mirrored to AsyncStorage.
+  const [activeBrainIds, setActiveBrainIds] = useState<string[]>([]);
+  useEffect(() => { loadActiveBrains().then(setActiveBrainIds); }, []);
+  const toggleActiveBrain = useCallback((id: string) => {
+    setActiveBrainIds((prev) => {
+      const next = prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id];
+      void saveActiveBrains(next);
+      return next;
+    });
+  }, []);
   // ── Model selection (Model-Fabric Phase 5: unified catalog — Phone / This PC /
   //    Mesh:<node> / Cloud groups, each a real, tool-capable agentChatStream target) ──
   const [providers, setProviders] = useState<ModelGroup[]>([]);
@@ -140,6 +155,10 @@ export default function ChatScreen() {
   const [selectedModelId, setSelectedModelId]       = useState<string | null>(null);
   const [showModelSelector, setShowModelSelector]   = useState(false);
   const [showOptions, setShowOptions]               = useState(false);
+  // Bumped when the Options sheet opens so BrainToggle refetches `brains.list`
+  // (picks up imports/deletes made in the Brains Manager screen).
+  const [brainsRefreshKey, setBrainsRefreshKey]     = useState(0);
+  const openOptions = useCallback(() => { setBrainsRefreshKey((k) => k + 1); setShowOptions(true); }, []);
   const [phoneModel, setPhoneModel] = useState<PhoneModelStatus>(getPhoneModelStatus());
   useEffect(() => subscribePhoneModel(setPhoneModel), []);
 
@@ -166,11 +185,15 @@ export default function ChatScreen() {
     selectedProviderId, selectedModelId, selectedNeuralMapId, neuralMapList,
     selectedNeuralMap, selectedAgent, autoApprove: chatDisplaySettings.autoApproveTools,
     autoRead, providers, phoneModel, voice, models,
+    brainIds: activeBrainIds, personaId: selectedPersonaId,
+    enableBlueprintTools: chatDisplaySettings.fabricationTools,
   });
   sendCtxRef.current = {
     selectedProviderId, selectedModelId, selectedNeuralMapId, neuralMapList,
     selectedNeuralMap, selectedAgent, autoApprove: chatDisplaySettings.autoApproveTools,
     autoRead, providers, phoneModel, voice, models,
+    brainIds: activeBrainIds, personaId: selectedPersonaId,
+    enableBlueprintTools: chatDisplaySettings.fabricationTools,
   };
 
   // ── Session management (new chat / delete) ──
@@ -437,6 +460,21 @@ export default function ChatScreen() {
   /** Guard for async on-device callbacks — bail if this turn was stopped/superseded. */
   const isCurrent = useCallback((msgId: string) => streamMsgRef.current?.msgId === msgId, []);
 
+  // Blueprint Studio handoff — a finished `create_blueprint` tool box carries a
+  // JSON result `{ planId, title, mapId, mapCreated, mapName }`. Offer to open
+  // the new Build Plan in the native Studio (mirrors the web Chat.tsx handler).
+  const maybeOfferBlueprint = useCallback((block: AssistantBlock) => {
+    const info = parseCreateBlueprint(block);
+    if (!info) return;
+    const label = info.mapCreated
+      ? `New Project "${info.mapName ?? info.title ?? "Project"}" + Build Plan created.`
+      : `Build Plan "${info.title ?? "created"}" is ready.`;
+    Alert.alert("Blueprint Studio", `${label}\n\nOpen it in Blueprint Studio?`, [
+      { text: "Not now", style: "cancel" },
+      { text: "Open Studio", onPress: () => router.push({ pathname: "/blueprint", params: { planId: info.planId } }) },
+    ]);
+  }, []);
+
   const startPcStream = useCallback((sessionId: string, msgId: string, providerId: string, modelId: string, apiMessages: { role: "user" | "assistant" | "system"; content: string }[], targetNodeId?: string) => {
     const ctx = sendCtxRef.current;
     let client: ReturnType<typeof getAgentTrpc>;
@@ -458,6 +496,14 @@ export default function ChatScreen() {
         rootDirectories: map?.rootDirectories,
         autoApprove: ctx.autoApprove,
         conversationId: sessionId,
+        // Brains-Upgrade Phase 8 — Brain Packs attached to this chat (charter +
+        // corpus injected server-side). Persona-durable brains are unioned in
+        // server-side when personaId is set.
+        brainIds: ctx.brainIds?.length ? ctx.brainIds : undefined,
+        personaId: ctx.personaId ?? undefined,
+        // Blueprint "Fabrication" toggle — exposes create_blueprint + the
+        // Blueprint domain toolset in the main chat when on.
+        enableBlueprintTools: ctx.enableBlueprintTools || undefined,
         // Model-Fabric Phase 5 — pins mesh routing to the exact peer the user
         // picked in the catalog (undefined for This PC / Cloud selections,
         // which never go through mesh offload anyway).
@@ -468,13 +514,19 @@ export default function ChatScreen() {
           blocks = applyAgentEvent(blocks, ev);
           if (ev.type === "done") finalizeStream(sessionId, msgId, blocks, ev.content, ev.totalTokens);
           else if (ev.type === "error") failStream(sessionId, msgId, ev.message);
-          else setMsgBlocks(sessionId, msgId, blocks);
+          else {
+            setMsgBlocks(sessionId, msgId, blocks);
+            // Blueprint Studio handoff: a finished `create_blueprint` tool box
+            // means the agent just spun up a Build Plan — offer to open it in
+            // the native Studio (same block shape as the web Chat.tsx handler).
+            if (ev.type === "block_end") maybeOfferBlueprint(ev.block);
+          }
         },
         onError(err) { failStream(sessionId, msgId, err.message); },
       },
     );
     streamSubRef.current = sub;
-  }, [failStream, finalizeStream, setMsgBlocks]);
+  }, [failStream, finalizeStream, setMsgBlocks, maybeOfferBlueprint]);
 
   const startPhoneStream = useCallback(async (sessionId: string, msgId: string, modelId: string | null, text: string) => {
     const ctx = sendCtxRef.current;
@@ -889,7 +941,7 @@ export default function ChatScreen() {
           className="w-10 h-10 items-center justify-center bg-background border border-border rounded-lg active:opacity-70">
           <Text className="text-primary text-xl leading-none">＋</Text>
         </Pressable>
-        <Pressable testID="btn-chat-options" onPress={() => setShowOptions(true)}
+        <Pressable testID="btn-chat-options" onPress={openOptions}
           className="w-10 h-10 items-center justify-center bg-background border border-border rounded-lg active:opacity-70">
           <Text className="text-lg leading-none">⚙️</Text>
         </Pressable>
@@ -1099,6 +1151,33 @@ export default function ChatScreen() {
                             </Pressable>
                           ))}
                         </View>
+                      </View>
+                    </View>
+
+                    {/* Brains — per-chat Brain Pack attach (Brains-Upgrade Phase 8) */}
+                    <BrainToggle
+                      activeBrainIds={activeBrainIds}
+                      onToggle={toggleActiveBrain}
+                      onOpenManager={() => { setShowOptions(false); router.push("/brains"); }}
+                      refreshKey={brainsRefreshKey}
+                    />
+
+                    {/* Fabrication — expose the Blueprint Studio toolset in chat */}
+                    <View>
+                      <Text className="text-xs text-muted mb-1 px-1">Fabrication</Text>
+                      <View className="bg-background border border-border rounded-lg p-3 gap-2">
+                        <Pressable testID="toggle-fabrication-tools" onPress={() => updateSettings({ fabricationTools: !chatDisplaySettings.fabricationTools })}
+                          className="flex-row items-center justify-between">
+                          <View className="flex-1 pr-2">
+                            <Text className="text-sm text-foreground">Enable Blueprint tools</Text>
+                            <Text className="text-xs text-muted">Let the AI turn a described project into a Build Plan</Text>
+                          </View>
+                          <Text className="text-base">{chatDisplaySettings.fabricationTools ? "✅" : "⬜"}</Text>
+                        </Pressable>
+                        <Pressable testID="btn-open-blueprint-studio" onPress={() => { setShowOptions(false); router.push("/blueprint"); }}
+                          className="active:opacity-60">
+                          <Text className="text-xs font-semibold text-primary">Open Blueprint Studio →</Text>
+                        </Pressable>
                       </View>
                     </View>
                   </View>

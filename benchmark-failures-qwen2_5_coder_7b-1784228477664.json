@@ -1,0 +1,180 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "provider": "ollama",
+  "date": "2026-07-16T19:01:17.664Z",
+  "runs": 1,
+  "repeat": 1,
+  "samplesPerExample": 1,
+  "failures": [
+    {
+      "run": 1,
+      "task": "Collatz steps @27",
+      "arm": "empowered",
+      "category": "no_answer_line",
+      "expected": "111",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps print(collatz_steps(27))\n  File \"<string>\", line 1\n    def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps print(collatz_steps(27))\n                                    ^^^^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps; print(collatz_steps(27))\n  File \"<string>\", line 1\n    def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps; print(collatz_steps(27))\n                                    ^^^^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1; steps += 1; return steps; print(collatz_steps(27))\n  File \"<string>\", line 1\n    def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1; steps += 1; return steps; print(collatz_steps(27))\n                                    ^^^^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Collatz steps @27",
+      "arm": "empowered+brain",
+      "category": "no_answer_line",
+      "expected": "111",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps print(collatz_steps(27))\n  File \"<string>\", line 1\n    def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps print(collatz_steps(27))\n                                    ^^^^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps print(collatz_steps(27))\n  File \"<string>\", line 1\n    def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps print(collatz_steps(27))\n                                    ^^^^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1; steps += 1; return steps; print(collatz_steps(27))\n  File \"<string>\", line 1\n    def collatz_steps(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1; steps += 1; return steps; print(collatz_steps(27))\n                                    ^^^^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered",
+      "category": "no_answer_line",
+      "expected": "77031",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n  File \"<string>\", line 1\n    def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n                                       ^^^^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n  File \"<string>\", line 1\n    def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n                                       ^^^^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n  File \"<string>\", line 1\n    def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n                                       ^^^^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered+brain",
+      "category": "wrong_value",
+      "expected": "77031",
+      "got": "{starting_number}')\"]}}",
+      "toolSteps": 1,
+      "toolErrors": [
+        "Command failed: python3 -c def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n  File \"<string>\", line 1\n    def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n                                       ^^^^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Levenshtein",
+      "arm": "empowered",
+      "category": "no_answer_line",
+      "expected": "3",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c def levenshtein_distance(s1, s2): if len(s1) > len(s2): s1, s2 = s2, s1; distances = range(len(s1) + 1); for index2, char2 in enumerate(s2): newDistances = [index2+1]; for index1, char1 in enumerate(s1): if char1 == char2: newDistances.append(distances[index1]); else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1])))]; distances = newDistances; return distances[len(s1)]; print(levenshtein_distance('kitten', 'sitting'))\n  File \"<string>\", line 1\n    def levenshtein_distance(s1, s2): if len(s1) > len(s2): s1, s2 = s2, s1; distances = range(len(s1) + 1); for index2, char2 in enumerate(s2): newDistances = [index2+1]; for index1, char1 in enumerate(s1): if char1 == char2: newDistances.append(distances[index1]); else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1])))]; distances = newDistances; return distances[len(s1)]; print(levenshtein_distance('kitten', 'sitting'))\n                                                                                                                                                                                                                                                                                                                                                                           ^\nSyntaxError: unmatched ']'\n",
+        "Command failed: python3 -c def levenshtein_distance(s1, s2): if len(s1) > len(s2): s1, s2 = s2, s1; distances = range(len(s1) + 1); for index2, char2 in enumerate(s2): newDistances = [index2+1]; for index1, char1 in enumerate(s1): if char1 == char2: newDistances.append(distances[index1]); else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))); distances = newDistances; return distances[len(s1)]; print(levenshtein_distance('kitten', 'sitting'))\n  File \"<string>\", line 1\n    def levenshtein_distance(s1, s2): if len(s1) > len(s2): s1, s2 = s2, s1; distances = range(len(s1) + 1); for index2, char2 in enumerate(s2): newDistances = [index2+1]; for index1, char1 in enumerate(s1): if char1 == char2: newDistances.append(distances[index1]); else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))); distances = newDistances; return distances[len(s1)]; print(levenshtein_distance('kitten', 'sitting'))\n                                      ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def levenshtein_distance(s1, s2): if len(s1) > len(s2): s1, s2 = s2, s1; distances = range(len(s1) + 1); for index2, char2 in enumerate(s2): newDistances = [index2+1]; for index1, char1 in enumerate(s1): if char1 == char2: newDistances.append(distances[index1]); else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))); distances = newDistances; return distances[len(s1)]; print(levenshtein_distance('kitten', 'sitting'))\n  File \"<string>\", line 1\n    def levenshtein_distance(s1, s2): if len(s1) > len(s2): s1, s2 = s2, s1; distances = range(len(s1) + 1); for index2, char2 in enumerate(s2): newDistances = [index2+1]; for index1, char1 in enumerate(s1): if char1 == char2: newDistances.append(distances[index1]); else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))); distances = newDistances; return distances[len(s1)]; print(levenshtein_distance('kitten', 'sitting'))\n                                      ^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Levenshtein",
+      "arm": "empowered+brain",
+      "category": "no_tool_use",
+      "expected": "3",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": ") else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))) distances = newDistances return distances[-1] print(levenshtein_distance('kitten', 'sitting')) \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Recurrence f(60)",
+      "arm": "empowered",
+      "category": "no_answer_line",
+      "expected": "576460752303423488",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n  File \"<string>\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n  File \"<string>\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n  File \"<string>\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Recurrence f(60)",
+      "arm": "empowered+brain",
+      "category": "no_answer_line",
+      "expected": "576460752303423488",
+      "got": null,
+      "toolSteps": 3,
+      "toolErrors": [
+        "Command failed: python3 -c def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n  File \"<string>\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 -c def f(n):\\n    if n == 1:\\n        return 1\\n    elif n == 2:\\n        return 2\\n    else:\\n        return f(n-1) + 2*f(n-2)\\nprint(f(60))\n  File \"<string>\", line 1\n    def f(n):\\n    if n == 1:\\n        return 1\\n    elif n == 2:\\n        return 2\\n    else:\\n        return f(n-1) + 2*f(n-2)\\nprint(f(60))\n              ^\nSyntaxError: unexpected character after line continuation character\n",
+        "Command failed: python3 -c def f(n):\\n    if n == 1:\\n        return 1\\n    elif n == 2:\\n        return 2\\n    else:\\n        return f(n-1) + 2*f(n-2)\\nprint(f(60))\n  File \"<string>\", line 1\n    def f(n):\\n    if n == 1:\\n        return 1\\n    elif n == 2:\\n        return 2\\n    else:\\n        return f(n-1) + 2*f(n-2)\\nprint(f(60))\n              ^\nSyntaxError: unexpected character after line continuation character\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "e continuations. {\"name\": \"execute_sandbox\", \"arguments\": {\"command\": \"python3\", \"args\": [\"-c\", \"\"\"def f(n): if n == 1: return 1 elif n == 2: return 2 else: return f(n-1) + 2*f(n-2) print(f(60))\"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Distinct substrings",
+      "arm": "empowered",
+      "category": "no_tool_use",
+      "expected": "53",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "n [''.join(sorted(list(set(s[i:i+1] for i in range(len(s)))) for s in [''.join(sorted(list(set(s[i:i+1] for i in range(len(s)))) for s in [''.join(sorted(list(set(s[i:i+1] for i in range(len(s)))) for"
+    },
+    {
+      "run": 1,
+      "task": "Distinct substrings",
+      "arm": "empowered+brain",
+      "category": "no_answer_line",
+      "expected": "53",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n  File \"<string>\", line 1\n    print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n         ^\nSyntaxError: '(' was never closed\n",
+        "Command failed: python3 -c print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n  File \"<string>\", line 1\n    print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n         ^\nSyntaxError: '(' was never closed\n",
+        "Command failed: python3 -c print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n  File \"<string>\", line 1\n    print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n         ^\nSyntaxError: '(' was never closed\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    }
+  ]
+}

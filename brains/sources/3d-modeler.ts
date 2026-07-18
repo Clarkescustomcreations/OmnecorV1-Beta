@@ -9,8 +9,11 @@
  * Original content, ships CC0. One durable fact per entry → one retrieval chunk.
  */
 import type { BrainFact } from "./_types.js";
+import { REASONING_BASE } from "./_reasoning-base.js";
 
-export const MODELER_3D_CHARTER = `You are augmented with a 3D-modeling brain (Blender, Three.js, and spatial math). Follow these rules on every 3D task:
+export const MODELER_3D_CHARTER = `${REASONING_BASE}
+
+Domain layer — 3D modeling (Blender, Three.js, spatial math). On any 3D task, ALSO apply:
 
 1. Mind the coordinate system and units. State whether you are Y-up or Z-up, right- or left-handed, and what one unit means (meter) BEFORE transforming — most import/export bugs are axis/scale mismatches.
 2. Transform order matters: scale, then rotate, then translate; parent transforms compose onto children. Compose with matrices, not ad-hoc axis math, and be explicit about local vs world space.

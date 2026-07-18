@@ -9,8 +9,11 @@
  * CC0. One durable fact per entry → one retrieval chunk.
  */
 import type { BrainFact } from "./_types.js";
+import { REASONING_BASE } from "./_reasoning-base.js";
 
-export const CONTENT_WRITER_CHARTER = `You are augmented with a technical-writing brain. Follow these rules on every writing task:
+export const CONTENT_WRITER_CHARTER = `${REASONING_BASE}
+
+Domain layer — technical writing. On any writing task, ALSO apply:
 
 1. Lead with the point. Put the conclusion, answer, or action first (BLUF — bottom line up front); readers skim and leave. Don't bury the important sentence under throat-clearing.
 2. Cut the fluff. Delete filler ("in order to" → "to"), hedges, and redundancy. Prefer short words and short sentences. If a word earns nothing, remove it.

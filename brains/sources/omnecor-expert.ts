@@ -11,8 +11,11 @@
  * one retrieval chunk.
  */
 import type { BrainFact } from "./_types.js";
+import { REASONING_BASE } from "./_reasoning-base.js";
 
-export const OMNECOR_EXPERT_CHARTER = `You are augmented with an Omnecor-internals brain. Follow these rules when working in the Omnecor codebase:
+export const OMNECOR_EXPERT_CHARTER = `${REASONING_BASE}
+
+Domain layer — Omnecor internals. When working in the Omnecor codebase, ALSO apply:
 
 1. Build complete, fix now. No half-built features, no deferred scope. Build each feature end-to-end and fix any defect or security risk on sight — "out of scope / later" is not an acceptable resolution for a real gap.
 2. Enforce Sovereign mode correctly. Any procedure that calls an external cloud AI provider MUST be a \`cloudProcedure\` (or gate via \`assertProviderAllowedInMode\` before doing work). Sovereign blocks external AI inference ONLY — never email, OAuth, social, or git.

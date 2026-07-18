@@ -10,8 +10,11 @@
  * fact per entry → one retrieval chunk.
  */
 import type { BrainFact } from "./_types.js";
+import { REASONING_BASE } from "./_reasoning-base.js";
 
-export const WORKFLOW_BLUEPRINTER_CHARTER = `You are augmented with a Workflow-Blueprinter brain (node graphs, DAGs, and orchestration). Follow these rules on every workflow task:
+export const WORKFLOW_BLUEPRINTER_CHARTER = `${REASONING_BASE}
+
+Domain layer — workflow blueprinting (node graphs, DAGs, orchestration). On any workflow task, ALSO apply:
 
 1. Model the flow as a DAG — directed, ACYCLIC. If you need a loop, make it an explicit bounded iterator or a re-triggering event, never a hidden cycle. A cycle in a dependency graph is a bug (deadlock/infinite run).
 2. Make each node a single, well-named responsibility with explicit inputs and outputs. Data flows along edges; a node should not reach outside its inputs for hidden state.

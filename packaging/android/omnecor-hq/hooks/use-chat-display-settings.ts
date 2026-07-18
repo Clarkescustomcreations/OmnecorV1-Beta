@@ -22,12 +22,20 @@ export interface MobileChatDisplaySettings {
    * approved automatically (still scoped to the active map's roots server-side).
    */
   autoApproveTools: boolean;
+  /**
+   * Chat "Fabrication" toggle — exposes the Blueprint Studio toolset
+   * (`create_blueprint` + domain tools) in the main chat when on. Mirrors the
+   * web `chatDisplaySettings.fabricationTools`; threaded to `agentChatStream` as
+   * `enableBlueprintTools`.
+   */
+  fabricationTools: boolean;
 }
 
 const DEFAULTS: MobileChatDisplaySettings = {
   showThinkingQuotes: true,
   quoteStyle: "random",
   autoApproveTools: false,
+  fabricationTools: false,
 };
 
 async function load(): Promise<MobileChatDisplaySettings> {

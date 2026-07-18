@@ -1093,6 +1093,8 @@ export class AiProviderService {
         };
         if (parsed.message?.thinking) result.thinking = parsed.message.thinking;
         if (Array.isArray(parsed.message?.tool_calls) && parsed.message.tool_calls.length > 0) {
+          // Always surface native calls structurally (streamChat consumers read
+          // `chunk.toolCalls`).
           const calls: NativeToolCall[] = parsed.message.tool_calls
             .map((tc: { id?: string; function?: { name?: string; arguments?: unknown } }) => ({
               id: tc.id,
@@ -1103,6 +1105,23 @@ export class AiProviderService {
             }))
             .filter((tc: NativeToolCall) => !!tc.name);
           if (calls.length) result.toolCalls = calls;
+          // ALSO shim them into the streamed CONTENT for the sub-agent worker:
+          // it calls `chat()` (content-only, drops `toolCalls`) and parses TEXT
+          // `<tool_call>` blocks. The non-streaming path already does this shim,
+          // but `chat()` streams — so without this a native-tool-calling model's
+          // calls were parsed into `toolCalls` and dropped, and the worker
+          // mistook an empty turn for a final answer. Scoped to the worker's
+          // routing mode so the interactive chat's native path is untouched.
+          if (input.routingMode === "sub_agent_internal") {
+            for (const tc of parsed.message.tool_calls as Array<{ function?: { name?: string; arguments?: unknown } }>) {
+              const fn = tc.function;
+              if (!fn?.name) continue;
+              const args = typeof fn.arguments === "string"
+                ? ((): Record<string, unknown> => { try { return JSON.parse(fn.arguments as string); } catch { return {}; } })()
+                : ((fn.arguments as Record<string, unknown>) ?? {});
+              result.content += `\n<tool_call>\n${JSON.stringify({ action: fn.name, ...args }, null, 2)}\n</tool_call>\n`;
+            }
+          }
         }
         if (parsed.done) {
           // Ollama's terminal object carries real token accounting; report the

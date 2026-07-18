@@ -53,6 +53,17 @@ const agentChatStreamInput = z.object({
   rootDirectories: z.array(z.string()).optional(),
   autoApprove: z.boolean().optional(),
   conversationId: z.string().optional(),
+  /** Brains-Upgrade Phase 8 — Brain Packs attached to this chat. The server
+   *  injects each brain's charter + retrieves its top-k corpus (see
+   *  `injectBrainContext`); mirrors the desktop `chatInputSchema.brainIds`. */
+  brainIds: z.array(z.string().max(128)).max(16).optional(),
+  /** Brains-Upgrade Phase 4 — active persona whose durable `data.brains` are
+   *  resolved server-side and unioned with `brainIds`. Owner-scoped. */
+  personaId: z.string().max(128).optional(),
+  /** Blueprint chat "Fabrication" toggle — exposes the Blueprint Studio toolset
+   *  (create_blueprint + domain tools) in the main chat when on (mirrors the
+   *  desktop `agentChatStream.extend`). */
+  enableBlueprintTools: z.boolean().optional(),
   /** Model-Fabric Phase 2 — native tool-calling opt-in (mirrors the desktop's
    *  chatInputSchema field, was missing from this mirror before Phase 5). */
   supportsNativeTools: z.boolean().optional(),
@@ -124,6 +135,32 @@ const appRouter = t.router({
     status: t.procedure
       .input(z.object({ conversationId: z.string().min(1) }))
       .query((): { status: string; taskId: string; nodeId: string } => ({ status: "idle", taskId: "", nodeId: "" })),
+  }),
+  /**
+   * Blueprint Studio planning stream (Blueprint Studio → APK port). The agent
+   * designs a Build Plan (BOM / cut list / drawings / calcs) using the Blueprint
+   * domain toolset — same `AgentStreamEvent` contract as `agentChatStream`, so
+   * the mobile Studio reuses the shared `applyAgentEvent` reducer + assistant
+   * renderers. Only this subscription needs typing (imperative `.subscribe()`);
+   * every other `blueprint.*` procedure goes through the untyped HTTP helpers.
+   * Mirrors the desktop `server/routers/blueprintRouter.ts` `agentStream`.
+   */
+  blueprint: t.router({
+    agentStream: t.procedure
+      .input(
+        z.object({
+          planId: z.string().min(1),
+          providerId: z.string().min(1),
+          modelId: z.string().min(1),
+          message: z.string().min(1).max(32000),
+          maxTokens: z.number().int().optional(),
+          supportsNativeTools: z.boolean().optional(),
+          targetNodeId: z.string().optional(),
+        }),
+      )
+      .subscription(async function* (): AsyncGenerator<AgentStreamEvent> {
+        // Type-only stub: the real planning loop runs on the desktop server.
+      }),
   }),
 });
 

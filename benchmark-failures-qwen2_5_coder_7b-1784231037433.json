@@ -1,0 +1,229 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "provider": "ollama",
+  "date": "2026-07-16T19:43:57.433Z",
+  "runs": 2,
+  "repeat": 1,
+  "samplesPerExample": 2,
+  "failures": [
+    {
+      "run": 1,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered",
+      "category": "no_tool_use",
+      "expected": "77031",
+      "got": "{starting_number}\")",
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": " = 0 starting_number = 0 for i in range(1, 100000): length = len(collatz_sequence(i)) if length > longest_length: longest_length = length starting_number = i print(f\"ANSWER: {starting_number}\") \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered+brain",
+      "category": "no_tool_use",
+      "expected": "77031",
+      "got": "{starting_number}\")",
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "er = 0 for i in range(1, 100000): current_length = collatz_sequence_length(i) if current_length > max_length: max_length = current_length starting_number = i print(f\"ANSWER: {starting_number}\") \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Levenshtein",
+      "arm": "empowered",
+      "category": "no_tool_use",
+      "expected": "3",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": ") else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))) distances = newDistances return distances[-1] print(levenshtein_distance('kitten', 'sitting')) \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Levenshtein",
+      "arm": "empowered+brain",
+      "category": "no_tool_use",
+      "expected": "3",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": ") else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))) distances = newDistances return distances[-1] print(levenshtein_distance('kitten', 'sitting')) \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Recurrence f(60)",
+      "arm": "empowered",
+      "category": "wrong_value",
+      "expected": "576460752303423488",
+      "got": "32733777552734744709300",
+      "toolSteps": 5,
+      "toolErrors": [
+        "Command failed: python3 /tmp/omnecor-sandbox-211e4ec0-b129-44e7-b411-f8f5499f7245.py\n  File \"/tmp/omnecor-sandbox-211e4ec0-b129-44e7-b411-f8f5499f7245.py\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-ae20ef08-55e6-42de-851c-8c13acd45786.py\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-6e61a691-ca21-4b5c-b590-4d0a62f7de0f.py\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "ANSWER: 32733777552734744709300"
+    },
+    {
+      "run": 1,
+      "task": "Recurrence f(60)",
+      "arm": "empowered+brain",
+      "category": "no_answer_line",
+      "expected": "576460752303423488",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 /tmp/omnecor-sandbox-2ec0a063-d27f-4228-a4f7-a43023f9b1f2.py\n  File \"/tmp/omnecor-sandbox-2ec0a063-d27f-4228-a4f7-a43023f9b1f2.py\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-f38ae1d3-f5ec-46f3-9bfe-83729d150dad.py\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-0764eaf4-9144-4d3a-9add-f73be9732fa9.py\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Distinct substrings",
+      "arm": "empowered",
+      "category": "no_tool_use",
+      "expected": "53",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "ame\": \"execute_sandbox\", \"arguments\": {\"command\": \"python3\", \"args\": [\"-c\", \"print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi']))) for s in ['mississippi']))\")]}"
+    },
+    {
+      "run": 1,
+      "task": "Distinct substrings",
+      "arm": "empowered+brain",
+      "category": "wrong_value",
+      "expected": "53",
+      "got": "4",
+      "toolSteps": 3,
+      "toolErrors": [
+        "Command failed: python3 -c print(len(set(''.join(sorted(set(s[i:j] for i in range(len(s)) for j in range(i+1, len(s)+1))))))) s='mississippi'\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nNameError: name 's' is not defined\n",
+        "Command failed: python3 -c print(len(set(''.join(sorted(set(s[i:j] for i in range(len(s)) for j in range(i+1, len(s)+1))))))) s='mississippi'\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nNameError: name 's' is not defined\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "ANSWER: 4"
+    },
+    {
+      "run": 2,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered",
+      "category": "no_answer_line",
+      "expected": "77031",
+      "got": null,
+      "toolSteps": 2,
+      "toolErrors": [
+        "Command failed: python3 -c def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n  File \"<string>\", line 1\n    def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n                                       ^^^^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "The starting number under 100,000 that produces the longest Collatz sequence is **77031**."
+    },
+    {
+      "run": 2,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered+brain",
+      "category": "no_answer_line",
+      "expected": "77031",
+      "got": null,
+      "toolSteps": 2,
+      "toolErrors": [
+        "Command failed: python3 -c def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n  File \"<string>\", line 1\n    def collatz_sequence(n): steps = 0 while n != 1: if n % 2 == 0: n = n // 2 else: n = 3 * n + 1 steps += 1 return steps max_steps = 0 starting_number = 0 for i in range(1, 100000): current_steps = collatz_sequence(i) if current_steps > max_steps: max_steps = current_steps starting_number = i print(f'ANSWER: {starting_number}')\n                                       ^^^^^\nSyntaxError: invalid syntax\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "The starting number under 100,000 that produces the longest Collatz sequence is **77031**."
+    },
+    {
+      "run": 2,
+      "task": "Levenshtein",
+      "arm": "empowered",
+      "category": "no_tool_use",
+      "expected": "3",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": ") else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))) distances = newDistances return distances[-1] print(levenshtein_distance('kitten', 'sitting')) \"\"\"]}}"
+    },
+    {
+      "run": 2,
+      "task": "Recurrence f(60)",
+      "arm": "empowered",
+      "category": "wrong_value",
+      "expected": "576460752303423488",
+      "got": "32733777552734744709300",
+      "toolSteps": 5,
+      "toolErrors": [
+        "Command failed: python3 /tmp/omnecor-sandbox-c6ac31d5-49d3-4867-a33b-545a1c7aeadd.py\n  File \"/tmp/omnecor-sandbox-c6ac31d5-49d3-4867-a33b-545a1c7aeadd.py\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-99868f62-bdbd-4aa9-8301-3a9b180c3c16.py\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-cd326f4e-5453-4f03-883b-5429806c8d86.py\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "ANSWER: 32733777552734744709300"
+    },
+    {
+      "run": 2,
+      "task": "Recurrence f(60)",
+      "arm": "empowered+brain",
+      "category": "maxsteps_exceeded",
+      "expected": "576460752303423488",
+      "got": null,
+      "toolSteps": 20,
+      "toolErrors": [
+        "Command failed: python3 /tmp/omnecor-sandbox-4edde3d5-9aaf-47d4-9e50-8902b4f735ff.py\n  File \"/tmp/omnecor-sandbox-4edde3d5-9aaf-47d4-9e50-8902b4f735ff.py\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-d824b2cb-6553-4caf-bf36-954680ead45e.py\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-9f30b4d1-0552-4ad0-81d3-2d06e49a51dd.py\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": true,
+      "finalSnippet": "Task exceeded the 20-step ceiling without a final answer."
+    },
+    {
+      "run": 2,
+      "task": "Distinct substrings",
+      "arm": "empowered+brain",
+      "category": "no_tool_use",
+      "expected": "53",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": " \"execute_sandbox\", \"arguments\": {\"command\": \"python3\", \"args\": [\"-c\", \"print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi']))) for s in ['mississippi']))\")]}} ```"
+    }
+  ]
+}

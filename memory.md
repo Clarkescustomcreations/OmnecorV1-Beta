@@ -5,18 +5,51 @@ Compiled 2026-07-15 from a full sweep of the trackers: `Task-Brains-Upgrade.md`
 `Context/Tracker-Docs/Verification-Pass.md` (Sections 8/10/11/12), and
 `Context/Tracker-Docs/Workflow-Matrix.md` (unchecked `[ ]` journeys).
 
-**All completed feature work is recorded** — Brains Upgrade Phases 0–8, Chats
+**All completed feature work is recorded** — Brains Upgrade Phases 0–**9**, Chats
 Agentic Phases 0–6, Model-Fabric Phases 0–8, and Mesh-Delegation Phases 1–9 are
-all SHIPPED with green static gates (last measured baseline **1590 passing / 4
-skipped, 140 files**). What remains below is **verification + a few deferred
-gaps**, not core building. Record every result into
+all SHIPPED with green static gates (last measured baseline **1741 passing / 4
+skipped, 152 files** — 2026-07-15). What remains below is **verification + a few
+deferred gaps**, not core building. Record every result into
 `Context/Tracker-Docs/Verification-Pass.md` as items land.
+
+> **✅ Session 2026-07-15 (this session) — A1 Brains Phase 9 CLOSED (live-proven).**
+> Drove the Coding + Omnecor-Expert brains end-to-end over strict-mTLS OMMESH to
+> **Omnecor's OWN `llama-server` runtime on DadsPC `.201`** (qwen2.5-coder:7b, NOT
+> Ollama — the Ollama provider path skews eval). Proven-remote (pinned
+> `targetNodeId` throws on offload failure + this box has no local runtime).
+> **Grounded + CITED** (`[Brain: Coding · sec-sql-dynamic-identifiers-allowlist]`);
+> impossible→success (baseline hallucinated "Omnecor = Alibaba Cloud", brain gave
+> correct Sovereign/Scrapper/Big-Spender + `cloudProcedure`). Gates: `pnpm check`✅ /
+> `pnpm test` **1741 pass / 4 skip / 152 files**✅. Recorded in Task-Brains-Upgrade.md
+> Phase 9 + Verification-Pass.md Session-41. Also lifted **real cross-node mTLS
+> OMMESH inference via the `llamacpp` own-runtime** from 🤝-hardware → ✅. **A1's
+> other half (Chats Phase 7 static close-out: `/review` + `pnpm build` + `pnpm audit
+> --prod` + `/remember save`) is NOT yet done.** Harness gotchas logged in the
+> [[brain-packs-workstream]] auto-memory (ZERO_LOGIN-in-prod guard, ENOSPC dev
+> server, base64 `brains.import`, `pkill -f` self-match).
 
 > **The big unlock:** one **live multi-peer / on-device session** (Group B) closes
 > the most at once — it's the shared gate behind Chats Phase 7, Brains Phase 9
 > end-to-end, Model-Fabric Phase 7, Mesh-Delegation Phase 10, and the whole APK +
 > OMMESH manual checklist. Group A needs no hardware and can be done at the desk
 > first. See the `ommesh-mesh-test` + `run-omnecor` skills.
+
+> **APK port landed 2026-07-15 (pre-req for the Group B APK wave) — `/review`d + fixed.**
+> **Brains** (full parity) + **Blueprint Studio** (Core depth) were web/server-only;
+> both are now ported to `packaging/android/omnecor-hq`. New: `app/brains.tsx` (manager:
+> import built-ins/.obp, export, delete, rebuild, sync-to-peer, persona attach),
+> `app/blueprint.tsx` (plans rail + intake + planning chat reusing the existing
+> agentic stream + read-only Build Plan doc w/ inline SVG-drawing WebView + PDF
+> export + concept render + visible delete + get-error/retry), `components/chat/BrainToggle.tsx`,
+> `components/blueprint/PlanDocument.tsx`, `lib/_core/{brain-store,file-export,blueprint-handoff}.ts`.
+> Chat now threads `brainIds`/`personaId`/`enableBlueprintTools` and offers a
+> `create_blueprint` "Open in Studio" handoff. **`/review` found 5 (1 important
+> design-token drift + 4 minor); ALL FIXED** (hardcoded `#888`/`#fff` → `useColors()`
+> tokens, inline SVG rendering, brains no-concurrent-mutation, doc error/retry state,
+> visible plan-delete). All static gates green (APK tsc/lint clean, root tsc, full
+> suite 1756✓/4-skip, +15 new tests). Durable detail + gotchas in the
+> [[apk-brains-blueprint-port]] auto-memory. **Still unverified on-device** — folds
+> into B1/B2 below (drive brains-in-chat + build-plan-via-chat over `adb reverse`).
 
 ---
 
@@ -26,12 +59,15 @@ These are verifiable at the desk via `appRouter.createCaller`, the dev server un
 `ZERO_LOGIN_MODE`, a local Ollama, Playwright, or the OAuth emulator skills.
 
 ### A1 — Close-out gates on the two shipped workstreams
-- [ ] **Brains Phase 9** — end-to-end drive: attach the Coding brain → real local-model
-      chat (Ollama/own runtime) → confirm grounded, **cited** output. Then coverage
-      ratchet + `pnpm check`/`pnpm test`. (`Task-Brains-Upgrade.md` Phase 9 = the only 🔄.)
+- [x] ~~**Brains Phase 9** — end-to-end drive: attach the Coding brain → real local-model
+      chat → confirm grounded, **cited** output.~~ **DONE 2026-07-15** — live-proven over
+      OMMESH to .201's own `llama-server` runtime (grounded + cited + impossible→success);
+      `pnpm check`✅ / `pnpm test` 1741✅. See the session banner above + Verification-Pass.md
+      Session-41.
 - [ ] **Chats Phase 7 static close-out** — `/review` the full feature · `pnpm check` ·
       `pnpm test` · `pnpm build` · `pnpm audit --prod` all green · then `/remember save`.
-      (On-device tool-loop part of Phase 7 is in Group B.)
+      (`pnpm check`/`pnpm test` already green 2026-07-15; still need `/review` + `build` +
+      `audit`. On-device tool-loop part of Phase 7 is in Group B.)
 
 ### A2 — Verification-Pass §8 Priority 1 (core server, ZERO_LOGIN dev server)
 - [ ] Health endpoint 200 · tRPC `auth.me` · zero-login banner

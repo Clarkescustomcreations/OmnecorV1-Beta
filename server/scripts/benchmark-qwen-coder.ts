@@ -6,8 +6,18 @@ import fs from "fs/promises";
 import path from "path";
 
 async function main() {
+  // Optional extra system prompt. The worker already ships a complete default
+  // tool-instruction prompt, so a missing file here is not fatal — we just run
+  // with the worker's default (older revisions hard-read this path and crashed).
   const promptPath = path.resolve(process.cwd(), "agents/4B-Logic-Controller-Prompt.md");
-  const systemPrompt = await fs.readFile(promptPath, "utf-8");
+  let systemPrompt: string | undefined;
+  try {
+    systemPrompt = await fs.readFile(promptPath, "utf-8");
+    console.log(`Loaded extra system prompt from ${promptPath}`);
+  } catch {
+    systemPrompt = undefined;
+    console.log("No extra system prompt found — using LocalSubAgentWorker's default tool prompt.");
+  }
 
   const aiService = AiProviderService.getInstance();
 

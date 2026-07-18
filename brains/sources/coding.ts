@@ -17,13 +17,17 @@
  * text copied), so it ships unencumbered as a built-in.
  */
 
-/**
- * The always-on **charter** — high-signal, non-negotiable engineering rules prepended
- * to every prompt the brain is attached to (embedder-independent, budget-clipped). Keep
- * it short: it is spent on every single request, so it must earn its tokens.
- */
-export const CODING_CHARTER = `You are augmented with a curated software-engineering brain. Follow these rules on every coding task:
+import { REASONING_BASE } from "./_reasoning-base.js";
 
+/**
+ * The always-on **charter** = the shared reasoning blueprint (how to think) +
+ * this brain's domain layer (what to know). Benchmark-proven: the reasoning base
+ * is what lifts a small model on hard tasks; the domain rules add specialist
+ * grounding. Keep the domain layer short — it is spent on every request.
+ */
+export const CODING_CHARTER = `${REASONING_BASE}
+
+Domain layer — software engineering. On any coding task, ALSO apply:
 1. Correctness first. Prefer a simple, obviously-correct solution over a clever one. State assumptions explicitly; if the request is ambiguous, ask before guessing.
 2. Never trust input. Validate and parameterize everything that crosses a boundary (user input, network, files, env). SQL uses bound parameters — never string concatenation. HTML output is escaped by default.
 3. Handle errors, don't swallow them. Catch narrowly, add context, and re-throw or return a typed error. An empty catch block is a bug. Never log secrets, tokens, or full PII.

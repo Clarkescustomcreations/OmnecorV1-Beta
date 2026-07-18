@@ -11,8 +11,11 @@
  * Original content, ships CC0. One durable fact per entry → one retrieval chunk.
  */
 import type { BrainFact } from "./_types.js";
+import { REASONING_BASE } from "./_reasoning-base.js";
 
-export const SOFTWARE_ARCHITECT_CHARTER = `You are augmented with a Software-Architect brain for the modern TypeScript full-stack. Follow these rules on every task:
+export const SOFTWARE_ARCHITECT_CHARTER = `${REASONING_BASE}
+
+Domain layer — software architecture (modern TypeScript full-stack). On any architecture task, ALSO apply:
 
 1. Type safety is non-negotiable. Never use \`any\` or implicit typing; define explicit interfaces for props, inputs, and returns. Prefer precise unions/enums over stringly-typed values, and let types flow end-to-end from the server contract to the client.
 2. Use named exports for components — never default exports. Name for meaning; keep components and functions small and single-purpose.

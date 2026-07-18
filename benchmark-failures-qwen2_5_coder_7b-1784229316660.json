@@ -1,0 +1,138 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "provider": "ollama",
+  "date": "2026-07-16T19:15:16.660Z",
+  "runs": 1,
+  "repeat": 1,
+  "samplesPerExample": 1,
+  "failures": [
+    {
+      "run": 1,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered",
+      "category": "no_tool_use",
+      "expected": "77031",
+      "got": "{starting_number}\")",
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "er = 0 for i in range(1, 100000): current_length = collatz_sequence_length(i) if current_length > max_length: max_length = current_length starting_number = i print(f\"ANSWER: {starting_number}\") \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Longest Collatz <100000",
+      "arm": "empowered+brain",
+      "category": "no_tool_use",
+      "expected": "77031",
+      "got": "{starting_number}')",
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "er = 0 for i in range(1, 100000): current_length = collatz_sequence_length(i) if current_length > max_length: max_length = current_length starting_number = i print(f'ANSWER: {starting_number}') \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Levenshtein",
+      "arm": "empowered",
+      "category": "no_tool_use",
+      "expected": "3",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": ") else: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))) distances = newDistances return distances[-1] print(levenshtein_distance('kitten', 'sitting')) \"\"\"]}}"
+    },
+    {
+      "run": 1,
+      "task": "Levenshtein",
+      "arm": "empowered+brain",
+      "category": "no_tool_use",
+      "expected": "3",
+      "got": null,
+      "toolSteps": 0,
+      "toolErrors": [],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "lse: newDistances.append(1 + min((distances[index1], distances[index1 + 1], newDistances[-1]))) distances = newDistances return distances[-1] print(levenshtein_distance('kitten', 'sitting')) \"\"\" ] } }"
+    },
+    {
+      "run": 1,
+      "task": "Recurrence f(60)",
+      "arm": "empowered",
+      "category": "no_answer_line",
+      "expected": "576460752303423488",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 /tmp/omnecor-sandbox-be306fcc-9f8c-40d0-9344-15a26c67826d.py\n  File \"/tmp/omnecor-sandbox-be306fcc-9f8c-40d0-9344-15a26c67826d.py\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-fcf0730a-3ea0-457e-a03f-dbccedfc52e7.py\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-de309f52-9f3a-4243-96e9-f9a331685a1f.py\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Recurrence f(60)",
+      "arm": "empowered+brain",
+      "category": "no_answer_line",
+      "expected": "576460752303423488",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 /tmp/omnecor-sandbox-3fe05948-6f55-42af-8288-fe850265ac78.py\n  File \"/tmp/omnecor-sandbox-3fe05948-6f55-42af-8288-fe850265ac78.py\", line 1\n    def f(n): if n == 1: return 1; elif n == 2: return 2; else: return f(n-1) + 2*f(n-2); print(f(60))\n              ^^\nSyntaxError: invalid syntax\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-03f57713-850e-4f78-8546-7cca2894b90a.py\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-9a20ab99-44ab-4d57-b982-9fba5f930494.py\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Distinct substrings",
+      "arm": "empowered",
+      "category": "no_answer_line",
+      "expected": "53",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c print(len(set(''.join([s[i:j] for i in range(len(s)) for j in range(i+1, len(s)+1)] for s in ['mississippi']))))\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: sequence item 0: expected str instance, list found\n",
+        "Command failed: python3 -c print(len(set(''.join([s[i:j] for i in range(len(s)) for j in range(i+1, len(s)+1)] for s in ['mississippi']))))\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: sequence item 0: expected str instance, list found\n",
+        "Command failed: python3 -c print(len(set(''.join([s[i:j] for i in range(len(s)) for j in range(i+1, len(s)+1)] for s in ['mississippi']))))\nTraceback (most recent call last):\n  File \"<string>\", line 1, in <module>\nTypeError: sequence item 0: expected str instance, list found\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    },
+    {
+      "run": 1,
+      "task": "Distinct substrings",
+      "arm": "empowered+brain",
+      "category": "no_answer_line",
+      "expected": "53",
+      "got": null,
+      "toolSteps": 8,
+      "toolErrors": [
+        "Command failed: python3 -c print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n  File \"<string>\", line 1\n    print(len(set(''.join(sorted(set(s[i:i+1] for i in range(len(s)) for s in ['mississippi'][0])))))\n         ^\nSyntaxError: '(' was never closed\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-e0176ee5-0f6e-497f-b614-9b8048668acb.py\n  File \"/tmp/omnecor-sandbox-e0176ee5-0f6e-497f-b614-9b8048668acb.py\", line 2\n    distinct_substrings = set(''.join(sorted(set(s[i:i+1] for i in range(len(s)))))\n                             ^\nSyntaxError: '(' was never closed\n",
+        "Command failed: python3 /tmp/omnecor-sandbox-d1d82a1a-c237-4148-92de-1f486b1c2559.py\n  File \"/tmp/omnecor-sandbox-d1d82a1a-c237-4148-92de-1f486b1c2559.py\", line 2\n    distinct_substrings = set(''.join(sorted(set(s[i:i+1] for i in range(len(s)))))\n                             ^\nSyntaxError: '(' was never closed\n"
+      ],
+      "parseErrors": 0,
+      "harnessErrors": 0,
+      "maxStepsHit": false,
+      "finalSnippet": "Task exceeded maximum retries without a clear final answer."
+    }
+  ]
+}

@@ -5,18 +5,22 @@ integrates with massive frontier cloud models (Claude, GPT‑4o, Gemini) via `cl
 routing, one of its most powerful capabilities is closing the gap for small models running on
 modest local hardware.
 
-The question is often asked: **Can a 1.5B–8B parameter model running locally on an RTX 4060
-(8 GB VRAM) — or even a phone — beat its stock benchmarks and perform complex, multi-step
-agentic work?**
+A recurring question: **can a 1.5B–8B parameter model running locally on an RTX 4060 (8 GB VRAM)
+— or even a phone — do reliable, complex, multi-step agentic work, rather than fumbling it the way
+a bare model of that size usually does?**
 
-With Omnecor's architectural scaffolding, the answer is **Yes**. Omnecor surrounds smaller
+Omnecor's architectural scaffolding is **designed to make that possible**. It surrounds smaller
 models with a resilient ecosystem that patches their inherent weaknesses — context limits,
-tool-calling fragility, brittle CLI syntax, hallucinated math, and hardware constraints —
-letting them "punch above their weight class." A small model plugged into Omnecor is never
-working alone: it is wrapped in a self-correcting harness, given high-level tools instead of raw
-shell, handed pre-compressed context, backstopped by deterministic engines for anything it
-shouldn't guess at, and able to borrow a bigger GPU (or a full sub-agent) from anywhere on the
-LAN.
+tool-calling fragility, brittle CLI syntax, hallucinated math, and hardware constraints — so they
+can punch above their weight class. A small model plugged into Omnecor is never working alone: it
+is wrapped in a self-correcting harness, given high-level tools instead of raw shell, handed
+pre-compressed context, backstopped by deterministic engines for anything it shouldn't guess at,
+and able to borrow a bigger GPU (or a full sub-agent) from anywhere on the LAN.
+
+> **On evidence.** This document describes the *architecture* and what each layer is intended to
+> do. Where it makes an empirical claim, that claim is scoped to what has actually been measured —
+> see the smoke test at the end. It deliberately does **not** claim a small model equals any
+> specific larger model; no controlled comparative benchmark has been run to support that.
 
 This document is the complete inventory of what Omnecor has built to empower local models, and
 where each piece lives in the codebase.
@@ -279,24 +283,119 @@ is a small model at the center of a resilient, self-correcting, hardware-aware a
 
 ---
 
-## Benchmark Results: `qwen2.5-coder:7b`
+## Measured Benchmark: `qwen2.5-coder:7b` (2026-07-16)
 
-To answer whether a smaller model can beat its stock benchmarks when empowered by Omnecor, an
-automated harness (`server/scripts/benchmark-qwen-coder.ts`) was run against `qwen2.5-coder:7b`
-hosted on a local Ollama server (node 201).
+Rather than compare against an untested larger model, `server/scripts/benchmark-agentic.ts` measures
+the two things the empowerment layers are actually *for*, against **independently computed ground
+truth** the model never sees. It runs in the real target topology (§3): a **weak laptop-class node
+drives the agentic tool loop locally while inference runs on a secondary GPU node** — here the tool
+loop ran on the Linux dev box (GTX-1650-class) and each `qwen2.5-coder:7b` inference executed on the
+`.201` AI-server node (RTX 4060 Ti). Every task is run in **three arms** to isolate each layer's
+contribution:
 
-**The Test Suite:** the model was run through a multi-case suite to prove consistent performance
-rather than a one-off success. Tasks included:
-1. Basic tool invocation (printing strings via `python3`).
-2. Local filesystem inspection (safely running `ls` on constrained directories).
-3. Multi-step algorithmic reasoning (generating and running a Python script to compute math).
+1. **bare** — the raw model, no tools, no brain (answers from weights);
+2. **empowered** — the sandbox tool + the Try‑Fail‑Fix harness (§5–6);
+3. **empowered + Generalist brain** — arm 2 plus the Generalist Brain Pack (§8) injected.
 
-**The Result:** across multiple distinct runs, the 7B model consistently demonstrated successful
-reasoning and execution:
-1. **Tool Invocation:** accurately crafted JSON tool payloads with zero formatting errors across
-   tests.
-2. **Try‑Fail‑Fix Resiliency:** on harder multi-step tasks that traditionally cause 7B models to
-   hallucinate CLI commands, the sandbox intercepted failures and let the model self-correct.
-3. **Completion & Speed:** tasks completed consistently in under 2–4 seconds each — proving the
-   Omnecor harness functionally elevates a 7B model to reliable, multi-step agentic work that would
-   normally require a 70B+ class model, without sacrificing speed.
+### Test conditions — exactly how it was run
+
+**Serving.** One model under test: `qwen2.5-coder:7b` (a ~4.7 GB Q4 GGUF). It was served by **Ollama on
+the `.201` AI-server node** (RTX 4060 Ti 8 GB) at `http://192.168.1.201:11434`; the **Linux dev box drove
+the agentic loop** and offloaded each inference to `.201` over the LAN — the weak-laptop + secondary-GPU
+topology of §3. Sampling: `temperature 0.2`, `maxTokens 1500`. *Caveat:* this used `.201`'s **Ollama**,
+not Omnecor's own `llama-server` (that runtime is bound to `127.0.0.1:8014` on `.201` and isn't LAN-reachable);
+the harness normalized Ollama's chat-focused tool-call format. The empowerment layers under test (harness,
+sandbox, brain) are provider-agnostic.
+
+**Ground truth (never shown to the model).** Every task's answer is computed **independently in this
+Node process** — `crypto` (SHA‑256), `BigInt` (factorial, 2ⁿ, the recurrence), a sieve (prime count /
+nth prime), DP (Levenshtein), brute force (Collatz), set enumeration (distinct substrings). The model
+never receives the truth; a run passes only if its `ANSWER` (or full output) contains/equals the
+Node value. For 64-hex digests and multi-hundred-digit integers, a coincidental match is impossible.
+
+**What each arm could and could not access:**
+
+| | Arm 1 — bare | Arm 2 — empowered | Arm 3 — empowered + brain |
+|---|---|---|---|
+| Model weights | ✅ | ✅ | ✅ |
+| Code execution / tools | ❌ none | ✅ `execute_sandbox` only | ✅ `execute_sandbox` only |
+| Try‑Fail‑Fix self-correction | ❌ | ✅ (maxRetries 8) | ✅ |
+| Generalist Brain (charter + retrieval) | ❌ | ❌ | ✅ (local embed store) |
+| Internet / web search | ❌ | ❌ | ❌ |
+| The ground-truth values | ❌ | ❌ | ❌ |
+| Pre-written solutions | ❌ (wrote its own) | ❌ (wrote its own) | ❌ (wrote its own) |
+
+- **Bare** is a single call; its system prompt states plainly *"you have NO tools and NO code execution —
+  answer from your own knowledge only."*
+- **Empowered** is the real `LocalSubAgentWorker` tool loop. Its ONE tool, `execute_sandbox`, runs a
+  command via `execFile` — **no shell** (no pipes/redirects/globbing/injection), an **allowlist of exactly
+  `python3` / `node` / `ls` / `echo`**, a **10 s per-command timeout**, executing on the **driver (Linux)
+  node** in the repo root, with **no network**. A prepended mandate required it to *compute via the tool,
+  not from memory*. The model had to **write the code itself** (a stdlib one-liner for the "core" tier;
+  genuine DP/loop/recurrence logic for the "hard" tier).
+- **Empowered + brain** is identical to Arm 2 plus the Generalist Brain Pack injected via
+  `injectBrainContext` (always-on charter + top-k retrieved corpus for the task query); the brain store is
+  local, so still no internet.
+
+Each task runs `RUNS × REPEAT` times per arm; scoring is binary pass/fail vs the independent truth,
+aggregated as correct/total. Reproduce with
+`BENCH_TIER=<core|hard> BENCH_RUNS=<n> OLLAMA_BASE_URL=http://<gpu-node>:11434 npx tsx server/scripts/benchmark-agentic.ts`.
+
+### Part A — Long-horizon reliability
+
+One run must chain many **sequential, non-precomputable** tool steps: each round draws a fresh random
+number via the sandbox and threads the running total into the next call, so the model *cannot* batch
+or precompute — it must sustain a real multi-step trajectory. Verified by reconstructing the expected
+value from the observed tool outputs.
+
+| Arm | Sequential tool steps | State threaded correctly | Final answer verified | Harness loop failures |
+|---|---|---|---|---|
+| empowered | **14** | ✅ | ✅ | **0** |
+| empowered + brain | **10** | ✅ | ✅ | **0** |
+
+The harness carried 10–14 consecutive tool round-trips with **zero loop failures** and perfectly
+threaded state; the runs stopped a step or two short of the 15-round target (the model chose to
+finish early), but every step it executed was correct.
+
+### Part B — Capability lift (bare vs empowered), ground-truth verified
+
+Four tasks with an exact answer that a 7B model **cannot** produce from weights — a SHA‑256 digest,
+the count of primes below 200000 (17984), an exact 30! , and the SHA‑256 of 30!'s decimal string.
+The ground truth is computed independently in Node (crypto / BigInt / a sieve) and never shown to
+the model.
+
+| Task (independent truth) | 1. bare | 2. empowered | 3. empowered + brain |
+|---|---|---|---|
+| SHA‑256 of a string | ✗ (hallucinated) | ✅ (1 step) | ✅ (1 step) |
+| Primes < 200000 = 17984 | ✗ | ✅ (3 steps) | ✅ (1 step) |
+| 30! exact | ✅ (from memory) | ✅ (1 step) | ✅ (1 step) |
+| SHA‑256 of 30! | ✗ | ✅ (1 step) | ✅ (2 steps) |
+| **Score** | **1 / 4** | **4 / 4** | **4 / 4** |
+
+### What this shows — and what it does not
+
+- **The empowerment is real and measured, not asserted.** On verifiable tasks the bare 7B scores
+  **1/4** (it only nails 30!, a value common enough to be in-weights, and confidently hallucinates
+  the SHA‑256 digests and the prime count); wrapped in Omnecor's sandbox + harness it scores
+  **4/4**, computing each answer exactly. That is a controlled bare-vs-empowered A/B with an
+  independent oracle — the kind of evidence the earlier "equals a 70B" line lacked.
+- **On these tasks the *tool* carries the lift, not the brain.** Both empowered arms score 4/4 —
+  the Generalist brain doesn't change correctness on pure-computation tasks (correctness there comes
+  from the deterministic sandbox, §10), though it did reduce the prime-count run from 3 tool steps to
+  1. The brain's value is knowledge/reasoning grounding (§8), which these deterministic tasks do not
+  probe; measuring that needs knowledge tasks with a verifiable oracle, which this suite does not yet
+  include.
+- **Scope.** This is a small, focused suite (one long-horizon task + four computation tasks), run on
+  one model on one GPU node. It is **not** a standardized agentic benchmark (SWE-bench and the like)
+  and makes **no** claim of parity with any particular larger model — it measures the empowerment
+  delta on this model, honestly and reproducibly. Re-run with
+  `OLLAMA_BASE_URL=http://<gpu-node>:11434 npx tsx server/scripts/benchmark-agentic.ts`.
+
+> **Harness note.** Building this benchmark surfaced (and fixed) two real bugs in the background
+> sub-agent harness — the streaming path dropped a model's native `tool_calls`, and the parser only
+> recognized `<tool_call>`-tagged calls while `qwen2.5-coder` emits **bare JSON** tool calls. Both
+> silently caused zero tool execution. The parser now normalizes tagged / fenced / bare-JSON /
+> native forms alike. See `Context/Tracker-Docs/Tech-Debt.md` (2026‑07‑16). This is itself a
+> data point for §1's thesis: depending on a chat-focused backend's tool-calling is fragile;
+> Omnecor owning the runtime *and* a format-agnostic tool parser is what makes small-model tool use
+> reliable.

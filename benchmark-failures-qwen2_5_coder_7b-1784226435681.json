@@ -1,0 +1,9 @@
+{
+  "model": "qwen2.5-coder:7b",
+  "provider": "ollama",
+  "date": "2026-07-16T18:27:15.681Z",
+  "runs": 12,
+  "repeat": 1,
+  "samplesPerExample": 12,
+  "failures": []
+}
