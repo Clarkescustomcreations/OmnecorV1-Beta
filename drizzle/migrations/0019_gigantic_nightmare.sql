@@ -1,0 +1,1 @@
+ALTER TABLE `paired_devices` ADD `terminalEnabled` integer DEFAULT false NOT NULL;

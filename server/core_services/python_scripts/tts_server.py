@@ -230,14 +230,30 @@ def _resolve_speaker_wav(raw_path: str) -> Path:
     # ever land under SPEAKER_WAV_ROOT.
     target = candidate if candidate.is_absolute() else SPEAKER_WAV_ROOT / candidate
 
+    # Containment barrier BEFORE any filesystem access (.resolve()/stat) touches
+    # attacker-influenced input: lexically normalise the joined path and require
+    # it to stay within SPEAKER_WAV_ROOT. This rejects absolute paths pointing
+    # outside the root (e.g. "/etc/passwd") and any residual traversal up front,
+    # so tainted data never reaches a path-access sink unvalidated (CWE-22).
+    root_str = str(SPEAKER_WAV_ROOT)
+    normalized = os.path.normpath(str(target))
+    if normalized != root_str and not normalized.startswith(root_str + os.sep):
+        log.warning("Path traversal attempt blocked (pre-resolve): %s", raw_path)
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Access to the specified speaker reference path is restricted.",
+        )
+
     try:
-        resolved = target.resolve(strict=True)
+        resolved = Path(normalized).resolve(strict=True)
     except (FileNotFoundError, OSError) as exc:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Speaker reference file not found.",
         ) from exc
 
+    # Re-check after symlink resolution — a symlink inside the root must not be
+    # able to point the final target back outside it.
     if not is_safe_path(resolved, SPEAKER_WAV_ROOT):
         log.warning("Path traversal attempt blocked: %s", raw_path)
         raise HTTPException(

@@ -69,6 +69,10 @@ export const pairedDevices = sqliteTable("paired_devices", {
   createdAt: integer("createdAt", { mode: "timestamp" }).notNull().$defaultFn(now),
   lastSeenAt: integer("lastSeenAt", { mode: "timestamp" }).notNull().$defaultFn(now),
   revokedAt: integer("revokedAt", { mode: "timestamp" }), // non-null = revoked
+  // Per-device opt-in for the remote PTY terminal. Default false (secure by
+  // default): a paired phone can drive a host shell ONLY after the owner
+  // explicitly enables it for this device. Independently revocable.
+  terminalEnabled: integer("terminalEnabled", { mode: "boolean" }).notNull().default(false),
 }, (t) => ({
   openIdIdx: index("paired_devices_openId_idx").on(t.openId),
 }));

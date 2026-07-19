@@ -3,9 +3,11 @@ import { trpc } from "../../lib/trpc";
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from "../ui/card";
 import { Button } from "../ui/button";
 import { Badge } from "../ui/badge";
+import { Switch } from "../ui/switch";
+import { Label } from "../ui/label";
 import QRCode from "qrcode";
 import { toast } from "sonner";
-import { Smartphone, QrCode, RefreshCw, Trash2, Wifi } from "lucide-react";
+import { Smartphone, QrCode, RefreshCw, Trash2, Wifi, TerminalSquare } from "lucide-react";
 
 /**
  * Payload encoded in the pairing QR. The Omnecor HQ app scans it to set the PC
@@ -29,6 +31,7 @@ export function PairDevicePanel() {
   const devicesQuery = trpc.pairing.listDevices.useQuery();
   const createCode = trpc.pairing.createCode.useMutation();
   const revokeDevice = trpc.pairing.revokeDevice.useMutation();
+  const setDeviceTerminal = trpc.pairing.setDeviceTerminal.useMutation();
 
   const [qrDataUrl, setQrDataUrl] = useState<string | null>(null);
   const [secondsLeft, setSecondsLeft] = useState(0);
@@ -77,6 +80,22 @@ export function PairDevicePanel() {
       );
     },
     [revokeDevice, devicesQuery],
+  );
+
+  const handleToggleTerminal = useCallback(
+    (deviceId: string, name: string, enabled: boolean) => {
+      setDeviceTerminal.mutate(
+        { deviceId, enabled },
+        {
+          onSuccess: () => {
+            toast.success(enabled ? `Terminal enabled for "${name}"` : `Terminal disabled for "${name}"`);
+            void devicesQuery.refetch();
+          },
+          onError: (e) => toast.error("Could not change terminal access: " + e.message),
+        },
+      );
+    },
+    [setDeviceTerminal, devicesQuery],
   );
 
   return (
@@ -130,7 +149,10 @@ export function PairDevicePanel() {
           <CardTitle className="flex items-center gap-2">
             <Wifi className="h-5 w-5" /> Paired devices
           </CardTitle>
-          <CardDescription>Phones paired to this PC. Revoke a device to sign it out immediately.</CardDescription>
+          <CardDescription>
+            Phones paired to this PC. Revoke a device to sign it out immediately. Terminal access (remote
+            shell to this PC) is off by default — enable it only for devices you trust.
+          </CardDescription>
         </CardHeader>
         <CardContent>
           {devicesQuery.isLoading ? (
@@ -160,14 +182,30 @@ export function PairDevicePanel() {
                       </p>
                     </div>
                     {!revoked && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleRevoke(d.deviceId, d.name)}
-                        disabled={revokeDevice.isPending}
-                      >
-                        <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Revoke
-                      </Button>
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="flex items-center gap-1.5">
+                          <Switch
+                            id={`terminal-${d.deviceId}`}
+                            checked={d.terminalEnabled}
+                            onCheckedChange={(v) => handleToggleTerminal(d.deviceId, d.name, v)}
+                            disabled={setDeviceTerminal.isPending}
+                          />
+                          <Label
+                            htmlFor={`terminal-${d.deviceId}`}
+                            className="flex items-center gap-1 text-xs text-muted-foreground cursor-pointer"
+                          >
+                            <TerminalSquare className="h-3.5 w-3.5" /> Terminal
+                          </Label>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => handleRevoke(d.deviceId, d.name)}
+                          disabled={revokeDevice.isPending}
+                        >
+                          <Trash2 className="h-3.5 w-3.5 mr-1.5" /> Revoke
+                        </Button>
+                      </div>
                     )}
                   </li>
                 );

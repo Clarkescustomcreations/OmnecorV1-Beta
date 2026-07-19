@@ -171,6 +171,36 @@ export const PairingService = {
       .orderBy(desc(pairedDevices.lastSeenAt));
   },
 
+  /**
+   * Fetch a single paired-device row by its (JWT-embedded, unforgeable) deviceId.
+   * Used by the WebSocket PTY gate to check per-device terminal authorization.
+   * Returns undefined for an unknown device.
+   */
+  async getDevice(deviceId: string): Promise<PairedDevice | undefined> {
+    const db = await getDb();
+    const rows = await db
+      .select()
+      .from(pairedDevices)
+      .where(eq(pairedDevices.deviceId, deviceId))
+      .limit(1);
+    return rows[0];
+  },
+
+  /**
+   * Enable or disable the remote PTY terminal for one of a user's devices.
+   * Scoped by openId so an operator can only toggle their own devices. Returns
+   * false when no matching device row exists.
+   */
+  async setTerminalEnabled(openId: string, deviceId: string, enabled: boolean): Promise<boolean> {
+    const db = await getDb();
+    const rows = await db
+      .update(pairedDevices)
+      .set({ terminalEnabled: enabled })
+      .where(and(eq(pairedDevices.openId, openId), eq(pairedDevices.deviceId, deviceId)))
+      .returning({ id: pairedDevices.id });
+    return rows.length > 0;
+  },
+
   /** Revoke a device — its existing session tokens stop authenticating at once. */
   async revokeDevice(openId: string, deviceId: string): Promise<boolean> {
     const db = await getDb();

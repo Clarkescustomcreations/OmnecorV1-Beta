@@ -92,6 +92,14 @@ overrides:
   "simple-oauth2>joi": ">=18.2.1"
   "tailwindcss>nanoid": "3.3.7"
   "tar": ">=7.5.11"
+  # adm-zip crafted-ZIP memory-allocation DoS (CVE-2026-39244 / GHSA-xcpc-8h2w-3j85,
+  # Dependabot #346/#347). Reaches us ONLY transitively via onnxruntime-node
+  # (^0.5.16), which uses adm-zip to unpack its OWN release artifacts (trusted
+  # inputs) — the app never feeds an untrusted ZIP through this path, so real
+  # exposure is nil. NO patched release exists on npm yet (latest is 0.5.17; the
+  # advisory names 0.5.18/0.6.0, unpublished), so a version pin is impossible
+  # today — DO NOT add `"adm-zip": ">=0.5.18"` (install would fail to resolve).
+  # Add the floor the moment a patched release ships.
   # uuid buffer-bounds advisory (GHSA-w5hq-g745-h8pq) — old uuid only reaches us
   # through Expo build tooling (xcode, @expo/ngrok); scoped so app deps keep uuid 14
   "xcode>uuid": ">=11.1.1"

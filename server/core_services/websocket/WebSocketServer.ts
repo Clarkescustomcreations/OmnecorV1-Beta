@@ -70,6 +70,7 @@ import { AgentMessengerStore } from "../../_core/AgentMessengerStore.js";
 import { validatePath } from "../../_core/security.js";
 import { PATHS } from "../../_core/paths.js";
 import path from "path";
+import fsSync from "fs";
 import type { PtySpawnData, PtyInputData, PtyResizeData } from "../../../shared/types/terminal.types.js";
 
 
@@ -81,6 +82,18 @@ async function getPty() {
   }
   return ptyModule;
 }
+
+// Client-supplied `data.shell` must resolve to one of these known shells /
+// interactive REPLs (matched by basename, case-insensitively). Without this an
+// authorized caller could launch an ARBITRARY binary as the "shell" (e.g. a
+// payload dropper). `python3`/`python`/`node` are here because the desktop
+// terminal UI legitimately offers them as REPL "shells". Anything not on the
+// list falls back to the platform default rather than being honoured verbatim.
+const ALLOWED_PTY_SHELLS = new Set([
+  "bash", "sh", "zsh", "fish", "dash",
+  "powershell.exe", "pwsh.exe", "pwsh", "cmd.exe",
+  "python3", "python", "node",
+]);
 import { SERVER_CONFIG } from "../config/index.js";
 import { createLogger } from "../../_core/logger.js";
 const log = createLogger("WebSocket");
@@ -220,6 +233,31 @@ interface OmnecorSocket extends WebSocket {
    * any other message type or channel subscription is processed.
    */
   authenticated: boolean;
+  /**
+   * Effective role of the connection, resolved at auth time. Mirrors the
+   * role cap `sdk.authenticateRequest` applies on the HTTP/tRPC path:
+   *   - loopback / zero-login → "owner" / "admin" (trusted local operator)
+   *   - a session token carrying a `deviceId` (paired phone) → capped to "device"
+   *   - a `mobile_node_register` (OMMESH_SECRET) connection → "device"
+   * PTY shell spawning is restricted to "admin"/"owner" so a paired device,
+   * a mesh node, or a low-privilege user account can never open a host shell —
+   * EXCEPT a device the owner has explicitly enabled for terminal (see
+   * `deviceId` + `accountRole` and `isPtyAuthorized`).
+   */
+  role?: "user" | "admin" | "owner" | "device";
+  /**
+   * The paired device's id, taken from the SERVER-SIGNED session JWT (never a
+   * client claim), when this connection authenticated with a device token.
+   * Absent for browser/loopback/mesh connections. Keys the per-device terminal
+   * opt-in lookup.
+   */
+  deviceId?: string;
+  /**
+   * The underlying account's real role BEFORE the device-role cap. A phone
+   * paired to the owner has `role: "device"` but `accountRole: "owner"`; used
+   * so terminal access can require a privileged owning account.
+   */
+  accountRole?: "user" | "admin" | "owner";
   /** Remote address captured at connection time (for loopback checks). */
   remoteAddress?: string;
 }
@@ -445,6 +483,8 @@ export class OmnecorWebSocketServer {
         ws.userId = user.id;
         ws.openId = user.openId;
       }
+      // Zero-login is a local admin surface.
+      ws.role = (user?.role as OmnecorSocket["role"]) ?? "admin";
       return true;
     }
     if (isLoopbackAddress(req.socket.remoteAddress ?? undefined)) {
@@ -453,6 +493,8 @@ export class OmnecorWebSocketServer {
         ws.userId = user.id;
         ws.openId = user.openId;
       }
+      // The loopback peer is the local desktop operator — trusted for PTY.
+      ws.role = (user?.role as OmnecorSocket["role"]) ?? "owner";
       return true;
     }
 
@@ -481,6 +523,20 @@ export class OmnecorWebSocketServer {
           if (user) {
             ws.userId = user.id;
             ws.openId = user.openId;
+          }
+          // Mirror the HTTP/tRPC device-role cap: a token minted for a paired
+          // phone carries a `deviceId`, so its effective role is "device"
+          // regardless of the owner account's stored role. Otherwise use the
+          // account's real role (defaulting to the least-privileged "user").
+          const accountRole = (user?.role as OmnecorSocket["accountRole"]) ?? "user";
+          ws.accountRole = accountRole;
+          if (session.deviceId) {
+            ws.role = "device";
+            // Verified from the signed JWT — safe to key per-device terminal
+            // authorization on it.
+            ws.deviceId = session.deviceId;
+          } else {
+            ws.role = accountRole;
           }
           return true;
         }
@@ -599,8 +655,12 @@ export class OmnecorWebSocketServer {
         }
 
         // Registration succeeded — the connection is now authenticated and may
-        // send other message types.
+        // send other message types. It authenticated purely via OMMESH_SECRET
+        // (an inference-node join secret), so its effective role is "device":
+        // it must NOT be able to open a host PTY shell. Loopback/zero-login
+        // registrations keep the trusted role set at upgrade time.
         ws.authenticated = true;
+        if (ws.role !== "owner" && ws.role !== "admin") ws.role = "device";
         ws.mobileNodeId = nodeId;
         
         const defaultOpenId = ENV.zeroLoginMode ? "local-zero-login" : "local:owner";
@@ -1020,7 +1080,49 @@ export class OmnecorWebSocketServer {
     });
   }
 
+  /**
+   * Whether this connection may open a host PTY shell.
+   *  - Local operator / admin / owner session → yes (trusted desktop operator).
+   *  - A paired device → yes ONLY when the owner has explicitly enabled terminal
+   *    for THIS device (verified `deviceId` from the signed JWT), the device is
+   *    not revoked, and the owning account is admin/owner.
+   *  - Everything else (plain "user", mesh `mobile_node_register` connections
+   *    which never carry a `deviceId`) → no.
+   */
+  private async isPtyAuthorized(ws: OmnecorSocket): Promise<boolean> {
+    if (ws.role === "admin" || ws.role === "owner") return true;
+    if (
+      ws.role === "device" &&
+      ws.deviceId &&
+      (ws.accountRole === "owner" || ws.accountRole === "admin")
+    ) {
+      try {
+        const { PairingService } = await import("../../_core/pairing.js");
+        const device = await PairingService.getDevice(ws.deviceId);
+        return !!device && device.terminalEnabled === true && device.revokedAt == null;
+      } catch (err) {
+        log.warn("PTY auth: device lookup failed", { deviceId: ws.deviceId, err: String(err) });
+        return false; // fail closed
+      }
+    }
+    return false;
+  }
+
   private async handlePtySpawn(ws: OmnecorSocket, data: PtySpawnData | undefined): Promise<void> {
+    // AUTHORIZATION GATE — a PTY is arbitrary command execution on the host, so
+    // it is restricted to the trusted local operator (loopback/zero-login),
+    // admin/owner accounts, and paired devices the owner has EXPLICITLY enabled
+    // for terminal access. A mesh node (OMMESH_SECRET) or a plain "user" account
+    // is always refused. See isPtyAuthorized.
+    if (!(await this.isPtyAuthorized(ws))) {
+      log.warn("PTY spawn refused — not authorized", { id: ws.id, role: ws.role, deviceId: ws.deviceId, ip: ws.remoteAddress });
+      this.sendToClient(ws, {
+        type: "error",
+        data: { message: "Terminal access is not enabled for this device. Enable it from the PC (Settings → Devices)." },
+      });
+      return;
+    }
+
     const pty = await getPty();
     if (!pty) {
       this.sendToClient(ws, { type: "error", data: { message: "PTY (node-pty) native binding not available on this server." } });
@@ -1030,8 +1132,25 @@ export class OmnecorWebSocketServer {
     // Kill any existing session first
     this.killPtySession(ws);
 
-    const shell = data?.shell || process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "bash");
-    const cwd = data?.cwd || homedir();
+    // Only honour a client-supplied shell when it is a known interactive shell
+    // (matched by basename); otherwise fall back to the platform default so an
+    // arbitrary binary can never be launched as the "shell".
+    const defaultShell = process.env.SHELL || (process.platform === "win32" ? "powershell.exe" : "bash");
+    const requestedShell = typeof data?.shell === "string" ? data.shell.trim() : "";
+    const shell =
+      requestedShell && ALLOWED_PTY_SHELLS.has(path.basename(requestedShell).toLowerCase())
+        ? requestedShell
+        : defaultShell;
+
+    // Initial working directory: use the requested one only if it is an existing
+    // directory, else the operator's home. (An admin shell is unconstrained once
+    // open; this just avoids a spawn failure on a bogus cwd.)
+    let cwd = homedir();
+    if (typeof data?.cwd === "string" && data.cwd) {
+      try {
+        if (fsSync.statSync(data.cwd).isDirectory()) cwd = data.cwd;
+      } catch { /* fall back to homedir */ }
+    }
     const cols = data?.cols || 80;
     const rows = data?.rows || 24;
     const sessionId = uuidv4();
