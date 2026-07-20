@@ -73,6 +73,11 @@ describe("workflow — auth boundary", () => {
 });
 
 describe("workflow.reviewContext", () => {
+  // Spawns two real `git` subprocesses. Under CI's heavily-parallel run (150+
+  // test files importing concurrently) the subprocess spawn can be starved of
+  // CPU well past vitest's 5s default, so give this real-subprocess test a
+  // generous wall-clock bound. The router itself caps each git call at
+  // GIT_TIMEOUT_MS so a genuine hang still fails loudly rather than dangling.
   it("returns the working-tree diff + plan excerpts (real git in the repo)", async () => {
     const caller: Caller = appRouter.createCaller(makeContext(user, db));
     const res = await caller.workflow.reviewContext();
@@ -82,7 +87,7 @@ describe("workflow.reviewContext", () => {
     expect(typeof res.diff).toBe("string");
     expect(typeof res.hasChanges).toBe("boolean");
     expect(res.planExcerpts).toBeTypeOf("object");
-  });
+  }, 30000);
 });
 
 describe("workflow.rememberSave", () => {

@@ -35,6 +35,8 @@ const execFileAsync = promisify(execFile);
 
 const MAX_DIFF_CHARS = 16000;
 const MAX_TRANSCRIPT_CHARS = 24000;
+/** Hard bound so a wedged git subprocess can never hang the request. */
+const GIT_TIMEOUT_MS = 30000;
 
 /** Project ids are used as a directory segment — restrict to a safe slug. */
 const projectIdSchema = z
@@ -77,11 +79,15 @@ export const workflowRouter = router({
       let diff = "";
       let isRepo = true;
       try {
-        const stat = await execFileAsync("git", ["diff", "--stat"], { cwd });
+        const stat = await execFileAsync("git", ["diff", "--stat"], {
+          cwd,
+          timeout: GIT_TIMEOUT_MS,
+        });
         diffStat = stat.stdout.trim();
         const full = await execFileAsync("git", ["diff"], {
           cwd,
           maxBuffer: 1024 * 1024 * 8,
+          timeout: GIT_TIMEOUT_MS,
         });
         diff = full.stdout.slice(0, MAX_DIFF_CHARS);
       } catch {
