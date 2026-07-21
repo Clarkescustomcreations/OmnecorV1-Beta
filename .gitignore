@@ -191,3 +191,9 @@ reference_mcp_codebase/
 Chats-Agentic-Upgrade.md
 Model-Fabric.md
 Mesh-Delegation.md
+
+# pnpm-only repo (root + every workspace package): an npm/yarn lockfile is
+# drift and generates spurious Dependabot alerts against a lockfile nothing
+# consumes — all installs go through pnpm --frozen-lockfile. Keep them out.
+package-lock.json
+yarn.lock

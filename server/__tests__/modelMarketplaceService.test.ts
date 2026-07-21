@@ -165,8 +165,8 @@ describe("ModelMarketplaceService GGUF download", () => {
     expect(fetchMock).not.toHaveBeenCalled(); // never hit the resolve URL
   });
 
-  it("de-dupes a concurrent download of the same file (double-click → one download)", () => {
-    fetchMock = vi.fn(() => new Promise(() => {})); // resolve URL hangs → stays "downloading"
+  it("de-dupes a concurrent download of the same file (double-click → one download)", async () => {
+    fetchMock = vi.fn(() => new Promise<Response>(() => {})); // resolve URL hangs → stays "downloading"
     vi.stubGlobal("fetch", fetchMock);
     const svc = ModelMarketplaceService.getInstance();
 
@@ -175,6 +175,13 @@ describe("ModelMarketplaceService GGUF download", () => {
 
     expect(id2).toBe(id1);
     expect(svc.listDownloads().filter((d) => d.state === "downloading")).toHaveLength(1);
+
+    // The detached download reaches `fetch` only after its mkdir/stat/statfs
+    // steps resolve — i.e. asynchronously, after this (synchronous) test body.
+    // Wait for it to park at the (forever-hanging) fetch so that call is
+    // contained here; otherwise it can spill into the NEXT test's fetch mock
+    // under load and trip that test's `not.toHaveBeenCalled` assertion.
+    await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1), { timeout: 4000, interval: 20 });
   });
 
   it("fails fast with a clear message when the disk can't hold the download", async () => {
@@ -189,7 +196,11 @@ describe("ModelMarketplaceService GGUF download", () => {
 
     expect(status.state).toBe("error");
     expect(status.error).toMatch(/Not enough disk space/);
-    expect(fetchMock).not.toHaveBeenCalled(); // guard fired before streaming
+    // Guard fired before streaming: assert THIS file was never fetched, rather
+    // than that the shared global mock is pristine — a detached download from
+    // another test could otherwise spill an unrelated call onto it under load.
+    const fetchedBig = fetchMock.mock.calls.some(([u]) => String(u).includes("big.gguf"));
+    expect(fetchedBig).toBe(false);
     statfsSpy.mockRestore();
   });
 });
